@@ -3,8 +3,8 @@
 #include <stack>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
 
 #include "extensions/filters/network/thrift_proxy/protocol.h"
 

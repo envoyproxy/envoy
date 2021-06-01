@@ -2,7 +2,7 @@
 
 #include <fcntl.h>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

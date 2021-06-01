@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/tracing/trace_driver.h"
-#include "include/envoy/tracing/trace_reason.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/pure.h"
+#include "envoy/http/header_map.h"
+#include "envoy/tracing/trace_driver.h"
+#include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
 namespace Tracing {

@@ -20,7 +20,7 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/registry",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/extensions/filters/http:well_known_names",

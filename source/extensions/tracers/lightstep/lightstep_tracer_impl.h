@@ -5,9 +5,9 @@
 #include <string>
 
 #include "envoy/config/trace/v3/lightstep.pb.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/context_impl.h"

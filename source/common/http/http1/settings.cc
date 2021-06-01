@@ -1,6 +1,6 @@
 #include "common/http/http1/settings.h"
 
-#include "include/envoy/http/header_formatter.h"
+#include "envoy/http/header_formatter.h"
 
 #include "common/config/utility.h"
 

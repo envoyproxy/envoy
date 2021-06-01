@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/common/exception.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"
 #include "common/common/c_smart_ptr.h"

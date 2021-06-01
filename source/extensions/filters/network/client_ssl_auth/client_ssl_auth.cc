@@ -5,8 +5,8 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

@@ -4,9 +4,9 @@
 #include <string>
 #include <utility>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"

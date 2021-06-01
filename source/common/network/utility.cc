@@ -7,11 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"

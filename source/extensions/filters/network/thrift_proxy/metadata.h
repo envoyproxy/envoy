@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "common/common/macros.h"
 #include "common/http/header_map_impl.h"

@@ -39,9 +39,9 @@ envoy_cc_library(
     external_deps = [],
     deps = [
         ":daemon_cc_proto",
-        "//include/envoy/common:time_interface_no_include_prefix",
-        "//include/envoy/server:tracer_config_interface_no_include_prefix",
-        "//include/envoy/tracing:trace_driver_interface_no_include_prefix",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/server:tracer_config_interface",
+        "//include/envoy/tracing:trace_driver_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
         "//source/common/common:random_generator_lib",

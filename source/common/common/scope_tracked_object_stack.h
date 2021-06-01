@@ -3,7 +3,7 @@
 #include <functional>
 #include <vector>
 
-#include "include/envoy/common/scope_tracker.h"
+#include "envoy/common/scope_tracker.h"
 
 namespace Envoy {
 

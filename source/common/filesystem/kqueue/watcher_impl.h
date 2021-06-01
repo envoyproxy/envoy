@@ -4,9 +4,9 @@
 #include <list>
 #include <string>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/filesystem/watcher.h"
+#include "envoy/api/api.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"

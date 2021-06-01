@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "common/common/assert.h"
 

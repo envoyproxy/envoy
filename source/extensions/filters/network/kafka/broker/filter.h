@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/network/filter.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 

@@ -5,16 +5,16 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/health_check_host_monitor.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/http/codec.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/health_check_host_monitor.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/network/utility.h"

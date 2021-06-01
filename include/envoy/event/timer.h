@@ -4,9 +4,9 @@
 #include <functional>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/event/schedulable_cb.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+#include "envoy/event/schedulable_cb.h"
 
 namespace Envoy {
 

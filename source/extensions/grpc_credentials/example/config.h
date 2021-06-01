@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "include/envoy/grpc/google_grpc_creds.h"
+#include "envoy/grpc/google_grpc_creds.h"
 
 #include "extensions/grpc_credentials/well_known_names.h"
 

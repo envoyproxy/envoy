@@ -3,15 +3,15 @@
 #include <chrono>
 #include <vector>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/server/configuration.h"
-#include "include/envoy/server/guarddog.h"
-#include "include/envoy/server/guarddog_config.h"
-#include "include/envoy/server/watchdog.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/event/timer.h"
+#include "envoy/server/configuration.h"
+#include "envoy/server/guarddog.h"
+#include "envoy/server/guarddog_config.h"
+#include "envoy/server/watchdog.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"

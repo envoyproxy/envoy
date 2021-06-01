@@ -8,19 +8,19 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/common/callback.h"
-#include "include/envoy/common/time.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
+#include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/upstream/outlier_detection.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/event/timer.h"
+#include "envoy/http/codes.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "absl/container/node_hash_map.h"
 

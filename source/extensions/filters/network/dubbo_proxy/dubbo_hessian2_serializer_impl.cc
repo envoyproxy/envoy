@@ -1,6 +1,6 @@
 #include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"

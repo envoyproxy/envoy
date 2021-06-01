@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
 #include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "extensions/filters/listener/well_known_names.h"

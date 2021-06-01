@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/stream_info/uint32_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
 namespace Envoy {
 namespace StreamInfo {

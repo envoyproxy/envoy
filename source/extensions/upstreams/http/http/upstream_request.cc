@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <memory>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/conn_pool.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/conn_pool.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
 #include "common/http/codes.h"

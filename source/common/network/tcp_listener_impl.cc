@@ -1,9 +1,9 @@
 #include "common/network/tcp_listener_impl.h"
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/exception.h"
+#include "envoy/network/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"

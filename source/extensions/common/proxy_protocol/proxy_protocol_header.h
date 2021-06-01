@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection.h"
 
 namespace Envoy {
 namespace Extensions {

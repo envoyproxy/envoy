@@ -6,8 +6,8 @@
 #include <sstream>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

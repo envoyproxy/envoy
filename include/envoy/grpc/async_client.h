@@ -2,12 +2,12 @@
 
 #include <chrono>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/async_client.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/tracing/http_tracer.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/async_client.h"
+#include "envoy/http/header_map.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"

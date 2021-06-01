@@ -3,9 +3,9 @@
 #include <functional>
 #include <memory>
 
-#include "include/envoy/common/random_generator.h"
-#include "include/envoy/config/grpc_mux.h"
-#include "include/envoy/grpc/async_client.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/config/grpc_mux.h"
+#include "envoy/grpc/async_client.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"

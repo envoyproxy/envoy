@@ -6,7 +6,7 @@
 
 #include "common/quic/platform/quic_mem_slice_impl.h"
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
 

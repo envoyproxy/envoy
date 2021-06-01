@@ -5,16 +5,16 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/scope_tracker.h"
-#include "include/envoy/event/deferred_deletable.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/network/socket.h"
-#include "include/envoy/ssl/connection.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/scope_tracker.h"
+#include "envoy/event/deferred_deletable.h"
+#include "envoy/network/address.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Event {

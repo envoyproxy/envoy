@@ -1,6 +1,6 @@
 #include "test/test_common/test_time_system.h"
 
-#include "include/envoy/event/timer.h"
+#include "envoy/event/timer.h"
 
 #include "common/common/thread.h"
 

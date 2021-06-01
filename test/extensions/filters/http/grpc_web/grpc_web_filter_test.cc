@@ -1,4 +1,4 @@
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"

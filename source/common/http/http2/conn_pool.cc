@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/http/http2/codec_impl.h"
 #include "common/runtime/runtime_features.h"

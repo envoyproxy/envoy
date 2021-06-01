@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
-#include "include/envoy/http/original_ip_detection.h"
+#include "envoy/http/original_ip_detection.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "envoy/admin/v3/certs.pb.h"
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
-#include "include/envoy/ssl/ssl_socket_extended_info.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
+#include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/common/assert.h"

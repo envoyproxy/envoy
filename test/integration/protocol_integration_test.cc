@@ -7,13 +7,13 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"

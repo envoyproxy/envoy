@@ -3,8 +3,8 @@
 #include <cstdlib>
 
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "extensions/filters/network/rocketmq_proxy/stats.h"

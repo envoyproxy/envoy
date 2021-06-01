@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"

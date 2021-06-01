@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/server/listener_manager.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/server/listener_manager.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_handle_impl.h"

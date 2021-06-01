@@ -3,7 +3,7 @@
 #include <regex>
 
 #include "envoy/admin/v3/server_info.pb.h"
-#include "include/envoy/init/manager.h"
+#include "envoy/init/manager.h"
 
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"

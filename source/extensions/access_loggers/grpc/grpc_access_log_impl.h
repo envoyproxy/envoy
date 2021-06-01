@@ -3,12 +3,12 @@
 #include <memory>
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "include/envoy/grpc/async_client_manager.h"
-#include "include/envoy/local_info/local_info.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "extensions/access_loggers/common/grpc_access_logger.h"
 

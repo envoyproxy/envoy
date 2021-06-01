@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/admin/v3/init_dump.pb.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/init/target.h"
-#include "include/envoy/init/watcher.h"
+#include "envoy/common/pure.h"
+#include "envoy/init/target.h"
+#include "envoy/init/watcher.h"
 
 #include "absl/container/flat_hash_map.h"
 

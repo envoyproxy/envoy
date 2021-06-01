@@ -1,6 +1,6 @@
 #include "extensions/filters/network/rocketmq_proxy/active_message.h"
 
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"

@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "include/envoy/common/random_generator.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"

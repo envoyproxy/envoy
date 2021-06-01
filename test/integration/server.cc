@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/random_generator.h"
 #include "common/common/thread.h"

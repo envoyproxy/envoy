@@ -8,10 +8,10 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"

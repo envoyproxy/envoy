@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"

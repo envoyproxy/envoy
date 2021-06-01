@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/matcher/matcher.h"
+#include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/scope_tracked_object_stack.h"

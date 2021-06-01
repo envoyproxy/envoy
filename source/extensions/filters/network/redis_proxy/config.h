@@ -2,11 +2,11 @@
 
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"

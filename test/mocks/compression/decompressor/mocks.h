@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/compression/decompressor/config.h"
-#include "include/envoy/compression/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/config.h"
+#include "envoy/compression/decompressor/decompressor.h"
 
 #include "gmock/gmock.h"
 

@@ -3,9 +3,9 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/protobuf/message_validator.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/network/socket_impl.h"
 

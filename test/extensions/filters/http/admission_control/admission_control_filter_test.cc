@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
-#include "include/envoy/grpc/status.h"
+#include "envoy/grpc/status.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/stats/isolated_store_impl.h"

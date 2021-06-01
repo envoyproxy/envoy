@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/tracing/trace_driver.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "common/common/empty_string.h"
 

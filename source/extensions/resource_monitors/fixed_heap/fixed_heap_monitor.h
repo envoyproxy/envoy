@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
-#include "include/envoy/server/resource_monitor.h"
+#include "envoy/server/resource_monitor.h"
 
 namespace Envoy {
 namespace Extensions {

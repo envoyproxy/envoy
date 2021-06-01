@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/compression/decompressor/config.h"
-#include "include/envoy/compression/decompressor/decompressor.h"
+#include "envoy/compression/decompressor/config.h"
+#include "envoy/compression/decompressor/decompressor.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 #include "common/common/macros.h"
 #include "common/http/headers.h"

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/post_io_action.h"
-#include "include/envoy/protobuf/message_validator.h"
+#include "envoy/api/api.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/post_io_action.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "openssl/ssl.h"
 

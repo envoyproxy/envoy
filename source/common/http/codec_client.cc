@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "include/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/config/utility.h"

@@ -1,6 +1,6 @@
 #include "server/hot_restarting_parent.h"
 
-#include "include/envoy/server/instance.h"
+#include "envoy/server/instance.h"
 
 #include "common/memory/stats.h"
 #include "common/network/utility.h"

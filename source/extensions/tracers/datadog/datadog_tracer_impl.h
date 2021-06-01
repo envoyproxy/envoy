@@ -3,10 +3,10 @@
 #include <datadog/opentracing.h>
 
 #include "envoy/config/trace/v3/datadog.pb.h"
-#include "include/envoy/local_info/local_info.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/async_client_utility.h"
 #include "common/http/header_map_impl.h"

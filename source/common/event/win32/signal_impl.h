@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/event/signal.h"
-#include "include/envoy/network/io_handle.h"
+#include "envoy/event/signal.h"
+#include "envoy/network/io_handle.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/event/event_impl_base.h"

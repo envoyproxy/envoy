@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "include/envoy/server/drain_manager.h"
-#include "include/envoy/server/listener_manager.h"
+#include "envoy/server/drain_manager.h"
+#include "envoy/server/listener_manager.h"
 
 #include "test/mocks/network/mocks.h"
 

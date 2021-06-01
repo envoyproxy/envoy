@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
-#include "include/envoy/server/health_checker_config.h"
+#include "envoy/server/health_checker_config.h"
 
 #include "extensions/health_checkers/redis/redis.h"
 #include "extensions/health_checkers/well_known_names.h"

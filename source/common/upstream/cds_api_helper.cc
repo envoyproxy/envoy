@@ -1,9 +1,9 @@
 #include "common/upstream/cds_api_helper.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "include/envoy/config/grpc_mux.h"
+#include "envoy/config/grpc_mux.h"
 
 #include "common/common/fmt.h"
 #include "common/config/resource_name.h"

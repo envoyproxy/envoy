@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 
 namespace Envoy {
 namespace Server {

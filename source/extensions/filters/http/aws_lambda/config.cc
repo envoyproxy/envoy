@@ -1,9 +1,9 @@
 #include "extensions/filters/http/aws_lambda/config.h"
 
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/registry/registry.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/fmt.h"
 

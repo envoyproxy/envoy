@@ -3,7 +3,7 @@
 #include <list>
 #include <string>
 
-#include "include/envoy/json/json_object.h"
+#include "envoy/json/json_object.h"
 
 namespace Envoy {
 namespace Json {

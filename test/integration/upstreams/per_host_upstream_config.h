@@ -1,11 +1,11 @@
 #pragma once
 
-#include "include/envoy/http/conn_pool.h"
-#include "include/envoy/http/metadata_interface.h"
-#include "include/envoy/http/protocol.h"
-#include "include/envoy/router/router.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/host_description.h"
+#include "envoy/http/conn_pool.h"
+#include "envoy/http/metadata_interface.h"
+#include "envoy/http/protocol.h"
+#include "envoy/router/router.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/host_description.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/router/router.h"

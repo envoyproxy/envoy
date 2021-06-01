@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/network/connection.h"
+#include "envoy/network/connection.h"
 
 #include "extensions/common/tap/tap.h"
 

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/random_generator.h"
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "include/envoy/config/subscription.h"
-#include "include/envoy/config/subscription_factory.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 

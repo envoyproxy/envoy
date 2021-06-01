@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

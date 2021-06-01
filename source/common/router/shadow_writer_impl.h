@@ -3,8 +3,8 @@
 #include <chrono>
 #include <string>
 
-#include "include/envoy/router/shadow_writer.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/router/shadow_writer.h"
+#include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
 namespace Router {

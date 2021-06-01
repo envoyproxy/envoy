@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "extensions/common/wasm/plugin.h"
 #include "extensions/common/wasm/well_known_names.h"

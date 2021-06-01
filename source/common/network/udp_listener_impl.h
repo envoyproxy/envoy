@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/event_impl_base.h"

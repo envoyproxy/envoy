@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "test/mocks/stats/mocks.h"
 

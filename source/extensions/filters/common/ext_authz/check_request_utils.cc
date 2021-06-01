@@ -8,7 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/attribute_context.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
-#include "include/envoy/ssl/connection.h"
+#include "envoy/ssl/connection.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "include/envoy/router/string_accessor.h"
-#include "include/envoy/server/filter_config.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/router/string_accessor.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "extensions/filters/http/jwt_authn/matcher.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"

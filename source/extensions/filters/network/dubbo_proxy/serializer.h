@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/config/typed_config.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"

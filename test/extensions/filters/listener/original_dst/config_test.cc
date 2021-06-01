@@ -1,5 +1,5 @@
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "test/test_common/utility.h"
 

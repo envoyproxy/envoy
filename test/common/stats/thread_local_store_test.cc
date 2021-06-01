@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "include/envoy/stats/histogram.h"
+#include "envoy/stats/histogram.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"

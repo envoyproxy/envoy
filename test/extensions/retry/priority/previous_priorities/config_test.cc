@@ -1,6 +1,6 @@
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/upstream/retry.h"
+#include "envoy/registry/registry.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/message_validator_impl.h"
 

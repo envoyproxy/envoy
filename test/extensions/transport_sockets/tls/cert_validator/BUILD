@@ -51,8 +51,8 @@ envoy_cc_test_library(
     name = "test_common",
     hdrs = ["test_common.h"],
     deps = [
-        "//include/envoy/ssl:context_config_interface_no_include_prefix",
-        "//include/envoy/ssl:ssl_socket_extended_info_interface_no_include_prefix",
+        "//include/envoy/ssl:context_config_interface",
+        "//include/envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:macros",
         "//test/test_common:utility_lib",
     ],

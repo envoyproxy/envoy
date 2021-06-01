@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/real_time_system.h"

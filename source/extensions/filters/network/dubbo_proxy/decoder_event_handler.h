@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/network/filter.h"
+#include "envoy/common/pure.h"
+#include "envoy/network/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 

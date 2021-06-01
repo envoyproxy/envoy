@@ -2,10 +2,10 @@
 
 #include <chrono>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/config/overload/v3/overload.pb.validate.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
 #include "common/config/utility.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/configuration.h"
+#include "envoy/server/configuration.h"
 
 #include "gmock/gmock.h"
 #include "instance.h"

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 namespace Envoy {
 namespace Extensions {

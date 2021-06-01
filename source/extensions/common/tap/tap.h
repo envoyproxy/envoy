@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "extensions/common/matcher/matcher.h"
 

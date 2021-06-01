@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"

@@ -1,6 +1,6 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster.pb.validate.h"
-#include "include/envoy/protobuf/message_validator.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "common/protobuf/utility.h"
 

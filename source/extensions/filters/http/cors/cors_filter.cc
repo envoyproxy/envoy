@@ -1,8 +1,8 @@
 #include "extensions/filters/http/cors/cors_filter.h"
 
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"

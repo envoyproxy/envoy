@@ -3,12 +3,12 @@
 #include <functional>
 #include <memory>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/network/connection_handler.h"
-#include "include/envoy/server/guarddog.h"
-#include "include/envoy/server/listener_manager.h"
-#include "include/envoy/server/worker.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/api/api.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/server/guarddog.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/server/worker.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
 

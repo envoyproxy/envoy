@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
 #include "common/router/router.h"

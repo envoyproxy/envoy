@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/tls/io_handle_bio.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/io_handle.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/io_handle.h"
 
 #include "openssl/bio.h"
 #include "openssl/err.h"

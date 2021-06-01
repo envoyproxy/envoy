@@ -2,10 +2,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/event/scaled_range_timer_manager.h"
-#include "include/envoy/network/address.h"
+#include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/network/address.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"

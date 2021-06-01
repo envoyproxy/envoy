@@ -5,12 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/ratelimit/ratelimit.h"
+#include "envoy/common/pure.h"
+#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/service/ratelimit/v3/rls.pb.h"
-#include "include/envoy/singleton/manager.h"
-#include "include/envoy/stream_info/stream_info.h"
-#include "include/envoy/tracing/http_tracer.h"
+#include "envoy/singleton/manager.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "absl/types/optional.h"
 

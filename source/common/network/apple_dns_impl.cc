@@ -8,8 +8,8 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/platform.h"
-#include "include/envoy/event/file_event.h"
+#include "envoy/common/platform.h"
+#include "envoy/event/file_event.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

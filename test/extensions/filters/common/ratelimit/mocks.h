@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/ratelimit/ratelimit.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/ratelimit/ratelimit.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 

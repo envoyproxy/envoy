@@ -1,7 +1,7 @@
 #include "extensions/filters/http/composite/config.h"
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/composite/filter.h"
 

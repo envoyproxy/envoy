@@ -6,8 +6,8 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/scope_tracker.h"
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/common/scope_tracker.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/event/libevent.h"

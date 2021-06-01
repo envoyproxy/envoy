@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
 
 #include "common/network/utility.h"
 

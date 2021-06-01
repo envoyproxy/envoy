@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "common/filesystem/file_shared_impl.h"
 

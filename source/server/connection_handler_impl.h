@@ -5,12 +5,12 @@
 #include <list>
 #include <memory>
 
-#include "include/envoy/network/connection_handler.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/network/listener.h"
-#include "include/envoy/server/listener_manager.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/network/connection_handler.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/non_copyable.h"
 

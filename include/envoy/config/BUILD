@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["config_provider.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/common:time_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
     ],
@@ -23,8 +23,8 @@ envoy_cc_library(
     name = "config_provider_manager_interface",
     hdrs = ["config_provider_manager.h"],
     deps = [
-        ":config_provider_interface_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        ":config_provider_interface",
+        "//include/envoy/server:filter_config_interface",
         "//source/common/protobuf",
     ],
 )
@@ -33,7 +33,7 @@ envoy_cc_library(
     name = "context_provider_interface",
     hdrs = ["context_provider.h"],
     deps = [
-        "//include/envoy/common:callback_no_include_prefix",
+        "//include/envoy/common:callback",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
     ],
 )
@@ -48,8 +48,8 @@ envoy_cc_library(
     name = "grpc_mux_interface",
     hdrs = ["grpc_mux.h"],
     deps = [
-        ":subscription_interface_no_include_prefix",
-        "//include/envoy/stats:stats_macros_no_include_prefix",
+        ":subscription_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/common:cleanup_lib",
         "//source/common/protobuf",
     ],
@@ -59,7 +59,7 @@ envoy_cc_library(
     name = "subscription_factory_interface",
     hdrs = ["subscription_factory.h"],
     deps = [
-        ":subscription_interface_no_include_prefix",
+        ":subscription_interface",
         "@com_github_cncf_udpa//xds/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -69,7 +69,7 @@ envoy_cc_library(
     name = "subscription_interface",
     hdrs = ["subscription.h"],
     deps = [
-        "//include/envoy/stats:stats_macros_no_include_prefix",
+        "//include/envoy/stats:stats_macros",
         "//source/common/config:api_type_oracle_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -89,7 +89,7 @@ envoy_cc_library(
     name = "typed_metadata_interface",
     hdrs = ["typed_metadata.h"],
     deps = [
-        ":typed_config_interface_no_include_prefix",
+        ":typed_config_interface",
         "//source/common/protobuf",
     ],
 )

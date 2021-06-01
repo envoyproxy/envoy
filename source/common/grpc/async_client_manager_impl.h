@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "include/envoy/grpc/async_client_manager.h"
-#include "include/envoy/singleton/manager.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/singleton/manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/grpc/stat_names.h"
 

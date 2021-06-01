@@ -4,9 +4,9 @@
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/stats/store.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/store.h"
 
 #include "common/common/matchers.h"
 #include "common/common/non_copyable.h"

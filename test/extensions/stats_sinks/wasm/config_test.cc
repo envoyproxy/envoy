@@ -1,5 +1,5 @@
 #include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
 

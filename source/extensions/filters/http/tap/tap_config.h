@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/http/header_map.h"
 
 #include "extensions/common/tap/tap.h"
 

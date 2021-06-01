@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 #include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/listener/original_src/config.h"
 #include "extensions/filters/listener/original_src/original_src.h"

@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"

@@ -1,6 +1,6 @@
 #include <array>
 
-#include "include/envoy/common/scope_tracker.h"
+#include "envoy/common/scope_tracker.h"
 
 #include "common/common/scope_tracked_object_stack.h"
 #include "common/common/utility.h"

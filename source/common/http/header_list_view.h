@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

@@ -42,8 +42,8 @@ envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     deps = [
-        "//include/envoy/http:codes_interface_no_include_prefix",
-        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/http:filter_interface",
         "//source/extensions/filters/http/cdn_loop:filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",

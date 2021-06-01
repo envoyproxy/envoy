@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/protobuf/utility.h"

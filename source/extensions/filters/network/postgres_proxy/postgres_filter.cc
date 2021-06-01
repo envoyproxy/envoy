@@ -1,7 +1,7 @@
 #include "extensions/filters/network/postgres_proxy/postgres_filter.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/connection.h"
 
 #include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
 #include "extensions/filters/network/well_known_names.h"

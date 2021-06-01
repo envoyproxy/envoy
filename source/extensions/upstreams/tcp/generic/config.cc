@@ -1,6 +1,6 @@
 #include "extensions/upstreams/tcp/generic/config.h"
 
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/codec_client.h"
 #include "common/tcp_proxy/upstream.h"

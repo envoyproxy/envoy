@@ -4,12 +4,12 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"

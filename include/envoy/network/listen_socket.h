@@ -5,13 +5,13 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/scope_tracker.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/io_handle.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/socket.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/upstream/health_checker.h"
+#include "envoy/upstream/health_checker.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/api/io_error.h"
+#include "envoy/api/io_error.h"
 
 #include "common/common/assert.h"
 

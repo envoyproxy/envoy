@@ -7,7 +7,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"

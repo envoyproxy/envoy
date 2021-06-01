@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Server {

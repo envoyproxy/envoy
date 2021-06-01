@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/api/os_sys_calls.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/listen_socket.h"
+#include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

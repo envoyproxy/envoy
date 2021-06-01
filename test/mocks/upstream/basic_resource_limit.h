@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/resource.h"
+#include "envoy/common/resource.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

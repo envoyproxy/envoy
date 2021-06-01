@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/random_generator.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/router/router.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/router/router.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/http/header_utility.h"

@@ -6,10 +6,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/stats/allocator.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/sink.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/stats/allocator.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"
 #include "common/stats/histogram_impl.h"

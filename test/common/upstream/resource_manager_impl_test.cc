@@ -1,5 +1,5 @@
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/stats/stats.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/upstream/resource_manager_impl.h"
 

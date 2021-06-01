@@ -1,6 +1,6 @@
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
 
-#include "include/envoy/ssl/context_config.h"
+#include "envoy/ssl/context_config.h"
 
 #include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 

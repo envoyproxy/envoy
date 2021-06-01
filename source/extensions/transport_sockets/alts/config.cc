@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/transport_socket_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/assert.h"
 #include "common/grpc/google_grpc_context.h"

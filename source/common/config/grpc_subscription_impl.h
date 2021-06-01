@@ -3,9 +3,9 @@
 #include <chrono>
 #include <memory>
 
-#include "include/envoy/config/grpc_mux.h"
-#include "include/envoy/config/subscription.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/config/grpc_mux.h"
+#include "envoy/config/subscription.h"
+#include "envoy/event/dispatcher.h"
 
 #include "common/common/logger.h"
 

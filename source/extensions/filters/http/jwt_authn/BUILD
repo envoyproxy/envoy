@@ -42,8 +42,8 @@ envoy_cc_library(
     deps = [
         ":extractor_lib",
         ":jwks_cache_lib",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
-        "//include/envoy/stats:stats_macros_no_include_prefix",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/http:message_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
@@ -60,7 +60,7 @@ envoy_cc_library(
     deps = [
         ":filter_config_interface",
         ":matchers_lib",
-        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http:well_known_names",
     ],
@@ -75,7 +75,7 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         ":filter_lib",
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
@@ -103,7 +103,7 @@ envoy_cc_library(
     deps = [
         ":authenticator_lib",
         ":extractor_lib",
-        "//include/envoy/http:header_map_interface_no_include_prefix",
+        "//include/envoy/http:header_map_interface",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
@@ -115,10 +115,10 @@ envoy_cc_library(
     deps = [
         ":jwks_cache_lib",
         ":matchers_lib",
-        "//include/envoy/router:string_accessor_interface_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
-        "//include/envoy/stats:stats_macros_no_include_prefix",
-        "//include/envoy/thread_local:thread_local_interface_no_include_prefix",
+        "//include/envoy/router:string_accessor_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/thread_local:thread_local_interface",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

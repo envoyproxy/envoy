@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/transport_socket_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/transport_socket_config.h"
 
 namespace Envoy {
 namespace Extensions {

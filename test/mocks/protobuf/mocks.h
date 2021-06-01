@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/protobuf/message_validator.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "gmock/gmock.h"
 

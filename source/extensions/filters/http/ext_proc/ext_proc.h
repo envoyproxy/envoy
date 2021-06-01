@@ -4,13 +4,13 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/event/timer.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "include/envoy/grpc/async_client.h"
-#include "include/envoy/http/filter.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/http/filter.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 

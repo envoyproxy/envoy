@@ -2,8 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/config/well_known_names.h"
 #include "common/memory/stats.h"

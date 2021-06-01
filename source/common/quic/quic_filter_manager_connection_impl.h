@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/connection.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push

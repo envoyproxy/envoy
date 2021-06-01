@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log.h"
 
 #include "gmock/gmock.h"
 

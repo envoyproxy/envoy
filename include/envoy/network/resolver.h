@@ -5,10 +5,10 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/network/address.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Network {

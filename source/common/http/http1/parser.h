@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/statusor.h"
 #include "common/http/status.h"

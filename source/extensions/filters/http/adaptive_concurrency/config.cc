@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 #include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"

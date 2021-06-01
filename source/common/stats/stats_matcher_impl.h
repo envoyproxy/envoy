@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "include/envoy/stats/stats_matcher.h"
+#include "envoy/stats/stats_matcher.h"
 
 #include "common/common/matchers.h"
 #include "common/protobuf/protobuf.h"

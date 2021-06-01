@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/byte_order.h"

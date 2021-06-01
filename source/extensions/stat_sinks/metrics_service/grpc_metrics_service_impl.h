@@ -2,15 +2,15 @@
 
 #include <memory>
 
-#include "include/envoy/grpc/async_client.h"
-#include "include/envoy/local_info/local_info.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/network/connection.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
-#include "include/envoy/singleton/instance.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/sink.h"
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/stats.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/typed_async_client.h"

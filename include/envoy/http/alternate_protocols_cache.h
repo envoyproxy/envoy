@@ -6,8 +6,8 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/common/optref.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 
 #include "absl/strings/string_view.h"

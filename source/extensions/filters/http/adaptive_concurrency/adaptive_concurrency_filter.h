@@ -4,12 +4,12 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
 #include "common/runtime/runtime_protos.h"

@@ -3,8 +3,8 @@
 #include <functional>
 #include <list>
 
-#include "include/envoy/http/filter.h"
-#include "include/envoy/server/admin.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/admin.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/watermark_buffer.h"

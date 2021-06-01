@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
-#include "include/envoy/local_info/local_info.h"
+#include "envoy/local_info/local_info.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"

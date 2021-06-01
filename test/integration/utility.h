@@ -5,11 +5,11 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/server/factory_context.h"
+#include "envoy/api/api.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"

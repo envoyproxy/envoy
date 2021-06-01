@@ -18,8 +18,8 @@ envoy_cc_library(
     srcs = ["manager_impl.cc"],
     hdrs = ["manager_impl.h"],
     deps = [
-        "//include/envoy/registry:registry_no_include_prefix",
-        "//include/envoy/singleton:manager_interface_no_include_prefix",
+        "//include/envoy/registry",
+        "//include/envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
         "//source/common/common:thread_lib",

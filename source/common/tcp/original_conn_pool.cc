@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"

@@ -1,6 +1,6 @@
 #include "extensions/filters/http/grpc_web/config.h"
 
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 

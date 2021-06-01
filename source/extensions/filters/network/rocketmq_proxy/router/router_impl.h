@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/tcp/conn_pool.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/thread_local_cluster.h"
+#include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/logger.h"
 #include "common/upstream/load_balancer_impl.h"

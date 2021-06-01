@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 namespace Envoy {
 namespace Http {

@@ -2,9 +2,9 @@
 
 #include <vector>
 
-#include "include/envoy/stats/allocator.h"
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/stats/symbol_table.h"
+#include "envoy/stats/allocator.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/thread_synchronizer.h"
 #include "common/stats/metric_impl.h"

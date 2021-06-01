@@ -1,6 +1,6 @@
 #include "extensions/tracers/xray/daemon_broker.h"
 
-#include "include/envoy/network/address.h"
+#include "envoy/network/address.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/socket_interface.h"

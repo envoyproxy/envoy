@@ -3,7 +3,7 @@
 #include <csignal>
 #include <vector>
 
-#include "include/envoy/common/scope_tracker.h"
+#include "envoy/common/scope_tracker.h"
 
 #include "common/signal/fatal_error_handler.h"
 #include "common/signal/signal_action.h"

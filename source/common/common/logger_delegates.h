@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log.h"
 
 #include "common/common/logger.h"
 #include "common/common/macros.h"

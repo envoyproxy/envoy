@@ -21,23 +21,12 @@ envoy_basic_cc_library(
     include_prefix = "envoy/common",
 )
 
-envoy_basic_cc_library(
-    name = "base_includes_no_include_prefix",
-    hdrs = [
-        "exception.h",
-        "optref.h",
-        "platform.h",
-        "pure.h",
-    ],
-    external_deps = ["abseil_optional"],
-)
-
 envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        "//include/envoy/event:deferred_deletable_no_include_prefix",
-        "//include/envoy/upstream:upstream_interface_no_include_prefix",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
@@ -71,7 +60,7 @@ envoy_cc_library(
     name = "regex_interface",
     hdrs = ["regex.h"],
     deps = [
-        ":matchers_interface_no_include_prefix",
+        ":matchers_interface",
     ],
 )
 
@@ -79,7 +68,7 @@ envoy_cc_library(
     name = "token_bucket_interface",
     hdrs = ["token_bucket.h"],
     deps = [
-        ":time_interface_no_include_prefix",
+        ":time_interface",
     ],
 )
 

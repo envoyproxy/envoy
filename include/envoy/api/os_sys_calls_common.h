@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Api {

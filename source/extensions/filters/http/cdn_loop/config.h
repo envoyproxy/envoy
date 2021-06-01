@@ -4,8 +4,8 @@
 
 #include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
 #include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.validate.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/server/factory_context.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/factory_context.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"

@@ -4,8 +4,8 @@
 #include <sstream>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

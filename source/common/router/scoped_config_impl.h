@@ -5,10 +5,10 @@
 
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "include/envoy/router/rds.h"
-#include "include/envoy/router/router.h"
-#include "include/envoy/router/scopes.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/router/rds.h"
+#include "envoy/router/router.h"
+#include "envoy/router/scopes.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
 #include "common/protobuf/utility.h"

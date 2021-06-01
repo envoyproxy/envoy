@@ -11,9 +11,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "include/envoy/server/filter_config.h"
-#include "include/envoy/server/listener_manager.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/config/metadata.h"

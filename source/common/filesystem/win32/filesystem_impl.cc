@@ -5,8 +5,8 @@
 #include <sstream>
 #include <string>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

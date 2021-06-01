@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/base64.h"

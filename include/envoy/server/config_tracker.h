@@ -4,7 +4,7 @@
 #include <map>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/non_copyable.h"
 #include "common/protobuf/protobuf.h"

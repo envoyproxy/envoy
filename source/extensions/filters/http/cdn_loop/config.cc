@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/factory_context.h"
+#include "envoy/http/filter.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/factory_context.h"
 
 #include "common/common/statusor.h"
 

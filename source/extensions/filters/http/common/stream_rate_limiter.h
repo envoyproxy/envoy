@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/token_bucket.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/common/token_bucket.h"
+#include "envoy/event/timer.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/buffer/watermark_buffer.h"
 

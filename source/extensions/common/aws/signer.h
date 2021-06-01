@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/http/message.h"
+#include "envoy/common/pure.h"
+#include "envoy/http/message.h"
 
 namespace Envoy {
 namespace Extensions {

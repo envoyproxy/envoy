@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/protobuf/message_validator.h"
-#include "include/envoy/server/tracer_config.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/server/tracer_config.h"
 
 #include "gmock/gmock.h"
 

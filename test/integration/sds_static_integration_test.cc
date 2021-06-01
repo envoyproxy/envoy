@@ -3,7 +3,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"

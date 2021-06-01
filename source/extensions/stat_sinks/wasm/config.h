@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "include/envoy/server/factory_context.h"
-#include "include/envoy/server/instance.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/server/instance.h"
 
 #include "common/config/datasource.h"
 

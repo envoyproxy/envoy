@@ -2,7 +2,7 @@
 
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/config/trace/v3/datadog.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 

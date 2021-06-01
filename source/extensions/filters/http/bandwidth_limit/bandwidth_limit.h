@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/stats/timespan.h"
+#include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/assert.h"
 #include "common/common/shared_token_bucket_impl.h"

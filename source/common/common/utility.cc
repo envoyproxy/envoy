@@ -10,7 +10,7 @@
 #include <regex>
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

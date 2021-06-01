@@ -3,13 +3,13 @@
 #include <chrono>
 #include <cstdint>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/http/request_id_extension.h"
-#include "include/envoy/network/socket.h"
-#include "include/envoy/stream_info/stream_info.h"
-#include "include/envoy/tracing/trace_reason.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/request_id_extension.h"
+#include "envoy/network/socket.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"

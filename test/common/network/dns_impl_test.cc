@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/dns.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/utility.h"

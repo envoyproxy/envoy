@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/lifecycle_notifier.h"
+#include "envoy/server/lifecycle_notifier.h"
 
 #include "gmock/gmock.h"
 #include "spdlog/spdlog.h"

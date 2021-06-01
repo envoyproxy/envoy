@@ -1,7 +1,7 @@
 #include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/connection.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/protobuf/utility.h"

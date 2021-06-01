@@ -12,7 +12,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "include/envoy/network/udp_packet_writer_handler.h"
+#include "envoy/network/udp_packet_writer_handler.h"
 
 namespace Envoy {
 namespace Quic {

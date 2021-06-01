@@ -1,4 +1,4 @@
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/grpc/common.h"
 #include "common/http/headers.h"

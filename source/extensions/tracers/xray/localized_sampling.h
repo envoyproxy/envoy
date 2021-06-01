@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/common/logger.h"
 #include "common/common/random_generator.h"

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "common/http/utility.h"

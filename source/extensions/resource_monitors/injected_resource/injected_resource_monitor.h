@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/server/resource_monitor.h"
-#include "include/envoy/server/resource_monitor_config.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/server/resource_monitor.h"
+#include "envoy/server/resource_monitor_config.h"
 
 namespace Envoy {
 namespace Extensions {

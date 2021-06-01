@@ -6,9 +6,9 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/api/os_sys_calls_common.h"
-#include "include/envoy/common/platform.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/api/os_sys_calls_common.h"
+#include "envoy/common/platform.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Api {

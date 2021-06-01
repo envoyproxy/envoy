@@ -12,9 +12,9 @@ envoy_cc_library(
     name = "decompressor_config_interface",
     hdrs = ["config.h"],
     deps = [
-        ":decompressor_factory_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        ":decompressor_factory_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/server:filter_config_interface",
     ],
 )
 
@@ -22,7 +22,7 @@ envoy_cc_library(
     name = "decompressor_factory_interface",
     hdrs = ["factory.h"],
     deps = [
-        ":decompressor_interface_no_include_prefix",
+        ":decompressor_interface",
     ],
 )
 
@@ -30,6 +30,6 @@ envoy_cc_library(
     name = "decompressor_interface",
     hdrs = ["decompressor.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )

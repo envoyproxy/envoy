@@ -2,8 +2,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/secret/secret_provider.h"
+#include "envoy/http/filter.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/datasource.h"

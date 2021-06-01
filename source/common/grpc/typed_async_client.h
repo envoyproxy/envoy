@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "include/envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/version_converter.h"

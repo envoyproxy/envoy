@@ -14,8 +14,8 @@ envoy_cc_library(
         "shared_pool.h",
     ],
     deps = [
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
-        "//include/envoy/singleton:instance_interface_no_include_prefix",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/singleton:instance_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
         "//source/common/common:thread_synchronizer_lib",

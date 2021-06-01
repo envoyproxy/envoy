@@ -5,8 +5,8 @@
 #include <cstring>
 #include <string>
 
-#include "include/envoy/grpc/google_grpc_creds.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/grpc/google_grpc_creds.h"
+#include "envoy/registry/registry.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

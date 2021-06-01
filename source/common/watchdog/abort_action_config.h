@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/guarddog_config.h"
+#include "envoy/server/guarddog_config.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/protobuf/protobuf.h"

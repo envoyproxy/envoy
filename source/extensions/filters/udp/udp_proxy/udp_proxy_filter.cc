@@ -1,6 +1,6 @@
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
-#include "include/envoy/network/listener.h"
+#include "envoy/network/listener.h"
 
 #include "common/network/socket_option_factory.h"
 

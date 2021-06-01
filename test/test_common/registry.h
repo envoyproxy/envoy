@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "gtest/gtest.h"
 

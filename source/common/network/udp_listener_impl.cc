@@ -4,11 +4,11 @@
 #include <csetjmp>
 #include <cstring>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/exception.h"
+#include "envoy/network/exception.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

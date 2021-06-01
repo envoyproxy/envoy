@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/api/api.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

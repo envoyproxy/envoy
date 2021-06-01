@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
-#include "include/envoy/stream_info/stream_info.h"
-#include "include/envoy/thread_local/thread_local_object.h"
-#include "include/envoy/upstream/thread_local_cluster.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/thread_local/thread_local_object.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/logger.h"
 #include "common/upstream/cluster_factory_impl.h"

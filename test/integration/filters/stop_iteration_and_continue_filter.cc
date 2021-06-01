@@ -1,10 +1,10 @@
 #include <iostream>
 #include <string>
 
-#include "include/envoy/common/scope_tracker.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/common/scope_tracker.h"
+#include "envoy/http/filter.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/scope_tracker.h"
 

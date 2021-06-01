@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha/sni_dynamic_forward_proxy.pb.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/network/filter.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
 

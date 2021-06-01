@@ -4,7 +4,7 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/network/resolver_impl.h"
 

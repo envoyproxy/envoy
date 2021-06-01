@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/http/context.h"
+#include "envoy/http/context.h"
 
 #include "common/http/codes.h"
 #include "common/http/user_agent.h"

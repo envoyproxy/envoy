@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
 #include "common/tracing/http_tracer_impl.h"

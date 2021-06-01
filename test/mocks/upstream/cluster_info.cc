@@ -3,8 +3,8 @@
 #include <limits>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "include/envoy/upstream/host_description.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/host_description.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/metadata.h"
 #include "common/http/utility.h"

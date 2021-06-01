@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "include/envoy/udp/hash_policy.h"
+#include "envoy/udp/hash_policy.h"
 
 #include "common/common/hash.h"
 

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/resolver.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/resolver.h"
 
 #include "common/network/address_impl.h"
 

@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/ratelimit/ratelimit.h"
+#include "envoy/http/filter.h"
+#include "envoy/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Router {

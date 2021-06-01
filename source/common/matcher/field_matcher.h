@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "include/envoy/matcher/matcher.h"
+#include "envoy/matcher/matcher.h"
 
 namespace Envoy {
 namespace Matcher {

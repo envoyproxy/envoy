@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/optref.h"
-#include "include/envoy/config/typed_config.h"
+#include "envoy/common/optref.h"
+#include "envoy/config/typed_config.h"
 
 namespace Envoy {
 namespace Http {

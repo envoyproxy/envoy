@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/formatter/substitution_formatter.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/formatter/substitution_formatter.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/utility.h"
 

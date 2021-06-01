@@ -1,7 +1,7 @@
 #include <chrono>
 #include <memory>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 

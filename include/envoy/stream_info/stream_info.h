@@ -4,17 +4,17 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/http/protocol.h"
-#include "include/envoy/http/request_id_extension.h"
-#include "include/envoy/network/socket.h"
-#include "include/envoy/ssl/connection.h"
-#include "include/envoy/stream_info/filter_state.h"
-#include "include/envoy/tracing/trace_reason.h"
-#include "include/envoy/upstream/host_description.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
+#include "envoy/http/request_id_extension.h"
+#include "envoy/network/socket.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/stream_info/filter_state.h"
+#include "envoy/tracing/trace_reason.h"
+#include "envoy/upstream/host_description.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"

@@ -4,14 +4,14 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/transport_socket.h"
-#include "include/envoy/stats/primitive_stats_macros.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/upstream/health_check_host_monitor.h"
-#include "include/envoy/upstream/outlier_detection.h"
+#include "envoy/network/address.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/stats/primitive_stats_macros.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/health_check_host_monitor.h"
+#include "envoy/upstream/outlier_detection.h"
 
 #include "absl/strings/string_view.h"
 

@@ -1,5 +1,5 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
-#include "include/envoy/network/proxy_protocol.h"
+#include "envoy/network/proxy_protocol.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/address_impl.h"

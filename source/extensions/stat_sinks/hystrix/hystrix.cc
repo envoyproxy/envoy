@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

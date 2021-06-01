@@ -2,9 +2,9 @@
 
 #include <cstdint>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/http/codes.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+#include "envoy/http/codes.h"
 
 namespace Envoy {
 namespace Extensions {

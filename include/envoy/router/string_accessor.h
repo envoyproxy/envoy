@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/strings/string_view.h"
 

@@ -4,10 +4,10 @@
 #include <functional>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/symbol_table.h"
-#include "include/envoy/stats/tag.h"
+#include "envoy/common/pure.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/symbol_table.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 

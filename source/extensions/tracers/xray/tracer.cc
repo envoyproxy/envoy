@@ -4,8 +4,8 @@
 #include <chrono>
 #include <string>
 
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/listener.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/listener.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

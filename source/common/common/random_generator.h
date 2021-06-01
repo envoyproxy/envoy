@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/random_generator.h"
+#include "envoy/common/random_generator.h"
 
 namespace Envoy {
 namespace Random {

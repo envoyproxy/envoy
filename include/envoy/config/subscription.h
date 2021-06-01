@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
 

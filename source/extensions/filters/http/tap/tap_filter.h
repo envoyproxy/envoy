@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "extensions/common/tap/extension_config_base.h"
 #include "extensions/filters/http/tap/tap_config.h"

@@ -4,14 +4,14 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/random_generator.h"
-#include "include/envoy/config/subscription.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/rest_api_fetcher.h"
 #include "common/network/cidr_range.h"

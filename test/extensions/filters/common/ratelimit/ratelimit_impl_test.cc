@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/service/ratelimit/v3/rls.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"

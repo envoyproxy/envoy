@@ -2,7 +2,7 @@
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
 

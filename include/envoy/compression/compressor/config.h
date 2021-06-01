@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/compression/compressor/factory.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/compression/compressor/factory.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/server/filter_config.h"
 
 namespace Envoy {
 namespace Compression {

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/filesystem.h"
 
 #include "common/filesystem/directory_iterator_impl.h"
 

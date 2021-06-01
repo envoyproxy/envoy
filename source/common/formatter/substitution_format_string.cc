@@ -1,6 +1,6 @@
 #include "common/formatter/substitution_format_string.h"
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 
 #include "common/config/datasource.h"
 #include "common/config/utility.h"

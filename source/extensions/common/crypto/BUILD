@@ -30,7 +30,7 @@ envoy_cc_extension(
     security_posture = "unknown",
     undocumented = True,
     deps = [
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
         "//source/common/crypto:utility_lib",
     ],

@@ -5,10 +5,10 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/http/codec.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"

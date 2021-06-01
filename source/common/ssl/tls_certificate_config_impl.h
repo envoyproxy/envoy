@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/ssl/private_key/private_key.h"
-#include "include/envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/private_key/private_key.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
 namespace Ssl {

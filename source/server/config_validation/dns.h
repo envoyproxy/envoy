@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/network/dns.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/dns.h"
 
 namespace Envoy {
 namespace Network {

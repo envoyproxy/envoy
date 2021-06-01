@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
 
 #include "common/common/c_smart_ptr.h"
 

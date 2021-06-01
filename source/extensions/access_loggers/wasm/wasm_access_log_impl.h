@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log.h"
 
 #include "common/common/logger.h"
 

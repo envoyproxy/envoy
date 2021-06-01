@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
 

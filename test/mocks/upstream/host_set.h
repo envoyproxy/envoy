@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
 #include "common/upstream/upstream_impl.h"

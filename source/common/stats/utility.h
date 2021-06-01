@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/thread.h"
 #include "common/stats/symbol_table_impl.h"

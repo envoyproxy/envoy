@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "include/envoy/server/process_context.h"
+#include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/api_version.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/network/socket.h"
+#include "envoy/network/socket.h"
 
 #include "test/mocks/network/io_handle.h"
 

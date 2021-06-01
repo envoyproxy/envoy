@@ -3,8 +3,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/file_based_metadata.pb.h"
 #include "envoy/config/grpc_credential/v3/file_based_metadata.pb.validate.h"
-#include "include/envoy/grpc/google_grpc_creds.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/grpc/google_grpc_creds.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/datasource.h"
 #include "common/config/utility.h"

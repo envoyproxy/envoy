@@ -3,9 +3,9 @@
 #include <list>
 #include <memory>
 
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/linked_object.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace StreamInfo {

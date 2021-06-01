@@ -15,7 +15,7 @@ envoy_cc_extension(
     category = "envoy.http.stateful_header_formatters",
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/registry",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
 )

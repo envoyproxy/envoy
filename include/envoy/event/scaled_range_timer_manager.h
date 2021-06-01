@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/event/scaled_timer.h"
-#include "include/envoy/event/timer.h"
+#include "envoy/common/pure.h"
+#include "envoy/event/scaled_timer.h"
+#include "envoy/event/timer.h"
 
 #include "common/common/interval_value.h"
 

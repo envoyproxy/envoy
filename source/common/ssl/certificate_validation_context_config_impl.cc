@@ -1,6 +1,6 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/common/empty_string.h"

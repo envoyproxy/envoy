@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/server/admin.h"
+#include "envoy/server/admin.h"
 
 #include "test/mocks/network/socket.h"
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
-#include "include/envoy/upstream/retry.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 

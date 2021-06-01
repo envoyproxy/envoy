@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"

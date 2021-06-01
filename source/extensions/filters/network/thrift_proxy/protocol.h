@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"

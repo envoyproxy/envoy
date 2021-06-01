@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/common/random_generator.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/server/access_log_config.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/server/access_log_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/matchers.h"

@@ -3,9 +3,9 @@
 #include <chrono>
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "include/envoy/stats/timespan.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/stats/timespan.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hash.h"

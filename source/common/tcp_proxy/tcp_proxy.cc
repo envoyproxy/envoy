@@ -4,14 +4,14 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/timer.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"

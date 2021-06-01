@@ -1,8 +1,8 @@
 #include "extensions/filters/http/cdn_loop/filter.h"
 
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/statusor.h"
 #include "common/http/headers.h"

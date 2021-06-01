@@ -19,8 +19,8 @@ envoy_cc_extension(
     security_posture = "data_plane_agnostic",
     status = "alpha",
     deps = [
-        "//include/envoy/grpc:google_grpc_creds_interface_no_include_prefix",
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/grpc:google_grpc_creds_interface",
+        "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:google_grpc_creds_lib",

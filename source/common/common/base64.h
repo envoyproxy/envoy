@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "absl/strings/string_view.h"
 

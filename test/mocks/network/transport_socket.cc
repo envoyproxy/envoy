@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

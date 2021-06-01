@@ -1,7 +1,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/network/address.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"

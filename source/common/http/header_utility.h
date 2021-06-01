@@ -2,11 +2,11 @@
 
 #include <vector>
 
-#include "include/envoy/common/regex.h"
+#include "envoy/common/regex.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/http/protocol.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "common/http/status.h"

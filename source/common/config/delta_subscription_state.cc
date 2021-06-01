@@ -1,6 +1,6 @@
 #include "common/config/delta_subscription_state.h"
 
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"

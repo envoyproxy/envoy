@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 
-#include "include/envoy/network/address.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Http {

@@ -23,8 +23,8 @@ envoy_cc_test(
     srcs = ["stream_info_impl_test.cc"],
     deps = [
         ":test_int_accessor_lib",
-        "//include/envoy/http:protocol_interface_no_include_prefix",
-        "//include/envoy/upstream:host_description_interface_no_include_prefix",
+        "//include/envoy/http:protocol_interface",
+        "//include/envoy/upstream:host_description_interface",
         "//source/common/stream_info:stream_info_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -38,7 +38,7 @@ envoy_cc_test_library(
     name = "test_int_accessor_lib",
     hdrs = ["test_int_accessor.h"],
     deps = [
-        "//include/envoy/stream_info:filter_state_interface_no_include_prefix",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -46,8 +46,8 @@ envoy_cc_test_library(
     name = "test_util",
     hdrs = ["test_util.h"],
     deps = [
-        "//include/envoy/http:request_id_extension_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
+        "//include/envoy/http:request_id_extension_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/runtime:runtime_lib",

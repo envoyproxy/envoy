@@ -3,10 +3,10 @@
 #include <functional>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/ssl/private_key/private_key_callbacks.h"
+#include "envoy/ssl/private_key/private_key_callbacks.h"
 
 #include "openssl/ssl.h"
 

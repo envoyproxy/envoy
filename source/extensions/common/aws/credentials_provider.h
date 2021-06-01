@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

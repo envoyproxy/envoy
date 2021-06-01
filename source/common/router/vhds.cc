@@ -7,7 +7,7 @@
 
 #include "envoy/api/v2/route/route_components.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "include/envoy/config/subscription.h"
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"

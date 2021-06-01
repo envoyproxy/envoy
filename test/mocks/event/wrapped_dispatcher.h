@@ -5,7 +5,7 @@
 #include <functional>
 #include <list>
 
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 
 namespace Envoy {
 namespace Event {

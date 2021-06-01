@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/logger.h"
 #include "common/protobuf/protobuf.h"

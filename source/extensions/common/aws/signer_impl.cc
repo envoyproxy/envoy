@@ -1,6 +1,6 @@
 #include "extensions/common/aws/signer_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"

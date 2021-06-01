@@ -1,4 +1,4 @@
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"

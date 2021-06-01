@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "include/envoy/upstream/health_checker.h"
+#include "envoy/upstream/health_checker.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

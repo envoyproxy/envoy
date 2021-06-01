@@ -135,8 +135,8 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//include/envoy/config:subscription_interface_no_include_prefix",
-        "//include/envoy/init:manager_interface_no_include_prefix",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",

@@ -17,7 +17,7 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/registry",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:utility_lib",

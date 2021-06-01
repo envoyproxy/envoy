@@ -13,8 +13,8 @@ envoy_cc_library(
     srcs = ["passthrough.cc"],
     hdrs = ["passthrough.h"],
     deps = [
-        "//include/envoy/network:connection_interface_no_include_prefix",
-        "//include/envoy/network:transport_socket_interface_no_include_prefix",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
     ],
 )

@@ -4,10 +4,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/singleton/instance.h"
+#include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/singleton/instance.h"
 
 namespace Envoy {
 namespace Singleton {

@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/config/typed_config.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

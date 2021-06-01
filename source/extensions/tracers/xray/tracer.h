@@ -4,8 +4,8 @@
 #include <utility>
 #include <vector>
 
-#include "include/envoy/common/time.h"
-#include "include/envoy/tracing/http_tracer.h"
+#include "envoy/common/time.h"
+#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"

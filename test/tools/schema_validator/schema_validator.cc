@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "test/tools/schema_validator/validator.h"
 

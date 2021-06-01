@@ -1,5 +1,5 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 

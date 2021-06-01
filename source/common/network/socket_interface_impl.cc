@@ -1,6 +1,6 @@
 #include "common/network/socket_interface_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/network/socket_interface/v3/default_socket_interface.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/thread_annotations.h"
 

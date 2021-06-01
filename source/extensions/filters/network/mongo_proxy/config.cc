@@ -4,8 +4,8 @@
 
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/fmt.h"
 

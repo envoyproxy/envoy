@@ -4,7 +4,7 @@
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 

@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/access_log_config.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/access_log_config.h"
+#include "envoy/stats/scope.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"

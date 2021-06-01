@@ -19,7 +19,7 @@ envoy_cc_extension(
     security_posture = "data_plane_agnostic",
     deps = [
         ":hystrix_lib",
-        "//include/envoy/registry:registry_no_include_prefix",
+        "//include/envoy/registry",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/extensions/stat_sinks:well_known_names",
@@ -33,9 +33,9 @@ envoy_cc_library(
     srcs = ["hystrix.cc"],
     hdrs = ["hystrix.h"],
     deps = [
-        "//include/envoy/server:admin_interface_no_include_prefix",
-        "//include/envoy/server:instance_interface_no_include_prefix",
-        "//include/envoy/stats:stats_interface_no_include_prefix",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:instance_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:well_known_names",

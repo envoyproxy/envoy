@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/network/address.h"
+#include "envoy/network/address.h"
 
 #include "common/protobuf/protobuf.h"
 

@@ -1,6 +1,6 @@
 #include "extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 
 #include "common/protobuf/utility.h"

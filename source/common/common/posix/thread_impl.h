@@ -4,7 +4,7 @@
 
 #include <functional>
 
-#include "include/envoy/thread/thread.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Thread {

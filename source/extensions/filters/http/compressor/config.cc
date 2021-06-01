@@ -1,6 +1,6 @@
 #include "extensions/filters/http/compressor/config.h"
 
-#include "include/envoy/compression/compressor/config.h"
+#include "envoy/compression/compressor/config.h"
 
 #include "common/config/utility.h"
 

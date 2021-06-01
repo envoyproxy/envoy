@@ -2,7 +2,7 @@
 
 #include <openssl/bio.h>
 
-#include "include/envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 #include "common/quic/envoy_quic_utils.h"
 #include "common/quic/quic_io_handle_wrapper.h"

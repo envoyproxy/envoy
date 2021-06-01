@@ -1,8 +1,8 @@
-#include "include/envoy/common/optref.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/matcher/matcher.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/common/optref.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "common/http/filter_manager.h"
 #include "common/http/matching/inputs.h"

@@ -1,6 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

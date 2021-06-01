@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/config/subscription.h"
+#include "envoy/config/subscription.h"
 
 #include "common/protobuf/utility.h"
 

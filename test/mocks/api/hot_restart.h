@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/api/os_sys_calls.h"
+#include "envoy/api/os_sys_calls.h"
 
 #include "common/api/os_sys_calls_impl_hot_restart.h"
 

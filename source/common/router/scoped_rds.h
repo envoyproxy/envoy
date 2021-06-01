@@ -3,15 +3,15 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.validate.h"
-#include "include/envoy/config/subscription.h"
+#include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "include/envoy/router/route_config_provider_manager.h"
+#include "envoy/router/route_config_provider_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/config_provider_impl.h"
 #include "common/config/subscription_base.h"

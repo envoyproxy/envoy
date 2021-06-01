@@ -4,10 +4,10 @@
 #include <memory>
 #include <vector>
 
-#include "include/envoy/server/admin.h"
-#include "include/envoy/server/instance.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/sink.h"
+#include "envoy/server/admin.h"
+#include "envoy/server/instance.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
 
 #include "common/stats/symbol_table_impl.h"
 

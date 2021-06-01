@@ -6,13 +6,13 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/matchers.h"
 

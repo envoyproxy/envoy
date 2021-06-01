@@ -3,7 +3,7 @@
 #include <functional>
 #include <list>
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 
 #include "common/common/assert.h"
 

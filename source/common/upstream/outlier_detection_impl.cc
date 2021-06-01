@@ -9,8 +9,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

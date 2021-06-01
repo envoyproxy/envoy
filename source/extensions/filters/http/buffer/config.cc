@@ -6,7 +6,7 @@
 
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 

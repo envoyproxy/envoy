@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/time.h"
-#include "include/envoy/ssl/context_manager.h"
+#include "envoy/common/time.h"
+#include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
 namespace Server {

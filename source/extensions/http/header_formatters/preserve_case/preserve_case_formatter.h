@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/http/header_formatter.h"
+#include "envoy/http/header_formatter.h"
 
 #include "common/common/utility.h"
 

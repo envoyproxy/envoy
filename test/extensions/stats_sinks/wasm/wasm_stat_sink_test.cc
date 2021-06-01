@@ -1,4 +1,4 @@
-#include "include/envoy/server/lifecycle_notifier.h"
+#include "envoy/server/lifecycle_notifier.h"
 
 #include "extensions/common/wasm/wasm.h"
 

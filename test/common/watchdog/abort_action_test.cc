@@ -1,11 +1,11 @@
 #include <csignal>
 #include <memory>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/server/guarddog_config.h"
-#include "include/envoy/thread/thread.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/server/guarddog_config.h"
+#include "envoy/thread/thread.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
 #include "common/watchdog/abort_action.h"

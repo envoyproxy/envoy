@@ -3,8 +3,8 @@
 #include <map>
 #include <utility>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

@@ -5,7 +5,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"

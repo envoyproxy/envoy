@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/config/typed_config.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/ssl/private_key/private_key.h"
+#include "envoy/registry/registry.h"
+#include "envoy/ssl/private_key/private_key.h"
 
 namespace Envoy {
 namespace Ssl {

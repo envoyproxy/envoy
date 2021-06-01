@@ -3,7 +3,7 @@
 #include <memory>
 #include <regex>
 
-#include "include/envoy/common/regex.h"
+#include "envoy/common/regex.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 namespace Envoy {

@@ -1,9 +1,9 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/http/codec.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/utility.h"

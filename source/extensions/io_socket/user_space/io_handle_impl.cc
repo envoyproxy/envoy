@@ -1,7 +1,7 @@
 #include "extensions/io_socket/user_space/io_handle_impl.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

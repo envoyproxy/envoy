@@ -4,10 +4,10 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/options.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/options.h"
 
 #include "common/common/logger.h"
 

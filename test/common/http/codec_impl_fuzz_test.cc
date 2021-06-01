@@ -1,4 +1,4 @@
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 // Fuzzer for the H1/H2 codecs. This is similar in structure to
 // //test/common/http/http2:codec_impl_test, where a client H2 codec is wired

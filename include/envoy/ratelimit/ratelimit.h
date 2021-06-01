@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/protobuf/message_validator.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/http/header_map.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/type/v3/ratelimit_unit.pb.h"
 
 #include "absl/time/time.h"

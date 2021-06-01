@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/upstream/retry.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/retry.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/config/well_known_names.h"
 

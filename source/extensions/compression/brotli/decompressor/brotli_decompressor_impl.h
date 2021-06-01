@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/compression/decompressor/decompressor.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/compression/decompressor/decompressor.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "extensions/compression/brotli/common/base.h"
 

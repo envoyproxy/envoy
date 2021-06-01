@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/event/file_event.h"
-#include "include/envoy/event/timer.h"
+#include "envoy/event/file_event.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/network/filter.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/network/socket_impl.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/resource_monitor_config.h"
+#include "envoy/server/resource_monitor_config.h"
 
 namespace Envoy {
 namespace Server {

@@ -128,32 +128,6 @@ def envoy_cc_library(
         strip_include_prefix = strip_include_prefix,
     )
 
-    # Temporary target with all include_prefix paths for transitioning external consumers of
-    # Envoy's source code to full path in the #include directives.
-    cc_library(
-        name = name + "_no_include_prefix",
-        srcs = srcs,
-        hdrs = hdrs,
-        copts = envoy_copts(repository) + copts,
-        visibility = visibility,
-        tags = tags,
-        textual_hdrs = textual_hdrs,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//include/envoy/common:base_includes_no_include_prefix",
-            repository + "//source/common/common:fmt_lib",
-            envoy_external_dep_path("abseil_flat_hash_map"),
-            envoy_external_dep_path("abseil_flat_hash_set"),
-            envoy_external_dep_path("abseil_strings"),
-            envoy_external_dep_path("spdlog"),
-            envoy_external_dep_path("fmtlib"),
-        ],
-        alwayslink = 1,
-        linkstatic = envoy_linkstatic(),
-        strip_include_prefix = strip_include_prefix,
-        defines = defines,
-    )
-
-
 # Used to specify a library that only builds on POSIX
 def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
@@ -218,7 +192,7 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
 
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
-# include using this path scheme (e.g. #include "include/envoy/common/time.h").
+# include using this path scheme (e.g. #include "envoy/common/time.h").
 def envoy_include_prefix(path):
     if path.startswith("source/") or path.startswith("include/"):
         return "/".join(path.split("/")[1:])

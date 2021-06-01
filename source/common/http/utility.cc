@@ -8,7 +8,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

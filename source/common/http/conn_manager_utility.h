@@ -3,9 +3,9 @@
 #include <atomic>
 #include <cstdint>
 
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/tracing/trace_reason.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
+#include "envoy/tracing/trace_reason.h"
 
 #include "common/http/conn_manager_impl.h"
 #include "common/http/http1/codec_stats.h"

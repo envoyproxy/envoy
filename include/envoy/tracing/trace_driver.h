@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/stream_info/stream_info.h"
-#include "include/envoy/tracing/trace_reason.h"
+#include "envoy/common/pure.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
 namespace Tracing {

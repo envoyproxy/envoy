@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/tcp/conn_pool.h"
+#include "envoy/tcp/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {

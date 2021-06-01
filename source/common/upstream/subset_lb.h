@@ -6,9 +6,9 @@
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/load_balancer.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "common/common/macros.h"
 #include "common/protobuf/protobuf.h"

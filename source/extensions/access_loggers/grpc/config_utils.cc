@@ -1,6 +1,6 @@
 #include "extensions/access_loggers/grpc/config_utils.h"
 
-#include "include/envoy/singleton/manager.h"
+#include "envoy/singleton/manager.h"
 
 namespace Envoy {
 namespace Extensions {

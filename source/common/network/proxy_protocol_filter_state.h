@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/network/proxy_protocol.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/network/proxy_protocol.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
 namespace Network {

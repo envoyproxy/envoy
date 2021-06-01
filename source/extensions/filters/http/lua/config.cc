@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
 #include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 

@@ -8,6 +8,6 @@
 
 #include <memory>
 
-#include "include/envoy/api/io_error.h"
+#include "envoy/api/io_error.h"
 
 #define QUIC_EMSGSIZE_IMPL static_cast<int>(Envoy::Api::IoError::IoErrorCode::MessageTooBig)

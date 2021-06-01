@@ -1,6 +1,6 @@
 #include "common/network/io_socket_error_impl.h"
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"

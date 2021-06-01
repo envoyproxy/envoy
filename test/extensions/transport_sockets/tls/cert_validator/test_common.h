@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "include/envoy/ssl/context_config.h"
-#include "include/envoy/ssl/ssl_socket_extended_info.h"
+#include "envoy/ssl/context_config.h"
+#include "envoy/ssl/ssl_socket_extended_info.h"
 
 #include "common/common/macros.h"
 #include "common/common/matchers.h"

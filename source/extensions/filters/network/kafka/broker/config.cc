@@ -1,8 +1,8 @@
 #include "extensions/filters/network/kafka/broker/config.h"
 
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
 
 #include "extensions/filters/network/kafka/broker/filter.h"
 

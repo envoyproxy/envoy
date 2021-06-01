@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"

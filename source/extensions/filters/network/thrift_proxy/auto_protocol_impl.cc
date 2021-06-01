@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/byte_order.h"

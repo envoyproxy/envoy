@@ -2,11 +2,11 @@
 
 #include <functional>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/server/drain_manager.h"
-#include "include/envoy/server/instance.h"
+#include "envoy/event/timer.h"
+#include "envoy/server/drain_manager.h"
+#include "envoy/server/instance.h"
 
 #include "common/common/logger.h"
 

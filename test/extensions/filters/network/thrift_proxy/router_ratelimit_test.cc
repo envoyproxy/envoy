@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
-#include "include/envoy/ratelimit/ratelimit.h"
+#include "envoy/ratelimit/ratelimit.h"
 
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"

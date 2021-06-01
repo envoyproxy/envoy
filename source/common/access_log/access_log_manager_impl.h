@@ -2,12 +2,12 @@
 
 #include <string>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/api/api.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/stats/store.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stats/store.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

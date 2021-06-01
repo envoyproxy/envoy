@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/interval_set.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/interval_set.h"
+#include "envoy/common/time.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"

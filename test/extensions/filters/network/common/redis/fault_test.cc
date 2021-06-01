@@ -1,4 +1,4 @@
-#include "include/envoy/common/random_generator.h"
+#include "envoy/common/random_generator.h"
 
 #include "common/common/assert.h"
 

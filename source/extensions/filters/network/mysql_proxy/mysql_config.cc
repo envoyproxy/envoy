@@ -4,8 +4,8 @@
 
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/logger.h"
 

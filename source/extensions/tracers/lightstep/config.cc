@@ -2,7 +2,7 @@
 
 #include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/config/trace/v3/lightstep.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 #include "common/config/datasource.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "common/protobuf/protobuf.h"
 

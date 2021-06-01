@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
 

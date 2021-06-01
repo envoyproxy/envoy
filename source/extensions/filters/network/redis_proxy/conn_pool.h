@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"

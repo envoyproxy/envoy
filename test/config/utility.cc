@@ -12,7 +12,7 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"

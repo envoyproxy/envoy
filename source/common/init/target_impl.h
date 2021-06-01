@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "include/envoy/init/target.h"
+#include "envoy/init/target.h"
 
 #include "common/common/logger.h"
 

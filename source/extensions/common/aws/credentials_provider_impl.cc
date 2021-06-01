@@ -1,6 +1,6 @@
 #include "extensions/common/aws/credentials_provider_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/lock_guard.h"
 #include "common/http/utility.h"

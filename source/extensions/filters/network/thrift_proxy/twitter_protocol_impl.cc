@@ -1,6 +1,6 @@
 #include "extensions/filters/network/thrift_proxy/twitter_protocol_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
 

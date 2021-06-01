@@ -6,11 +6,11 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"

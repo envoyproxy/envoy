@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "alternate_protocols_cache_interface",
     hdrs = ["alternate_protocols_cache.h"],
     deps = [
-        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/common:time_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -20,7 +20,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
-    deps = [":codec_interface_no_include_prefix"],
+    deps = [":codec_interface"],
 )
 
 envoy_cc_library(
@@ -28,9 +28,9 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":message_interface_no_include_prefix",
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
-        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
+        ":message_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -40,13 +40,13 @@ envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
-        ":header_map_interface_no_include_prefix",
-        ":metadata_interface_no_include_prefix",
-        ":protocol_interface_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
-        "//include/envoy/grpc:status_no_include_prefix",
-        "//include/envoy/network:address_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
+        ":header_map_interface",
+        ":metadata_interface",
+        ":protocol_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/grpc:status",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
     ],
 )
@@ -54,17 +54,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codes_interface",
     hdrs = ["codes.h"],
-    deps = ["//include/envoy/stats:stats_interface_no_include_prefix"],
+    deps = ["//include/envoy/stats:stats_interface"],
 )
 
 envoy_cc_library(
     name = "conn_pool_interface",
     hdrs = ["conn_pool.h"],
     deps = [
-        ":codec_interface_no_include_prefix",
-        "//include/envoy/common:conn_pool_interface_no_include_prefix",
-        "//include/envoy/event:deferred_deletable_no_include_prefix",
-        "//include/envoy/upstream:upstream_interface_no_include_prefix",
+        ":codec_interface",
+        "//include/envoy/common:conn_pool_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/upstream:upstream_interface",
     ],
 )
 
@@ -72,7 +72,7 @@ envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
     deps = [
-        ":codes_interface_no_include_prefix",
+        ":codes_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -82,17 +82,17 @@ envoy_cc_library(
     hdrs = ["filter.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":codec_interface_no_include_prefix",
-        ":header_map_interface_no_include_prefix",
-        "//include/envoy/access_log:access_log_interface_no_include_prefix",
-        "//include/envoy/common:scope_tracker_interface_no_include_prefix",
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
-        "//include/envoy/grpc:status_no_include_prefix",
-        "//include/envoy/matcher:matcher_interface_no_include_prefix",
-        "//include/envoy/router:router_interface_no_include_prefix",
-        "//include/envoy/ssl:connection_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
-        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
+        ":codec_interface",
+        ":header_map_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/grpc:status",
+        "//include/envoy/matcher:matcher_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
+        "//include/envoy/tracing:http_tracer_interface",
         "//source/common/common:scope_tracked_object_stack",
     ],
 )
@@ -101,9 +101,9 @@ envoy_cc_library(
     name = "hash_policy_interface",
     hdrs = ["hash_policy.h"],
     deps = [
-        ":header_map_interface_no_include_prefix",
-        "//include/envoy/network:address_interface_no_include_prefix",
-        "//include/envoy/stream_info:filter_state_interface_no_include_prefix",
+        ":header_map_interface",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -114,7 +114,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
-        ":header_formatter_interface_no_include_prefix",
+        ":header_formatter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
     ],
@@ -124,8 +124,8 @@ envoy_cc_library(
     name = "message_interface",
     hdrs = ["message.h"],
     deps = [
-        ":header_map_interface_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        ":header_map_interface",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
@@ -149,8 +149,8 @@ envoy_cc_library(
     name = "request_id_extension_interface",
     hdrs = ["request_id_extension.h"],
     deps = [
-        ":header_map_interface_no_include_prefix",
-        "//include/envoy/tracing:trace_reason_interface_no_include_prefix",
+        ":header_map_interface",
+        "//include/envoy/tracing:trace_reason_interface",
     ],
 )
 
@@ -158,7 +158,7 @@ envoy_cc_library(
     name = "header_formatter_interface",
     hdrs = ["header_formatter.h"],
     deps = [
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface",
     ],
 )
 
@@ -166,10 +166,10 @@ envoy_cc_library(
     name = "original_ip_detection_interface",
     hdrs = ["original_ip_detection.h"],
     deps = [
-        ":codes_interface_no_include_prefix",
-        ":header_map_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/network:address_interface_no_include_prefix",
-        "//include/envoy/server:factory_context_interface_no_include_prefix",
+        ":codes_interface",
+        ":header_map_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/server:factory_context_interface",
     ],
 )

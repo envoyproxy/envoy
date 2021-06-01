@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/network/transport_socket.h"
-#include "include/envoy/stream_info/stream_info.h"
-#include "include/envoy/upstream/host_description.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/stream_info/stream_info.h"
+#include "envoy/upstream/host_description.h"
 
 #include "common/protobuf/protobuf.h"
 

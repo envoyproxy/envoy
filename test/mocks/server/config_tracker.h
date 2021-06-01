@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/server/config_tracker.h"
+#include "envoy/server/config_tracker.h"
 
 #include "absl/container/node_hash_map.h"
 #include "gmock/gmock.h"

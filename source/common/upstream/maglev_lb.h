@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/common/random_generator.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/upstream/thread_aware_lb_impl.h"
 #include "common/upstream/upstream_impl.h"

@@ -1,6 +1,6 @@
 #include "common/network/filter_matcher.h"
 
-#include "include/envoy/network/filter.h"
+#include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
 

@@ -3,8 +3,8 @@
 
 #include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "include/envoy/matcher/matcher.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/registry/registry.h"
 
 #include "common/matcher/list_matcher.h"
 #include "common/matcher/matcher.h"

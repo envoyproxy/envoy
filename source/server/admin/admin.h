@@ -7,16 +7,16 @@
 #include <utility>
 #include <vector>
 
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/request_id_extension.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/server/admin.h"
-#include "include/envoy/server/instance.h"
-#include "include/envoy/server/listener_manager.h"
-#include "include/envoy/server/overload/overload_manager.h"
-#include "include/envoy/upstream/outlier_detection.h"
-#include "include/envoy/upstream/resource_manager.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/request_id_extension.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/server/admin.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/server/overload/overload_manager.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/basic_resource_impl.h"

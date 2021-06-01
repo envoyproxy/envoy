@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/stats/symbol_table.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "absl/types/optional.h"
 

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 #include "test/common/stats/stat_test_utility.h"
 

@@ -6,8 +6,8 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/upstream/resource_manager.h"
+#include "envoy/http/codes.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/matchers.h"

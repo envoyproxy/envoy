@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
 namespace Upstream {

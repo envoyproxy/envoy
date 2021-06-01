@@ -2,9 +2,9 @@
 
 #include <ostream>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/server/fatal_action_config.h"
-#include "include/envoy/thread/thread.h"
+#include "envoy/common/pure.h"
+#include "envoy/server/fatal_action_config.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace FatalAction {

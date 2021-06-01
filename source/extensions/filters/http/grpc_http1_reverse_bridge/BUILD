@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface",
         "//source/common/common:enum_to_int",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -36,9 +36,9 @@ envoy_cc_extension(
     status = "alpha",
     deps = [
         ":filter_lib",
-        "//include/envoy/http:filter_interface_no_include_prefix",
-        "//include/envoy/registry:registry_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3:pkg_cc_proto",

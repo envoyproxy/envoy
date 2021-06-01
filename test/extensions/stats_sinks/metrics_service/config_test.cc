@@ -1,4 +1,4 @@
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/stat_sinks/metrics_service/config.h"
 

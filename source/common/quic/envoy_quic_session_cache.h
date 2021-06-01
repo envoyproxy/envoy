@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_client_config.h"
 

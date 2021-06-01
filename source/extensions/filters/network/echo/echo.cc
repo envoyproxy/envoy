@@ -1,7 +1,7 @@
 #include "extensions/filters/network/echo/echo.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
 

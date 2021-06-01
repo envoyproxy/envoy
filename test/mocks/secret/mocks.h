@@ -2,10 +2,10 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/secret/secret_callbacks.h"
-#include "include/envoy/secret/secret_manager.h"
-#include "include/envoy/server/transport_socket_config.h"
-#include "include/envoy/ssl/tls_certificate_config.h"
+#include "envoy/secret/secret_callbacks.h"
+#include "envoy/secret/secret_manager.h"
+#include "envoy/server/transport_socket_config.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

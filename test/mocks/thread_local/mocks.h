@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "test/mocks/event/mocks.h"
 

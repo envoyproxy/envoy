@@ -1,5 +1,5 @@
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/http/original_ip_detection/custom_header/config.h"
 

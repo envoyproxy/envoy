@@ -2,11 +2,11 @@
 #include <initializer_list>
 
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "include/envoy/event/scaled_range_timer_manager.h"
-#include "include/envoy/server/overload/overload_manager.h"
-#include "include/envoy/server/overload/thread_local_overload_state.h"
-#include "include/envoy/server/resource_monitor.h"
-#include "include/envoy/server/resource_monitor_config.h"
+#include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/overload_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
+#include "envoy/server/resource_monitor.h"
+#include "envoy/server/resource_monitor_config.h"
 
 #include "common/stats/isolated_store_impl.h"
 

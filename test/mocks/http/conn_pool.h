@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/http/conn_pool.h"
+#include "envoy/http/conn_pool.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/upstream/host.h"

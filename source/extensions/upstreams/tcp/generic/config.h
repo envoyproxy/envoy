@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/tcp/upstream.h"
+#include "envoy/registry/registry.h"
+#include "envoy/tcp/upstream.h"
 
 namespace Envoy {
 namespace Extensions {

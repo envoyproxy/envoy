@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/server/tracer_config.h"
-#include "include/envoy/singleton/instance.h"
-#include "include/envoy/tracing/http_tracer_manager.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/tracing/http_tracer_manager.h"
 
 #include "common/common/logger.h"
 #include "common/tracing/http_tracer_impl.h"

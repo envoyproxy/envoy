@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/crypto/crypto.h"
+#include "envoy/common/crypto/crypto.h"
 
 #include "openssl/base.h"
 #include "openssl/evp.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/callback.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/common/callback.h"
+#include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
 #include "xds/core/v3/context_params.pb.h"

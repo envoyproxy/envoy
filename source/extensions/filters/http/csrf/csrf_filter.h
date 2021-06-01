@@ -2,9 +2,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/matchers.h"

@@ -5,8 +5,8 @@
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/network/connection.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 

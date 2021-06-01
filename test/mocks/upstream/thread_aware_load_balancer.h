@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/upstream/load_balancer.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

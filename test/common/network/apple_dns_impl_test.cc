@@ -3,12 +3,12 @@
 #include <list>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/file_event.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/dns.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/file_event.h"
+#include "envoy/network/address.h"
+#include "envoy/network/dns.h"
 
 #include "common/common/random_generator.h"
 #include "common/network/address_impl.h"

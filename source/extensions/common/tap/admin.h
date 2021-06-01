@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/server/admin.h"
-#include "include/envoy/singleton/manager.h"
+#include "envoy/server/admin.h"
+#include "envoy/singleton/manager.h"
 
 #include "extensions/common/tap/tap.h"
 

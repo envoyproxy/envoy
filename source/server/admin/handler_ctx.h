@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/instance.h"
+#include "envoy/server/instance.h"
 
 namespace Envoy {
 namespace Server {

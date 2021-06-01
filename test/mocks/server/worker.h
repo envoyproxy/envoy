@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/worker.h"
+#include "envoy/server/worker.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"

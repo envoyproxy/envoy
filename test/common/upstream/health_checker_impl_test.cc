@@ -8,7 +8,7 @@
 #include "envoy/config/core/v3/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "include/envoy/upstream/health_check_host_monitor.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"

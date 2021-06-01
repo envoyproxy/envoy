@@ -16,8 +16,8 @@ envoy_cc_library(
         "abseil_hash",
     ],
     deps = [
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/protobuf:message_validator_interface",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

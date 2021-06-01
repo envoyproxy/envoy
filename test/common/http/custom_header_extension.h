@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/http/original_ip_detection.h"
+#include "envoy/http/original_ip_detection.h"
 
 // This helper is used to escape namespace pollution issues.
 namespace Envoy {

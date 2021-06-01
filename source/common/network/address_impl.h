@@ -6,9 +6,9 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/platform.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/common/platform.h"
+#include "envoy/network/address.h"
+#include "envoy/network/socket.h"
 
 #include "common/common/assert.h"
 

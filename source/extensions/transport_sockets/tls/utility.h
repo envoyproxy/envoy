@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/ssl/context.h"
+#include "envoy/ssl/context.h"
 
 #include "common/common/utility.h"
 

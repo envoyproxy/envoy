@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/common/logger.h"

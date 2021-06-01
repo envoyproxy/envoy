@@ -3,8 +3,8 @@
 #include <list>
 #include <memory>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/exception.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
 

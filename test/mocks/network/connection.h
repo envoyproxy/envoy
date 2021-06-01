@@ -3,7 +3,7 @@
 #include <list>
 #include <ostream>
 
-#include "include/envoy/network/connection.h"
+#include "envoy/network/connection.h"
 
 #include "common/network/filter_manager_impl.h"
 

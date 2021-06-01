@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/upstream/retry.h"
+#include "envoy/upstream/retry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

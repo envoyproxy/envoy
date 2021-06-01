@@ -2,12 +2,12 @@
 
 #include <vector>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/network/io_handle.h"
-#include "include/envoy/network/post_io_action.h"
-#include "include/envoy/network/proxy_protocol.h"
-#include "include/envoy/ssl/connection.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/post_io_action.h"
+#include "envoy/network/proxy_protocol.h"
+#include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
 

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/common/matchers.h"
+#include "envoy/common/matchers.h"
 
 namespace Envoy {
 namespace Regex {

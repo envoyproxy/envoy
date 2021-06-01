@@ -1,6 +1,6 @@
 #include <string>
 
-#include "include/envoy/common/optref.h"
+#include "envoy/common/optref.h"
 
 #include "gtest/gtest.h"
 

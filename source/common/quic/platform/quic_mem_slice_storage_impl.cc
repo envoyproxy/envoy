@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/buffer/buffer.h"
 
 #include "quiche/quic/core/quic_utils.h"
 

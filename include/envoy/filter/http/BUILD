@@ -12,10 +12,10 @@ envoy_cc_library(
     name = "filter_config_provider_interface",
     hdrs = ["filter_config_provider.h"],
     deps = [
-        "//include/envoy/config:extension_config_provider_interface_no_include_prefix",
-        "//include/envoy/http:filter_interface_no_include_prefix",
-        "//include/envoy/init:manager_interface_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        "//include/envoy/config:extension_config_provider_interface",
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/server:filter_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

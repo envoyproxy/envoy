@@ -4,7 +4,7 @@
 #error "Linux platform file is part of non-Linux build."
 #endif
 
-#include "include/envoy/api/os_sys_calls_linux.h"
+#include "envoy/api/os_sys_calls_linux.h"
 
 #include "common/singleton/threadsafe_singleton.h"
 

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/event/timer.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
 #include "common/common/logger.h"

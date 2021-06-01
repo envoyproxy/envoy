@@ -6,14 +6,14 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/conn_pool.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/conn_pool.h"
+#include "envoy/http/header_map.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"

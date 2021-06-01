@@ -3,8 +3,8 @@
 #include <memory>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"

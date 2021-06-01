@@ -6,11 +6,11 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
 #include "common/config/utility.h"

@@ -12,12 +12,12 @@ envoy_cc_library(
     name = "api_interface",
     hdrs = ["api.h"],
     deps = [
-        "//include/envoy/common:random_generator_interface_no_include_prefix",
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
-        "//include/envoy/event:scaled_range_timer_manager_interface_no_include_prefix",
-        "//include/envoy/filesystem:filesystem_interface_no_include_prefix",
-        "//include/envoy/server:process_context_interface_no_include_prefix",
-        "//include/envoy/thread:thread_interface_no_include_prefix",
+        "//include/envoy/common:random_generator_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:scaled_range_timer_manager_interface",
+        "//include/envoy/filesystem:filesystem_interface",
+        "//include/envoy/server:process_context_interface",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 

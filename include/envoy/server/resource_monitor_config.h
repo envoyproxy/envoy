@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/protobuf/message_validator.h"
-#include "include/envoy/server/options.h"
-#include "include/envoy/server/resource_monitor.h"
+#include "envoy/api/api.h"
+#include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/server/options.h"
+#include "envoy/server/resource_monitor.h"
 
 #include "common/protobuf/protobuf.h"
 

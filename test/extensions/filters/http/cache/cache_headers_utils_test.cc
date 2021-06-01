@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/common/macros.h"
 #include "common/common/utility.h"

@@ -6,7 +6,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"

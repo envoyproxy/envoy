@@ -2,10 +2,10 @@
 
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/scaled_range_timer_manager.h"
-#include "include/envoy/server/overload/thread_local_overload_state.h"
+#include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "common/singleton/const_singleton.h"
 

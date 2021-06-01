@@ -4,11 +4,11 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/stats/timespan.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/stats/symbol_table_impl.h"
 

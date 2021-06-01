@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/api/os_sys_calls.h"
+#include "envoy/api/os_sys_calls.h"
 
 #include "common/singleton/threadsafe_singleton.h"
 

@@ -1,4 +1,4 @@
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/singleton/manager_impl.h"
 

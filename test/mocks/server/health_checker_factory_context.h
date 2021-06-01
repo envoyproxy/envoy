@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/health_checker_config.h"
+#include "envoy/server/health_checker_config.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"

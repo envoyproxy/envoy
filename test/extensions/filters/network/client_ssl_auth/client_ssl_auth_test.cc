@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"

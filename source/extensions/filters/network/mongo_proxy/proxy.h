@@ -6,15 +6,15 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/drain_decision.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/time.h"
+#include "envoy/event/timer.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/drain_decision.h"
+#include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

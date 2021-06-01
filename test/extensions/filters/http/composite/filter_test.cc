@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "include/envoy/http/metadata_interface.h"
+#include "envoy/http/metadata_interface.h"
 
 #include "extensions/filters/http/composite/filter.h"
 

@@ -3,9 +3,9 @@
 #include <regex>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Server {

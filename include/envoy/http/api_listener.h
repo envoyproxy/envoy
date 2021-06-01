@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 
 namespace Envoy {
 namespace Http {

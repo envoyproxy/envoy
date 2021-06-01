@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/http/codes.h"
+#include "envoy/http/codes.h"
 
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"

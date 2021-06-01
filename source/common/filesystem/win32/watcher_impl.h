@@ -8,10 +8,10 @@
 #include <locale>
 #include <string>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/filesystem/watcher.h"
-#include "include/envoy/network/io_handle.h"
+#include "envoy/api/api.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/filesystem/watcher.h"
+#include "envoy/network/io_handle.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/buffer/buffer_impl.h"

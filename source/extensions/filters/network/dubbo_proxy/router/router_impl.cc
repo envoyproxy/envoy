@@ -1,7 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/thread_local_cluster.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/message_impl.h"

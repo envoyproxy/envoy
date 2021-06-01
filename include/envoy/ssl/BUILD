@@ -13,8 +13,8 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":ssl_socket_state_no_include_prefix",
-        "//include/envoy/common:time_interface_no_include_prefix",
+        ":ssl_socket_state",
+        "//include/envoy/common:time_interface",
     ],
 )
 
@@ -28,9 +28,9 @@ envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
     deps = [
-        ":certificate_validation_context_config_interface_no_include_prefix",
-        ":handshaker_interface_no_include_prefix",
-        ":tls_certificate_config_interface_no_include_prefix",
+        ":certificate_validation_context_config_interface",
+        ":handshaker_interface",
+        ":tls_certificate_config_interface",
     ],
 )
 
@@ -38,11 +38,11 @@ envoy_cc_library(
     name = "context_manager_interface",
     hdrs = ["context_manager.h"],
     deps = [
-        ":context_config_interface_no_include_prefix",
-        ":context_interface_no_include_prefix",
-        "//include/envoy/common:time_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/stats:stats_interface_no_include_prefix",
+        ":context_config_interface",
+        ":context_interface",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -50,7 +50,7 @@ envoy_cc_library(
     name = "tls_certificate_config_interface",
     hdrs = ["tls_certificate_config.h"],
     deps = [
-        "//include/envoy/ssl/private_key:private_key_interface_no_include_prefix",
+        "//include/envoy/ssl/private_key:private_key_interface",
     ],
 )
 
@@ -80,10 +80,10 @@ envoy_cc_library(
     hdrs = ["handshaker.h"],
     external_deps = ["ssl"],
     deps = [
-        "//include/envoy/api:api_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/network:connection_interface_no_include_prefix",
-        "//include/envoy/network:post_io_action_interface_no_include_prefix",
-        "//include/envoy/protobuf:message_validator_interface_no_include_prefix",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:post_io_action_interface",
+        "//include/envoy/protobuf:message_validator_interface",
     ],
 )

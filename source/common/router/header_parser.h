@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/access_log/access_log.h"
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/router/header_formatter.h"

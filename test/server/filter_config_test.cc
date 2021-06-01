@@ -1,4 +1,4 @@
-#include "include/envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 

@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 namespace Envoy {

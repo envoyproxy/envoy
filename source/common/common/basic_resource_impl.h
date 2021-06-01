@@ -2,8 +2,8 @@
 
 #include <limits>
 
-#include "include/envoy/common/resource.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/common/resource.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
 

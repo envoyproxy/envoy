@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/stats/histogram.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Stats {

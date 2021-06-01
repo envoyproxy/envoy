@@ -5,9 +5,9 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/common/optref.h"
-#include "include/envoy/common/time.h"
-#include "include/envoy/http/alternate_protocols_cache.h"
+#include "envoy/common/optref.h"
+#include "envoy/common/time.h"
+#include "envoy/http/alternate_protocols_cache.h"
 
 #include "absl/strings/string_view.h"
 

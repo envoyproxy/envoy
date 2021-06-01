@@ -1,9 +1,9 @@
 #include "mocks.h"
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/optref.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

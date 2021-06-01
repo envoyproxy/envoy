@@ -3,7 +3,7 @@
 #include <atomic>
 #include <memory>
 
-#include "include/envoy/http/codes.h"
+#include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

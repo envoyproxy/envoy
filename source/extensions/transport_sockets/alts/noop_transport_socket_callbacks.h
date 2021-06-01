@@ -1,6 +1,6 @@
 #pragma once
-#include "include/envoy/network/io_handle.h"
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/transport_socket.h"
 
 namespace Envoy {
 namespace Extensions {

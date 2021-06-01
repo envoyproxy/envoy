@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "thread_local_interface",
     hdrs = ["thread_local.h"],
     deps = [
-        ":thread_local_object_no_include_prefix",
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        ":thread_local_object",
+        "//include/envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
     ],
 )

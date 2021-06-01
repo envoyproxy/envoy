@@ -26,7 +26,7 @@
 
 #pragma GCC diagnostic pop
 
-#include "include/envoy/network/udp_packet_writer_handler.h"
+#include "envoy/network/udp_packet_writer_handler.h"
 
 #include "common/protobuf/utility.h"
 #include "common/runtime/runtime_protos.h"

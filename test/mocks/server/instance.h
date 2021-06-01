@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/instance.h"
+#include "envoy/server/instance.h"
 
 #include "common/grpc/context_impl.h"
 #include "common/http/context_impl.h"

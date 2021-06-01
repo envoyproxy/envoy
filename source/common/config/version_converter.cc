@@ -1,6 +1,6 @@
 #include "common/config/version_converter.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"

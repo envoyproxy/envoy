@@ -3,7 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"

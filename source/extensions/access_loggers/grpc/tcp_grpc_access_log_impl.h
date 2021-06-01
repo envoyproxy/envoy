@@ -3,11 +3,11 @@
 #include <vector>
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "include/envoy/grpc/async_client.h"
-#include "include/envoy/grpc/async_client_manager.h"
-#include "include/envoy/local_info/local_info.h"
-#include "include/envoy/singleton/instance.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/grpc/typed_async_client.h"
 

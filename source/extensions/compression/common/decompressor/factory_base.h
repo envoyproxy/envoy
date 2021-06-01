@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/compression/decompressor/config.h"
+#include "envoy/compression/decompressor/config.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -3,10 +3,10 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/random_generator.h"
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"

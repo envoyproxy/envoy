@@ -4,7 +4,7 @@
 #include <functional>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Event {

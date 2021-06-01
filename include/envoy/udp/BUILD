@@ -13,6 +13,6 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/network:address_interface_no_include_prefix",
+        "//include/envoy/network:address_interface",
     ],
 )

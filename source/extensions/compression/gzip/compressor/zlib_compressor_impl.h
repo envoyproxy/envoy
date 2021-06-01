@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/compression/compressor/compressor.h"
+#include "envoy/compression/compressor/compressor.h"
 
 #include "extensions/compression/gzip/common/base.h"
 

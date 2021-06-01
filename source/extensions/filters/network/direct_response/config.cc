@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/config/datasource.h"
 

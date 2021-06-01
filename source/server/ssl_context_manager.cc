@@ -1,7 +1,7 @@
 #include "server/ssl_context_manager.h"
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Server {

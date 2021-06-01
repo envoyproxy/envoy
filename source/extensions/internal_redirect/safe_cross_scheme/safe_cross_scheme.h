@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/router/internal_redirect.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/router/internal_redirect.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "extensions/internal_redirect/well_known_names.h"
 

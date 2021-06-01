@@ -1,4 +1,4 @@
-#include "include/envoy/server/lifecycle_notifier.h"
+#include "envoy/server/lifecycle_notifier.h"
 
 #include "common/common/hex.h"
 #include "common/event/dispatcher_impl.h"

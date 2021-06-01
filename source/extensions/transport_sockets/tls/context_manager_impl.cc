@@ -4,7 +4,7 @@
 #include <functional>
 #include <limits>
 
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 

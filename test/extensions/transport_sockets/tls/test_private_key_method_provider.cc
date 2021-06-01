@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 
 #include "openssl/ssl.h"
 

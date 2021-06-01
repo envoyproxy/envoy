@@ -1,9 +1,9 @@
 #pragma once
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
-#include "include/envoy/server/tracer_config.h"
-#include "include/envoy/thread_local/thread_local.h"
-#include "include/envoy/tracing/trace_driver.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/tracing_context_impl.h"
 

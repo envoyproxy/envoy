@@ -3,13 +3,13 @@
 #include <memory>
 #include <vector>
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
 #include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"

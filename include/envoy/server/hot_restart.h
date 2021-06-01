@@ -3,11 +3,11 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/stats/allocator.h"
-#include "include/envoy/stats/store.h"
-#include "include/envoy/thread/thread.h"
+#include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/stats/allocator.h"
+#include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "source/server/hot_restart.pb.h"
 

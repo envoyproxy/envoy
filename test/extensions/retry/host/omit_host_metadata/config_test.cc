@@ -1,6 +1,6 @@
 #include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/upstream/retry.h"
+#include "envoy/registry/registry.h"
+#include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
 

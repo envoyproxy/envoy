@@ -7,7 +7,7 @@
 #include <functional>
 #include <string>
 
-#include "include/envoy/event/signal.h"
+#include "envoy/event/signal.h"
 
 #include "common/common/win32/event_logger_impl.h"
 

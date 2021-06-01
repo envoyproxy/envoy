@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/stats/primitive_stats.h"
+#include "envoy/stats/primitive_stats.h"
 
 #include "absl/strings/string_view.h"
 

@@ -5,17 +5,17 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/common/scope_tracker.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/matcher/matcher.h"
-#include "include/envoy/router/router.h"
-#include "include/envoy/ssl/connection.h"
-#include "include/envoy/tracing/http_tracer.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/common/scope_tracker.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/router/router.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/scope_tracked_object_stack.h"
 

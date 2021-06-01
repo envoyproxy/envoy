@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
-#include "include/envoy/formatter/substitution_formatter.h"
+#include "envoy/formatter/substitution_formatter.h"
 
 #include "common/protobuf/protobuf.h"
 

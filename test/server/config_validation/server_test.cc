@@ -1,6 +1,6 @@
 #include <vector>
 
-#include "include/envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h"
 
 #include "server/config_validation/server.h"
 

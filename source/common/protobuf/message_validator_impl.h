@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/protobuf/message_validator.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/documentation_url.h"
 #include "common/common/logger.h"

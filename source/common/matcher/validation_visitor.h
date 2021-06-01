@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/matcher/matcher.h"
+#include "envoy/matcher/matcher.h"
 
 #include "absl/status/status.h"
 

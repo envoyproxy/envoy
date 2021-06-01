@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
 

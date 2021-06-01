@@ -2,8 +2,8 @@
 
 #include <sstream>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/network/address.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/network/address.h"
 
 #include "common/network/address_impl.h"
 

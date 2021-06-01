@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

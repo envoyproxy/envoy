@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"

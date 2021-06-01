@@ -4,7 +4,7 @@
 #include <cmath>
 #include <memory>
 
-#include "include/envoy/event/timer.h"
+#include "envoy/event/timer.h"
 
 #include "common/common/assert.h"
 #include "common/common/scope_tracker.h"

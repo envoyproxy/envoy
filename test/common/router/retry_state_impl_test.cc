@@ -1,7 +1,7 @@
 #include <chrono>
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/router/reset_header_parser.h"

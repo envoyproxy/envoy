@@ -3,10 +3,10 @@
 #include <list>
 #include <string>
 
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/io_handle.h"
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/network/address.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/network/utility.h"
 

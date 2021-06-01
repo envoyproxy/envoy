@@ -4,9 +4,9 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

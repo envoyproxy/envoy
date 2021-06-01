@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
 #include "common/common/dump_state_utils.h"

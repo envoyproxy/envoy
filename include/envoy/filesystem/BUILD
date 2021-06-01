@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "filesystem_interface",
     hdrs = ["filesystem.h"],
     deps = [
-        "//include/envoy/api:io_error_interface_no_include_prefix",
-        "//include/envoy/api:os_sys_calls_interface_no_include_prefix",
+        "//include/envoy/api:io_error_interface",
+        "//include/envoy/api:os_sys_calls_interface",
     ],
 )
 

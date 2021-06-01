@@ -17,7 +17,7 @@ envoy_cc_library(
     name = "target_interface",
     hdrs = ["target.h"],
     deps = [
-        ":watcher_interface_no_include_prefix",
+        ":watcher_interface",
     ],
 )
 
@@ -25,8 +25,8 @@ envoy_cc_library(
     name = "manager_interface",
     hdrs = ["manager.h"],
     deps = [
-        ":target_interface_no_include_prefix",
-        ":watcher_interface_no_include_prefix",
+        ":target_interface",
+        ":watcher_interface",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

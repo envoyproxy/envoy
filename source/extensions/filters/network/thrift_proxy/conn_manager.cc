@@ -1,7 +1,7 @@
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/common/exception.h"
+#include "envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"

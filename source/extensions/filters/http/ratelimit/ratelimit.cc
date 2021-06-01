@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/http/codes.h"
+#include "envoy/http/codes.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

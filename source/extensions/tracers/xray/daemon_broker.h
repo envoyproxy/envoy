@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/network/address.h"
+#include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "common/network/io_socket_handle_impl.h"
 

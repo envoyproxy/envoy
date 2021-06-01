@@ -15,9 +15,9 @@ envoy_cc_library(
     hdrs = ["zlib_decompressor_impl.h"],
     external_deps = ["zlib"],
     deps = [
-        "//include/envoy/compression/decompressor:decompressor_interface_no_include_prefix",
-        "//include/envoy/stats:stats_interface_no_include_prefix",
-        "//include/envoy/stats:stats_macros_no_include_prefix",
+        "//include/envoy/compression/decompressor:decompressor_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",

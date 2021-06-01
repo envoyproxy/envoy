@@ -1,6 +1,6 @@
 #include "common/protobuf/message_validator_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"

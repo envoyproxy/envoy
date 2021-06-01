@@ -1,4 +1,4 @@
-#include "include/envoy/split"
+#include "envoy/split"
 
 // NOLINT(namespace-envoy)
 

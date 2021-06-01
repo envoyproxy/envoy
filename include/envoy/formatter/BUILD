@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "substitution_formatter_interface",
     hdrs = ["substitution_formatter.h"],
     deps = [
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
-        "//include/envoy/http:header_map_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/stream_info:stream_info_interface",
     ],
 )

@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/http/codec.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/utility.h"

@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/macros.h"

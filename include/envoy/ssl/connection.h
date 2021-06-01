@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

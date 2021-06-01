@@ -1,6 +1,6 @@
 #include "extensions/watchdog/profile_action/config.h"
 
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"

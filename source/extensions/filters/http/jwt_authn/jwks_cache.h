@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
+#include "envoy/api/api.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "jwt_verify_lib/jwks.h"
 

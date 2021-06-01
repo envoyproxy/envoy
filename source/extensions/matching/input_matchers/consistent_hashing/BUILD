@@ -13,8 +13,8 @@ envoy_cc_library(
     name = "consistent_hashing_lib",
     hdrs = ["matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface_no_include_prefix",
-        "//include/envoy/upstream:retry_interface_no_include_prefix",
+        "//include/envoy/matcher:matcher_interface",
+        "//include/envoy/upstream:retry_interface",
         "//source/common/common:hash_lib",
     ],
 )
@@ -27,9 +27,9 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":consistent_hashing_lib",
-        "//include/envoy/matcher:matcher_interface_no_include_prefix",
-        "//include/envoy/registry:registry_no_include_prefix",
-        "//include/envoy/server:factory_context_interface_no_include_prefix",
+        "//include/envoy/matcher:matcher_interface",
+        "//include/envoy/registry",
+        "//include/envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg_cc_proto",
     ],
 )

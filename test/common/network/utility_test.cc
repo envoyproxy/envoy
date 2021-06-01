@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
 
 #include "common/common/thread.h"

@@ -1,6 +1,6 @@
 #include "extensions/common/redis/cluster_refresh_manager_impl.h"
 
-#include "include/envoy/singleton/manager.h"
+#include "envoy/singleton/manager.h"
 
 namespace Envoy {
 namespace Extensions {

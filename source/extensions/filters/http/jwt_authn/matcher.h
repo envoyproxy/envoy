@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Extensions {

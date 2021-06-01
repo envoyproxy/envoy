@@ -1,8 +1,8 @@
 #include "common/http/match_wrapper/config.h"
 
-#include "include/envoy/http/filter.h"
-#include "include/envoy/matcher/matcher.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/http/filter.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/matcher/matcher.h"

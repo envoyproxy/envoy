@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/common/exception.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Http {

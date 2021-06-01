@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/csrf/csrf_filter.h"
 

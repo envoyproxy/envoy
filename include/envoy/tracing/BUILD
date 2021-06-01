@@ -12,9 +12,9 @@ envoy_cc_library(
     name = "http_tracer_interface",
     hdrs = ["http_tracer.h"],
     deps = [
-        ":trace_driver_interface_no_include_prefix",
-        "//include/envoy/access_log:access_log_interface_no_include_prefix",
-        "//include/envoy/http:header_map_interface_no_include_prefix",
+        ":trace_driver_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/http:header_map_interface",
     ],
 )
 
@@ -22,7 +22,7 @@ envoy_cc_library(
     name = "http_tracer_manager_interface",
     hdrs = ["http_tracer_manager.h"],
     deps = [
-        ":http_tracer_interface_no_include_prefix",
+        ":http_tracer_interface",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -36,7 +36,7 @@ envoy_cc_library(
     name = "trace_driver_interface",
     hdrs = ["trace_driver.h"],
     deps = [
-        ":trace_reason_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
+        ":trace_reason_interface",
+        "//include/envoy/stream_info:stream_info_interface",
     ],
 )

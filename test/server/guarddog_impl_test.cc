@@ -4,11 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "include/envoy/common/time.h"
-#include "include/envoy/server/configuration.h"
-#include "include/envoy/server/guarddog_config.h"
-#include "include/envoy/server/watchdog.h"
-#include "include/envoy/thread/thread.h"
+#include "envoy/common/time.h"
+#include "envoy/server/configuration.h"
+#include "envoy/server/guarddog_config.h"
+#include "envoy/server/watchdog.h"
+#include "envoy/thread/thread.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/macros.h"

@@ -32,8 +32,8 @@ As an example, consider adding the following interface in `include/envoy/foo/bar
 ```c++
 #pragma once
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/foo/baz.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/foo/baz.h"
 
 class Bar {
 public:
@@ -73,7 +73,7 @@ Continuing the above example, the implementation of `Bar` might take place in
 ```c++
 #pragma once
 
-#include "include/envoy/foo/bar.h"
+#include "envoy/foo/bar.h"
 
 class BarImpl : public Bar {
 ...

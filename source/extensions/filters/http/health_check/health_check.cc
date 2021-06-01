@@ -3,9 +3,9 @@
 #include <chrono>
 #include <string>
 
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
+#include "envoy/http/header_map.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"

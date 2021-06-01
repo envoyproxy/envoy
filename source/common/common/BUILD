@@ -44,8 +44,8 @@ envoy_cc_library(
     hdrs = ["backoff_strategy.h"],
     deps = [
         ":assert_lib",
-        "//include/envoy/common:backoff_strategy_interface_no_include_prefix",
-        "//include/envoy/common:random_generator_interface_no_include_prefix",
+        "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/common:random_generator_interface",
     ],
 )
 
@@ -56,7 +56,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":empty_string",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
+        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
@@ -112,7 +112,7 @@ envoy_basic_cc_library(
         "fmtlib",
     ],
     include_prefix = envoy_include_prefix(package_name()),
-    deps = ["//include/envoy/common:base_includes_no_include_prefix"],
+    deps = ["//include/envoy/common:base_includes"],
 )
 
 envoy_cc_library(
@@ -227,7 +227,7 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":assert_lib",
-        "//include/envoy/common:mutex_tracer_no_include_prefix",
+        "//include/envoy/common:mutex_tracer",
     ],
 )
 
@@ -241,7 +241,7 @@ envoy_cc_library(
         ":dump_state_utils",
         ":macros",
         ":minimal_logger_lib",
-        "//include/envoy/access_log:access_log_interface_no_include_prefix",
+        "//include/envoy/access_log:access_log_interface",
     ],
 )
 
@@ -249,8 +249,8 @@ envoy_cc_library(
     name = "basic_resource_lib",
     hdrs = ["basic_resource_impl.h"],
     deps = [
-        "//include/envoy/common:resource_interface_no_include_prefix",
-        "//include/envoy/runtime:runtime_interface_no_include_prefix",
+        "//include/envoy/common:resource_interface",
+        "//include/envoy/runtime:runtime_interface",
     ],
 )
 
@@ -266,7 +266,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
-        "//include/envoy/common:matchers_interface_no_include_prefix",
+        "//include/envoy/common:matchers_interface",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/http:path_utility_lib",
@@ -287,7 +287,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":assert_lib",
-        "//include/envoy/common:random_generator_interface_no_include_prefix",
+        "//include/envoy/common:random_generator_interface",
     ],
 )
 
@@ -297,7 +297,7 @@ envoy_cc_library(
     hdrs = ["regex.h"],
     deps = [
         ":assert_lib",
-        "//include/envoy/common:regex_interface_no_include_prefix",
+        "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@com_googlesource_code_re2//:re2",
@@ -319,8 +319,8 @@ envoy_cc_library(
     name = "scope_tracker",
     hdrs = ["scope_tracker.h"],
     deps = [
-        "//include/envoy/common:scope_tracker_interface_no_include_prefix",
-        "//include/envoy/event:dispatcher_interface_no_include_prefix",
+        "//include/envoy/common:scope_tracker_interface",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
 
@@ -328,7 +328,7 @@ envoy_cc_library(
     name = "scope_tracked_object_stack",
     hdrs = ["scope_tracked_object_stack.h"],
     deps = [
-        "//include/envoy/common:scope_tracker_interface_no_include_prefix",
+        "//include/envoy/common:scope_tracker_interface",
     ],
 )
 
@@ -371,7 +371,7 @@ envoy_cc_posix_library(
     strip_include_prefix = "posix",
     deps = [
         ":assert_lib",
-        "//include/envoy/thread:thread_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -382,7 +382,7 @@ envoy_cc_win32_library(
     strip_include_prefix = "win32",
     deps = [
         ":assert_lib",
-        "//include/envoy/thread:thread_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -391,7 +391,7 @@ envoy_cc_library(
     hdrs = ["lock_guard.h"],
     deps = [
         ":thread_annotations",
-        "//include/envoy/thread:thread_interface_no_include_prefix",
+        "//include/envoy/thread:thread_interface",
     ],
 )
 
@@ -404,8 +404,8 @@ envoy_cc_library(
         ":assert_lib",
         ":hash_lib",
         ":non_copyable",
-        "//include/envoy/common:interval_set_interface_no_include_prefix",
-        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/common:interval_set_interface",
+        "//include/envoy/common:time_interface",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -415,7 +415,7 @@ envoy_cc_library(
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
-        "//include/envoy/common:callback_no_include_prefix",
+        "//include/envoy/common:callback",
     ],
 )
 
@@ -441,8 +441,8 @@ envoy_cc_library(
     srcs = ["token_bucket_impl.cc"],
     hdrs = ["token_bucket_impl.h"],
     deps = [
-        "//include/envoy/common:time_interface_no_include_prefix",
-        "//include/envoy/common:token_bucket_interface_no_include_prefix",
+        "//include/envoy/common:time_interface",
+        "//include/envoy/common:token_bucket_interface",
         "//source/common/common:utility_lib",
     ],
 )
@@ -452,7 +452,7 @@ envoy_cc_library(
     srcs = ["shared_token_bucket_impl.cc"],
     hdrs = ["shared_token_bucket_impl.h"],
     deps = [
-        "//include/envoy/common:time_interface_no_include_prefix",
+        "//include/envoy/common:time_interface",
         "//source/common/common:thread_lib",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",

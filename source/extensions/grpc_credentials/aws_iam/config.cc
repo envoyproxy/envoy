@@ -1,11 +1,11 @@
 #include "extensions/grpc_credentials/aws_iam/config.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
 #include "envoy/config/grpc_credential/v3/aws_iam.pb.validate.h"
-#include "include/envoy/grpc/google_grpc_creds.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/grpc/google_grpc_creds.h"
+#include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
 #include "common/grpc/google_grpc_creds_impl.h"

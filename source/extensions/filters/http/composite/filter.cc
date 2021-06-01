@@ -1,6 +1,6 @@
 #include "extensions/filters/http/composite/filter.h"
 
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 #include "common/common/stl_helpers.h"
 

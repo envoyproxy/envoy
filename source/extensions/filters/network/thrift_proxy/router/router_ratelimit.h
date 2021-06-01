@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/ratelimit/ratelimit.h"
+#include "envoy/http/header_map.h"
+#include "envoy/ratelimit/ratelimit.h"
 
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"

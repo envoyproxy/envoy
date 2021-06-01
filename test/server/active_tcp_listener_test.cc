@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "include/envoy/network/filter.h"
-#include "include/envoy/network/listener.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/connection_balancer_impl.h"

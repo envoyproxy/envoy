@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/pure.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Json {

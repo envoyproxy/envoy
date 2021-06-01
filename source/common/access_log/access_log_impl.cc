@@ -3,13 +3,13 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/http/header_map.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"

@@ -6,14 +6,14 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/local_info/local_info.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/stats/sink.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codes.h"
+#include "envoy/local_info/local_info.h"
+#include "envoy/network/filter.h"
+#include "envoy/stats/sink.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

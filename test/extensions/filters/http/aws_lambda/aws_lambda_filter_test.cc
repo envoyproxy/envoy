@@ -1,7 +1,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 

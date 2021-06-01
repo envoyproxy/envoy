@@ -6,15 +6,15 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/server/instance.h"
-#include "include/envoy/server/tracer_config.h"
-#include "include/envoy/ssl/context_manager.h"
+#include "envoy/network/connection.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
+#include "envoy/ssl/context_manager.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/assert.h"

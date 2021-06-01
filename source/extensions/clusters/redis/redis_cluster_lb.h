@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/upstream/load_balancer.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/network/address_impl.h"
 #include "common/upstream/load_balancer_impl.h"

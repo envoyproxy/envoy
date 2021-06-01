@@ -1,6 +1,6 @@
-#include "include/envoy/http/filter.h"
-#include "include/envoy/server/factory_context.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/http/match_wrapper/config.h"
 

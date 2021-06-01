@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
     deps = [
-        "//include/envoy/api:os_sys_calls_interface_no_include_prefix",
+        "//include/envoy/api:os_sys_calls_interface",
     ],
 )
 
@@ -21,13 +21,13 @@ envoy_cc_library(
     hdrs = ["connection.h"],
     external_deps = ["abseil_int128"],
     deps = [
-        ":address_interface_no_include_prefix",
-        ":filter_interface_no_include_prefix",
-        ":listen_socket_interface_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
-        "//include/envoy/event:deferred_deletable_no_include_prefix",
-        "//include/envoy/ssl:connection_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
+        ":address_interface",
+        ":filter_interface",
+        ":listen_socket_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/event:deferred_deletable",
+        "//include/envoy/ssl:connection_interface",
+        "//include/envoy/stream_info:stream_info_interface",
     ],
 )
 
@@ -35,10 +35,10 @@ envoy_cc_library(
     name = "connection_handler_interface",
     hdrs = ["connection_handler.h"],
     deps = [
-        ":connection_balancer_interface_no_include_prefix",
-        ":listen_socket_interface_no_include_prefix",
-        ":listener_interface_no_include_prefix",
-        "//include/envoy/ssl:context_interface_no_include_prefix",
+        ":connection_balancer_interface",
+        ":listen_socket_interface",
+        ":listener_interface",
+        "//include/envoy/ssl:context_interface",
         "//source/common/common:interval_value",
     ],
 )
@@ -47,20 +47,20 @@ envoy_cc_library(
     name = "udp_packet_writer_handler_interface",
     hdrs = ["udp_packet_writer_handler.h"],
     deps = [
-        ":address_interface_no_include_prefix",
-        ":io_handle_interface_no_include_prefix",
-        ":socket_interface_no_include_prefix",
-        "//include/envoy/api:io_error_interface_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
-        "//include/envoy/stats:stats_interface_no_include_prefix",
-        "//include/envoy/stats:stats_macros_no_include_prefix",
+        ":address_interface",
+        ":io_handle_interface",
+        ":socket_interface",
+        "//include/envoy/api:io_error_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/stats:stats_macros",
     ],
 )
 
 envoy_cc_library(
     name = "dns_interface",
     hdrs = ["dns.h"],
-    deps = ["//include/envoy/network:address_interface_no_include_prefix"],
+    deps = ["//include/envoy/network:address_interface"],
 )
 
 envoy_cc_library(
@@ -77,11 +77,11 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
-        ":listen_socket_interface_no_include_prefix",
-        ":transport_socket_interface_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
-        "//include/envoy/stream_info:stream_info_interface_no_include_prefix",
-        "//include/envoy/upstream:host_description_interface_no_include_prefix",
+        ":listen_socket_interface",
+        ":transport_socket_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/stream_info:stream_info_interface",
+        "//include/envoy/upstream:host_description_interface",
         "//source/common/protobuf",
     ],
 )
@@ -91,7 +91,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":address_interface_no_include_prefix",
+        ":address_interface",
     ],
 )
 
@@ -100,10 +100,10 @@ envoy_cc_library(
     hdrs = ["io_handle.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":address_interface_no_include_prefix",
-        "//include/envoy/api:io_error_interface_no_include_prefix",
-        "//include/envoy/api:os_sys_calls_interface_no_include_prefix",
-        "//include/envoy/event:file_event_interface_no_include_prefix",
+        ":address_interface",
+        "//include/envoy/api:io_error_interface",
+        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -112,8 +112,8 @@ envoy_cc_library(
     name = "socket_interface",
     hdrs = ["socket.h"],
     deps = [
-        ":address_interface_no_include_prefix",
-        ":io_handle_interface_no_include_prefix",
+        ":address_interface",
+        ":io_handle_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -122,8 +122,8 @@ envoy_cc_library(
     name = "socket_interface_interface",
     hdrs = ["socket_interface.h"],
     deps = [
-        ":socket_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        ":socket_interface",
+        "//include/envoy/config:typed_config_interface",
     ],
 )
 
@@ -131,9 +131,9 @@ envoy_cc_library(
     name = "listen_socket_interface",
     hdrs = ["listen_socket.h"],
     deps = [
-        ":io_handle_interface_no_include_prefix",
-        ":socket_interface_no_include_prefix",
-        "//include/envoy/common:scope_tracker_interface_no_include_prefix",
+        ":io_handle_interface",
+        ":socket_interface",
+        "//include/envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -142,11 +142,11 @@ envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
-        ":io_handle_interface_no_include_prefix",
-        ":post_io_action_interface_no_include_prefix",
-        ":proxy_protocol_options_lib_no_include_prefix",
-        "//include/envoy/buffer:buffer_interface_no_include_prefix",
-        "//include/envoy/ssl:connection_interface_no_include_prefix",
+        ":io_handle_interface",
+        ":post_io_action_interface",
+        ":proxy_protocol_options_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/ssl:connection_interface",
     ],
 )
 
@@ -160,7 +160,7 @@ envoy_cc_library(
     name = "connection_balancer_interface",
     hdrs = ["connection_balancer.h"],
     deps = [
-        ":listen_socket_interface_no_include_prefix",
+        ":listen_socket_interface",
     ],
 )
 
@@ -168,14 +168,14 @@ envoy_cc_library(
     name = "listener_interface",
     hdrs = ["listener.h"],
     deps = [
-        ":connection_balancer_interface_no_include_prefix",
-        ":connection_interface_no_include_prefix",
-        ":listen_socket_interface_no_include_prefix",
-        ":udp_packet_writer_handler_interface_no_include_prefix",
-        "//include/envoy/access_log:access_log_interface_no_include_prefix",
-        "//include/envoy/common:resource_interface_no_include_prefix",
-        "//include/envoy/init:manager_interface_no_include_prefix",
-        "//include/envoy/stats:stats_interface_no_include_prefix",
+        ":connection_balancer_interface",
+        ":connection_interface",
+        ":listen_socket_interface",
+        ":udp_packet_writer_handler_interface",
+        "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/common:resource_interface",
+        "//include/envoy/init:manager_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:interval_value",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
@@ -186,8 +186,8 @@ envoy_cc_library(
     name = "resolver_interface",
     hdrs = ["resolver.h"],
     deps = [
-        ":address_interface_no_include_prefix",
-        "//include/envoy/config:typed_config_interface_no_include_prefix",
+        ":address_interface",
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -196,6 +196,6 @@ envoy_cc_library(
     name = "proxy_protocol_options_lib",
     hdrs = ["proxy_protocol.h"],
     deps = [
-        ":address_interface_no_include_prefix",
+        ":address_interface",
     ],
 )

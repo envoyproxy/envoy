@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "include/envoy/http/request_id_extension.h"
-#include "include/envoy/server/request_id_extension_config.h"
+#include "envoy/http/request_id_extension.h"
+#include "envoy/server/request_id_extension_config.h"
 
 namespace Envoy {
 namespace Http {

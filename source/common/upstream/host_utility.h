@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {

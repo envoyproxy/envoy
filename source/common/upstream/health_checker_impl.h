@@ -1,12 +1,12 @@
 #pragma once
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/random_generator.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/network/socket.h"
+#include "envoy/grpc/status.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 

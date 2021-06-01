@@ -6,7 +6,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
-#include "include/envoy/http/filter.h"
+#include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
 

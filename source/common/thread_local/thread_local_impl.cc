@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <list>
 
-#include "include/envoy/event/dispatcher.h"
+#include "envoy/event/dispatcher.h"
 
 #include "common/common/assert.h"
 #include "common/common/stl_helpers.h"

@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "compressor_factory_base_lib",
     hdrs = ["factory_base.h"],
     deps = [
-        "//include/envoy/compression/compressor:compressor_config_interface_no_include_prefix",
-        "//include/envoy/compression/compressor:compressor_factory_interface_no_include_prefix",
-        "//include/envoy/server:filter_config_interface_no_include_prefix",
+        "//include/envoy/compression/compressor:compressor_config_interface",
+        "//include/envoy/compression/compressor:compressor_factory_interface",
+        "//include/envoy/server:filter_config_interface",
     ],
 )

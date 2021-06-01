@@ -1,10 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/stats/symbol_table_impl.h"
 

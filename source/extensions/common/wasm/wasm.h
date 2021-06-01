@@ -5,14 +5,14 @@
 #include <map>
 #include <memory>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/server/lifecycle_notifier.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
-#include "include/envoy/thread_local/thread_local_object.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/lifecycle_notifier.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local_object.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

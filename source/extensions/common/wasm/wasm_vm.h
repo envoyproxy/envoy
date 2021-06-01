@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats.h"
+#include "envoy/common/exception.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/logger.h"
 

@@ -1,7 +1,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/grpc/status.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"

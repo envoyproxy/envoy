@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "include/envoy/common/scope_tracker.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/exception.h"
-#include "include/envoy/server/bootstrap_extension_config.h"
-#include "include/envoy/server/fatal_action_config.h"
+#include "envoy/network/exception.h"
+#include "envoy/server/bootstrap_extension_config.h"
+#include "envoy/server/fatal_action_config.h"
 
 #include "common/common/assert.h"
 #include "common/network/address_impl.h"

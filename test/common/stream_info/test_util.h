@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
 #include "common/common/random_generator.h"

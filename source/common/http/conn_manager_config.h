@@ -1,13 +1,13 @@
 #pragma once
 
-#include "include/envoy/config/config_provider.h"
+#include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/original_ip_detection.h"
-#include "include/envoy/http/request_id_extension.h"
-#include "include/envoy/router/rds.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/tracing/http_tracer.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/original_ip_detection.h"
+#include "envoy/http/request_id_extension.h"
+#include "envoy/router/rds.h"
+#include "envoy/stats/scope.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"

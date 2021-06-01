@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/init/manager.h"
+#include "envoy/init/manager.h"
 
 #include "common/init/target_impl.h"
 #include "common/init/watcher_impl.h"

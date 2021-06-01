@@ -1,6 +1,6 @@
 #include "test/test_common/only_one_thread.h"
 
-#include "include/envoy/thread/thread.h"
+#include "envoy/thread/thread.h"
 
 #include "common/common/lock_guard.h"
 

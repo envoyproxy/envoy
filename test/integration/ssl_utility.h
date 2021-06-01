@@ -1,11 +1,11 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/network/transport_socket.h"
-#include "include/envoy/secret/secret_manager.h"
-#include "include/envoy/ssl/context_manager.h"
+#include "envoy/network/address.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/secret/secret_manager.h"
+#include "envoy/ssl/context_manager.h"
 
 namespace Envoy {
 namespace Ssl {

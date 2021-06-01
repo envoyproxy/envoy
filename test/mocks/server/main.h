@@ -5,8 +5,8 @@
 #include <list>
 #include <string>
 
-#include "include/envoy/server/configuration.h"
-#include "include/envoy/server/overload/overload_manager.h"
+#include "envoy/server/configuration.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "gmock/gmock.h"
 

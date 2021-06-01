@@ -3,11 +3,11 @@
 #include <chrono>
 #include <string>
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/event/timer.h"
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/network/socket.h"
-#include "include/envoy/thread/thread.h"
+#include "envoy/api/api.h"
+#include "envoy/event/timer.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/network/socket.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Api {

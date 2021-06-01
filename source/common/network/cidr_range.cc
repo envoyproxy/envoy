@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/common/platform.h"
+#include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 
 #include "common/common/assert.h"

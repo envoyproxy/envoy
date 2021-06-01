@@ -1,9 +1,9 @@
 #pragma once
 
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {

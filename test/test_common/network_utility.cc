@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

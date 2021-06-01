@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/common/random_generator.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/upstream/health_checker.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/upstream/health_checker.h"
 
 namespace Envoy {
 namespace Server {

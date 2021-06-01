@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/common/utility.h"

@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 namespace Envoy {
 

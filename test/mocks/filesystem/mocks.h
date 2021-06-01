@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <string>
 
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/filesystem/watcher.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 
 #include "common/common/thread.h"
 

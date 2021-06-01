@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "extensions/filters/network/kafka/external/serialization_composite.h"
 #include "extensions/filters/network/kafka/serialization.h"

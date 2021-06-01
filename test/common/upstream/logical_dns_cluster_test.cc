@@ -4,11 +4,11 @@
 #include <tuple>
 #include <vector>
 
-#include "include/envoy/common/callback.h"
+#include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/upstream/health_check_host_monitor.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/health_check_host_monitor.h"
 
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"

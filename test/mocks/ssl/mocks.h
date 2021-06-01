@@ -3,14 +3,14 @@
 #include <functional>
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/ssl/certificate_validation_context_config.h"
-#include "include/envoy/ssl/connection.h"
-#include "include/envoy/ssl/context.h"
-#include "include/envoy/ssl/context_config.h"
-#include "include/envoy/ssl/context_manager.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/connection.h"
+#include "envoy/ssl/context.h"
+#include "envoy/ssl/context_config.h"
+#include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "test/mocks/secret/mocks.h"
 

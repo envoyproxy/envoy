@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "include/envoy/thread/thread.h"
+#include "envoy/thread/thread.h"
 
 #include "common/profiler/profiler.h"
 #include "common/protobuf/utility.h"

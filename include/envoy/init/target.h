@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/init/watcher.h"
+#include "envoy/common/pure.h"
+#include "envoy/init/watcher.h"
 
 #include "absl/strings/string_view.h"
 

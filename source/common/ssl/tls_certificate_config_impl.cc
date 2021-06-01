@@ -1,8 +1,8 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "include/envoy/server/transport_socket_config.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/time.h"
+#include "envoy/common/time.h"
 
 #include "common/common/byte_order.h"
 #include "common/protobuf/utility.h"

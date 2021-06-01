@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 
 #include "common/stats/isolated_store_impl.h"
 

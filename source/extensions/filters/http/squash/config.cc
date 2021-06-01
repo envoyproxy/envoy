@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"

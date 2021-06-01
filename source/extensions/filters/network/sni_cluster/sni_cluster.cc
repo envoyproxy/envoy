@@ -1,6 +1,6 @@
 #include "extensions/filters/network/sni_cluster/sni_cluster.h"
 
-#include "include/envoy/network/connection.h"
+#include "envoy/network/connection.h"
 
 #include "common/common/assert.h"
 #include "common/tcp_proxy/tcp_proxy.h"

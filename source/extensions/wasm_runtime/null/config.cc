@@ -1,4 +1,4 @@
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/common/wasm/wasm_runtime_factory.h"
 

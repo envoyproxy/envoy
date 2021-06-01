@@ -2,11 +2,11 @@
 
 #include <string>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/config/context_provider.h"
+#include "envoy/common/pure.h"
+#include "envoy/config/context_provider.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/network/address.h"
-#include "include/envoy/stats/symbol_table.h"
+#include "envoy/network/address.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace LocalInfo {

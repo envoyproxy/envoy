@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/original_ip_detection.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/original_ip_detection.h"
 
 namespace Envoy {
 namespace Extensions {

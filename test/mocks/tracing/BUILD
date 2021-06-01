@@ -13,7 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/tracing:http_tracer_interface_no_include_prefix",
-        "//include/envoy/tracing:http_tracer_manager_interface_no_include_prefix",
+        "//include/envoy/tracing:http_tracer_interface",
+        "//include/envoy/tracing:http_tracer_manager_interface",
     ],
 )

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/network/connection_handler.h"
+#include "envoy/network/connection_handler.h"
 
 namespace Envoy {
 namespace Server {

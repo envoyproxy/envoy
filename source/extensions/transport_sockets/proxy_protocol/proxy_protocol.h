@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/network/transport_socket.h"
+#include "envoy/network/connection.h"
+#include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"

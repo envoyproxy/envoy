@@ -8,7 +8,7 @@
 #include <iostream>
 #include <string>
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"

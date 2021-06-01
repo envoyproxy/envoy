@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/server/configuration.h"
+#include "envoy/server/configuration.h"
 
 #include "common/router/context_impl.h"
 

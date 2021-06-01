@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/thread_local_cluster.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/utility.h"
 #include "common/router/metadatamatchcriteria_impl.h"

@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/server/filter_config.h"
 
 #include "extensions/filters/udp/dns_filter/dns_filter.h"
 

@@ -4,12 +4,12 @@
 #include <map>
 #include <memory>
 
-#include "include/envoy/access_log/access_log.h"
-#include "include/envoy/buffer/buffer.h"
+#include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/stats/sink.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/http/filter.h"
+#include "envoy/stats/sink.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

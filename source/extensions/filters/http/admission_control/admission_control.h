@@ -4,15 +4,15 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/common/random_generator.h"
-#include "include/envoy/common/time.h"
+#include "envoy/common/random_generator.h"
+#include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/runtime/runtime.h"
-#include "include/envoy/server/filter_config.h"
-#include "include/envoy/stats/scope.h"
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"

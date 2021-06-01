@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/network/connection.h"
-#include "include/envoy/stream_info/stream_info.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "extensions/filters/network/dubbo_proxy/message.h"

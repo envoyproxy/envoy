@@ -3,14 +3,14 @@
 #include <functional>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/pure.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/http/query_params.h"
-#include "include/envoy/network/listen_socket.h"
-#include "include/envoy/server/config_tracker.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/pure.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/query_params.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/server/config_tracker.h"
 
 #include "absl/strings/string_view.h"
 

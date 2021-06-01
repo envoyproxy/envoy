@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/common/exception.h"
+#include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
 

@@ -1,7 +1,7 @@
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
-#include "include/envoy/network/filter.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/network/filter.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/network/connection_impl.h"
 

@@ -3,11 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/optref.h"
-#include "include/envoy/http/codec.h"
-#include "include/envoy/http/header_map.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
+#include "envoy/http/codec.h"
+#include "envoy/http/header_map.h"
+#include "envoy/network/connection.h"
 
 #include "common/common/cleanup.h"
 #include "common/common/dump_state_utils.h"

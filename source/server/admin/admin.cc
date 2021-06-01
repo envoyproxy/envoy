@@ -7,13 +7,13 @@
 #include <utility>
 #include <vector>
 
-#include "include/envoy/filesystem/filesystem.h"
-#include "include/envoy/server/hot_restart.h"
-#include "include/envoy/server/instance.h"
-#include "include/envoy/server/options.h"
-#include "include/envoy/upstream/cluster_manager.h"
-#include "include/envoy/upstream/outlier_detection.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/filesystem/filesystem.h"
+#include "envoy/server/hot_restart.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/options.h"
+#include "envoy/upstream/cluster_manager.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/buffer_impl.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/runtime/runtime.h"
+#include "envoy/common/exception.h"
+#include "envoy/runtime/runtime.h"
 
 #include "common/common/documentation_url.h"
 #include "common/common/logger.h"

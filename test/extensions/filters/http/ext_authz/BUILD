@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["ext_authz_test.cc"],
     extension_name = "envoy.filters.http.ext_authz",
     deps = [
-        "//include/envoy/http:codes_interface_no_include_prefix",
+        "//include/envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:context_lib",

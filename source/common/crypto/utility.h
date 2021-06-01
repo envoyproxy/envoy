@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "include/envoy/buffer/buffer.h"
-#include "include/envoy/common/crypto/crypto.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/crypto/crypto.h"
 
 #include "common/singleton/threadsafe_singleton.h"
 

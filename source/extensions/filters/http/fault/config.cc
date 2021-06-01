@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
-#include "include/envoy/registry/registry.h"
+#include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
 

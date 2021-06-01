@@ -1,8 +1,8 @@
 #pragma once
 
-#include "include/envoy/common/platform.h"
+#include "envoy/common/platform.h"
 #include "envoy/config/listener/v3/quic_config.pb.h"
-#include "include/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 
 #include "common/common/assert.h"
 #include "common/http/header_map_impl.h"

@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/common/exception.h"
-#include "include/envoy/stats/symbol_table.h"
+#include "envoy/common/exception.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"

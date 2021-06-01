@@ -1,6 +1,6 @@
 #include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.h"
-#include "include/envoy/registry/registry.h"
-#include "include/envoy/router/internal_redirect.h"
+#include "envoy/registry/registry.h"
+#include "envoy/router/internal_redirect.h"
 
 #include "common/stream_info/filter_state_impl.h"
 

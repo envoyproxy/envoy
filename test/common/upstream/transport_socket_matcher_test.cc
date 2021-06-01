@@ -1,12 +1,12 @@
 #include <string>
 #include <vector>
 
-#include "include/envoy/api/api.h"
+#include "envoy/api/api.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
-#include "include/envoy/network/transport_socket.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/metadata.h"
 #include "common/network/transport_socket_options_impl.h"

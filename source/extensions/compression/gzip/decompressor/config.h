@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/compression/decompressor/config.h"
+#include "envoy/compression/decompressor/config.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.validate.h"
 

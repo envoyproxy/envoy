@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "include/envoy/http/header_map.h"
+#include "envoy/http/header_map.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"

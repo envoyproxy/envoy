@@ -4,7 +4,7 @@
 #include <functional>
 
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "include/envoy/network/connection.h"
+#include "envoy/network/connection.h"
 
 #include "common/http/http2/codec_stats.h"
 #include "common/http/status.h"

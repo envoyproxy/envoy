@@ -1,15 +1,15 @@
 #pragma once
 
-#include "include/envoy/api/api.h"
-#include "include/envoy/common/random_generator.h"
+#include "envoy/api/api.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
-#include "include/envoy/event/dispatcher.h"
-#include "include/envoy/server/transport_socket_config.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/service/health/v3/hds.pb.h"
-#include "include/envoy/ssl/context_manager.h"
-#include "include/envoy/stats/stats_macros.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/ssl/context_manager.h"
+#include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"

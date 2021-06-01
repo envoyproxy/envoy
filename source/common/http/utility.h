@@ -6,12 +6,12 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "include/envoy/grpc/status.h"
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/http/message.h"
-#include "include/envoy/http/metadata_interface.h"
-#include "include/envoy/http/query_params.h"
+#include "envoy/grpc/status.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/message.h"
+#include "envoy/http/metadata_interface.h"
+#include "envoy/http/query_params.h"
 
 #include "common/http/exception.h"
 #include "common/http/status.h"

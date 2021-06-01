@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/route/v3/route.pb.h"
-#include "include/envoy/router/router.h"
+#include "envoy/router/router.h"
 
 namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {

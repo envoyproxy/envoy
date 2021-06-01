@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/router/router.h"
+#include "envoy/router/router.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/conn_state.h"

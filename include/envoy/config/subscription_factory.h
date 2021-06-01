@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "include/envoy/config/subscription.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/config/subscription.h"
+#include "envoy/stats/scope.h"
 
 #include "xds/core/v3/resource_locator.pb.h"
 

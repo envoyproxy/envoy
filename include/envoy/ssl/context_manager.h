@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "include/envoy/common/time.h"
-#include "include/envoy/config/typed_config.h"
-#include "include/envoy/ssl/context.h"
-#include "include/envoy/ssl/context_config.h"
-#include "include/envoy/ssl/private_key/private_key.h"
-#include "include/envoy/stats/scope.h"
+#include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/ssl/context.h"
+#include "envoy/ssl/context_config.h"
+#include "envoy/ssl/private_key/private_key.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Ssl {

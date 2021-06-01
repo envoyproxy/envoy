@@ -3,11 +3,11 @@
 #include <cstdint>
 #include <memory>
 
-#include "include/envoy/common/pure.h"
-#include "include/envoy/network/transport_socket.h"
-#include "include/envoy/router/router.h"
-#include "include/envoy/upstream/types.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/common/pure.h"
+#include "envoy/network/transport_socket.h"
+#include "envoy/router/router.h"
+#include "envoy/upstream/types.h"
+#include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {

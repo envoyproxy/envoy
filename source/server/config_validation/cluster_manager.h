@@ -2,9 +2,9 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
-#include "include/envoy/secret/secret_manager.h"
-#include "include/envoy/server/options.h"
-#include "include/envoy/upstream/cluster_manager.h"
+#include "envoy/secret/secret_manager.h"
+#include "envoy/server/options.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/http/context_impl.h"
 #include "common/upstream/cluster_manager_impl.h"

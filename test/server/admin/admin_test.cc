@@ -4,9 +4,9 @@
 #include <regex>
 #include <vector>
 
-#include "include/envoy/json/json_object.h"
-#include "include/envoy/upstream/outlier_detection.h"
-#include "include/envoy/upstream/upstream.h"
+#include "envoy/json/json_object.h"
+#include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/http/message_impl.h"

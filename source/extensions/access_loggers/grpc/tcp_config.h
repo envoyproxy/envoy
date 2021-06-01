@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "include/envoy/server/access_log_config.h"
+#include "envoy/server/access_log_config.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "include/envoy/common/backoff_strategy.h"
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/network/dns.h"
-#include "include/envoy/thread_local/thread_local.h"
+#include "envoy/http/filter.h"
+#include "envoy/network/dns.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/cleanup.h"
 

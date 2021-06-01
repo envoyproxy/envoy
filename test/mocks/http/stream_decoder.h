@@ -1,5 +1,5 @@
 #pragma once
-#include "include/envoy/http/codec.h"
+#include "envoy/http/codec.h"
 
 #include "gmock/gmock.h"
 

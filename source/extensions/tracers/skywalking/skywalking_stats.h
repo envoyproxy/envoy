@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/stats/stats_macros.h"
+#include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
 namespace Extensions {

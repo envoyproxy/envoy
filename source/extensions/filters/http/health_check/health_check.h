@@ -5,9 +5,9 @@
 #include <memory>
 #include <string>
 
-#include "include/envoy/http/codes.h"
-#include "include/envoy/http/filter.h"
-#include "include/envoy/server/filter_config.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/http/header_utility.h"
 

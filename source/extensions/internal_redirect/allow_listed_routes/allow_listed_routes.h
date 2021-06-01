@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/extensions/internal_redirect/allow_listed_routes/v3/allow_listed_routes_config.pb.h"
-#include "include/envoy/router/internal_redirect.h"
-#include "include/envoy/stream_info/filter_state.h"
+#include "envoy/router/internal_redirect.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "extensions/internal_redirect/well_known_names.h"
 
