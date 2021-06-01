@@ -87,7 +87,12 @@ the following statistics:
 Per listener statistics
 -----------------------
 
-Additional per listener statistics are rooted at *listener.<address>.http.<stat_prefix>.* with the
+Per listener statistics are rooted at *listener.<address>.
+
+Http per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Additional HTTP statistics are of the form http.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
@@ -101,12 +106,24 @@ following statistics:
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
 
+Http3 per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Http3 statistics with the form of http3.<stat_prefix>.*:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   [direction].[source].quic_connection_close_error_code_[error_code], Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present. direction could be *upstream* or *downstream*. source could be *self* or *peer*.
+
+
 .. _config_http_conn_man_stats_per_codec:
 
 Per codec statistics
 -----------------------
 
-Each codec has the option of adding per-codec statistics. Both http1 and http2 have codec stats.
+Each codec has the option of adding per-codec statistics. http1, http2, and http3 all have codec stats.
 
 Http1 codec statistics
 ~~~~~~~~~~~~~~~~~~~~~~

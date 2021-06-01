@@ -28,6 +28,7 @@ private:
 
   Stats::StatNamePool stat_name_pool_;
   Stats::SymbolTable& symbol_table_;
+  const Stats::StatName http3_prefix_;
   const Stats::StatName downstream_;
   const Stats::StatName upstream_;
   const Stats::StatName from_self_;
