@@ -82,11 +82,15 @@ extlinks = {
 
 # Setup global substitutions
 if 'pre-release' in release_level:
-    substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha))]
+    substitutions = [
+        ('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
+        ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha)),
+        ('|envoy_distroless_docker_image|', 'envoy-distroless-dev:{}'.format(blob_sha))
+    ]
 else:
     substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha))]
+                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha)),
+                     ('|envoy_distroless_docker_image|', 'envoy-distroless:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -147,8 +151,6 @@ exclude_patterns = [
     '_venv',
     'Thumbs.db',
     '.DS_Store',
-    'api-v2/api/v2/endpoint/load_report.proto.rst',
-    'api-v2/service/discovery/v2/hds.proto.rst',
 ]
 
 # The reST default role (used for this markup: `text`) to use for all

@@ -27,6 +27,7 @@
 
 using testing::_;
 using testing::An;
+using testing::AnyNumber;
 using testing::Eq;
 using testing::NotNull;
 using testing::Pointee;
@@ -840,8 +841,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
@@ -861,8 +862,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
@@ -882,8 +883,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
@@ -904,8 +905,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
-                       &Runtime::MockSnapshot::featureEnabledDefault));
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
@@ -927,6 +928,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
@@ -948,6 +952,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -969,6 +976,9 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   - name: envoy.filters.http.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
               featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
@@ -1140,6 +1150,59 @@ TEST_F(HttpConnectionManagerConfigTest, RemoveAnyPortFalse) {
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
   EXPECT_EQ(Http::StripPortType::None, config.stripPortType());
+}
+
+// Validated that by default we don't remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when configured, we remove host's trailing dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: true
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(true, config.shouldStripTrailingHostDot());
+}
+
+// Validated that when explicitly set false, then we don't remove trailing host dot.
+TEST_F(HttpConnectionManagerConfigTest, RemoveTrailingDotFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  strip_trailing_host_dot: false
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(false, config.shouldStripTrailingHostDot());
 }
 
 // Validated that by default we allow requests with header names containing underscores.
@@ -1730,6 +1793,33 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownRequestIDExtension) {
                           "Didn't find a registered implementation for type");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownHttpFilterWithException) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Didn't find a registered implementation for name: 'envoy.filters.http.unknown");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownOptionalHttpFilterWithIgnore) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.unknown
+    is_optional: true
+  )EOF";
+
+  createHttpConnectionManagerConfig(yaml_string);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -1770,6 +1860,89 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Original IP detection extension not found: "
+                          "'envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension'");
+}
+
+namespace {
+
+class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
+public:
+  Http::OriginalIPDetectionSharedPtr
+  createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::UInt32Value>();
+  }
+
+  std::string name() const override {
+    return "envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated";
+  }
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) {
+  OriginalIPDetectionExtensionNotCreatedFactory factory;
+  Registry::InjectFactory<Http::OriginalIPDetectionFactory> registration(factory);
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Original IP detection extension could not be created: "
+      "'envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated'");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
+  EXPECT_EQ(1, original_ip_detection_extensions.size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
@@ -1978,6 +2151,162 @@ http_filters:
   )EOF";
 
   createHttpConnectionManagerConfig(yaml_string);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(0));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverriden) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: IMPLEMENTATION_SPECIFIC_DEFAULT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(3));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::UNESCAPE_AND_REDIRECT,
+            config.pathWithEscapedSlashesAction());
+
+  // Check the UNESCAPE_AND_FORWARD override to mollify coverage check
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .WillOnce(Return(4));
+  HttpConnectionManagerConfig config1(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                      date_provider_, route_config_provider_manager_,
+                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                      filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::UNESCAPE_AND_FORWARD,
+            config1.pathWithEscapedSlashesAction());
+}
+
+// Verify that runtime override does not affect non default configuration value.
+TEST_F(HttpConnectionManagerConfigTest,
+       PathWithEscapedSlashesActionRuntimeOverrideDoesNotChangeNonDefaultConfigValue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: REJECT_REQUEST
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled(_, An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(true));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  // When configuration value is not the IMPLEMENTATION_SPECIFIC_DEFAULT the runtime override should
+  // not even be considered.
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::REJECT_REQUEST,
+            config.pathWithEscapedSlashesAction());
+}
+
+// Verify that disabling unescaping slashes results in the KEEP_UNCHANGED action when config is
+// value is not set.
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverridenAndDisabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
+                             An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
+}
+
+// Verify that disabling unescaping slashes results in the KEEP_UNCHANGED action when config is
+// value is set.
+TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionSetAndDisabled) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.path_with_escaped_slashes_action_enabled",
+                             An<const envoy::type::v3::FractionalPercent&>()))
+      .WillOnce(Return(false));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              getInteger("http_connection_manager.path_with_escaped_slashes_action", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED,
+            config.pathWithEscapedSlashesAction());
 }
 
 class HcmUtilityTest : public testing::Test {

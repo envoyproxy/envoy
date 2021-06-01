@@ -12,11 +12,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.access_loggers",
     extra_visibility = [
         "//test:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//include/envoy/registry",
         "//source/common/config:config_provider_lib",

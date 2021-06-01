@@ -15,6 +15,7 @@
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/process_context_filter.h"
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -360,7 +361,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   testEnvoyProxying1xx(true);
 }
@@ -368,6 +369,7 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:
@@ -636,7 +638,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_explicit_http_config()
           ->mutable_http_protocol_options()
@@ -1395,40 +1397,6 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // close.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-}
-
-// Test that delay closed connections are eventually force closed when the timeout triggers.
-TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // 200ms.
-        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
-      });
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
-  EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
-            1);
 }
 
 // Test that if the route cache is cleared, it doesn't cause problems.

@@ -554,7 +554,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -1100,6 +1102,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& rando
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Useful for testing ScopeTrackedObject order of deletion.
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);

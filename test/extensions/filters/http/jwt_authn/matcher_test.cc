@@ -40,25 +40,6 @@ TEST_F(MatcherTest, TestMatchPrefix) {
   EXPECT_FALSE(matcher->matches(headers));
 }
 
-TEST_F(MatcherTest, TestMatchRegex) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const char config[] = R"(match:
-  regex: "/[^c][au]t")";
-  RequirementRule rule;
-  TestUtility::loadFromYaml(config, rule);
-  MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestRequestHeaderMapImpl{{":path", "/but"}};
-  EXPECT_TRUE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/mat?ok=bye"}};
-  EXPECT_TRUE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/maut"}};
-  EXPECT_FALSE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/cut"}};
-  EXPECT_FALSE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/mut/"}};
-  EXPECT_FALSE(matcher->matches(headers));
-}
-
 TEST_F(MatcherTest, TestMatchSafeRegex) {
   const char config[] = R"(
 match:

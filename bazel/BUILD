@@ -402,6 +402,11 @@ config_setting(
 )
 
 config_setting(
+    name = "wasm_wamr",
+    values = {"define": "wasm=wamr"},
+)
+
+config_setting(
     name = "wasm_wasmtime",
     values = {"define": "wasm=wasmtime"},
 )

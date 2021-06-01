@@ -3,7 +3,6 @@
 #include "envoy/http/async_client.h"
 
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 #include "common/http/message_impl.h"
@@ -222,6 +221,7 @@ void AuthenticatorImpl::startVerify() {
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  jwks_cache_.stats().jwks_fetch_success_.inc();
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -230,7 +230,10 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   }
 }
 
-void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
+void AuthenticatorImpl::onJwksError(Failure) {
+  jwks_cache_.stats().jwks_fetch_failed_.inc();
+  doneWithStatus(Status::JwksFetchFail);
+}
 
 void AuthenticatorImpl::onDestroy() {
   if (fetcher_) {
@@ -249,12 +252,9 @@ void AuthenticatorImpl::verifyKey() {
 
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
-
   if (!provider.forward_payload_header().empty()) {
-    std::string payload_with_padding = jwt_->payload_str_base64url_;
-    Base64::completePadding(payload_with_padding);
     headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
-                      payload_with_padding);
+                      jwt_->payload_str_base64url_);
   }
 
   if (!provider.forward()) {

@@ -397,6 +397,11 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
+Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
+  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  return ssl_ctx_;
+}
+
 Network::TransportSocketPtr
 ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and

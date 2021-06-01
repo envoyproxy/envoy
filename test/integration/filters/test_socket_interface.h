@@ -27,12 +27,30 @@ public:
                      bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
       : IoSocketHandleImpl(fd, socket_v6only, domain), writev_override_(writev_override_proc) {}
 
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override {
+    absl::MutexLock lock(&mutex_);
+    dispatcher_ = &dispatcher;
+    IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
+  }
+
+  // Schedule resumption on the IoHandle by posting a callback to the IoHandle's dispatcher. Note
+  // that this operation is inherently racy, nothing guarantees that the TestIoSocketHandle is not
+  // deleted before the posted callback executes.
+  void activateInDispatcherThread(uint32_t events) {
+    absl::MutexLock lock(&mutex_);
+    RELEASE_ASSERT(dispatcher_ != nullptr, "null dispatcher");
+    dispatcher_->post([this, events]() { activateFileEvents(events); });
+  }
+
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   IoHandlePtr duplicate() override;
 
   const WritevOverrideProc writev_override_;
+  absl::Mutex mutex_;
+  Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(mutex_) = nullptr;
 };
 
 /**
