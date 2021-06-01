@@ -81,8 +81,7 @@ public:
               (), (const));
   MOCK_METHOD(const ::google::jwt_verify::Jwks*, getJwksObj, (), (const));
   MOCK_METHOD(bool, isExpired, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (::google::jwt_verify::JwksPtr &&),
-              ());
+  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (JwksConstPtr &&), ());
   MOCK_METHOD(JwtCache&, getJwtCache, (), ());
 
   envoy::extensions::filters::http::jwt_authn::v3::JwtProvider jwt_provider_;
@@ -91,14 +90,22 @@ public:
 
 class MockJwksCache : public JwksCache {
 public:
-  MockJwksCache() {
+  MockJwksCache() : stats_(generateMockStats(stats_store_)) {
     ON_CALL(*this, findByIssuer(_)).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, findByProvider(_)).WillByDefault(::testing::Return(&jwks_data_));
+    ON_CALL(*this, stats()).WillByDefault(::testing::ReturnRef(stats_));
+  }
+
+  JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
+    return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, ""))};
   }
 
   MOCK_METHOD(JwksData*, findByIssuer, (const std::string&), ());
   MOCK_METHOD(JwksData*, findByProvider, (const std::string&), ());
+  MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
 
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  JwtAuthnFilterStats stats_;
   ::testing::NiceMock<MockJwksData> jwks_data_;
 };
 
