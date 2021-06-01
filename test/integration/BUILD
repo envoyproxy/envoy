@@ -486,6 +486,7 @@ envoy_cc_test_library(
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
+        "//test/integration/filters:remove_response_headers_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

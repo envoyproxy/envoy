@@ -1084,6 +1084,17 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
+  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+  if (!status.ok()) {
+    // We enter this branch when a misbehaving filter chain removed critical headers or set
+    // malformed header values.
+    sendLocalReply(
+        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                     "{", status.message(), "}"));
+    return;
+  }
+
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
