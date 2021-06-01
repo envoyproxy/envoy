@@ -1477,23 +1477,29 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
 }
 
-TEST(CheckRequiredRequestHeaders, OK) {
+TEST(CheckRequiredHeaders, Request) {
   EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(
                                   TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}));
   EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{
                                   {":method", "CONNECT"}, {":authority", "localhost:1234"}}));
-}
-
-TEST(CheckRequiredRequestHeaders, NG) {
   EXPECT_EQ(absl::InvalidArgumentError("missing required header: :method"),
             HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{}));
-
   EXPECT_EQ(
       absl::InvalidArgumentError("missing required header: :path"),
       HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}));
   EXPECT_EQ(
       absl::InvalidArgumentError("missing required header: :authority"),
       HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+}
+
+TEST(CheckRequiredHeaders, Response) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredResponseHeaders(
+                                  TestResponseHeaderMapImpl{{":status", "200"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
+            HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :status"),
+      HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
 } // namespace Http
