@@ -2417,7 +2417,7 @@ TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilte
   upstream_request_->encodeHeaders(default_response_headers_, false);
   ASSERT_TRUE(response->waitForEndStream());
   // If a filter chain removes :status from the response headers, then Envoy must reply with
-  // InternalServerError and must not crash.
+  // BadGateway and must not crash.
   ASSERT_TRUE(codec_client_->connected());
   EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
@@ -2434,7 +2434,7 @@ TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
   ASSERT_TRUE(response->waitForEndStream());
   // If a filter chain removes :status from the response headers, then Envoy must reply with
-  // InternalServerError and not crash.
+  // BadGateway and not crash.
   ASSERT_TRUE(codec_client_->connected());
   EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
