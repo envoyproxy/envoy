@@ -53,9 +53,11 @@ message QuicProtocolOptions {
 
   // Configure which implementation of quic::QuicCryptoClientStreamBase to be used for this listener.
   // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.v3.CryptoServerStreamConfig>` will be used.
+  // [#extension-category: envoy.quic.server.crypto_stream]
   core.v3.TypedExtensionConfig crypto_stream = 6;
 
   // Configure which implementation of quic::ProofSource to be used for this listener.
   // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.v3.ProofSourceConfig>` will be used.
+  // [#extension-category: envoy.quic.proof_source]
   core.v3.TypedExtensionConfig proof_source = 7;
 }
