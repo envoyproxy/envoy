@@ -72,6 +72,11 @@ updates:
       interval: "daily"
 
   - package-ecosystem: "pip"
+    directory: "/tools/slackbot"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
     directory: "/tools/testing"
     schedule:
       interval: "daily"

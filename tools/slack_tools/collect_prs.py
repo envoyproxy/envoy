@@ -36,12 +36,43 @@ def get_slo_hours():
     return 24
 
 
+# Return true if the PR has a waiting tag, false otherwise.
+def is_waiting(labels):
+    for label in labels:
+        if label.name == 'waiting':
+            return True
+    return False
+
+
+# Generate a pr message, bolding the time if it's out-SLO
+def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
+    if pr_age < datetime.timedelta(hours=get_slo_hours()):
+        return "<%s|%s> has been waiting %s days %s hours\n" % (
+            pr_url, pr_title, delta_days, delta_hours)
+    else:
+        return "<%s|%s> has been waiting *%s days %s hours*\n" % (
+            pr_url, pr_title, delta_days, delta_hours)
+
+
+# Adds reminder lines to the appropriate maintainer to review the assigned PRs
+def add_reminders(assignees, maintainers_and_prs, message):
+    has_maintainer_assignee = False
+    for assignee_info in assignees:
+        assignee = assignee_info.login
+        if assignee not in MAINTAINERS:
+            continue
+        has_maintainer_assignee = True
+        if assignee not in maintainers_and_prs.keys():
+            maintainers_and_prs[
+                assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
+        maintainers_and_prs[assignee] = maintainers_and_prs[assignee] + message
+        return has_maintainer_assignee
+
+
 def track_prs():
     git = github.Github()
     repo = git.get_repo('envoyproxy/envoy')
 
-    # The list of PRs tagged with the waiting label
-    waiting_prs = []
     # The list of PRs which are not waiting, but are well within review SLO
     recent_prs = []
     # A dict of maintainer : outstanding_pr_string to be sent to slack
@@ -53,59 +84,26 @@ def track_prs():
 
     # Snag all PRs, including drafts
     for pr_info in repo.get_pulls("open"):
-
-        pr_title = pr_info.title
-        pr_url = pr_info.html_url
-
-        # If the PR is waiting, collect it in that list and continue.
-        waiting = False
-        for label in pr_info.labels:
-            if label.name == 'waiting':
-                waiting_prs.append("PR %s' is tagged as waiting" % (pr_title))
-                waiting = True
-                continue
-        if waiting:
+        # If the PR is waiting, continue.
+        if is_waiting(pr_info.labels):
             continue
 
-        # If the PR hasn't been updated recently, don't nag.
-        # We can revisit this time, and always warn.
-        now = datetime.datetime.now()
-        time_zone_shift = datetime.timedelta(hours=4)
-        pr_age = pr_info.updated_at - time_zone_shift
-        delta = now - pr_age
+        # Update the time based on the time zone delta from github's
+        pr_age = pr_info.updated_at - datetime.timedelta(hours=4)
+        delta = datetime.datetime.now() - pr_age
         delta_days = delta.days
         delta_hours = delta.seconds // 3600
-        if delta < datetime.timedelta(hours=8):
-            recent_prs.append("PR %s' was updated %s hours ago" % (pr_title, delta_hours))
-            continue
 
         # If we get to this point, the review may be in SLO - nudge if it's in
         # SLO, nudge in bold if not.
-        message = ""
-        if delta < datetime.timedelta(hours=get_slo_hours()):
-            message = "<%s|%s> has been waiting %s days %s hours\n" % (
-                pr_url, pr_title, delta_days, delta_hours)
-        else:
-            message = "<%s|%s> has been waiting *%s days %s hours*\n" % (
-                pr_url, pr_title, delta_days, delta_hours)
+        message = pr_message(delta, pr_info.html_url, pr_info.title, delta_days, delta_hours)
 
         # If the PR has been out-SLO for over a day, inform on-call
         if delta > datetime.timedelta(hours=get_slo_hours() + 36):
-            message = "<%s|%s> has been waiting *%s days %s hours*\n" % (
-                pr_url, pr_title, delta_days, delta_hours)
             stalled_prs = stalled_prs + message
 
         # Add a reminder to each maintainer-assigner on the PR.
-        has_maintainer_assignee = False
-        for assignee_info in pr_info.assignees:
-            assignee = assignee_info.login
-            if assignee not in MAINTAINERS:
-                continue
-            has_maintainer_assignee = True
-            if assignee not in maintainers_and_prs.keys():
-                maintainers_and_prs[
-                    assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
-            maintainers_and_prs[assignee] = maintainers_and_prs[assignee] + message
+        has_maintainer_assignee = add_reminders(pr_info.assignees, maintainers_and_prs, message)
 
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
@@ -115,21 +113,7 @@ def track_prs():
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications}, and stalled PRs
-    # comment this line out for the local local print statements below
     return maintainers_and_prs, stalled_prs
-
-    print("RECENT PRS")
-    for line in recent_prs:
-        print(line)
-
-    print("WAITING PRS")
-    for line in waiting_prs:
-        print(line)
-
-    for key in maintainers_and_prs.keys():
-        print(key)
-        print(maintainers_and_prs[key])
-        print('\n\n\n')
 
 
 def post_to_maintainers(client, maintainers_and_messages):
