@@ -1084,10 +1084,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
+  // Check if the filter chain above did not remove critical headers or set malformed header values.
+  // We could do this at the codec in order to prevent other places than the filter chain from
+  // removing critical headers, but it will come with the implementation complexity.
+  // See the previous attempt (#15658) for detail, and for now we choose to protect only against
+  // filter chains.
   const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
   if (!status.ok()) {
-    // We enter this branch when a misbehaving filter chain removed critical headers or set
-    // malformed header values.
+    // If the check failed, then we reply with BadGateway, and stop the further processing.
     sendLocalReply(
         Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
