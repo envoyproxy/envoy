@@ -22,7 +22,7 @@ envoy_cc_extension(
     ],
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",

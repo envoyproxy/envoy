@@ -101,7 +101,7 @@ def envoy_cc_library(
         tags = tags,
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            repository + "//include/envoy/common:base_includes",
+            repository + "//envoy/common:base_includes",
             repository + "//source/common/common:fmt_lib",
             envoy_external_dep_path("abseil_flat_hash_map"),
             envoy_external_dep_path("abseil_flat_hash_set"),
@@ -194,7 +194,7 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
 def envoy_include_prefix(path):
-    if path.startswith("source/") or path.startswith("include/"):
+    if path.startswith("source/"):
         return "/".join(path.split("/")[1:])
     return None
 

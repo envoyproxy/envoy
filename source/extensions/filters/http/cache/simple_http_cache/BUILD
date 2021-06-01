@@ -18,8 +18,8 @@ envoy_cc_extension(
     security_posture = "robust_to_untrusted_downstream_and_upstream",
     status = "wip",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/registry",
+        "//envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",

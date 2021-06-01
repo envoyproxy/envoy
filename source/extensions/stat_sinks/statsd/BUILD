@@ -18,7 +18,7 @@ envoy_cc_extension(
     security_posture = "data_plane_agnostic",
     # Legacy test use. TODO(#9953) clean up.
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/extensions/stat_sinks:well_known_names",

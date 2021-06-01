@@ -25,7 +25,7 @@ envoy_cc_library(
     deps = [
         ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
@@ -65,7 +65,7 @@ envoy_cc_extension(
     category = "envoy.filters.http",
     security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
