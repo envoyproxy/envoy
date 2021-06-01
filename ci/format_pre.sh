@@ -46,6 +46,9 @@ bazel run "${BAZEL_BUILD_OPTIONS[@]}" //configs:example_configs_validation
 CURRENT=python
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:python_check -- --diff-file="$DIFF_OUTPUT" --fix "$(pwd)"
 
+CURRENT=extensions
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:validate_extensions
+
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do

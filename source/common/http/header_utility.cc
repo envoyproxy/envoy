@@ -41,12 +41,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        config.hidden_envoy_deprecated_regex_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
@@ -58,6 +52,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = config.present_match();
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
@@ -76,6 +71,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     FALLTHRU;
   default:
     header_match_type_ = HeaderMatchType::Present;
+    present_ = true;
     break;
   }
 }
@@ -135,7 +131,11 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
 
   if (!header_value.result().has_value()) {
-    return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
+    if (header_data.invert_match_) {
+      return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
+    } else {
+      return header_data.header_match_type_ == HeaderMatchType::Present && !header_data.present_;
+    }
   }
 
   bool match;
@@ -154,7 +154,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     break;
   }
   case HeaderMatchType::Present:
-    match = true;
+    match = header_data.present_;
     break;
   case HeaderMatchType::Prefix:
     match = absl::StartsWith(header_value.result().value(), header_data.value_);
