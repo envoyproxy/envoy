@@ -4,12 +4,17 @@ set -e
 
 # BoringSSL build as described in the Security Policy for BoringCrypto module (2020-07-02):
 # https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf
+# Despite this script supporting building on CentOS, note that the certification only allows for FIPS crypto modules to be 
+# built on Ubuntu and Debian (Section 8).  FIPS Envoy will work on CentOS, but isn't certified on that Operational Environment.
 
 # This works only on Linux-x86_64.
 if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
   echo "ERROR: BoringSSL FIPS is currently supported only on Linux-x86_64."
   exit 1
 fi
+
+# The build currently works on Ubuntu and CentOS, but requires different configuration
+OS_ID=$$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
 
 # Bazel magic.
 ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
@@ -25,16 +30,28 @@ export PATH="$$(dirname `which cmake`):/usr/bin:/bin"
 
 # Clang 7.0.1
 VERSION=7.0.1
-SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
-PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
+if [[ $$OS_ID == 'ubuntu' ]]; then
+    SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
+    PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
 
-curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
-  && echo "$$SHA256" clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz | sha256sum --check
-tar xf clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz
+    curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
+      && echo "$$SHA256" clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz | sha256sum --check
+    tar xf clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz
 
-export HOME="$$PWD"
-printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > $${HOME}/toolchain
-export PATH="$$PWD/clang+llvm-$$VERSION-$$PLATFORM/bin:$$PATH"
+    export HOME="$$PWD"
+    printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > $${HOME}/toolchain
+    export PATH="$$PWD/clang+llvm-$$VERSION-$$PLATFORM/bin:$$PATH"
+elif [[ $$OS_ID == 'centos' ]]; then
+    yum install -y centos-release-scl-rh
+    yum install -y llvm-toolset-7.0-clang
+    set +eu
+    source /opt/rh/devtoolset-8/enable
+    source /opt/rh/llvm-toolset-7.0/enable
+    set -eu
+
+    export HOME="$$PWD"
+    printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > $${HOME}/toolchain
+fi
 
 if [[ `clang --version | head -1 | awk '{print $$3}'` != "$$VERSION" ]]; then
   echo "ERROR: Clang version doesn't match."
@@ -61,12 +78,22 @@ fi
 
 # Ninja 1.9.0
 VERSION=1.9.0
-SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
-PLATFORM="linux"
 
-curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
-  && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
-unzip -o ninja-"$$PLATFORM".zip
+if [[ $$OS_ID == 'ubuntu' ]]; then
+    SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
+    PLATFORM="linux"
+
+    curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
+      && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
+    unzip -o ninja-"$$PLATFORM".zip
+elif [[ $$OS_ID == 'centos' ]]; then
+    SHA256=5d7ec75828f8d3fd1a0c2f31b5b0cea780cdfe1031359228c428c1a48bfcd5b9
+
+    curl -sLO https://github.com/ninja-build/ninja/archive/refs/tags/v"$$VERSION".tar.gz \
+      && echo "$$SHA256" v"$$VERSION".tar.gz | sha256sum --check
+    tar xvf v"$$VERSION".tar.gz
+    ./ninja-"$$VERSION"/configure.py --bootstrap
+fi
 
 export PATH="$$PWD:$$PATH"
 
