@@ -45,7 +45,6 @@ namespace Server {
 namespace {
 
 using TimerType = Event::ScaledTimerType;
-// TODO add fakeProactiveResourceMonitor
 class FakeResourceMonitor : public ResourceMonitor {
 public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), response_(0.0) {}

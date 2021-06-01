@@ -34,8 +34,6 @@ public:
 
   // Overload action to reduce some subset of configured timeouts.
   const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
-
-  std::set<std::string> reactive_action_names_{StopAcceptingConnections, RejectIncomingConnections};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;

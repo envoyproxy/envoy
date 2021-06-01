@@ -25,7 +25,7 @@ public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
       : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
   ~FakeResourceMonitor() override;
-  void updateResourceUsage(Callbacks& callbacks) override;
+  void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override;
 
   void setResourcePressure(double pressure) {
     dispatcher_.post([this, pressure] { pressure_ = pressure; });
@@ -60,7 +60,7 @@ private:
 
 FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
 
-void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
+void FakeResourceMonitor::updateResourceUsage(ResourceUpdateCallbacks& callbacks) {
   Server::ResourceUsage usage;
   usage.resource_pressure_ = pressure_;
   callbacks.onSuccess(usage);
@@ -165,6 +165,18 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(0U, response->body().size());
+}
+
+TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloadedProactiveResourceMonitor) {
+  concurrency_ = 2;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.stop_accepting_requests"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.9
+    )EOF"));
 }
 
 TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
