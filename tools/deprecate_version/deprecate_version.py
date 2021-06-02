@@ -75,7 +75,7 @@ def create_issues(access_token, runtime_and_pr):
             # Extract PR title, number, and author.
             pr_info = repo.get_pull(pr)
             change_title = pr_info.title
-              number = ('#%d') % pr
+            number = ('#%d') % pr
             login = pr_info.user.login
         else:
             # Extract commit message, sha, and author.
