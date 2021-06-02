@@ -28,6 +28,11 @@ void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
                                                    bool is_upstream) {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
+  if (error_code >= quic::QUIC_LAST_ERROR) {
+    ENVOY_LOG(warn, fmt::format("Error code {} is out of range of QuicErrorCodes.", error_code));
+    return;
+  }
+
   const Stats::StatName connection_close = connectionCloseStatName(error_code);
   incCounter(scope, {http3_prefix_, is_upstream ? upstream_ : downstream_,
                      source == quic::ConnectionCloseSource::FROM_SELF ? from_self_ : from_peer_,
@@ -35,8 +40,6 @@ void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
 }
 
 Stats::StatName QuicStatNames::connectionCloseStatName(quic::QuicErrorCode error_code) {
-  ASSERT(error_code < quic::QUIC_LAST_ERROR);
-
   return Stats::StatName(
       connection_error_stat_names_.get(error_code, [this, error_code]() -> const uint8_t* {
         return stat_name_pool_.addReturningStorage(
