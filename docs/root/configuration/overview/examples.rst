@@ -326,7 +326,7 @@ See the following example:
     loaders about the !ignore tag. Compliant YAML loaders will typically expose an interface to
     allow you to choose how to handle a custom tag.
 
-For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>` to treat an ignored
+For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>`_ to treat an ignored
 node as a simple scalar when loading:
 
 .. code-block:: python3
