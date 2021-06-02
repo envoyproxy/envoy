@@ -2,7 +2,7 @@ version: 2
 updates:
 
   - package-ecosystem: "pip"
-    directory: ".github/actions/pr_notifier/"
+    directory: "/.github/actions/pr_notifier/"
     schedule:
       interval: "daily"
 

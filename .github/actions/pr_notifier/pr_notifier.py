@@ -105,12 +105,11 @@ def track_prs():
         # Add a reminder to each maintainer-assigner on the PR.
         has_maintainer_assignee = add_reminders(pr_info.assignees, maintainers_and_prs, message)
 
-
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
             # don't bother assigning maintainer WIPs.
             if pr_info.draft and pr_info.user.login in maintainers_and_prs.keys():
-              continue
+                continue
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications}, and stalled PRs
@@ -147,7 +146,7 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
         try:
             response = client.chat_postMessage(
                 channel='#envoy-maintainer-oncall',
-                text=("*"Unassigned" PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
+                text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
             # TODO(alyssawilk) once maintainers start /wait tagging, uncomment this
             #response = client.chat_postMessage(
             #    channel='#envoy-maintainer-oncall', text=("*Stalled PRs*\n\n%s" % out_slo_prs))
