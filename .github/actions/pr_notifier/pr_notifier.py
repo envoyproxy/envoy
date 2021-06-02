@@ -147,7 +147,7 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
         try:
             response = client.chat_postMessage(
                 channel='#envoy-maintainer-oncall',
-                text=("*Unassigned PRs*\n\n%s" % unassigned_prs))
+                text=("*"Unassigned" PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
             # TODO(alyssawilk) once maintainers start /wait tagging, uncomment this
             #response = client.chat_postMessage(
             #    channel='#envoy-maintainer-oncall', text=("*Stalled PRs*\n\n%s" % out_slo_prs))
