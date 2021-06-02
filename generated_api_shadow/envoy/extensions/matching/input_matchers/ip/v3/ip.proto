@@ -16,9 +16,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.matching.input_matchers.ip]
 
 // This input matcher matches IPv4 or IPv6 addresses against a list of CIDR
-// ranges. It returns true if and only if the input IP belongs to one of these
-// CIDR ranges. Internally, it uses a Level-Compressed trie, as described in
-// the paper `IP-address lookup using LC-tries
+// ranges. It returns true if and only if the input IP belongs to at least one
+// of these CIDR ranges. Internally, it uses a Level-Compressed trie, as
+// described in the paper `IP-address lookup using LC-tries
 // <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
 // by S. Nilsson and G. Karlsson.
 message Ip {
