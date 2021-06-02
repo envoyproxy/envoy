@@ -131,14 +131,14 @@ stages:
     # Only output if the build explicitly failed
     condition: and(not(canceled()), not(succeeded()))
     jobs:
-      - job: format_pre
+      - job: output_format_pre_failure
         dependsOn: []
         steps:
           - task: GitHubComment@0
             inputs:
               gitHubConnection: 'envoyproxy'
               repositoryName: '$(Build.Repository.Name)'
-              comment: 'CI prechecks failed.  Please check github for details'
+              comment: 'CI prechecks failed. Please check github for details'
 
   - stage: sync
     condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
@@ -552,3 +552,33 @@ stages:
               pathtoPublish: "$(Build.StagingDirectory)/build_images"
               artifactName: docker_windows
             condition: always()
+
+  - stage: output_failure_results
+    dependsOn: ["linux_x64", "linux_arm64", "check", "docker", "docs", "verify", "macos", "windows"]
+    # Only output if the build explicitly failed
+    condition: and(not(canceled()), not(succeeded()))
+    jobs:
+      - job: output_failure_results
+        dependsOn: []
+        steps:
+          - task: GitHubComment@0
+            inputs:
+              gitHubConnection: 'envoyproxy'
+              repositoryName: '$(Build.Repository.Name)'
+              comment: 'CI checks failed. Please check github for details'
+
+  - stage: output_success_results
+    dependsOn: ["linux_x64", "linux_arm64", "check", "docker", "docs", "verify", "macos", "windows"]
+    condition: and(not(canceled()), succeeded())
+    jobs:
+      - job: output_failure_results
+        dependsOn: []
+        steps:
+          - task: GitHubComment@0
+            inputs:
+              gitHubConnection: 'envoyproxy'
+              repositoryName: '$(Build.Repository.Name)'
+              comment: 'CI passed! All is well.'
+
+
+
