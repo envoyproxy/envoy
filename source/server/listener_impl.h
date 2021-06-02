@@ -428,7 +428,8 @@ private:
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
 
-  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context_;
+  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
+      transport_factory_context_;
 };
 
 } // namespace Server
