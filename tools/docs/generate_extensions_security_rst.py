@@ -5,6 +5,8 @@
 from collections import defaultdict
 import os
 import pathlib
+import sys
+import tarfile
 
 import yaml
 
@@ -19,15 +21,13 @@ def format_item(extension, metadata):
     return item
 
 
-if __name__ == '__main__':
-    try:
-        generated_rst_dir = os.environ["GENERATED_RST_DIR"]
-    except KeyError:
-        raise SystemExit(
-            "Path to an output directory must be specified with GENERATED_RST_DIR env var")
+def main():
+    metadata_filepath = sys.argv[1]
+    output_filename = sys.argv[2]
+    generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
-    with open("source/extensions/extensions_metadata.yaml") as f:
+    with open(metadata_filepath) as f:
         extension_db = yaml.safe_load(f.read())
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
@@ -43,3 +43,10 @@ if __name__ == '__main__':
             for extension in sorted(extensions)
             if extension_db[extension].get('status') != 'wip')
         output_path.write_text(content)
+
+    with tarfile.open(output_filename, "w") as tar:
+        tar.add(generated_rst_dir, arcname=".")
+
+
+if __name__ == '__main__':
+    sys.exit(main())
