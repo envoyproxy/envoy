@@ -129,7 +129,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -190,6 +190,10 @@ message HttpConnectionManager {
     //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
     //   on OpenCensus side.
     config.trace.v3.Tracing.Http provider = 9;
+
+    // Trace reason is decided by request_id by default. If true, these sampling strategy is delegated
+    // to the configured tracing provider.
+    bool delegate_sampling = 10;
 
     OperationName hidden_envoy_deprecated_operation_name = 1 [
       deprecated = true,

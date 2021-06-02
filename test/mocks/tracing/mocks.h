@@ -20,6 +20,7 @@ public:
   MOCK_METHOD(const CustomTagMap*, customTags, (), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
+  MOCK_METHOD(bool, delegateSampling, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
   CustomTagMap custom_tags_;

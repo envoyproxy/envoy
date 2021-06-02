@@ -1350,7 +1350,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   }
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
-                                     percent2, percent1, false, 256});
+                                     percent2, percent1, false, 256, false});
   NiceMock<Router::MockRouteTracing> route_tracing;
   ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
   ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
@@ -1632,7 +1632,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent2,
                                      percent1,
                                      false,
-                                     256});
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1714,7 +1715,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent2,
                                      percent1,
                                      false,
-                                     256});
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1798,7 +1800,8 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent2,
                                      percent1,
                                      false,
-                                     256});
+                                     256,
+                                     false});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1874,7 +1877,8 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent2,
                                      percent1,
                                      false,
-                                     256});
+                                     256,
+                                     false});
 
   EXPECT_CALL(
       runtime_.snapshot_,

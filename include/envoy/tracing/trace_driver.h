@@ -77,6 +77,11 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+  /**
+   * @return true if trace reason won't be decided by request_id value.
+   */
+  virtual bool delegateSampling() const PURE;
 };
 
 /**

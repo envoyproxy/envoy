@@ -281,6 +281,10 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!config.tracingConfig()) {
     return final_reason;
   }
+  if (config.tracingConfig()->delegate_sampling_) {
+    final_reason = Tracing::Reason::Sampling;
+    return final_reason;
+  }
 
   auto rid_extension = config.requestIDExtension();
   const auto rid_to_integer = rid_extension->toInteger(request_headers);

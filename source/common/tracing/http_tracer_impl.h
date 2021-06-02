@@ -81,6 +81,7 @@ public:
   const CustomTagMap* customTags() const override { return nullptr; }
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
+  bool delegateSampling() const override { return false; }
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;
