@@ -556,7 +556,7 @@ stages:
   - stage: output_failure_results
     dependsOn: ["linux_x64", "linux_arm64", "check", "docker", "docs", "verify", "macos", "windows"]
     # Only output if the build explicitly failed
-    condition: and(not(canceled()), not(succeeded()))
+    condition: and(not(canceled()), failed())
     jobs:
       - job: output_failure_results
         dependsOn: []
@@ -569,9 +569,9 @@ stages:
 
   - stage: output_success_results
     dependsOn: ["linux_x64", "linux_arm64", "check", "docker", "docs", "verify", "macos", "windows"]
-    condition: and(not(canceled()), succeeded())
+    condition: and(not(canceled()), not(failed()))
     jobs:
-      - job: output_failure_results
+      - job: output_success_results
         dependsOn: []
         steps:
           - task: GitHubComment@0
