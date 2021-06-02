@@ -83,7 +83,8 @@ TEST_F(FilterTest, ValidAltSvc) {
                                                        now + std::chrono::seconds(60)),
   };
 
-  std::shared_ptr<Network::MockResolvedAddress> address = std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443","1.2.3.4:443");
+  std::shared_ptr<Network::MockResolvedAddress> address =
+      std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443", "1.2.3.4:443");
   Network::MockIp ip;
   std::string hostname = "host1";
   std::shared_ptr<Upstream::MockHostDescription> hd =
