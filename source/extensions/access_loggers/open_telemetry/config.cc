@@ -13,7 +13,6 @@
 
 #include "extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
-#include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +52,7 @@ ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
       envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig>();
 }
 
-std::string AccessLogFactory::name() const { return AccessLogNames::get().OpenTelemetry; }
+std::string AccessLogFactory::name() const { return "envoy.access_loggers.open_telemetry"; }
 
 /**
  * Static registration for the OpenTelemetry (gRPC) access log. @see RegisterFactory.

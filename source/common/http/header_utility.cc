@@ -41,12 +41,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        config.hidden_envoy_deprecated_regex_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
@@ -322,7 +316,7 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   return false;
 }
 
-Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Method()) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
@@ -340,6 +334,15 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
+  }
+  return Http::okStatus();
+}
+
+Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
+  const absl::optional<uint64_t> status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
   }
   return Http::okStatus();
 }

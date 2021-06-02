@@ -81,7 +81,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: backendservice
+                address: backend-service
                 port_value: 8000
 
 admin:

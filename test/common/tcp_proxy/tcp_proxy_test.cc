@@ -24,8 +24,6 @@
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "extensions/access_loggers/well_known_names.h"
-
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"

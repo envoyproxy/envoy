@@ -42,7 +42,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.example.com");
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
@@ -92,7 +92,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex("spiffe://lyft.com/.*-team");
+  matcher.MergeFrom(TestUtility::createRegexMatcher("spiffe://lyft.com/.*-team"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
@@ -110,7 +110,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_hidden_envoy_deprecated_regex(".*.foo.com");
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.foo.com"));
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
