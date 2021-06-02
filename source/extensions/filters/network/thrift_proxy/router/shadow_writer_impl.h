@@ -49,7 +49,9 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   Buffer::OwnedImpl response_buffer_;
   Buffer::OwnedImpl upstream_buffer_;
   MessageMetadataSharedPtr metadata_;
+  absl::optional<bool> success_;
   bool complete_ : 1;
+  bool first_reply_field_ : 1;
 };
 using NullResponseDecoderPtr = std::unique_ptr<NullResponseDecoder>;
 
@@ -62,9 +64,9 @@ struct ShadowRequest : public ShadowRequestHandle,
                        public LinkedObject<ShadowRequest>,
                        Logger::Loggable<Logger::Id::thrift> {
 public:
-  ShadowRequest(ShadowWriterImpl& parent_, Tcp::ConnectionPool::Instance& pool,
-                MessageMetadataSharedPtr& metadata, TransportType transport_type,
-                ProtocolType protocol_type);
+  ShadowRequest(ShadowWriterImpl& parent_, Upstream::ClusterInfoConstSharedPtr&& cluster_info,
+                Upstream::TcpPoolData& pool, MessageMetadataSharedPtr& metadata,
+                TransportType transport_type, ProtocolType protocol_type);
   ~ShadowRequest() override;
 
   void start();
@@ -94,7 +96,7 @@ private:
   void onResetStream(ConnectionPool::PoolFailureReason reason);
 
   ShadowWriterImpl& parent_;
-  Tcp::ConnectionPool::Instance& conn_pool_;
+  Upstream::TcpPoolData& conn_pool_data_;
   MessageMetadataSharedPtr metadata_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
@@ -108,13 +110,28 @@ private:
   bool request_sent_{};
   Buffer::OwnedImpl request_buffer_;
   NullResponseDecoderPtr response_decoder_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  uint64_t response_size_{};
 };
 
 class ShadowWriterImpl : public ShadowWriter,
                          public Upstream::LoadBalancerContextBase,
                          Logger::Loggable<Logger::Id::thrift> {
 public:
-  ShadowWriterImpl(Upstream::ClusterManager& cm, Event::Dispatcher&) : cm_(cm) {}
+  ShadowWriterImpl(Upstream::ClusterManager& cm, Stats::Scope& scope, Event::Dispatcher&)
+      : cm_(cm), stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
+        symbol_table_(scope.symbolTable()),
+        upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
+        upstream_rq_oneway_(stat_name_set_->add("thrift.upstream_rq_oneway")),
+        upstream_rq_invalid_type_(stat_name_set_->add("thrift.upstream_rq_invalid_type")),
+        upstream_resp_reply_(stat_name_set_->add("thrift.upstream_resp_reply")),
+        upstream_resp_reply_success_(stat_name_set_->add("thrift.upstream_resp_success")),
+        upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
+        upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
+        upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
+        upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
+        upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
+        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")) {}
 
   ~ShadowWriterImpl() {
     while (!active_requests_.empty()) {
@@ -135,9 +152,28 @@ public:
 private:
   friend struct ShadowRequest;
 
+  void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
+                              const Stats::StatNameVec& names) const;
+  void recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
+                                   const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                                   uint64_t count) const;
+
   Upstream::ClusterManager& cm_;
   // Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<ShadowRequest>> active_requests_;
+  Stats::StatNameSetPtr stat_name_set_;
+  Stats::SymbolTable& symbol_table_;
+  const Stats::StatName upstream_rq_call_;
+  const Stats::StatName upstream_rq_oneway_;
+  const Stats::StatName upstream_rq_invalid_type_;
+  const Stats::StatName upstream_resp_reply_;
+  const Stats::StatName upstream_resp_reply_success_;
+  const Stats::StatName upstream_resp_reply_error_;
+  const Stats::StatName upstream_resp_exception_;
+  const Stats::StatName upstream_resp_invalid_type_;
+  const Stats::StatName upstream_rq_time_;
+  const Stats::StatName upstream_rq_size_;
+  const Stats::StatName upstream_resp_size_;
 };
 
 } // namespace Router

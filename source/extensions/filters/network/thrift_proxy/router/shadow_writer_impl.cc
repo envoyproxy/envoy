@@ -27,14 +27,40 @@ bool NullResponseDecoder::onData(Buffer::Instance& data) {
 
 FilterStatus NullResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
+  first_reply_field_ =
+      (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
+
   return FilterStatus::Continue;
 }
 
-FilterStatus NullResponseDecoder::fieldBegin(absl::string_view, FieldType&, int16_t&) {
+FilterStatus NullResponseDecoder::fieldBegin(absl::string_view, FieldType&, int16_t& field_id) {
+  if (first_reply_field_) {
+    // Reply messages contain a struct where field 0 is the call result and fields 1+ are
+    // exceptions, if defined. At most one field may be set. Therefore, the very first field we
+    // encounter in a reply is either field 0 (success) or not (IDL exception returned).
+    // If first fieldType is FieldType::Stop then it is a void success and handled in messageEnd()
+    // because decoder state machine does not call decoder event callback fieldBegin on
+    // FieldType::Stop.
+    success_ = (field_id == 0);
+    first_reply_field_ = false;
+  }
+
   return FilterStatus::Continue;
 }
 
-FilterStatus NullResponseDecoder::messageEnd() { return FilterStatus::Continue; }
+FilterStatus NullResponseDecoder::messageEnd() {
+  if (first_reply_field_) {
+    // When the response is thrift void type there is never a fieldBegin call on a success
+    // because the response struct has no fields and so the first field type is FieldType::Stop.
+    // The decoder state machine handles FieldType::Stop by going immediately to structEnd,
+    // skipping fieldBegin callback. Therefore if we are still waiting for the first reply field
+    // at end of message then it is a void success.
+    success_ = true;
+    first_reply_field_ = false;
+  }
+
+  return FilterStatus::Continue;
+}
 
 FilterStatus NullResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
@@ -54,7 +80,20 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
 
   Upstream::ClusterInfoConstSharedPtr cluster_info = cluster->info();
 
-  // TODO: increment stats
+  ENVOY_LOG(debug, "shadow request to cluster '{}', for method '{}'", cluster_name,
+            metadata->methodName());
+
+  switch (metadata->messageType()) {
+  case MessageType::Call:
+    incClusterScopeCounter(*cluster_info, {upstream_rq_call_});
+    break;
+  case MessageType::Oneway:
+    incClusterScopeCounter(*cluster_info, {upstream_rq_oneway_});
+    break;
+  default:
+    incClusterScopeCounter(*cluster_info, {upstream_rq_invalid_type_});
+    break;
+  }
 
   if (cluster_info->maintenanceMode()) {
     ENVOY_LOG(debug, "maintenance mode for cluster '{}' during shadow request", cluster_name);
@@ -72,16 +111,15 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
   const ProtocolType protocol = options ? options->protocol(original_protocol) : original_protocol;
   ASSERT(protocol != ProtocolType::Auto);
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     ENVOY_LOG(debug, "no healthy upstream for shadow request to '{}'", cluster_name);
     return absl::nullopt;
   }
 
   // We are ready to go: create shadow request.
-  auto request_ptr =
-      std::make_unique<ShadowRequest>(*this, *conn_pool, metadata, transport, protocol);
+  auto request_ptr = std::make_unique<ShadowRequest>(
+      *this, std::move(cluster_info), *conn_pool_data, metadata, transport, protocol);
   LinkedList::moveIntoList(std::move(request_ptr), active_requests_);
   auto& request = *active_requests_.front();
   request.start();
@@ -89,12 +127,14 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
   return request;
 }
 
-ShadowRequest::ShadowRequest(ShadowWriterImpl& parent, Tcp::ConnectionPool::Instance& pool,
-                             MessageMetadataSharedPtr&, TransportType transport,
-                             ProtocolType protocol)
-    : parent_(parent), conn_pool_(pool),
+ShadowRequest::ShadowRequest(ShadowWriterImpl& parent,
+                             Upstream::ClusterInfoConstSharedPtr&& cluster_info,
+                             Upstream::TcpPoolData& pool, MessageMetadataSharedPtr&,
+                             TransportType transport, ProtocolType protocol)
+    : parent_(parent), conn_pool_data_(pool),
       transport_(NamedTransportConfigFactory::getFactory(transport).createTransport()),
-      protocol_(NamedProtocolConfigFactory::getFactory(protocol).createProtocol()) {
+      protocol_(NamedProtocolConfigFactory::getFactory(protocol).createProtocol()),
+      cluster_(std::move(cluster_info)) {
   response_decoder_ = std::make_unique<NullResponseDecoder>(*transport_, *protocol_);
 }
 
@@ -104,8 +144,24 @@ ShadowRequest::~ShadowRequest() {
   }
 }
 
+void ShadowWriterImpl::incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
+                                              const Stats::StatNameVec& names) const {
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+}
+
+void ShadowWriterImpl::recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
+                                                   const Stats::StatNameVec& names,
+                                                   Stats::Histogram::Unit unit,
+                                                   uint64_t count) const {
+  const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+  cluster.statsScope()
+      .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
+      .recordValue(count);
+}
+
 void ShadowRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     conn_pool_handle_ = handle;
   }
@@ -136,6 +192,8 @@ void ShadowRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_da
   // Is the request buffer ready to be dispatched?
   if (request_buffer_.length() > 0) {
     // TODO: set response timeout.
+    parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
+                                        Stats::Histogram::Unit::Bytes, request_buffer_.length());
     conn_data_->connection().write(request_buffer_, false);
     request_sent_ = true;
   }
@@ -151,6 +209,8 @@ void ShadowRequest::tryWriteRequest(const Buffer::OwnedImpl& buffer) {
     Buffer::OwnedImpl shadow_buffer;
     shadow_buffer.add(buffer);
 
+    parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
+                                        Stats::Histogram::Unit::Bytes, shadow_buffer.length());
     conn_data_->connection().write(shadow_buffer, false);
     request_sent_ = true;
   } else {
@@ -162,10 +222,35 @@ void ShadowRequest::tryWriteRequest(const Buffer::OwnedImpl& buffer) {
 void ShadowRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "Shadow request upstream end_stream: {}", end_stream);
 
+  response_size_ += data.length();
+
   try {
     const bool complete = response_decoder_->onData(data);
     if (complete || end_stream) {
       ENVOY_LOG(debug, "Shadow request complete: {}", complete);
+
+      if (response_decoder_->metadata_ != nullptr) {
+        parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_resp_size_},
+                                            Stats::Histogram::Unit::Bytes, response_size_);
+
+        switch (response_decoder_->metadata_->messageType()) {
+        case MessageType::Reply:
+          parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_reply_});
+          if (response_decoder_->success_.value_or(false)) {
+            parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_reply_success_});
+          } else {
+            parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_reply_error_});
+          }
+          break;
+        case MessageType::Exception:
+          parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_exception_});
+          break;
+        default:
+          parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_invalid_type_});
+          break;
+        }
+      }
+
       releaseConnection(!complete);
       maybeCleanup();
     }
