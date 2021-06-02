@@ -1,10 +1,11 @@
 #pragma once
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/config/decoded_resource_impl.h"
 #include "common/config/unified_mux/subscription_state.h"
 
 #include "absl/types/optional.h"
@@ -20,8 +21,8 @@ class SotwSubscriptionState
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        std::chrono::milliseconds init_fetch_timeout,
-                        Event::Dispatcher& dispatcher);
+                        std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher,
+                        OpaqueResourceDecoder& resource_decoder);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -43,8 +44,10 @@ private:
   getNextRequestInternal() override;
 
   void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message) override;
-  bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource,
-                           const std::string& version);
+  void setResourceTtl(const DecodedResourceImpl& decoded_resource);
+  bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
+
+  OpaqueResourceDecoder& resource_decoder_;
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.

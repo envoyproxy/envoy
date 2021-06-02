@@ -43,6 +43,7 @@ private:
   std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest>
   getNextRequestInternal() override;
 
+  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
   void
   handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;

@@ -172,6 +172,16 @@ void DeltaSubscriptionState::addResourceState(
   resource_state_[resource.name()] = ResourceState(resource.version());
 }
 
+void DeltaSubscriptionState::setResourceTtl(
+    const envoy::service::discovery::v3::Resource& resource) {
+  if (resource.has_ttl()) {
+    ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
+             resource.name());
+  } else {
+    ttl_.clear(resource.name());
+  }
+}
+
 void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& expired) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   for (const auto& resource : expired) {

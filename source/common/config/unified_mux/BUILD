@@ -28,10 +28,12 @@ envoy_cc_library(
     hdrs = ["sotw_subscription_state.h"],
     deps = [
         ":subscription_state_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:decoded_resource_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,6 +48,6 @@ envoy_cc_library(
         "//source/common/config:ttl_lib",
         "//source/common/config:update_ack_lib",
         "//source/common/config:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

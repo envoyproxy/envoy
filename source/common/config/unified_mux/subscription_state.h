@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/ttl.h"
 #include "common/config/update_ack.h"
@@ -105,16 +105,6 @@ public:
 
 protected:
   virtual std::unique_ptr<RQ> getNextRequestInternal() PURE;
-
-  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource) {
-    if (resource.has_ttl()) {
-      ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
-               resource.name());
-    } else {
-      ttl_.clear(resource.name());
-    }
-  }
-
   virtual void handleGoodResponse(const RS& message) PURE;
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
     // Note that error_detail being set is what indicates that a (Delta)DiscoveryRequest is a NACK.

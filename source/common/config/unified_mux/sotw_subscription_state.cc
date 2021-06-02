@@ -11,8 +11,10 @@ namespace UnifiedMux {
 SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
                                              std::chrono::milliseconds init_fetch_timeout,
-                                             Event::Dispatcher& dispatcher)
-    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher) {}
+                                             Event::Dispatcher& dispatcher,
+                                             OpaqueResourceDecoder& resource_decoder)
+    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher),
+      resource_decoder_(resource_decoder) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
 
@@ -49,34 +51,29 @@ void SotwSubscriptionState::handleGoodResponse(
   std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(
       message.resources().size());
 
-  for (const auto& any : message.resources()) {
-    if (!any.Is<envoy::service::discovery::v3::Resource>() &&
-        any.type_url() != message.type_url()) {
-      throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
-                                       "the message-wide type URL {} in DiscoveryResponse {}",
-                                       any.type_url(), message.type_url(), message.DebugString()));
-    }
-
-    // ttl changes (including removing of the ttl timer) are only done when an Any is wrapped in a
-    // Resource (which contains ttl duration).
-    if (any.Is<envoy::service::discovery::v3::Resource>()) {
-      resources_with_ttl.emplace(resources_with_ttl.end());
-      MessageUtil::unpackTo(any, resources_with_ttl.back());
-
-      if (isHeartbeatResource(resources_with_ttl.back(), message.version_info())) {
-        continue;
-      }
-    }
-    non_heartbeat_resources.Add()->CopyFrom(any);
-  }
-
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    for (auto& resource : resources_with_ttl) {
-      setResourceTtl(resource);
+    for (const auto& any : message.resources()) {
+      if (!any.Is<envoy::service::discovery::v3::Resource>() &&
+          any.type_url() != message.type_url()) {
+        throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
+                                         "the message-wide type URL {} in DiscoveryResponse {}",
+                                         any.type_url(), message.type_url(),
+                                         message.DebugString()));
+      }
+
+      auto decoded_resource =
+          DecodedResourceImpl::fromResource(resource_decoder_, any, message.version_info());
+      setResourceTtl(*decoded_resource);
+      if (isHeartbeatResource(*decoded_resource, message.version_info())) {
+        continue;
+      }
+      non_heartbeat_resources.Add()->CopyFrom(any);
     }
   }
 
+  // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
+  // support passing of decoded resources
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
@@ -112,9 +109,17 @@ void SotwSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& ex
   callbacks().onConfigUpdate({}, removed_resources, "");
 }
 
-bool SotwSubscriptionState::isHeartbeatResource(
-    const envoy::service::discovery::v3::Resource& resource, const std::string& version) {
-  return !resource.has_resource() && last_good_version_info_.has_value() &&
+void SotwSubscriptionState::setResourceTtl(const DecodedResourceImpl& decoded_resource) {
+  if (decoded_resource.ttl()) {
+    ttl_.add(std::chrono::milliseconds(*decoded_resource.ttl()), decoded_resource.name());
+  } else {
+    ttl_.clear(decoded_resource.name());
+  }
+}
+
+bool SotwSubscriptionState::isHeartbeatResource(const DecodedResource& resource,
+                                                const std::string& version) {
+  return !resource.hasResource() && last_good_version_info_.has_value() &&
          version == last_good_version_info_.value();
 }
 
