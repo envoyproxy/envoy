@@ -225,7 +225,6 @@ UNOWNED_EXTENSIONS = {
   "extensions/stat_sinks/statsd",
   "extensions/stat_sinks/common",
   "extensions/stat_sinks/common/statsd",
-  "extensions/stat_sinks/graphite_statsd",
   "extensions/health_checkers/redis",
   "extensions/access_loggers/grpc",
   "extensions/access_loggers/file",
