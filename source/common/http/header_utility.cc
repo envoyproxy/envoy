@@ -41,12 +41,6 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      kHiddenEnvoyDeprecatedRegexMatch:
-    header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        config.hidden_envoy_deprecated_regex_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());

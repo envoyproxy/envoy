@@ -872,37 +872,21 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
 }
 
-// Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
-}
-
 class TestConfig : public Router::RouteSpecificFilterConfig {
 public:
   int state_;
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-// Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  TestConfig testConfig;
-
-  const std::string filter_name = "envoy.filter";
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  // make the file callbacks return our test config
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&testConfig));
-
-  // test the we get the same object back (as this goes through the dynamic_cast)
-  auto resolved_filter_config = Utility::resolveMostSpecificPerFilterConfig<TestConfig>(
-      filter_name, filter_callbacks.route());
-  EXPECT_EQ(&testConfig, resolved_filter_config);
+// Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr,
+            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
 }
 
-// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per
+// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
 // filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -911,28 +895,34 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                        filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
+  // Testing per-virtualhost typed filter config
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(&one));
-  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
+  // Testing per-route typed filter config
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Invoke(
+          [&](const std::string& name) { return filter_callbacks.route_->perFilterConfig(name); }));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
+  // Testing per-route entry typed filter config
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(&three));
-  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                       filter_callbacks.route()));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                        filter_name, filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.

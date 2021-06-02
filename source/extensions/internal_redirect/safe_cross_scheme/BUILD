@@ -15,7 +15,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/router:internal_redirect_interface",
         "//include/envoy/stream_info:filter_state_interface",
-        "//source/extensions/internal_redirect:well_known_names",
     ],
 )
 
@@ -31,7 +30,6 @@ envoy_cc_extension(
         ":safe_cross_scheme_lib",
         "//include/envoy/registry",
         "//include/envoy/router:internal_redirect_interface",
-        "//source/extensions/internal_redirect:well_known_names",
         "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],
 )

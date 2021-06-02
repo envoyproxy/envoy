@@ -75,7 +75,7 @@ BAZEL_BUILD_OPTIONS+=(
 
 # Generate RST for the lists of trusted/untrusted extensions in
 # intro/arch_overview/security docs.
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:generate_extension_rst
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:extensions_security_rst
 
 # Generate RST for external dependency docs in intro/arch_overview/security.
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:generate_external_dep_rst
@@ -144,6 +144,9 @@ rsync -av \
       "${SCRIPT_DIR}"/redirects.txt \
       "${SCRIPT_DIR}"/_ext \
       "${GENERATED_RST_DIR}"
+
+# TODO(phlax): once all of above jobs are moved to bazel build genrules this can be done as part of the sphinx build
+tar -xf bazel-out/k8-fastbuild/bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
 
 # Merge generated redirects
 jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt

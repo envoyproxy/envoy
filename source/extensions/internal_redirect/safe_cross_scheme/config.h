@@ -4,7 +4,6 @@
 #include "envoy/router/internal_redirect.h"
 
 #include "extensions/internal_redirect/safe_cross_scheme/safe_cross_scheme.h"
-#include "extensions/internal_redirect/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ public:
   }
 
   std::string name() const override {
-    return InternalRedirectPredicateValues::get().SafeCrossSchemePredicate;
+    return "envoy.internal_redirect_predicates.safe_cross_scheme";
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

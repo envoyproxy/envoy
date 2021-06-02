@@ -46,8 +46,6 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "extensions/clusters/well_known_names.h"
-
 namespace Envoy {
 namespace Upstream {
 
