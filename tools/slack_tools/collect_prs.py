@@ -83,7 +83,7 @@ def track_prs():
     stalled_prs = ""
 
     # Snag all PRs, including drafts
-    for pr_info in repo.get_pulls("open"):
+    for pr_info in repo.get_pulls("open", "updated", "desc"):
         # If the PR is waiting, continue.
         if is_waiting(pr_info.labels):
             continue
