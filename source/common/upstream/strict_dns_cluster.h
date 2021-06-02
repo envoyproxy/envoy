@@ -70,8 +70,7 @@ private:
  */
 class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  StrictDnsClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
+  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

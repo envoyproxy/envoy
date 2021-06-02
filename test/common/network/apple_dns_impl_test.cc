@@ -62,7 +62,9 @@ public:
   AppleDnsImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  void SetUp() override { resolver_ = dispatcher_->createDnsResolver({}, false); }
+  void SetUp() override {
+    resolver_ = dispatcher_->createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+  }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
@@ -118,12 +120,14 @@ protected:
 };
 
 TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
+  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
   EXPECT_DEATH(
-      dispatcher_->createDnsResolver({}, true),
-      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({nullptr}, false),
+      dispatcher_->createDnsResolver({nullptr}, dns_resolver_options),
       "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
+  dns_resolver_options.set_use_tcp_for_dns_lookups(true);
+  EXPECT_DEATH(
+      dispatcher_->createDnsResolver({}, dns_resolver_options),
+      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
 }
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
