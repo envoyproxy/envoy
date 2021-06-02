@@ -158,5 +158,5 @@ wrapt==1.12.1 \
     #   -r tools/dependency/requirements.txt
     #   deprecated
 yarl==1.6.3 \
-   --hash=sha256:73494d5b71099ae8cb8754f1df131c11d433b387efab7b51849e7e1e851f07a4
+   --hash=sha256:6d6283d8e0631b617edf0fd726353cb76630b83a089a40933043894e7f6721e2
 
