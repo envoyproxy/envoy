@@ -153,6 +153,7 @@ public:
   MOCK_METHOD(uint32_t, workerIndex, (), (const));
   MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
   MOCK_METHOD(void, post, (Network::UdpRecvData && data));
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class MockDrainDecision : public DrainDecision {

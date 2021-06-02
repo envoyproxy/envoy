@@ -41,12 +41,12 @@ using namespace std::chrono_literals;
 class ExtProcIntegrationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
-  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion()) {}
+  ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
   void createUpstreams() override {
     // Need to create a separate "upstream" for the gRPC server
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void TearDown() override {
@@ -82,8 +82,8 @@ protected:
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequest(

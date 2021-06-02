@@ -160,6 +160,24 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
   `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
 
+Http3 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~
+
+On the downstream side all http3 statistics are rooted at *http3.*
+
+On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   dropped_headers_with_underscores, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   rx_reset, Counter, Total number of reset stream frames received by Envoy
+   tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
+   metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
+
+
 Tracing statistics
 ------------------
 

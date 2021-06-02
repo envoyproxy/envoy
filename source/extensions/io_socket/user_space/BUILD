@@ -12,11 +12,6 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
-    category = "envoy.io_socket",
-    security_posture = "unknown",
-    status = "wip",
-    undocumented = True,
-    visibility = ["//visibility:public"],
     deps = [
         ":io_handle_impl_lib",
     ],

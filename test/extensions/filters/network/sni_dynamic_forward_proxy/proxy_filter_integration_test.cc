@@ -20,11 +20,10 @@ public:
   // This test is using HTTP integration test to use the utilities to pass SNI from downstream
   // to upstream. The config being tested is tcp_proxy.
   SniDynamicProxyFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(),
-                            ConfigHelper::tcpProxyConfig()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void setup(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addListenerFilter(ConfigHelper::tlsInspectorFilter());
 
@@ -86,7 +85,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        FakeHttpConnection::Type::HTTP1);
+        Http::CodecType::HTTP1);
   }
 
   Network::ClientConnectionPtr

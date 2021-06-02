@@ -55,7 +55,6 @@ static_resources:
                             cluster: service_foo
   clusters:
     - name: service_foo
-      connect_timeout: 15s
       load_assignment:
         cluster_name: some_service
         endpoints:

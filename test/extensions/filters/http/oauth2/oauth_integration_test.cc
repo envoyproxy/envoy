@@ -20,7 +20,7 @@ namespace {
 class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {
     enableHalfClose(true);
   }
 
@@ -38,7 +38,7 @@ public:
   }
 
   void initialize() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     TestEnvironment::writeStringToFileForTest("token_secret.yaml", R"EOF(
 resources:

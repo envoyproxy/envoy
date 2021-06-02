@@ -27,6 +27,10 @@ protected:
         context_);
   }
 
+  uint32_t highWatermark(EnvoyQuicClientSession* session) {
+    return session->write_buffer_watermark_simulation_.highWatermark();
+  }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
@@ -41,7 +45,7 @@ protected:
 TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
 
-  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_};
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_, 45};
 
   std::unique_ptr<Network::ClientConnection> client_connection =
       createQuicNetworkConnection(info, dispatcher_, test_address_, test_address_);
@@ -50,6 +54,7 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   client_connection->connect();
   EXPECT_TRUE(client_connection->connecting());
   ASSERT(session != nullptr);
+  EXPECT_EQ(highWatermark(session), 45);
   EXPECT_EQ(absl::nullopt, session->unixSocketPeerCredentials());
   EXPECT_EQ(absl::nullopt, session->lastRoundTripTime());
   client_connection->close(Network::ConnectionCloseType::NoFlush);

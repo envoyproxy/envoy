@@ -9,6 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "extensions/filters/http/jwt_authn/matcher.h"
+#include "extensions/filters/http/jwt_authn/stats.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -17,21 +18,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-
-/**
- * All stats for the Jwt Authn filter. @see stats_macros.h
- */
-#define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
-  COUNTER(allowed)                                                                                 \
-  COUNTER(cors_preflight_bypassed)                                                                 \
-  COUNTER(denied)
-
-/**
- * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
- */
-struct JwtAuthnFilterStats {
-  ALL_JWT_AUTHN_FILTER_STATS(GENERATE_COUNTER_STRUCT)
-};
 
 /**
  * The per-route filter config

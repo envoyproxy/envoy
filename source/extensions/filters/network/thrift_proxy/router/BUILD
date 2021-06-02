@@ -13,8 +13,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.thrift_proxy.filters",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":router_lib",
         "//include/envoy/registry",

@@ -180,8 +180,7 @@ class HeaderIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
+  HeaderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -370,7 +369,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+      addFakeUpstream(Http::CodecType::HTTP2);
     }
   }
 
