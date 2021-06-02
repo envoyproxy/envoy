@@ -18,13 +18,20 @@ TEST(HttpHeadersDataInputBase, ReturnValueNotPersistedBetweenCalls) {
     data.onRequestHeaders(request_headers);
 
     EXPECT_EQ(input.get(data).data_, "bar");
-    EXPECT_EQ(input.get(data).data_, "bar");
   }
 
-  TestRequestHeaderMapImpl request_headers({{"header", "baz"}});
+  {
+    TestRequestHeaderMapImpl request_headers({{"header", "baz"}});
+    data.onRequestHeaders(request_headers);
+    EXPECT_EQ(input.get(data).data_, "baz");
+  }
+
+  TestRequestHeaderMapImpl request_headers({{"not-header", "baz"}});
   data.onRequestHeaders(request_headers);
-  EXPECT_EQ(input.get(data).data_, "baz");
-  EXPECT_EQ(input.get(data).data_, "baz");
+  auto result = input.get(data);
+  EXPECT_EQ(result.data_availability_,
+            Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+  EXPECT_EQ(result.data_, absl::nullopt);
 }
 } // namespace Matching
 } // namespace Http
