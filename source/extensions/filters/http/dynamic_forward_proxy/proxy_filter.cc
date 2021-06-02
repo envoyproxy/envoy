@@ -4,7 +4,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "extensions/clusters/well_known_names.h"
+#include "common/http/utility.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -64,8 +65,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   if (!cluster_type) {
     return Http::FilterHeadersStatus::Continue;
   }
-  if (cluster_type->name() !=
-      Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {
+  if (cluster_type->name() != "envoy.clusters.dynamic_forward_proxy") {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -87,8 +87,9 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Check for per route filter config.
-  const auto* config = route_entry->mostSpecificPerFilterConfigTyped<ProxyPerRouteConfig>(
-      HttpFilterNames::get().DynamicForwardProxy);
+  const auto* config = Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(
+      HttpFilterNames::get().DynamicForwardProxy, route);
+
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {

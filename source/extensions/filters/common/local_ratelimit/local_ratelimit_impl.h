@@ -45,7 +45,7 @@ private:
     }
   };
   struct LocalDescriptorHash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)t
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const RateLimit::LocalDescriptor& d) const {
       return absl::Hash<std::vector<RateLimit::DescriptorEntry>>()(d.entries_);
     }

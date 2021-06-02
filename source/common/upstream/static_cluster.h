@@ -34,8 +34,7 @@ private:
  */
 class StaticClusterFactory : public ClusterFactoryImplBase {
 public:
-  StaticClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Static) {}
+  StaticClusterFactory() : ClusterFactoryImplBase("envoy.cluster.static") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

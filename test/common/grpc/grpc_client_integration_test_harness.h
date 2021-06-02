@@ -246,7 +246,7 @@ public:
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       FakeUpstreamConfig config(test_time_.timeSystem());
-      config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      config.upstream_protocol_ = Http::CodecType::HTTP2;
       fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
     }
     switch (clientType()) {
@@ -524,7 +524,7 @@ public:
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
-    config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =
         std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 

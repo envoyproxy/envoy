@@ -53,7 +53,7 @@ private:
     static uint64_t hash(const ViewTuple& key) { return absl::Hash<ViewTuple>()(key); }
 
   public:
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
 
     uint64_t operator()(const OwningKey& key) const { return hash(key); }
     uint64_t operator()(const ViewKey& key) const {
@@ -62,7 +62,7 @@ private:
   };
 
   struct MapEq {
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(const OwningKey& left, const OwningKey& right) const { return left == right; }
     bool operator()(const OwningKey& left, const ViewKey& right) const {
       return left == std::make_tuple(right.service_, right.method_);

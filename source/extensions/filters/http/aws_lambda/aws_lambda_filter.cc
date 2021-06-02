@@ -120,12 +120,8 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    return absl::nullopt;
-  }
-  const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-  const auto* settings = route_entry->mostSpecificPerFilterConfigTyped<FilterSettings>(
-      HttpFilterNames::get().AwsLambda);
+  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
+      HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
   if (!settings) {
     return absl::nullopt;
   }
@@ -333,6 +329,10 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
     return;
   }
 
+  // Use JSON as the default content-type. If the response headers have a different content-type
+  // set, that will be used instead.
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+
   for (auto&& kv : json_resp.headers()) {
     // ignore H2 pseudo-headers (if any)
     if (kv.first[0] == ':') {
@@ -348,7 +348,6 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
   if (json_resp.status_code() != 0) {
     headers.setStatus(json_resp.status_code());
   }
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   if (!json_resp.body().empty()) {
     if (json_resp.is_base64_encoded()) {
       body.add(Base64::decode(json_resp.body()));

@@ -665,6 +665,25 @@ public:
                                      ProtobufWkt::Timestamp& timestamp);
 };
 
+class StructUtil {
+public:
+  /**
+   * Recursively updates in-place a protobuf structure with keys from another
+   * object.
+   *
+   * The merging strategy is the following. If a key from \p other does not
+   * exists, it's just copied into \p obj. If the key exists but has a
+   * different type, it is replaced by the new value. Otherwise:
+   * - for scalar values (null, string, number, boolean) are replaced with the new value
+   * - for lists: new values are added to the current list
+   * - for structures: recursively apply this scheme
+   *
+   * @param obj the object to update in-place
+   * @param with the object to update \p obj with
+   */
+  static void update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with);
+};
+
 } // namespace Envoy
 
 namespace std {

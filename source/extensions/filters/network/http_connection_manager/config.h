@@ -175,6 +175,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -283,6 +284,7 @@ private:
   static const uint64_t RequestHeaderTimeoutMs = 0;
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
+  const bool strip_trailing_host_dot_;
 };
 
 /**
