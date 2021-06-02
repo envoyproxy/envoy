@@ -1205,7 +1205,6 @@ WasmResult
 Context::declareProperty(std::string_view path,
                          Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
   // Do not delete existing schema since it can be referenced by state objects.
-  // fixfix var
   if (state_prototypes_.find(toAbslStringView(path)) == state_prototypes_.end()) {
     state_prototypes_[toAbslStringView(path)] = std::move(state_prototype);
     return WasmResult::Ok;
