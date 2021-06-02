@@ -32,6 +32,11 @@ stages:
               artifactName: format
             # not all have fixes so improve condition/handling
             condition: failed()
+          - task: GitHubComment@0
+            inputs:
+              gitHubConnection: 'envoyproxy'
+              repositoryName: '$(Build.Repository.Name)'
+              comment: 'here is my comment'
 
       - job: tooling
         dependsOn: []
@@ -124,7 +129,20 @@ stages:
               BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
               GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
               GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
-            displayName: "Verify dependency information"
+
+  - stage: output_precheck_results
+    dependsOn: ["precheck"]
+    # Only output if the build explicitly failed
+    condition: and(not(canceled()), succeeded()))
+    jobs:
+      - job: format_pre
+        dependsOn: []
+        steps:
+          - task: GitHubComment@0
+            inputs:
+              gitHubConnection: 'envoyproxy'
+              repositoryName: '$(Build.Repository.Name)'
+              comment: 'CI prechecks failed.  Please check github for details'
 
   - stage: sync
     condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
@@ -538,3 +556,4 @@ stages:
               pathtoPublish: "$(Build.StagingDirectory)/build_images"
               artifactName: docker_windows
             condition: always()
+
