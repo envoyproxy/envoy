@@ -27,7 +27,6 @@
 #include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "extensions/transport_sockets/tls/cert_validator/utility.h"
-#include "extensions/transport_sockets/tls/cert_validator/well_known_names.h"
 #include "extensions/transport_sockets/tls/stats.h"
 #include "extensions/transport_sockets/tls/utility.h"
 
@@ -472,7 +471,7 @@ public:
     return std::make_unique<DefaultCertValidator>(config, stats, time_source);
   }
 
-  absl::string_view name() override { return CertValidatorNames::get().Default; }
+  absl::string_view name() override { return "envoy.tls.cert_validator.default"; }
 };
 
 REGISTER_FACTORY(DefaultCertValidatorFactory, CertValidatorFactory);
