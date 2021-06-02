@@ -62,57 +62,15 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      switch (tag_format_.tag_position) {
-      case Statsd::TagPosition::TagAfterValue: {
-        const std::string counter_str = absl::StrCat(
-            // metric name
-            prefix_, ".", getName(counter.counter_.get()),
-            // value and type
-            ":", counter.delta_, "|c",
-            // tags
-            buildTagStr(counter.counter_.get().tags()));
-        writeBuffer(buffer, writer, counter_str);
-      } break;
-
-      case Statsd::TagPosition::TagAfterName: {
-        const std::string counter_str = absl::StrCat(
-            // metric name
-            prefix_, ".", getName(counter.counter_.get()),
-            // tags
-            buildTagStr(counter.counter_.get().tags()),
-            // value and type
-            ":", counter.delta_, "|c");
-        writeBuffer(buffer, writer, counter_str);
-      } break;
-      }
+      const std::string counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
+      writeBuffer(buffer, writer, counter_str);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      switch (tag_format_.tag_position) {
-      case Statsd::TagPosition::TagAfterValue: {
-        const std::string gauge_str = absl::StrCat(
-            // metric name
-            prefix_, ".", getName(gauge.get()),
-            // value and type
-            ":", gauge.get().value(), "|g",
-            // tags
-            buildTagStr(gauge.get().tags()));
-        writeBuffer(buffer, writer, gauge_str);
-      } break;
-
-      case Statsd::TagPosition::TagAfterName: {
-        const std::string gauge_str = absl::StrCat(
-            // metric name
-            prefix_, ".", getName(gauge.get()),
-            // tags
-            buildTagStr(gauge.get().tags()),
-            // value and type
-            ":", gauge.get().value(), "|g");
-        writeBuffer(buffer, writer, gauge_str);
-      } break;
-      }
+      const std::string gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
+      writeBuffer(buffer, writer, gauge_str);
     }
   }
 
@@ -154,28 +112,35 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
+  const std::string message =
+      buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
+  tls_->getTyped<Writer>().write(message);
+}
+
+const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint64_t value,
+                                              const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
     const std::string message = absl::StrCat(
         // metric name
-        prefix_, ".", getName(histogram),
+        prefix_, ".", getName(metric),
         // value and type
-        ":", std::chrono::milliseconds(value).count(), "|ms",
+        ":", value, type,
         // tags
-        buildTagStr(histogram.tags()));
-    tls_->getTyped<Writer>().write(message);
-  } break;
+        buildTagStr(metric.tags()));
+    return message;
+  }
 
   case Statsd::TagPosition::TagAfterName: {
     const std::string message = absl::StrCat(
         // metric name
-        prefix_, ".", getName(histogram),
+        prefix_, ".", getName(metric),
         // tags
-        buildTagStr(histogram.tags()),
+        buildTagStr(metric.tags()),
         // value and type
-        ":", std::chrono::milliseconds(value).count(), "|ms");
-    tls_->getTyped<Writer>().write(message);
-  } break;
+        ":", value, type);
+    return message;
+  }
   }
 }
 
