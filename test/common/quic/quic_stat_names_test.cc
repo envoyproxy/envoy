@@ -26,5 +26,15 @@ TEST_F(QuicStatNamesTest, QuicConnectionCloseStats) {
       scope_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR").value());
 }
 
+TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
+  uint64_t bad_error_code = quic::QUIC_LAST_ERROR + 1;
+  quic_stat_names_.chargeQuicConnectionCloseStats(scope_,
+                                                  static_cast<quic::QuicErrorCode>(bad_error_code),
+                                                  quic::ConnectionCloseSource::FROM_SELF, false);
+  EXPECT_EQ(1U,
+            scope_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_LAST_ERROR")
+                .value());
+}
+
 } // namespace Quic
 } // namespace Envoy

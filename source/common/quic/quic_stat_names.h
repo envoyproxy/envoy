@@ -33,7 +33,7 @@ private:
   const Stats::StatName upstream_;
   const Stats::StatName from_self_;
   const Stats::StatName from_peer_;
-  Thread::AtomicPtrArray<const uint8_t, quic::QUIC_LAST_ERROR,
+  Thread::AtomicPtrArray<const uint8_t, quic::QUIC_LAST_ERROR + 1,
                          Thread::AtomicPtrAllocMode::DoNotDelete>
       connection_error_stat_names_;
 };
