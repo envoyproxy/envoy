@@ -4,7 +4,6 @@
 #include "envoy/ssl/handshaker.h"
 
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"

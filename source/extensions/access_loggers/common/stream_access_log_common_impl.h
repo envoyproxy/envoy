@@ -4,7 +4,6 @@
 
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
-
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {

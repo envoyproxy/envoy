@@ -5,7 +5,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"

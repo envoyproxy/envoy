@@ -12,7 +12,6 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/synchronization/mutex.h"

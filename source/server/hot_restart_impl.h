@@ -13,7 +13,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/stats/allocator_impl.h"
-
 #include "source/server/hot_restarting_child.h"
 #include "source/server/hot_restarting_parent.h"
 

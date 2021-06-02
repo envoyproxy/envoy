@@ -11,7 +11,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/thread_synchronizer.h"
-
 #include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/base/thread_annotations.h"

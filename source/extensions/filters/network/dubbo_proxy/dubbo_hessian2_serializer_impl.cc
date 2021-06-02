@@ -4,7 +4,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 

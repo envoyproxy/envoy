@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
 
 #include "source/common/common/enum_to_int.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
 #include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"

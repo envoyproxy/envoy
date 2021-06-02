@@ -1,7 +1,6 @@
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 

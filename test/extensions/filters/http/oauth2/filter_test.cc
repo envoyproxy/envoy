@@ -11,7 +11,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/secret_manager_impl.h"
-
 #include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"

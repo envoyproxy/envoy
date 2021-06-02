@@ -14,7 +14,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"

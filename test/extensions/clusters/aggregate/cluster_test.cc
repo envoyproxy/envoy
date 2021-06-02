@@ -3,7 +3,6 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "source/common/singleton/manager_impl.h"
-
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"

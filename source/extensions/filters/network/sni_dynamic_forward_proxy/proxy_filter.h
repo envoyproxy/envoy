@@ -5,7 +5,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {

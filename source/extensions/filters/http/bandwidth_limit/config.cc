@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 namespace Envoy {

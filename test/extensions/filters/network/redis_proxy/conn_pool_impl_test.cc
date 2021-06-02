@@ -8,7 +8,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 

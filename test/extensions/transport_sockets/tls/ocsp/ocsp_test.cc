@@ -1,5 +1,4 @@
 #include "source/common/filesystem/filesystem_impl.h"
-
 #include "source/extensions/transport_sockets/tls/ocsp/ocsp.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 

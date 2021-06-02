@@ -21,7 +21,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/well_known_names.h"
 

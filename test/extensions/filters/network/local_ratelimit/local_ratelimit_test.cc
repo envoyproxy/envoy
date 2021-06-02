@@ -2,7 +2,6 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.validate.h"
 
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/event/mocks.h"

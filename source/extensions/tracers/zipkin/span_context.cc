@@ -2,7 +2,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {

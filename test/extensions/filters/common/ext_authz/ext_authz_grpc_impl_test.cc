@@ -4,7 +4,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"

@@ -9,7 +9,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 

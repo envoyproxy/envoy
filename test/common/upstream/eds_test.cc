@@ -10,7 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/eds.h"
-
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"

@@ -3,7 +3,6 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"

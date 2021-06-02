@@ -9,7 +9,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
-
 #include "source/extensions/filters/network/mongo_proxy/bson.h"
 
 namespace Envoy {

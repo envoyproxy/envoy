@@ -5,7 +5,6 @@
 
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 #include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/extensions/stat_sinks/well_known_names.h"

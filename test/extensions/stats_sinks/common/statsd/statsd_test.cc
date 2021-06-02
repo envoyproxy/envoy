@@ -4,7 +4,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/common/upstream/utility.h"

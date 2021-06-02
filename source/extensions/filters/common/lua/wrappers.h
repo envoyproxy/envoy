@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/common/lua/lua.h"
 
 namespace Envoy {

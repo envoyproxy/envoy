@@ -8,7 +8,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"

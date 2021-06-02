@@ -2,7 +2,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"

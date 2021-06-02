@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/aws/region_provider.h"
 
 namespace Envoy {

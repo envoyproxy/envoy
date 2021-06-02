@@ -2,7 +2,6 @@
 
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 #include "test/mocks/grpc/mocks.h"

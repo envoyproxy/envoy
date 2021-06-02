@@ -9,7 +9,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/router/router.h"
 
 namespace Envoy {

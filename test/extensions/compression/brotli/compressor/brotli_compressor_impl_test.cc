@@ -1,6 +1,5 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
 

@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 namespace Envoy {

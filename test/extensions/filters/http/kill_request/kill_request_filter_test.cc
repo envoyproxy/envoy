@@ -3,7 +3,6 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/http/kill_request/kill_request_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

@@ -6,7 +6,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/host_utility.h"
-
 #include "source/server/admin/utils.h"
 
 namespace Envoy {

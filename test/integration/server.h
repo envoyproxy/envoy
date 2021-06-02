@@ -16,7 +16,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
-
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"

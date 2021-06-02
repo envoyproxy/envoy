@@ -1,7 +1,5 @@
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)

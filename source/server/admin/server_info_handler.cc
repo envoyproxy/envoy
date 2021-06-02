@@ -4,7 +4,6 @@
 
 #include "source/common/memory/stats.h"
 #include "source/common/version/version.h"
-
 #include "source/server/admin/utils.h"
 
 namespace Envoy {

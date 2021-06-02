@@ -7,7 +7,6 @@
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
-
 #include "source/extensions/transport_sockets/tls/io_handle_bio.h"
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 #include "source/extensions/transport_sockets/tls/utility.h"

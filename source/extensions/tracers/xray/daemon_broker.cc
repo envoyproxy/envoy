@@ -6,7 +6,6 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/xray/daemon.pb.h"
 
 namespace Envoy {

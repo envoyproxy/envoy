@@ -35,7 +35,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/scoped_config_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/admin/clusters_handler.h"
 #include "source/server/admin/config_dump_handler.h"
@@ -48,8 +48,6 @@
 #include "source/server/admin/server_cmd_handler.h"
 #include "source/server/admin/server_info_handler.h"
 #include "source/server/admin/stats_handler.h"
-
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
 

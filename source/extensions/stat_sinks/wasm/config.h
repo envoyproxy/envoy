@@ -6,7 +6,6 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/config/datasource.h"
-
 #include "source/server/configuration_impl.h"
 
 namespace Envoy {

@@ -21,7 +21,6 @@
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/common/fault/fault_config.h"
 #include "source/extensions/filters/network/mongo_proxy/codec.h"
 #include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"

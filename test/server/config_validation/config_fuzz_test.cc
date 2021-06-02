@@ -4,7 +4,6 @@
 
 #include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
-
 #include "source/server/config_validation/server.h"
 
 #include "test/fuzz/fuzz_runner.h"

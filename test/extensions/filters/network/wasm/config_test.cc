@@ -3,7 +3,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/network/wasm/config.h"
 #include "source/extensions/filters/network/wasm/wasm_filter.h"

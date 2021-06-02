@@ -4,7 +4,6 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"

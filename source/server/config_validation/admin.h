@@ -5,7 +5,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/network/listen_socket_impl.h"
-
 #include "source/server/admin/config_tracker_impl.h"
 
 namespace Envoy {

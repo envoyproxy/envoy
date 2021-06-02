@@ -8,7 +8,6 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/extensions/request_id/uuid/config.h"
 

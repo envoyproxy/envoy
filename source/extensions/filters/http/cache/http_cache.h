@@ -12,10 +12,8 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-
-#include "source/extensions/filters/http/cache/key.pb.h"
-
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/key.pb.h"
 
 #include "absl/strings/string_view.h"
 

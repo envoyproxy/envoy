@@ -12,7 +12,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/router/rds_impl.h"
-
 #include "source/server/admin/admin.h"
 
 #include "test/mocks/init/mocks.h"

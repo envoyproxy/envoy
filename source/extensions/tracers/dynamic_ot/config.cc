@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/utility.h"
-
 #include "source/extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
 
 namespace Envoy {

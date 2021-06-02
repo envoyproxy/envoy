@@ -3,7 +3,6 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {

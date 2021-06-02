@@ -5,7 +5,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "source/extensions/filters/network/rocketmq_proxy/topic_route.h"
 #include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"

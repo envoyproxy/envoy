@@ -6,7 +6,6 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/network/transport_socket_options_impl.h"
-
 #include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/mocks/network/mocks.h"

@@ -3,9 +3,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/filter.h"
 
-#include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
-
 #include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/common/aws/mocks.h"

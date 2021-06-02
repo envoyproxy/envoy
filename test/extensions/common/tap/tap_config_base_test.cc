@@ -5,7 +5,6 @@
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/common/tap/tap_config_base.h"
 
 #include "gtest/gtest.h"

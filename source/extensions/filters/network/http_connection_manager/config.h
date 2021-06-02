@@ -30,7 +30,6 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
 #include "source/extensions/filters/network/well_known_names.h"

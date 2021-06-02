@@ -2,7 +2,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include "test/mocks/http/mocks.h"

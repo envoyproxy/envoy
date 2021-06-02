@@ -11,7 +11,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 

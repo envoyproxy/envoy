@@ -21,7 +21,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
-
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/utility.h"

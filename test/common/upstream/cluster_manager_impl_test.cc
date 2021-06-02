@@ -6,7 +6,6 @@
 
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
-
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"

@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"

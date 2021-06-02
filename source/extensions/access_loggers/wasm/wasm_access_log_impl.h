@@ -3,7 +3,6 @@
 #include "envoy/access_log/access_log.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/access_loggers/well_known_names.h"
 #include "source/extensions/common/wasm/wasm.h"
 

@@ -8,7 +8,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/server/configuration_impl.h"
 
 #include "absl/container/node_hash_map.h"

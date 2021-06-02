@@ -6,7 +6,6 @@
 #include "source/common/common/thread_impl.h"
 #include "source/common/event/signal_impl.h"
 #include "source/common/filesystem/filesystem_impl.h"
-
 #include "source/exe/platform_impl.h"
 
 namespace Envoy {

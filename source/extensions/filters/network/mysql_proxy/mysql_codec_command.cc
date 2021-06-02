@@ -4,7 +4,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 

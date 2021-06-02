@@ -10,7 +10,6 @@
 #include "envoy/event/signal.h"
 
 #include "source/common/common/win32/event_logger_impl.h"
-
 #include "source/exe/service_status.h"
 
 namespace Envoy {

@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"

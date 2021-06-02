@@ -16,7 +16,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/common/ratelimit/stat_names.h"
 

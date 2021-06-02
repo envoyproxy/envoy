@@ -7,7 +7,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "absl/container/flat_hash_map.h"

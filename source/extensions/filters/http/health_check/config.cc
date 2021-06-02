@@ -8,7 +8,6 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/health_check/health_check.h"
 
 namespace Envoy {

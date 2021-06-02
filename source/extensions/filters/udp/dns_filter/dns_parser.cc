@@ -5,7 +5,6 @@
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "ares.h"

@@ -9,7 +9,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 namespace Envoy {

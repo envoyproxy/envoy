@@ -4,7 +4,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 

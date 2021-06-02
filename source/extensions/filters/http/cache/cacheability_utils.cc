@@ -4,7 +4,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {

@@ -1,5 +1,4 @@
 #include "source/common/common/fmt.h"
-
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/integration/integration.h"

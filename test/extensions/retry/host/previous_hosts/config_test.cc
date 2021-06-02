@@ -2,7 +2,6 @@
 #include "envoy/upstream/retry.h"
 
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/retry/host/previous_hosts/config.h"
 
 #include "test/mocks/upstream/host.h"

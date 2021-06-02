@@ -2,7 +2,6 @@
 
 #include "source/common/api/api_impl.h"
 #include "source/common/event/dispatcher_impl.h"
-
 #include "source/server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"

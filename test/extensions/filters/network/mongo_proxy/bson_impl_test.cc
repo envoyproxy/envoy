@@ -1,7 +1,6 @@
 #include <string>
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include "test/test_common/printers.h"

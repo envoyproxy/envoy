@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/tap/tap_config_base.h"
 #include "source/extensions/filters/http/tap/tap_config.h"
 

@@ -1,5 +1,4 @@
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 

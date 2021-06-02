@@ -7,7 +7,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/transport_sockets/tap/tap.h"
 #include "source/extensions/transport_sockets/tap/tap_config_impl.h"
 

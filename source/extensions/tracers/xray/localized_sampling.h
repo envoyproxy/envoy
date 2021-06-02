@@ -8,7 +8,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
-
 #include "source/extensions/tracers/xray/reservoir.h"
 #include "source/extensions/tracers/xray/sampling_strategy.h"
 

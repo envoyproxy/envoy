@@ -23,7 +23,6 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/access_loggers/well_known_names.h"
 
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"

@@ -2,7 +2,6 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
 
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "test/test_common/environment.h"

@@ -8,7 +8,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

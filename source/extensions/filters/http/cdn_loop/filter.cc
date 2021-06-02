@@ -6,7 +6,6 @@
 
 #include "source/common/common/statusor.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/cdn_loop/utils.h"
 
 namespace Envoy {

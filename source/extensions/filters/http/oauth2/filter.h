@@ -22,7 +22,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/rest_api_fetcher.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"

@@ -9,7 +9,6 @@
 
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
-
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_manager_impl.h"
 

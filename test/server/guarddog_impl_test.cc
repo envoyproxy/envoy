@@ -14,7 +14,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/server/guarddog_impl.h"
 
 #include "test/mocks/common.h"

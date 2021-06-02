@@ -6,7 +6,6 @@
 
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
-
 #include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "cpp2sky/tracing_context.h"

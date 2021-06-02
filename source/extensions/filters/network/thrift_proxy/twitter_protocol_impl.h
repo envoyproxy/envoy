@@ -6,7 +6,6 @@
 #include "envoy/common/pure.h"
 
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 
 #include "absl/types/optional.h"

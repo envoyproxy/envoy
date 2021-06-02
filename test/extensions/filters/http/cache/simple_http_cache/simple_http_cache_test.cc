@@ -2,7 +2,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 

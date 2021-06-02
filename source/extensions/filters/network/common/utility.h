@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/common/macros.h"
-
 #include "source/extensions/common/utility.h"
 #include "source/extensions/filters/network/well_known_names.h"
 

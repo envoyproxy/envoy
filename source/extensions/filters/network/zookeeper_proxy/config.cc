@@ -8,7 +8,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
 namespace Envoy {

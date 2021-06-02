@@ -14,11 +14,9 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/utility.h"
-
-#include "source/server/options_impl.h"
-
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
+#include "source/server/options_impl.h"
 
 #if defined(__linux__)
 #include <sched.h>

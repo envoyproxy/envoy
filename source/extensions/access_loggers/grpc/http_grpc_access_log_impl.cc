@@ -9,7 +9,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
-
 #include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 namespace Envoy {

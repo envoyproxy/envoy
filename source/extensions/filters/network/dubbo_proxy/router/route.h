@@ -10,7 +10,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 

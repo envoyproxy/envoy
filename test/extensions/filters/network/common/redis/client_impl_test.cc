@@ -5,7 +5,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 

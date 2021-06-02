@@ -5,7 +5,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/network/kafka/broker/filter.h"
 #include "source/extensions/filters/network/kafka/external/requests.h"
 #include "source/extensions/filters/network/kafka/external/responses.h"

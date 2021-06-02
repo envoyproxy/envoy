@@ -22,7 +22,6 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 

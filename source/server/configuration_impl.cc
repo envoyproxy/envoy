@@ -23,7 +23,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {

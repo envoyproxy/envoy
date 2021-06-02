@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/filters/http/jwt_authn/filter.h"
 
 #include "jwt_verify_lib/jwks.h"

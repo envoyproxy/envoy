@@ -14,7 +14,6 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 

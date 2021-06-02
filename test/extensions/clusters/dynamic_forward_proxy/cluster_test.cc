@@ -4,7 +4,6 @@
 
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "test/common/upstream/utility.h"

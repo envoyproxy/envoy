@@ -10,7 +10,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/network/common/redis/fault.h"
 
 namespace Envoy {

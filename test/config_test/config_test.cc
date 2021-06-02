@@ -9,7 +9,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"

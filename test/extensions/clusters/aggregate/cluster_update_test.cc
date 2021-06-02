@@ -6,7 +6,6 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/test_cluster_manager.h"

@@ -7,7 +7,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/init/target_impl.h"
-
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 

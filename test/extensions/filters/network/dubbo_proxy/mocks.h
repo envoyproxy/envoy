@@ -2,7 +2,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/decoder.h"
 #include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"

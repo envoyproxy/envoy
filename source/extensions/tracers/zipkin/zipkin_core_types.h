@@ -9,7 +9,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/zipkin/tracer_interface.h"
 #include "source/extensions/tracers/zipkin/util.h"
 

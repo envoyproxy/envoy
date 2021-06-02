@@ -5,7 +5,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/sqlutils/sqlutils.h"
 #include "source/extensions/filters/network/postgres_proxy/postgres_message.h"
 #include "source/extensions/filters/network/postgres_proxy/postgres_session.h"

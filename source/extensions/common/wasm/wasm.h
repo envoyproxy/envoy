@@ -19,7 +19,6 @@
 #include "source/common/config/datasource.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/common/version/version.h"
-
 #include "source/extensions/common/wasm/context.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm_extension.h"

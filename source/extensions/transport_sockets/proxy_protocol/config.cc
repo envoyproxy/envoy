@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 
 namespace Envoy {

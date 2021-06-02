@@ -1,7 +1,6 @@
 #include "test/server/admin/admin_instance.h"
 
 #include "source/common/access_log/access_log_impl.h"
-
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {

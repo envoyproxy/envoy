@@ -6,7 +6,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/matching/common_inputs/environment_variable/input.h"
 
 namespace Envoy {

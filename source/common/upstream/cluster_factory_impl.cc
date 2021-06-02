@@ -8,7 +8,6 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/upstream/health_checker_impl.h"
-
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {

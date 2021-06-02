@@ -7,7 +7,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/network/resolver_impl.h"
-
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 #include "source/extensions/stat_sinks/well_known_names.h"
 

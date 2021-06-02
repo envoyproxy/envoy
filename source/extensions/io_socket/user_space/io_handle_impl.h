@@ -12,7 +12,6 @@
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
-
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 

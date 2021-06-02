@@ -4,7 +4,6 @@
 #include "envoy/upstream/retry.h"
 
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/retry/priority/previous_priorities/previous_priorities.h"
 
 namespace Envoy {

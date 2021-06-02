@@ -20,7 +20,6 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_protos.h"
-
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"

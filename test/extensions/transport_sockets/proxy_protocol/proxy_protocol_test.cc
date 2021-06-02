@@ -4,7 +4,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
-
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 

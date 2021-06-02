@@ -1,6 +1,5 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"

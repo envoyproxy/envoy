@@ -8,7 +8,6 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/thrift_proxy/config.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"

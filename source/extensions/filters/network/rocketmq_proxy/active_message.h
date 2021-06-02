@@ -8,7 +8,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 #include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 #include "source/extensions/filters/network/rocketmq_proxy/router/router.h"

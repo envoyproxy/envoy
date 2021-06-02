@@ -16,7 +16,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

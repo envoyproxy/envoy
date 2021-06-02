@@ -8,7 +8,6 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/network/socket_impl.h"
-
 #include "source/server/filter_chain_manager_impl.h"
 
 #include "test/benchmark/main.h"

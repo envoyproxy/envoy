@@ -3,7 +3,6 @@
 #include "envoy/compression/decompressor/config.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
 namespace Envoy {

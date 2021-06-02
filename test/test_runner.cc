@@ -7,9 +7,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/event/libevent.h"
 #include "source/common/runtime/runtime_features.h"
-
 #include "source/exe/process_wide.h"
-
 #include "source/server/backtrace.h"
 
 #include "test/common/runtime/utility.h"

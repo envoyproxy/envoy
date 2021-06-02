@@ -6,7 +6,6 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_impl.h"
-
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

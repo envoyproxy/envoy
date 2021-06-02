@@ -7,7 +7,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-
 #include "source/extensions/common/aws/credentials_provider.h"
 
 #include "absl/strings/string_view.h"

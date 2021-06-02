@@ -39,11 +39,11 @@ envoy_cc_library(
         "//bazel:windows_x86_64": ["win32/os_sys_calls_impl.h"],
         "//conditions:default": ["posix/os_sys_calls_impl.h"],
     }) + envoy_select_hot_restart(["posix/os_sys_calls_impl_hot_restart.h"]),
+    include_prefix = "source/common/api",
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "posix",
     }),
-    include_prefix = "source/common/api",
     deps = [
         "//envoy/api:os_sys_calls_interface",
         "//source/common/singleton:threadsafe_singleton",

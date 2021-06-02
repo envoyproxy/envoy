@@ -1,5 +1,4 @@
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 

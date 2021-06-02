@@ -3,7 +3,6 @@
 
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/listener/original_src/original_src.h"
 
 #include "test/mocks/buffer/mocks.h"

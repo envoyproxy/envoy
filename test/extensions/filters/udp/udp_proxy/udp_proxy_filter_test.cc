@@ -4,7 +4,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
-
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"

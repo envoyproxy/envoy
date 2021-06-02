@@ -4,7 +4,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/libevent.h"
 #include "source/common/http/http2/codec_impl.h"
-
 #include "source/exe/process_wide.h"
 
 #include "test/test_common/environment.h"

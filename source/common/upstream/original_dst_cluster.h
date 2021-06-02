@@ -14,7 +14,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/clusters/well_known_names.h"
 
 namespace Envoy {

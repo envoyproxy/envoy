@@ -7,7 +7,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
-
 #include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"

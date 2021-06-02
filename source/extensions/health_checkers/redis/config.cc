@@ -6,7 +6,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/health_checkers/redis/utility.h"
 
 namespace Envoy {

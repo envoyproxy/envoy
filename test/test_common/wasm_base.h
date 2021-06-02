@@ -9,7 +9,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/grpc/mocks.h"

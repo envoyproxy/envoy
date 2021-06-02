@@ -5,7 +5,6 @@
 #include "envoy/type/matcher/v3/metadata.pb.h"
 
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 

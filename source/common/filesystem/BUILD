@@ -21,8 +21,8 @@ envoy_cc_win32_library(
     name = "directory_iterator_impl_lib",
     srcs = ["win32/directory_iterator_impl.cc"],
     hdrs = ["win32/directory_iterator_impl.h"],
-    strip_include_prefix = "win32",
     include_prefix = "source/common/filesystem",
+    strip_include_prefix = "win32",
     deps = [
         "//envoy/filesystem:filesystem_interface",
     ],
@@ -32,8 +32,8 @@ envoy_cc_posix_library(
     name = "directory_iterator_impl_lib",
     srcs = ["posix/directory_iterator_impl.cc"],
     hdrs = ["posix/directory_iterator_impl.h"],
-    strip_include_prefix = "posix",
     include_prefix = "source/common/filesystem",
+    strip_include_prefix = "posix",
     deps = [
         "//envoy/filesystem:filesystem_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -50,8 +50,8 @@ envoy_cc_posix_library(
     name = "filesystem_impl_lib",
     srcs = ["posix/filesystem_impl.cc"],
     hdrs = ["posix/filesystem_impl.h"],
-    strip_include_prefix = "posix",
     include_prefix = "source/common/filesystem",
+    strip_include_prefix = "posix",
     deps = [
         ":file_shared_lib",
     ],
@@ -61,8 +61,8 @@ envoy_cc_win32_library(
     name = "filesystem_impl_lib",
     srcs = ["win32/filesystem_impl.cc"],
     hdrs = ["win32/filesystem_impl.h"],
-    strip_include_prefix = "win32",
     include_prefix = "source/common/filesystem",
+    strip_include_prefix = "win32",
     deps = [
         ":file_shared_lib",
     ],
@@ -106,12 +106,12 @@ envoy_cc_library(
     external_deps = [
         "event",
     ],
+    include_prefix = "source/common/filesystem",
     strip_include_prefix = select({
         "//bazel:apple": "kqueue",
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "inotify",
     }),
-    include_prefix = "source/common/filesystem",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

@@ -16,7 +16,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

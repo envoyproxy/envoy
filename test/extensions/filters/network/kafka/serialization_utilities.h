@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/kafka/serialization.h"
 
 #include "absl/container/fixed_array.h"

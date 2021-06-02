@@ -8,7 +8,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"

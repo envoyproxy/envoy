@@ -10,7 +10,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 #include "source/extensions/access_loggers/open_telemetry/access_log_proto_descriptors.h"
 #include "source/extensions/access_loggers/well_known_names.h"

@@ -8,7 +8,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
-
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"

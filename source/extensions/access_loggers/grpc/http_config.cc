@@ -9,7 +9,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/access_loggers/grpc/config_utils.h"
 #include "source/extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
 #include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"

@@ -12,7 +12,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"

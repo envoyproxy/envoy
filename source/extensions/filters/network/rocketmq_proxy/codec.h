@@ -10,7 +10,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 namespace Envoy {

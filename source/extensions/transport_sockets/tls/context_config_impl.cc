@@ -11,7 +11,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
-
 #include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"

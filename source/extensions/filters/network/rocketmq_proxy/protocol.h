@@ -9,7 +9,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/metadata.h"
 
 #include "absl/strings/string_view.h"

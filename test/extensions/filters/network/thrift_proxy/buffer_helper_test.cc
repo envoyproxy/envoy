@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

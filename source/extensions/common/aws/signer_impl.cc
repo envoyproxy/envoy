@@ -7,7 +7,6 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"

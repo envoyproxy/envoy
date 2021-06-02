@@ -11,7 +11,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/stats/utility.h"
-
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {

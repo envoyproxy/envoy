@@ -10,7 +10,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {

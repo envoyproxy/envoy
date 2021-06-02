@@ -6,7 +6,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"

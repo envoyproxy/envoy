@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"

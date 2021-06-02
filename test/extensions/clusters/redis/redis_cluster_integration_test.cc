@@ -4,7 +4,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"

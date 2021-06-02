@@ -14,7 +14,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/logical_dns_cluster.h"
-
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"

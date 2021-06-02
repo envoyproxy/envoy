@@ -15,7 +15,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/matchers.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 

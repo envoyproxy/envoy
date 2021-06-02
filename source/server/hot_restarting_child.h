@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/stats/stat_merger.h"
-
 #include "source/server/hot_restarting_base.h"
 
 namespace Envoy {

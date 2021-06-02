@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
-
 #include "source/extensions/filters/network/common/redis/client.h"
 
 #include "test/common/upstream/utility.h"

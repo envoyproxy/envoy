@@ -11,7 +11,6 @@
 #include "source/common/common/hex.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/xray/daemon_broker.h"
 #include "source/extensions/tracers/xray/sampling_strategy.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"

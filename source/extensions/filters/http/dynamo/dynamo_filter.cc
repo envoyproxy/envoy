@@ -12,7 +12,6 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
-
 #include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
 #include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 

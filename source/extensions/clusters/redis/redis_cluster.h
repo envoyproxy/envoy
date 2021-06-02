@@ -54,11 +54,7 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
-
-#include "source/server/transport_socket_config_impl.h"
-
 #include "source/extensions/clusters/well_known_names.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -66,6 +62,7 @@
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

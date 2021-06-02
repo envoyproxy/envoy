@@ -8,7 +8,6 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "source/common/http/header_utility.h"
-
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"

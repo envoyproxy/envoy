@@ -6,7 +6,6 @@
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/assert.h"
-
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {

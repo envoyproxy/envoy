@@ -11,7 +11,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/server/listener_hooks.h"
 
 namespace Envoy {

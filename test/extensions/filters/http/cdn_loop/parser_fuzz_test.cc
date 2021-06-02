@@ -1,5 +1,4 @@
 #include "source/common/common/statusor.h"
-
 #include "source/extensions/filters/http/cdn_loop/parser.h"
 
 #include "test/fuzz/fuzz_runner.h"

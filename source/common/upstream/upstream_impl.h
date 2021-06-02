@@ -54,10 +54,8 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
-
-#include "source/server/transport_socket_config_impl.h"
-
 #include "source/extensions/upstreams/http/config.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/synchronization/mutex.h"

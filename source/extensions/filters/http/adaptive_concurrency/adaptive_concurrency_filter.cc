@@ -9,7 +9,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

@@ -1,5 +1,4 @@
 #include "source/common/network/io_socket_error_impl.h"
-
 #include "source/extensions/transport_sockets/tls/io_handle_bio.h"
 
 #include "test/mocks/network/io_handle.h"

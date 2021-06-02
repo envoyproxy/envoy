@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
 #include "source/common/common/enum_to_int.h"
-
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 

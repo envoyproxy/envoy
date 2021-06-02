@@ -1,5 +1,4 @@
 #include "source/common/stats/utility.h"
-
 #include "source/exe/main_common.h"
 
 // NOLINT(namespace-envoy)

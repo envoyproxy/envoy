@@ -11,7 +11,6 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"

@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {

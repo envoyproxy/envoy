@@ -8,7 +8,6 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {

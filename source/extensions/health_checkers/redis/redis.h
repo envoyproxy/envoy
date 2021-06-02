@@ -10,7 +10,6 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 
 #include "source/common/upstream/health_checker_base_impl.h"
-
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"

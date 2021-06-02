@@ -9,7 +9,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/grpc/typed_async_client.h"
-
 #include "source/extensions/filters/http/ext_proc/client.h"
 
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;

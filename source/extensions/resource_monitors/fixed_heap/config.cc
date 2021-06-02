@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 namespace Envoy {

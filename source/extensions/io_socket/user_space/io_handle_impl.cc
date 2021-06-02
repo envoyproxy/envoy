@@ -7,7 +7,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
 
 #include "absl/types/optional.h"

@@ -3,7 +3,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"

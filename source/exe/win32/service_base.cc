@@ -5,7 +5,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/thread.h"
 #include "source/common/event/signal_impl.h"
-
 #include "source/exe/main_common.h"
 #include "source/exe/service_base.h"
 

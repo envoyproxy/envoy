@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/kafka/external/request_metrics.h"
 #include "source/extensions/filters/network/kafka/external/response_metrics.h"
 #include "source/extensions/filters/network/kafka/parser.h"

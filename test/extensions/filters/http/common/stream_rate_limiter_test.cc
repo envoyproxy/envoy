@@ -2,7 +2,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
-
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "test/common/http/common.h"

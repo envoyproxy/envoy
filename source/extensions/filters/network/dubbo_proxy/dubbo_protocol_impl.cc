@@ -3,7 +3,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {

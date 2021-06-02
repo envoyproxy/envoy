@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-
 #include "source/server/admin/utils.h"
 
 #include "absl/container/node_hash_map.h"

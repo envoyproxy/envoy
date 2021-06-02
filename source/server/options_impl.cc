@@ -12,7 +12,6 @@
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/version/version.h"
-
 #include "source/server/options_impl_platform.h"
 
 #include "absl/strings/str_replace.h"

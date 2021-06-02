@@ -11,7 +11,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
-
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/custom_header_extension.h"

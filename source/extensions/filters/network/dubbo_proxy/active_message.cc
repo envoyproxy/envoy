@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/dubbo_proxy/active_message.h"
 
 #include "source/common/stats/timespan_impl.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 

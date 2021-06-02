@@ -7,7 +7,6 @@
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/logical_host.h"
-
 #include "source/extensions/clusters/well_known_names.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 

@@ -5,10 +5,8 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/common/thread.h"
 #include "source/common/runtime/runtime_impl.h"
-
 #include "source/exe/main_common.h"
 #include "source/exe/platform_impl.h"
-
 #include "source/server/options_impl.h"
 
 #include "test/mocks/common.h"

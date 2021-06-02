@@ -10,7 +10,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/router.h"
 #include "source/common/router/upstream_request.h"
-
 #include "source/extensions/upstreams/http/http/upstream_request.h"
 
 namespace Envoy {

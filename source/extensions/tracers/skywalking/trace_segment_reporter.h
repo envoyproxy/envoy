@@ -7,7 +7,6 @@
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/grpc/async_client_impl.h"
-
 #include "source/extensions/tracers/skywalking/skywalking_stats.h"
 
 #include "cpp2sky/tracing_context.h"

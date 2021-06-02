@@ -2,7 +2,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
-
 #include "source/extensions/tracers/xray/localized_sampling.h"
 #include "source/extensions/tracers/xray/tracer.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"

@@ -2,7 +2,6 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/filters/http/cors/cors_filter.h"
 
 #include "test/mocks/buffer/mocks.h"

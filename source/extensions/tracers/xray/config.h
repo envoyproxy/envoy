@@ -3,7 +3,6 @@
 #include "envoy/config/trace/v3/xray.pb.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/tracers/common/factory_base.h"
 
 namespace Envoy {

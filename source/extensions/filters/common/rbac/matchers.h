@@ -13,7 +13,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
-
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 namespace Envoy {

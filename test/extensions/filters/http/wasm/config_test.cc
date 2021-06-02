@@ -7,7 +7,6 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/http/wasm/config.h"
 

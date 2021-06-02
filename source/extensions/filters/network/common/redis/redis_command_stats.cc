@@ -2,7 +2,6 @@
 
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/stats/utility.h"
-
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {

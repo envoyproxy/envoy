@@ -3,7 +3,6 @@
 #include "envoy/router/internal_redirect.h"
 
 #include "source/common/stream_info/filter_state_impl.h"
-
 #include "source/extensions/internal_redirect/previous_routes/config.h"
 
 #include "gmock/gmock.h"

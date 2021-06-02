@@ -8,7 +8,6 @@
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/runtime/runtime_protos.h"
-
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 namespace Envoy {

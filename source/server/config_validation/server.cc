@@ -11,7 +11,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
-
 #include "source/server/ssl_context_manager.h"
 
 namespace Envoy {

@@ -1,6 +1,5 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
-
 #include "source/extensions/common/aws/signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 

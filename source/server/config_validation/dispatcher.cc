@@ -1,7 +1,6 @@
 #include "source/server/config_validation/dispatcher.h"
 
 #include "source/common/common/assert.h"
-
 #include "source/server/config_validation/connection.h"
 
 namespace Envoy {

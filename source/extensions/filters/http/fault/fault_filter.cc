@@ -21,7 +21,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/utility.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {

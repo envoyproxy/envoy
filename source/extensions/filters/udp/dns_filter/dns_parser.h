@@ -11,7 +11,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/timespan_impl.h"
-
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 namespace Envoy {

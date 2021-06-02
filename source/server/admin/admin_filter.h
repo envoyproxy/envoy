@@ -10,7 +10,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"

@@ -16,7 +16,6 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-
 #include "source/server/filter_chain_factory_context_callback.h"
 
 #include "absl/container/flat_hash_map.h"

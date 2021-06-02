@@ -1,7 +1,6 @@
 #include <memory>
 
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
 
 #include "test/mocks/http/mocks.h"

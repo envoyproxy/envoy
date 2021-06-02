@@ -2,7 +2,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
-
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/context.h"
 

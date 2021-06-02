@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/config.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"

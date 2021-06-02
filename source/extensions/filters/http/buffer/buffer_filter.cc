@@ -11,7 +11,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_impl.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {

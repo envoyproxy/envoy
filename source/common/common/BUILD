@@ -187,8 +187,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "logger_impl_lib_standard",
     hdrs = ["standard/logger_impl.h"],
-    strip_include_prefix = "standard",
     include_prefix = "source/common/common",
+    strip_include_prefix = "standard",
     deps = [":base_logger_lib"],
 )
 
@@ -202,8 +202,8 @@ envoy_cc_library(
         "//bazel:android_logger": ["android/logger_impl.h"],
         "//conditions:default": [],
     }),
-    strip_include_prefix = "android",
     include_prefix = "source/common/common",
+    strip_include_prefix = "android",
     deps = [":base_logger_lib"],
 )
 
@@ -368,8 +368,8 @@ envoy_cc_posix_library(
     name = "thread_impl_lib",
     srcs = ["posix/thread_impl.cc"],
     hdrs = ["posix/thread_impl.h"],
-    strip_include_prefix = "posix",
     include_prefix = "source/common/common",
+    strip_include_prefix = "posix",
     deps = [
         ":assert_lib",
         "//envoy/thread:thread_interface",
@@ -380,8 +380,8 @@ envoy_cc_win32_library(
     name = "thread_impl_lib",
     srcs = ["win32/thread_impl.cc"],
     hdrs = ["win32/thread_impl.h"],
-    strip_include_prefix = "win32",
     include_prefix = "source/common/common",
+    strip_include_prefix = "win32",
     deps = [
         ":assert_lib",
         "//envoy/thread:thread_interface",

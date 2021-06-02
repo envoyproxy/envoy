@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/formatter/substitution_formatter.h"
-
 #include "source/extensions/access_loggers/common/access_log_base.h"
 
 namespace Envoy {

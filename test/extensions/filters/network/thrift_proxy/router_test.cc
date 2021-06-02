@@ -5,7 +5,6 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/config.h"
 #include "source/extensions/filters/network/thrift_proxy/router/config.h"

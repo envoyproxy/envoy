@@ -3,7 +3,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/http/http2/nghttp2.h"
-
 #include "source/server/proto_descriptors.h"
 
 #include "ares.h"

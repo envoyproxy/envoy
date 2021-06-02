@@ -9,7 +9,6 @@
 #include <thread>
 
 #include "source/common/api/os_sys_calls_impl_linux.h"
-
 #include "source/server/options_impl_platform.h"
 
 namespace Envoy {

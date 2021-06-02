@@ -9,7 +9,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include "test/mocks/http/mocks.h"

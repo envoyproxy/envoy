@@ -8,7 +8,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
 
 namespace Envoy {

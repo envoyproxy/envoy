@@ -25,7 +25,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/common/expr/context.h"

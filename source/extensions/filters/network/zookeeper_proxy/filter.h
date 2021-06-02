@@ -13,7 +13,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 
 namespace Envoy {

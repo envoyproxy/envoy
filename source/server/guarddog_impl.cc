@@ -22,7 +22,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"

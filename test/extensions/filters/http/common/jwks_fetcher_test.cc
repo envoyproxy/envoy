@@ -5,7 +5,6 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/extensions/filters/http/common/mock.h"

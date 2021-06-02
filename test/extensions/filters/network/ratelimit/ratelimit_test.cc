@@ -6,7 +6,6 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 #include "source/extensions/filters/network/well_known_names.h"
 

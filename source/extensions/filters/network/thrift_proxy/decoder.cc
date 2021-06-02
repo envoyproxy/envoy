@@ -5,7 +5,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
-
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 namespace Envoy {

@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
-
 #include "source/extensions/filters/network/kafka/kafka_request.h"
 #include "source/extensions/filters/network/kafka/parser.h"
 #include "source/extensions/filters/network/kafka/tagged_fields.h"

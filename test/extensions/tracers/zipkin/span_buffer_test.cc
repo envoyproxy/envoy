@@ -2,7 +2,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/util.h"
 

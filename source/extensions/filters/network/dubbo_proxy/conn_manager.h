@@ -10,7 +10,6 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/active_message.h"
 #include "source/extensions/filters/network/dubbo_proxy/decoder.h"
 #include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"

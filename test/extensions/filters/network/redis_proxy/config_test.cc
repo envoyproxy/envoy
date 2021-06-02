@@ -2,7 +2,6 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"

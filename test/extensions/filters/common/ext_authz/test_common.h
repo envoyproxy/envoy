@@ -5,7 +5,6 @@
 #include "envoy/type/v3/http_status.pb.h"
 
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"

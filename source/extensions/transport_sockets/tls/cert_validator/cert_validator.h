@@ -15,7 +15,6 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"

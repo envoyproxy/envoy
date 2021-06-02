@@ -9,7 +9,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

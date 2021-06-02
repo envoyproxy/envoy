@@ -2,7 +2,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
-
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 namespace Envoy {

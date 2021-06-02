@@ -2,7 +2,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
-
 #include "source/extensions/tracers/zipkin/tracer.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"

@@ -11,7 +11,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"

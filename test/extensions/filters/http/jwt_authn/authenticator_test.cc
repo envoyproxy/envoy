@@ -3,7 +3,6 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/authenticator.h"
 #include "source/extensions/filters/http/jwt_authn/filter_config.h"

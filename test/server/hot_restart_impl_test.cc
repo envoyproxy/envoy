@@ -3,7 +3,6 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/api/os_sys_calls_impl_hot_restart.h"
 #include "source/common/common/hex.h"
-
 #include "source/server/hot_restart_impl.h"
 
 #include "test/mocks/api/hot_restart.h"

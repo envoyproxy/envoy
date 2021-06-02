@@ -3,7 +3,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
 #include "test/extensions/filters/network/local_ratelimit/local_ratelimit_fuzz.pb.validate.h"

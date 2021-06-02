@@ -10,7 +10,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/router/header_parser.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {

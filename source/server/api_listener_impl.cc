@@ -6,11 +6,9 @@
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
-
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_manager_impl.h"
-
-#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 namespace Envoy {
 namespace Server {

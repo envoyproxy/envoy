@@ -11,7 +11,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-
 #include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 namespace Envoy {

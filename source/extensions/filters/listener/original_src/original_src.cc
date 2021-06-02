@@ -4,7 +4,6 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
-
 #include "source/extensions/filters/common/original_src/socket_option_factory.h"
 
 namespace Envoy {

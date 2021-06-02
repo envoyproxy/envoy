@@ -9,7 +9,6 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/decoder.h"
 #include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"

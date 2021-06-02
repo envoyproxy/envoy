@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "source/common/http/message_impl.h"
-
 #include "source/extensions/filters/http/jwt_authn/authenticator.h"
 #include "source/extensions/filters/http/jwt_authn/verifier.h"
 

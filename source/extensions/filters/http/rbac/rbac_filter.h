@@ -8,7 +8,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 

@@ -1,5 +1,4 @@
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"

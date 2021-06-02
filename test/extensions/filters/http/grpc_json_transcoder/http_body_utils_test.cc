@@ -1,6 +1,5 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "test/proto/bookstore.pb.h"

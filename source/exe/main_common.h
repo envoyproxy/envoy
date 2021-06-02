@@ -10,9 +10,7 @@
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
-
 #include "source/exe/process_wide.h"
-
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
 #include "source/server/server.h"

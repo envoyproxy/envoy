@@ -37,7 +37,6 @@
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/filters/http/common/utility.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

@@ -2,7 +2,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"

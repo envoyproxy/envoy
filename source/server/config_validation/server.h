@@ -21,7 +21,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
-
 #include "source/server/admin/admin.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"

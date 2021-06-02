@@ -8,7 +8,6 @@
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include "test/common/upstream/utility.h"

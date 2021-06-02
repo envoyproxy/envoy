@@ -2,7 +2,6 @@
 
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
-
 #include "source/tracing_context_impl.h"
 
 #include "test/test_common/utility.h"

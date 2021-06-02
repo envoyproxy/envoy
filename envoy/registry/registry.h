@@ -15,7 +15,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_type_oracle.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/common/utility.h"
 
 #include "absl/base/attributes.h"

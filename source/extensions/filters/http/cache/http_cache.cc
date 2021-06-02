@@ -10,7 +10,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 

@@ -9,7 +9,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/statusor.h"
-
 #include "source/extensions/filters/http/cdn_loop/filter.h"
 #include "source/extensions/filters/http/cdn_loop/parser.h"
 

@@ -2,7 +2,6 @@
 
 #include "source/common/http/exception.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/tracers/xray/util.h"
 
 namespace Envoy {

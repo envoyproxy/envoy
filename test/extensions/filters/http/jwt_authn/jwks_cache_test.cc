@@ -5,7 +5,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"

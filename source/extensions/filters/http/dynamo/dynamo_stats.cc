@@ -6,7 +6,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/http/dynamo/dynamo_request_parser.h"
 
 namespace Envoy {

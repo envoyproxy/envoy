@@ -5,7 +5,6 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/common/fmt.h"
-
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {

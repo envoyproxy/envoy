@@ -21,7 +21,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/grpc/typed_async_client.h"
-
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 

@@ -6,7 +6,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/tracers/lightstep/lightstep_tracer_impl.h"
 
 #include "lightstep/tracer.h"

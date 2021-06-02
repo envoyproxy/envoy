@@ -6,7 +6,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
 #include "test/mocks/api/mocks.h"

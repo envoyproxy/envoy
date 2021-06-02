@@ -3,7 +3,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/http/codec_client.h"
-
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/integration/fake_upstream.h"

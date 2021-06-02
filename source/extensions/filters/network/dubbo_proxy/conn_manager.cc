@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/fmt.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"

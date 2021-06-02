@@ -3,7 +3,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
-
 #include "source/extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include "test/mocks/http/mocks.h"

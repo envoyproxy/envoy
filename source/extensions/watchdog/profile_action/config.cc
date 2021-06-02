@@ -4,7 +4,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
-
 #include "source/extensions/watchdog/profile_action/profile_action.h"
 
 namespace Envoy {

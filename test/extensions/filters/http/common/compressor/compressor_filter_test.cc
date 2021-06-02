@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/compression/compressor/mocks.h"

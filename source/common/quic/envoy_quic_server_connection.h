@@ -4,7 +4,6 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
-
 #include "source/server/connection_handler_impl.h"
 
 #if defined(__GNUC__)

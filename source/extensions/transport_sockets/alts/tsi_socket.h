@@ -5,7 +5,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/network/raw_buffer_socket.h"
-
 #include "source/extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 #include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 #include "source/extensions/transport_sockets/alts/tsi_handshaker.h"

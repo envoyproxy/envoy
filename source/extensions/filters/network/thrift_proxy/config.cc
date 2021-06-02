@@ -9,7 +9,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"

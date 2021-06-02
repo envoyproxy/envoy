@@ -7,7 +7,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/mocks/stats/mocks.h"

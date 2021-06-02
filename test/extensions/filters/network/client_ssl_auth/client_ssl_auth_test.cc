@@ -7,7 +7,6 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include "test/mocks/network/mocks.h"

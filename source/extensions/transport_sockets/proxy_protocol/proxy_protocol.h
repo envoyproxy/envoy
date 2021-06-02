@@ -6,7 +6,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/transport_sockets/common/passthrough.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;

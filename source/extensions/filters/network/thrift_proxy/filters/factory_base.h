@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/thrift_proxy/filters/filter_config.h"
 
 namespace Envoy {

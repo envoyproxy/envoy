@@ -7,7 +7,6 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {

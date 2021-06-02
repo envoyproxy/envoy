@@ -3,7 +3,6 @@
 #include <vector>
 
 #include "source/common/common/utility.h"
-
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"

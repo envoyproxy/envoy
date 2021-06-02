@@ -14,7 +14,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/server/admin/admin_instance.h"

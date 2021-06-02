@@ -6,7 +6,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/enum_to_int.h"
-
 #include "source/extensions/filters/http/admission_control/admission_control.h"
 #include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
 #include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"

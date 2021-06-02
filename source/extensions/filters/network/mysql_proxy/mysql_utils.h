@@ -6,7 +6,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/byte_order.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {

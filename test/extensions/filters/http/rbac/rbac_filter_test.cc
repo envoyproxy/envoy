@@ -3,7 +3,6 @@
 
 #include "source/common/config/metadata.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"

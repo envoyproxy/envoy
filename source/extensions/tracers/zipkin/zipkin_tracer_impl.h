@@ -15,7 +15,6 @@
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/upstream/cluster_update_tracker.h"
-
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/tracer.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"

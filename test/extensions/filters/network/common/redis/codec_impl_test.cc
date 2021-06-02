@@ -2,7 +2,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
-
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"

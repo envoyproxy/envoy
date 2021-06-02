@@ -25,11 +25,11 @@ envoy_cc_library(
             "posix/signal_impl.h",
         ],
     }),
+    include_prefix = "source/common/event",
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "posix",
     }),
-    include_prefix = "source/common/event",
     deps = [
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
@@ -62,8 +62,8 @@ envoy_cc_posix_library(
     name = "signal_impl_lib",
     srcs = ["posix/signal_impl.cc"],
     hdrs = ["posix/signal_impl.h"],
-    strip_include_prefix = "posix",
     include_prefix = "source/common/event",
+    strip_include_prefix = "posix",
     deps = [
         ":dispatcher_includes",
         "//envoy/event:signal_interface",
@@ -75,8 +75,8 @@ envoy_cc_win32_library(
     name = "signal_impl_lib",
     srcs = ["win32/signal_impl.cc"],
     hdrs = ["win32/signal_impl.h"],
-    strip_include_prefix = "win32",
     include_prefix = "source/common/event",
+    strip_include_prefix = "win32",
     deps = [
         ":dispatcher_includes",
         "//envoy/event:signal_interface",

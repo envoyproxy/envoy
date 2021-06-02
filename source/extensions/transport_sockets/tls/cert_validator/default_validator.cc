@@ -23,7 +23,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/common/stats/utility.h"
-
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"

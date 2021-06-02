@@ -12,9 +12,7 @@
 #include "source/common/common/perf_annotation.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/thread_local_store.h"
-
 #include "source/exe/platform_impl.h"
-
 #include "source/server/config_validation/server.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/hot_restart_nop_impl.h"

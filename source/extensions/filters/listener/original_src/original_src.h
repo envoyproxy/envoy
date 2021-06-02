@@ -4,7 +4,6 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/listener/original_src/config.h"
 
 namespace Envoy {

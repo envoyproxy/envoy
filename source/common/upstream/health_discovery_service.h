@@ -20,7 +20,6 @@
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_endpoint.h"
 #include "source/common/upstream/upstream_impl.h"
-
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"

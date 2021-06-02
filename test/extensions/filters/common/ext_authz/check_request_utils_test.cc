@@ -2,7 +2,6 @@
 
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 

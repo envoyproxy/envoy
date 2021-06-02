@@ -7,7 +7,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/scope_tracker.h"
-
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 

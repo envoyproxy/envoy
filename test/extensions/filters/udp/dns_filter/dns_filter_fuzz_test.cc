@@ -1,5 +1,4 @@
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "test/fuzz/fuzz_runner.h"

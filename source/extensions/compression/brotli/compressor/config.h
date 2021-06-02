@@ -5,7 +5,6 @@
 #include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.validate.h"
 
 #include "source/common/http/headers.h"
-
 #include "source/extensions/compression/brotli/compressor/brotli_compressor_impl.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"
 

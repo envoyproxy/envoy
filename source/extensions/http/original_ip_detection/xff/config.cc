@@ -5,7 +5,6 @@
 #include "envoy/http/original_ip_detection.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/http/original_ip_detection/xff/xff.h"
 
 namespace Envoy {

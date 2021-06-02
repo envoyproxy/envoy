@@ -13,7 +13,6 @@
 
 #include "source/common/common/cleanup.h"
 #include "source/common/runtime/runtime_protos.h"
-
 #include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 

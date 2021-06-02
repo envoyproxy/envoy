@@ -2,7 +2,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 namespace Envoy {

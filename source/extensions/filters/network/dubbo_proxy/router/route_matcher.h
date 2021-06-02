@@ -12,7 +12,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/route.h"

@@ -3,10 +3,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/event/dispatcher_impl.h"
-
-#include "source/server/resource_monitor_config_impl.h"
-
 #include "source/extensions/resource_monitors/injected_resource/config.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"

@@ -9,7 +9,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include "test/mocks/grpc/mocks.h"

@@ -13,7 +13,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
-
 #include "source/extensions/filters/network/kafka/kafka_types.h"
 
 #include "absl/strings/str_cat.h"

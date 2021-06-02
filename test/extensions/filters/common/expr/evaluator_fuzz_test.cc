@@ -1,5 +1,4 @@
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"

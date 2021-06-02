@@ -16,7 +16,6 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"

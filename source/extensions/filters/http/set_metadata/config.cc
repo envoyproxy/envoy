@@ -7,7 +7,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 namespace Envoy {

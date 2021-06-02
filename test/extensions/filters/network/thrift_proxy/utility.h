@@ -6,7 +6,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/byte_order.h"
-
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "test/common/buffer/utility.h"

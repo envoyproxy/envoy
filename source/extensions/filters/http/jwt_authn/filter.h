@@ -5,7 +5,6 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-
 #include "source/extensions/filters/http/jwt_authn/filter_config.h"
 #include "source/extensions/filters/http/jwt_authn/matcher.h"
 

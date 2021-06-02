@@ -8,7 +8,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/status.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {

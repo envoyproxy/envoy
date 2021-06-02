@@ -12,7 +12,6 @@
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/access_loggers/common/stream_access_log_common_impl.h"
 #include "source/extensions/access_loggers/well_known_names.h"

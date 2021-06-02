@@ -5,7 +5,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 

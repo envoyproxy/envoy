@@ -10,7 +10,6 @@
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
-
 #include "source/extensions/common/redis/cluster_refresh_manager.h"
 
 namespace Envoy {

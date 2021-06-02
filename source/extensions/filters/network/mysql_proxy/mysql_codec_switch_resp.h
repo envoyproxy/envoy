@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {

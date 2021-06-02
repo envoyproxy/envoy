@@ -2,7 +2,6 @@
 #include "envoy/network/address.h"
 
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "test/mocks/common.h"

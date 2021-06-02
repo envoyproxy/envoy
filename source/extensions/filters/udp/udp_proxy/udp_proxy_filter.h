@@ -12,7 +12,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/load_balancer_impl.h"
-
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "absl/container/flat_hash_set.h"

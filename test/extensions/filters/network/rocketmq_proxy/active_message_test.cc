@@ -1,5 +1,4 @@
 #include "source/common/network/address_impl.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
 #include "source/extensions/filters/network/rocketmq_proxy/config.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"

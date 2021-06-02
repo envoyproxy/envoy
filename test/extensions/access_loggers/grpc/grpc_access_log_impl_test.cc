@@ -6,7 +6,6 @@
 #include "envoy/service/accesslog/v3/als.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-
 #include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/grpc/mocks.h"

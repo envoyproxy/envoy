@@ -3,7 +3,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/common/expr/cel_state.h"
 
 #include "absl/strings/numbers.h"

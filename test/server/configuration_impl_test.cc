@@ -12,10 +12,8 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-
-#include "source/server/configuration_impl.h"
-
 #include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

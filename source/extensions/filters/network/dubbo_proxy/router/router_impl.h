@@ -8,7 +8,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/load_balancer_impl.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 

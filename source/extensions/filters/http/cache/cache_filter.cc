@@ -5,7 +5,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 

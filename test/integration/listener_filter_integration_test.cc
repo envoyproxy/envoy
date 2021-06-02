@@ -7,7 +7,6 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 

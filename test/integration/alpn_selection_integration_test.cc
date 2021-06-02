@@ -3,7 +3,6 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/http/utility.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"

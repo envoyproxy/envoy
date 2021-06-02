@@ -1,7 +1,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

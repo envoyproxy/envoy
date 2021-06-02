@@ -1,5 +1,4 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
-
 #include "source/extensions/filters/network/sni_cluster/config.h"
 #include "source/extensions/filters/network/sni_cluster/sni_cluster.h"
 

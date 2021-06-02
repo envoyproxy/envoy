@@ -3,7 +3,6 @@
 #include "envoy/upstream/retry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
-
 #include "source/extensions/retry/priority/previous_priorities/config.h"
 
 #include "test/mocks/upstream/host.h"

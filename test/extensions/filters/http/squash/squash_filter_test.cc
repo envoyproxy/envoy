@@ -7,7 +7,6 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/squash/squash_filter.h"
 
 #include "test/mocks/server/factory_context.h"

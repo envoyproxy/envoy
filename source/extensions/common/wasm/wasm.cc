@@ -6,7 +6,6 @@
 #include "envoy/event/deferred_deletable.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm_extension.h"
 

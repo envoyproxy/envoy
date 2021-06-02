@@ -9,7 +9,6 @@
 #include "source/common/grpc/context_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {

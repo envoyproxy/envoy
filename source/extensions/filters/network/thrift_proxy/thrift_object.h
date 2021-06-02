@@ -7,7 +7,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/utility.h"
-
 #include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {

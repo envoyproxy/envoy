@@ -2,7 +2,6 @@
 
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 namespace Envoy {

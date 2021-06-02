@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/utility.h"
-
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 namespace Envoy {

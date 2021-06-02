@@ -9,7 +9,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
-
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"

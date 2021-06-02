@@ -6,7 +6,6 @@
 #include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
 

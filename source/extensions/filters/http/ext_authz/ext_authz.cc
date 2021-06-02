@@ -7,7 +7,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {

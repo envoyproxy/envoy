@@ -18,7 +18,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/exe/platform_impl.h"
 
 // NOLINT(namespace-envoy)

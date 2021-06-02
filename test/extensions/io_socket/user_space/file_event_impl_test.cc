@@ -3,7 +3,6 @@
 #include "envoy/event/file_event.h"
 
 #include "source/common/event/dispatcher_impl.h"
-
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 

@@ -2,7 +2,6 @@
 #include <memory>
 
 #include "source/common/quic/envoy_quic_proof_verifier.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/ssl/mocks.h"

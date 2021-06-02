@@ -2,7 +2,6 @@
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
 #include "source/common/common/thread.h"
-
 #include "source/extensions/transport_sockets/alts/config.h"
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
 

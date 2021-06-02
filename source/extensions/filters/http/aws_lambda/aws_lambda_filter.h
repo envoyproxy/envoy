@@ -6,7 +6,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
-
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 

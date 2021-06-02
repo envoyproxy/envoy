@@ -1,7 +1,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 

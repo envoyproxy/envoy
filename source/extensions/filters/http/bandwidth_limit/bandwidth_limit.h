@@ -17,7 +17,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/runtime/runtime_protos.h"
-
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "absl/synchronization/mutex.h"

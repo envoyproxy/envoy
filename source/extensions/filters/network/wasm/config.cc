@@ -5,7 +5,6 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/network/wasm/wasm_filter.h"
 

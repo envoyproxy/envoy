@@ -9,7 +9,6 @@
 #include "source/common/grpc/google_grpc_context.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/transport_sockets/alts/grpc_tsi.h"
 #include "source/extensions/transport_sockets/alts/tsi_socket.h"
 

@@ -9,7 +9,6 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/network/utility.h"
-
 #include "source/server/active_listener_base.h"
 
 namespace Envoy {

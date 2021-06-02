@@ -6,7 +6,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/fmt.h"
-
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/signer_impl.h"
 #include "source/extensions/common/aws/utility.h"

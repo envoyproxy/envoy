@@ -5,7 +5,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/well_known_names.h"

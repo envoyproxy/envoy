@@ -10,7 +10,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 

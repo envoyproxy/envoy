@@ -37,7 +37,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
-
 #include "source/server/admin/admin.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"

@@ -4,7 +4,6 @@
 #include "envoy/ssl/context_config.h"
 
 #include "source/common/common/utility.h"
-
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 

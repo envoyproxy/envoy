@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/mongo_proxy/codec.h"
 
 namespace Envoy {

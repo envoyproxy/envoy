@@ -7,7 +7,6 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"

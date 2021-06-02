@@ -10,7 +10,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"

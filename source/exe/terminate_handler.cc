@@ -3,7 +3,6 @@
 #include <cstdlib>
 
 #include "source/common/common/logger.h"
-
 #include "source/server/backtrace.h"
 
 namespace Envoy {

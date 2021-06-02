@@ -1,5 +1,4 @@
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/topic_route.h"
 
 #include "absl/container/node_hash_map.h"

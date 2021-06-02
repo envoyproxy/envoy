@@ -14,11 +14,9 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
-
-#include "source/server/connection_handler_impl.h"
-
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 #include "source/extensions/filters/listener/well_known_names.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"

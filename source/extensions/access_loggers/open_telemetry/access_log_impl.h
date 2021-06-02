@@ -13,7 +13,6 @@
 
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/grpc/typed_async_client.h"
-
 #include "source/extensions/access_loggers/common/access_log_base.h"
 #include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 

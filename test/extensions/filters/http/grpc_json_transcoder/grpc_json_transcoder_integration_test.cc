@@ -4,7 +4,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
-
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"

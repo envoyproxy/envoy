@@ -10,7 +10,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
-
 #include "source/server/admin/admin.h"
 
 #include "test/mocks/config/mocks.h"

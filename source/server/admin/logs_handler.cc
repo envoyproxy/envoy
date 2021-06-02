@@ -4,7 +4,6 @@
 
 #include "source/common/common/fancy_logger.h"
 #include "source/common/common/logger.h"
-
 #include "source/server/admin/utils.h"
 
 namespace Envoy {

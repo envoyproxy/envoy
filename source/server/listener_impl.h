@@ -17,7 +17,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
-
 #include "source/server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"

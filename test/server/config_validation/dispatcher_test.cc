@@ -6,7 +6,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/server/config_validation/api.h"
 
 #include "test/mocks/common.h"

@@ -6,7 +6,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/squash/squash_filter.h"
 
 namespace Envoy {

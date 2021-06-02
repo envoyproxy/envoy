@@ -5,7 +5,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/router_ratelimit.h"
-
 #include "source/extensions/rate_limit_descriptors/expr/config.h"
 
 #include "test/mocks/http/mocks.h"

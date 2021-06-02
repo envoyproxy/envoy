@@ -10,7 +10,6 @@
 
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
 

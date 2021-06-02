@@ -11,7 +11,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/profiler/profiler.h"
-
 #include "source/extensions/watchdog/profile_action/config.h"
 #include "source/extensions/watchdog/profile_action/profile_action.h"
 

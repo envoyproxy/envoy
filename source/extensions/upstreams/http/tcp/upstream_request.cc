@@ -13,7 +13,6 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/router.h"
-
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 namespace Envoy {

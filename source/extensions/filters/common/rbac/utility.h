@@ -4,7 +4,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {

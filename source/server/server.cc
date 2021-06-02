@@ -48,7 +48,6 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
-
 #include "source/server/admin/utils.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/connection_handler_impl.h"

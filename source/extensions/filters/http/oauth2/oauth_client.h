@@ -11,7 +11,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {

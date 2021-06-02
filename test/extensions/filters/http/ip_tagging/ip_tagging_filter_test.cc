@@ -5,7 +5,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 #include "test/mocks/http/mocks.h"

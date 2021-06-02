@@ -5,7 +5,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/grpc/google_async_client_impl.h"
-
 #include "source/extensions/grpc_credentials/file_based_metadata/config.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"

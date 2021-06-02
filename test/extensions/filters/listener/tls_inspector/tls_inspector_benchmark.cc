@@ -4,7 +4,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
-
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"

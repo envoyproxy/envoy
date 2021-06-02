@@ -8,7 +8,6 @@
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
-
 #include "source/extensions/filters/http/ratelimit/config.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 

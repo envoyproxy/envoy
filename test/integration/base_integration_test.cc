@@ -21,7 +21,6 @@
 #include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/common/network/connection_impl.h"
-
 #include "source/server/config_validation/dispatcher.h"
 
 namespace Envoy {

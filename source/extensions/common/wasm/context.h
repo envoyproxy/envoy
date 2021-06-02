@@ -13,7 +13,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
 #include "source/extensions/filters/common/expr/evaluator.h"

@@ -4,7 +4,6 @@
 
 #include "source/common/common/hash.h"
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/udp/udp_proxy/hash_policy_impl.h"
 
 #include "gtest/gtest.h"

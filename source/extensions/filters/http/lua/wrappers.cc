@@ -2,7 +2,6 @@
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {

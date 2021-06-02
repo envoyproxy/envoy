@@ -11,7 +11,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/network/ext_authz/ext_authz.h"

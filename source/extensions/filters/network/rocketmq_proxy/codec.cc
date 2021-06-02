@@ -6,7 +6,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
-
 #include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 namespace Envoy {

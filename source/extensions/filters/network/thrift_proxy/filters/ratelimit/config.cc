@@ -9,7 +9,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 

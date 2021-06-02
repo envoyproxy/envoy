@@ -6,7 +6,6 @@
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/internal_redirect/allow_listed_routes/allow_listed_routes.h"
 
 namespace Envoy {

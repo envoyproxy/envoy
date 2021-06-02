@@ -7,7 +7,6 @@
 
 #include "source/common/event/deferred_task.h"
 #include "source/common/network/utility.h"
-
 #include "source/server/active_tcp_listener.h"
 
 namespace Envoy {

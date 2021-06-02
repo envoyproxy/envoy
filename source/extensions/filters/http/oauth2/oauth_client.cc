@@ -12,7 +12,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
 namespace Envoy {

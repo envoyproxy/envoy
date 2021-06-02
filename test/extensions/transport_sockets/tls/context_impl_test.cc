@@ -10,7 +10,6 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/context_impl.h"
 #include "source/extensions/transport_sockets/tls/utility.h"

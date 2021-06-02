@@ -11,7 +11,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/singleton/const_singleton.h"
-
 #include "source/extensions/filters/network/thrift_proxy/conn_state.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"

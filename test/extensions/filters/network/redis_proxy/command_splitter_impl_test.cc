@@ -5,7 +5,6 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/stats/isolated_store_impl.h"
-
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"

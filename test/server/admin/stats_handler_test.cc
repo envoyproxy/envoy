@@ -1,7 +1,6 @@
 #include <regex>
 
 #include "source/common/stats/thread_local_store.h"
-
 #include "source/server/admin/stats_handler.h"
 
 #include "test/server/admin/admin_instance.h"

@@ -3,7 +3,6 @@
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
 #include "source/common/network/utility.h"
-
 #include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "test/mocks/network/mocks.h"

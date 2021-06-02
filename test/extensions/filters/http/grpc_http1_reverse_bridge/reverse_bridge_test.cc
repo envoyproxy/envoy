@@ -7,7 +7,6 @@
 #include "source/common/grpc/codec.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
-
 #include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
