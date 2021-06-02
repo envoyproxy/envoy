@@ -773,7 +773,7 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 TEST(ConfigTest, AccessLogConfig) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
   envoy::config::accesslog::v3::AccessLog* log = config.mutable_access_log()->Add();
-  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
+  log->set_name("envoy.access_loggers.file");
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
@@ -783,7 +783,7 @@ TEST(ConfigTest, AccessLogConfig) {
   }
 
   log = config.mutable_access_log()->Add();
-  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
+  log->set_name("envoy.access_loggers.file");
   {
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("another path");

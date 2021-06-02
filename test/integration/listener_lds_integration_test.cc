@@ -33,7 +33,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -98,9 +98,9 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream (fake_upstreams_[2]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
@@ -265,6 +265,85 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
   initialize();
   registerTestServerPorts({listener_name_});
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+              http_filters:
+                - name: filter.unknown
+                - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+              http_filters:
+                - name: filter.unknown
+                  is_optional: true
+                - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 0);
 }
 
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server

@@ -222,7 +222,10 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
       cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
-  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+  if (result == nullptr) {
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    return;
+  }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     cluster_.cluster_stats_.sess_rx_errors_.inc();
   }

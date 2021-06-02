@@ -197,13 +197,13 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inRange(uint64_t http_status) con
   return false;
 }
 
-Http::Protocol codecClientTypeToProtocol(Http::CodecClient::Type codec_client_type) {
+Http::Protocol codecClientTypeToProtocol(Http::CodecType codec_client_type) {
   switch (codec_client_type) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     return Http::Protocol::Http11;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     return Http::Protocol::Http2;
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     return Http::Protocol::Http3;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -422,15 +422,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
   }
 }
 
-Http::CodecClient::Type
+Http::CodecType
 HttpHealthCheckerImpl::codecClientType(const envoy::type::v3::CodecClientType& type) {
   switch (type) {
   case envoy::type::v3::HTTP3:
-    return Http::CodecClient::Type::HTTP3;
+    return Http::CodecType::HTTP3;
   case envoy::type::v3::HTTP2:
-    return Http::CodecClient::Type::HTTP2;
+    return Http::CodecType::HTTP2;
   case envoy::type::v3::HTTP1:
-    return Http::CodecClient::Type::HTTP1;
+    return Http::CodecType::HTTP1;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -892,8 +892,8 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
 Http::CodecClientPtr
 ProdGrpcHealthCheckerImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {
   return std::make_unique<Http::CodecClientProd>(
-      Http::CodecClient::Type::HTTP2, std::move(data.connection_), data.host_description_,
-      dispatcher_, random_generator_);
+      Http::CodecType::HTTP2, std::move(data.connection_), data.host_description_, dispatcher_,
+      random_generator_);
 }
 
 std::ostream& operator<<(std::ostream& out, HealthState state) {

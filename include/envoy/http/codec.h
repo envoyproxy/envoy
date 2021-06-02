@@ -19,6 +19,8 @@
 namespace Envoy {
 namespace Http {
 
+enum class CodecType { HTTP1, HTTP2, HTTP3 };
+
 namespace Http1 {
 struct CodecStats;
 }
@@ -208,14 +210,13 @@ public:
 
   /**
    * Called if the codec needs to send a protocol error.
-   * @param is_grpc_request indicates if the request is a gRPC request
    * @param code supplies the HTTP error code to send.
    * @param body supplies an optional body to send with the local reply.
    * @param modify_headers supplies a way to edit headers before they are sent downstream.
    * @param grpc_status an optional gRPC status for gRPC requests
    * @param details details about the source of the error, for debug purposes
    */
-  virtual void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+  virtual void sendLocalReply(Code code, absl::string_view body,
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
@@ -380,6 +381,12 @@ public:
    * small window updates as satisfying the idle timeout as this is a potential DoS vector.
    */
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * Sets the account for this stream, propagating it to all of its buffers.
+   * @param the account to assign this stream.
+   */
+  virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 };
 
 /**

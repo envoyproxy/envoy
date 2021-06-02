@@ -97,20 +97,17 @@ envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
-    category = "envoy.access_loggers",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:http_grpc_access_log_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
@@ -121,20 +118,17 @@ envoy_cc_extension(
     name = "tcp_config",
     srcs = ["tcp_config.cc"],
     hdrs = ["tcp_config.h"],
-    category = "envoy.access_loggers",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_utils",
         "//include/envoy/server:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/grpc:grpc_access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/grpc:tcp_grpc_access_log_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",

@@ -255,7 +255,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
     if (admin_address != nullptr) {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1);
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();

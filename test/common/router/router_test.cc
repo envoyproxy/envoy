@@ -51,10 +51,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
-using testing::AssertionFailure;
-using testing::AssertionResult;
-using testing::AssertionSuccess;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
@@ -241,12 +237,13 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
 
   EXPECT_CALL(encoder, encodeHeaders(_, _))
       .WillOnce(Invoke([](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
-        return Http::HeaderUtility::checkRequiredHeaders(headers);
+        return Http::HeaderUtility::checkRequiredRequestHeaders(headers);
       }));
-  EXPECT_CALL(callbacks_,
-              sendLocalReply(Http::Code::ServiceUnavailable,
-                             testing::Eq("missing required header: :method"), _, _,
-                             "filter_removed_required_headers{missing required header: :method}"))
+  EXPECT_CALL(
+      callbacks_,
+      sendLocalReply(Http::Code::ServiceUnavailable,
+                     testing::Eq("missing required header: :method"), _, _,
+                     "filter_removed_required_request_headers{missing required header: :method}"))
       .WillOnce(testing::InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();

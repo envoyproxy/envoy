@@ -248,6 +248,7 @@ protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
+    FailedToCreateConnection,
     CreatedNewConnection,
     ShouldNotConnect,
     NoConnectionRateLimited,

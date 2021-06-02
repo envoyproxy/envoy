@@ -37,7 +37,7 @@ TEST(SafeMemcpyUnsafeDstTest, PrependGrpcFrameHeader) {
   uint8_t* dst = new uint8_t[4];
   memset(dst, 0, 4);
   safeMemcpyUnsafeDst(dst, &src);
-  EXPECT_THAT(std::vector(dst, dst + sizeof(src)), ElementsAre(1, 2, 3, 4));
+  EXPECT_THAT(std::vector<uint8_t>(dst, dst + sizeof(src)), ElementsAre(1, 2, 3, 4));
   delete[] dst;
 }
 

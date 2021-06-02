@@ -172,7 +172,6 @@ envoy_cc_test(
     deps = [
         ":grpc_client_integration_test_harness_lib",
         "//source/common/grpc:async_client_lib",
-        "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/example:config",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
