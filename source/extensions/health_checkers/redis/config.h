@@ -7,8 +7,8 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
-#include "extensions/health_checkers/redis/redis.h"
-#include "extensions/health_checkers/well_known_names.h"
+#include "source/extensions/health_checkers/redis/redis.h"
+#include "source/extensions/health_checkers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

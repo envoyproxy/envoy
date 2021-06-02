@@ -1,10 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
 
-#include "extensions/filters/http/dynamo/dynamo_filter.h"
+#include "source/extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

@@ -3,7 +3,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/extensions/grpc_credentials/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

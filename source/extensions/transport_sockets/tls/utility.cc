@@ -1,10 +1,10 @@
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/safe_memcpy.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"

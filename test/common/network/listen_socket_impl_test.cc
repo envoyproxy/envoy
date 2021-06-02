@@ -3,10 +3,10 @@
 #include "envoy/network/exception.h"
 #include "envoy/network/socket.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"

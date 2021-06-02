@@ -4,10 +4,10 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
-#include "extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;

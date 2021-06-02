@@ -9,14 +9,14 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/config/api_type_oracle.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/protobuf/utility.h"
 
-#include "extensions/common/utility.h"
+#include "source/extensions/common/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"

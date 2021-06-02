@@ -1,4 +1,4 @@
-#include "common/router/header_parser.h"
+#include "source/common/router/header_parser.h"
 
 #include <cctype>
 #include <memory>
@@ -6,10 +6,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"

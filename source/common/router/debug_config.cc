@@ -1,6 +1,6 @@
-#include "common/router/debug_config.h"
+#include "source/common/router/debug_config.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Router {

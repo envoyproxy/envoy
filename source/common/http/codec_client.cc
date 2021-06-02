@@ -1,20 +1,20 @@
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include <cstdint>
 #include <memory>
 
 #include "envoy/http/codec.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/config/utility.h"
-#include "common/http/exception.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/status.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/status.h"
+#include "source/common/http/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
 namespace Envoy {

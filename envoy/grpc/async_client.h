@@ -9,8 +9,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

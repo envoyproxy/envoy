@@ -11,7 +11,7 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/stats/scope.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

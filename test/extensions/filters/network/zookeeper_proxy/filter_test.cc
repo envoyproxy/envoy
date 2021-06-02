@@ -1,7 +1,7 @@
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/zookeeper_proxy/decoder.h"
-#include "extensions/filters/network/zookeeper_proxy/filter.h"
+#include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
+#include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"

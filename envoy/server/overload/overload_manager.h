@@ -7,7 +7,7 @@
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
-#include "common/singleton/const_singleton.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Server {

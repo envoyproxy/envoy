@@ -5,8 +5,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/json/json_object.h"
 
-#include "common/http/header_utility.h"
-#include "common/json/json_loader.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/json/json_loader.h"
 
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"

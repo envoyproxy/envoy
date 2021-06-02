@@ -1,4 +1,4 @@
-#include "server/active_tcp_listener.h"
+#include "source/server/active_tcp_listener.h"
 
 #include <chrono>
 
@@ -7,10 +7,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/event/deferred_task.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/timespan_impl.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Server {

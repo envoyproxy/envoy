@@ -3,10 +3,10 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 
-#include "extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/thread_local/mocks.h"

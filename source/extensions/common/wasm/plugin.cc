@@ -1,8 +1,8 @@
-#include "extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 #include "envoy/common/exception.h"
 
-#include "extensions/common/wasm/well_known_names.h"
+#include "source/extensions/common/wasm/well_known_names.h"
 
 #include "include/proxy-wasm/wasm.h"
 

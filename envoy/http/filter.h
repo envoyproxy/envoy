@@ -17,7 +17,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/scope_tracked_object_stack.h"
+#include "source/common/common/scope_tracked_object_stack.h"
 
 #include "absl/types/optional.h"
 

@@ -5,10 +5,10 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/http/header_map.h"
 
-#include "common/http/message_impl.h"
+#include "source/common/http/message_impl.h"
 
-#include "extensions/common/aws/signer.h"
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/grpc_credentials/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

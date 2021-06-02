@@ -4,8 +4,8 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

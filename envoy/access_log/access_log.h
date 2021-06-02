@@ -8,7 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace AccessLog {

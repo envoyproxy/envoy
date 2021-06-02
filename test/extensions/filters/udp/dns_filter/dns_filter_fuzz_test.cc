@@ -1,6 +1,6 @@
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"

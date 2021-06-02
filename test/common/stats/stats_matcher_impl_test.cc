@@ -1,7 +1,7 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/stats/stats_matcher_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 
 #include "test/test_common/utility.h"
 

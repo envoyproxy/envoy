@@ -30,9 +30,9 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

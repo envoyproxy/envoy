@@ -7,10 +7,10 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/router/upstream_request.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/router/upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {

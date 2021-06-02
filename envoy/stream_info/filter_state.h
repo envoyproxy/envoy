@@ -6,9 +6,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

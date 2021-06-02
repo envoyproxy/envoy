@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"

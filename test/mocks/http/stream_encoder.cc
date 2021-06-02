@@ -1,6 +1,6 @@
 #include "test/mocks/http/stream_encoder.h"
 
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 using testing::_;
 using testing::Invoke;

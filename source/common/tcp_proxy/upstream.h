@@ -7,9 +7,9 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/http/codec_client.h"
-#include "common/router/header_parser.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace TcpProxy {

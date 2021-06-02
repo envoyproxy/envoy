@@ -4,7 +4,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"

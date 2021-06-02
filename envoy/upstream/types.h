@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "common/common/phantom.h"
+#include "source/common/common/phantom.h"
 
 namespace Envoy {
 namespace Upstream {

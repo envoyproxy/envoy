@@ -6,8 +6,8 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/common/non_copyable.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

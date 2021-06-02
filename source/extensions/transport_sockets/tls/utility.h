@@ -5,7 +5,7 @@
 
 #include "envoy/ssl/context.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"

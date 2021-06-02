@@ -15,10 +15,10 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/http/conn_manager_config.h"
-#include "common/http/filter_manager.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/stats/stat_merger.h"
+#include "source/common/stats/stat_merger.h"
 
-#include "server/hot_restarting_base.h"
+#include "source/server/hot_restarting_base.h"
 
 namespace Envoy {
 namespace Server {

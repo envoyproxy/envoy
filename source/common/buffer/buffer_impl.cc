@@ -1,10 +1,10 @@
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include <cstdint>
 #include <memory>
 #include <string>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/buffer.h"

@@ -2,8 +2,8 @@
 
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
-#include "extensions/filters/network/dubbo_proxy/message.h"
+#include "source/extensions/filters/network/dubbo_proxy/hessian_utils.h"
+#include "source/extensions/filters/network/dubbo_proxy/message.h"
 
 namespace Envoy {
 namespace Extensions {

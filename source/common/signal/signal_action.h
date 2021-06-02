@@ -6,10 +6,10 @@
 #include <csignal>
 #include <list>
 
-#include "common/common/non_copyable.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/signal/fatal_error_handler.h"
 
-#include "server/backtrace.h"
+#include "source/server/backtrace.h"
 
 namespace Envoy {
 

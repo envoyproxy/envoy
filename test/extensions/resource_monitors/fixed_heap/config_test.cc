@@ -2,9 +2,9 @@
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "server/resource_monitor_config_impl.h"
+#include "source/server/resource_monitor_config_impl.h"
 
-#include "extensions/resource_monitors/fixed_heap/config.h"
+#include "source/extensions/resource_monitors/fixed_heap/config.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/options.h"

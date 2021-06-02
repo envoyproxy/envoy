@@ -2,7 +2,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 #include "absl/synchronization/mutex.h"
 

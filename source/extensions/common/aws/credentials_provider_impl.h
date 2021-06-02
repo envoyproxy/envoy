@@ -5,10 +5,10 @@
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
-#include "extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 
 #include "absl/strings/string_view.h"
 

@@ -5,11 +5,11 @@
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/utility.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http2/codec_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"

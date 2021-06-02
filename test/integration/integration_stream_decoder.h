@@ -9,7 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/dump_state_utils.h"
+#include "source/common/common/dump_state_utils.h"
 
 #include "test/test_common/utility.h"
 

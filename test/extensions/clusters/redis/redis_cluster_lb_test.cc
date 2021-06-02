@@ -2,7 +2,7 @@
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
-#include "extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/client.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

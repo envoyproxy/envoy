@@ -5,7 +5,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

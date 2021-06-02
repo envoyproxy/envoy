@@ -2,7 +2,7 @@
 
 #include "envoy/network/filter.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/utils/fakes.h"

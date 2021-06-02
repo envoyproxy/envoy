@@ -3,7 +3,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 #include "absl/strings/string_view.h"
 #include "base_listener_impl.h"

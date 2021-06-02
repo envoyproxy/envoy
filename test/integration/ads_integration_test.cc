@@ -6,11 +6,11 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/grpc/status.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/version/version.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"

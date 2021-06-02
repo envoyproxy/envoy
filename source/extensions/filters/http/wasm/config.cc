@@ -1,13 +1,13 @@
-#include "extensions/filters/http/wasm/config.h"
+#include "source/extensions/filters/http/wasm/config.h"
 
 #include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/http/wasm/wasm_filter.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 namespace Envoy {
 namespace Extensions {

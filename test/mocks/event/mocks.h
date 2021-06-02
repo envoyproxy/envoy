@@ -19,7 +19,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 
-#include "common/common/scope_tracker.h"
+#include "source/common/common/scope_tracker.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/test_time.h"

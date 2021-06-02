@@ -5,9 +5,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
-#include "extensions/io_socket/user_space/io_handle.h"
+#include "source/extensions/io_socket/user_space/io_handle.h"
 
 namespace Envoy {
 

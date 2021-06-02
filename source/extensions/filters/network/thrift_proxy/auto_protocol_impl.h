@@ -4,9 +4,9 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/fmt.h"
+#include "source/common/common/fmt.h"
 
-#include "extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {

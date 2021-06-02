@@ -17,7 +17,7 @@
 #include "envoy/network/udp_packet_writer_handler.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Network {

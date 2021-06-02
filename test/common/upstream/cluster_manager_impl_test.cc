@@ -4,10 +4,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/raw_buffer_socket.h"
-#include "common/router/context_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/context_impl.h"
 
-#include "extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/upstream/cds_api.h"

@@ -16,9 +16,9 @@
 #include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/types/optional.h"
 

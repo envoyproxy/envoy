@@ -1,8 +1,8 @@
 #include "envoy/registry/registry.h"
 
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

@@ -5,8 +5,8 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"

@@ -1,6 +1,6 @@
 #include "envoy/event/timer.h"
 
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"

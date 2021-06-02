@@ -2,11 +2,11 @@
 #include <string>
 #include <vector>
 
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"

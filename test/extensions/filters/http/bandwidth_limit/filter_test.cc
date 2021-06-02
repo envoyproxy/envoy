@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
 
-#include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
+#include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include "test/mocks/http/mocks.h"
 

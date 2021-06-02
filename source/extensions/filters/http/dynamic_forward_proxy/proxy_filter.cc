@@ -1,12 +1,12 @@
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/clusters/well_known_names.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

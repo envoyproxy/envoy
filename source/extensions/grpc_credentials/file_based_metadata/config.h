@@ -4,9 +4,9 @@
 #include "envoy/config/grpc_credential/v3/file_based_metadata.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/extensions/grpc_credentials/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

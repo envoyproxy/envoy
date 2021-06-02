@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"

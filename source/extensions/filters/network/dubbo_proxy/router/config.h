@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.validate.h"
 
-#include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
-#include "extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

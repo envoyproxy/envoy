@@ -5,9 +5,9 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
-#include "common/config/datasource.h"
+#include "source/common/config/datasource.h"
 
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -8,7 +8,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {

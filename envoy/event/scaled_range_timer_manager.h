@@ -4,7 +4,7 @@
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 #include "absl/types/variant.h"
 

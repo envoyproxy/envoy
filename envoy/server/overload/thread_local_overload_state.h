@@ -7,7 +7,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/thread_local/thread_local_object.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Server {

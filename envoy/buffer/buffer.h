@@ -10,9 +10,9 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
-#include "common/common/assert.h"
-#include "common/common/byte_order.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

@@ -8,7 +8,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

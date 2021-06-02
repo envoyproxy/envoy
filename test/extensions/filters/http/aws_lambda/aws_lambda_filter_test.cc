@@ -5,8 +5,8 @@
 
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/http/mocks.h"

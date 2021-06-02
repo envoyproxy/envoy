@@ -1,5 +1,5 @@
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_integration.h"
 

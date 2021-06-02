@@ -3,7 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 

@@ -7,7 +7,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/common/thread_annotations.h"
+#include "source/common/common/thread_annotations.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/http/fault/config.h"
+#include "source/extensions/filters/http/fault/config.h"
 
 #include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/server/factory_context.h"

@@ -4,7 +4,7 @@
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
-#include "extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/config.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"

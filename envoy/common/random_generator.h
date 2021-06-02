@@ -6,7 +6,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Random {

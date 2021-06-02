@@ -10,12 +10,12 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/empty_string.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/logical_host.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/logical_host.h"
+#include "source/common/upstream/upstream_impl.h"
 
-#include "extensions/clusters/well_known_names.h"
+#include "source/extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {

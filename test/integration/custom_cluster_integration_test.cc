@@ -1,8 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"

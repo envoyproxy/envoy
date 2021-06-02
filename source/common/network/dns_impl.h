@@ -8,9 +8,9 @@
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "ares.h"

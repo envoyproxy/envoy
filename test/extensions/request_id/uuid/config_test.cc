@@ -1,8 +1,8 @@
 #include <string>
 
-#include "common/common/random_generator.h"
+#include "source/common/common/random_generator.h"
 
-#include "extensions/request_id/uuid/config.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"

@@ -8,7 +8,7 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 

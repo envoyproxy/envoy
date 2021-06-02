@@ -14,7 +14,7 @@
 #include "envoy/network/address.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/http/status.h"
+#include "source/common/http/status.h"
 
 namespace Envoy {
 namespace Http {

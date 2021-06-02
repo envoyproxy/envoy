@@ -8,7 +8,7 @@
 #include "envoy/server/options.h"
 #include "envoy/server/resource_monitor.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

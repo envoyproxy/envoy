@@ -17,8 +17,8 @@
 #include <string>
 
 #include "envoy/network/listener.h"
-#include "server/connection_handler_impl.h"
-#include "server/active_listener_base.h"
+#include "source/server/connection_handler_impl.h"
+#include "source/server/active_listener_base.h"
 
 namespace Envoy {
 namespace Quic {

@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 

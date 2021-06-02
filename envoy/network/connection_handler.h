@@ -10,7 +10,7 @@
 #include "envoy/network/listener.h"
 #include "envoy/ssl/context.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 namespace Envoy {
 namespace Network {

@@ -5,7 +5,6 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
-    "envoy_include_prefix",
     "envoy_package",
 )
 
@@ -111,7 +110,6 @@ envoy_basic_cc_library(
         "abseil_strings",
         "fmtlib",
     ],
-    include_prefix = envoy_include_prefix(package_name()),
     deps = ["//envoy/common:base_includes"],
 )
 
@@ -190,6 +188,7 @@ envoy_cc_library(
     name = "logger_impl_lib_standard",
     hdrs = ["standard/logger_impl.h"],
     strip_include_prefix = "standard",
+    include_prefix = "source/common/common",
     deps = [":base_logger_lib"],
 )
 
@@ -204,6 +203,7 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     strip_include_prefix = "android",
+    include_prefix = "source/common/common",
     deps = [":base_logger_lib"],
 )
 
@@ -369,6 +369,7 @@ envoy_cc_posix_library(
     srcs = ["posix/thread_impl.cc"],
     hdrs = ["posix/thread_impl.h"],
     strip_include_prefix = "posix",
+    include_prefix = "source/common/common",
     deps = [
         ":assert_lib",
         "//envoy/thread:thread_interface",
@@ -380,6 +381,7 @@ envoy_cc_win32_library(
     srcs = ["win32/thread_impl.cc"],
     hdrs = ["win32/thread_impl.h"],
     strip_include_prefix = "win32",
+    include_prefix = "source/common/common",
     deps = [
         ":assert_lib",
         "//envoy/thread:thread_interface",

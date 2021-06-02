@@ -3,7 +3,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "absl/strings/string_view.h"
 

@@ -6,9 +6,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
-#include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
 namespace Extensions {

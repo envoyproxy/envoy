@@ -10,9 +10,9 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Server {

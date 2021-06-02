@@ -1,8 +1,8 @@
 #include <iostream>
 
-#include "common/api/api_impl.h"
-#include "common/common/scope_tracker.h"
-#include "common/event/dispatcher_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/utility.h"

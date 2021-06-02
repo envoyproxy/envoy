@@ -207,6 +207,7 @@ envoy_cc_library(
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "",
     }),
+    include_prefix = "source/exe",
     deps = select({
         "//bazel:windows_x86_64": [
             ":main_common_lib",

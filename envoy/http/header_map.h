@@ -12,9 +12,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/http/header_formatter.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/macros.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/macros.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

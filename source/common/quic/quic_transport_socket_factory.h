@@ -5,9 +5,9 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {

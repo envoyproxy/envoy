@@ -1,12 +1,12 @@
-#include "common/http/http2/conn_pool.h"
+#include "source/common/http/http2/conn_pool.h"
 
 #include <cstdint>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/http2/codec_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {

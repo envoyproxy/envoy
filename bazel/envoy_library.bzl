@@ -87,6 +87,7 @@ def envoy_cc_library(
         tags = [],
         deps = [],
         strip_include_prefix = None,
+        include_prefix = None,
         textual_hdrs = None,
         defines = []):
     if tcmalloc_dep:
@@ -109,10 +110,10 @@ def envoy_cc_library(
             envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
-        include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
+        include_prefix = include_prefix,
         defines = defines,
     )
 
@@ -126,6 +127,7 @@ def envoy_cc_library(
         tags = ["nocompdb"] + tags,
         deps = [":" + name],
         strip_include_prefix = strip_include_prefix,
+        include_prefix = include_prefix,
     )
 
 # Used to specify a library that only builds on POSIX
@@ -189,14 +191,6 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
         }),
         **kargs
     )
-
-# Transform the package path (e.g. include/envoy/common) into a path for
-# exporting the package headers at (e.g. envoy/common). Source files can then
-# include using this path scheme (e.g. #include "envoy/common/time.h").
-def envoy_include_prefix(path):
-    if path.startswith("source/"):
-        return "/".join(path.split("/")[1:])
-    return None
 
 # Envoy proto targets should be specified with this function.
 def envoy_proto_library(name, external_deps = [], **kwargs):

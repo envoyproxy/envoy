@@ -10,11 +10,11 @@
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 
-#include "common/common/random_generator.h"
-#include "common/network/address_impl.h"
-#include "common/network/apple_dns_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/apple_dns_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"

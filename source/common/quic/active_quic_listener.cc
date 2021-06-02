@@ -1,4 +1,4 @@
-#include "common/quic/active_quic_listener.h"
+#include "source/common/quic/active_quic_listener.h"
 
 #include "envoy/network/exception.h"
 
@@ -8,17 +8,17 @@
 
 #include <vector>
 
-#include "common/http/utility.h"
-#include "common/network/socket_option_impl.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_dispatcher.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_network_connection.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {

@@ -2,10 +2,10 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
-#include "extensions/retry/priority/previous_priorities/config.h"
-#include "extensions/retry/priority/well_known_names.h"
+#include "source/extensions/retry/priority/previous_priorities/config.h"
+#include "source/extensions/retry/priority/well_known_names.h"
 
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"

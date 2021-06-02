@@ -1,9 +1,9 @@
-#include "extensions/upstreams/tcp/generic/config.h"
+#include "source/extensions/upstreams/tcp/generic/config.h"
 
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/codec_client.h"
-#include "common/tcp_proxy/upstream.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/tcp_proxy/upstream.h"
 
 namespace Envoy {
 namespace Extensions {
