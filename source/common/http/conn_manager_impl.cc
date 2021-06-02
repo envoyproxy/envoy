@@ -106,7 +106,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           "envoy.reloadable_features.internal_redirects_with_body")) {}
 
 const ResponseHeaderMap& ConnectionManagerImpl::continueHeader() {
-  static const auto headers = createHeaderMap<ResponseHeaderMapImpl>( {{Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}}); return *headers;
+  static const auto headers = createHeaderMap<ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))}});
+  return *headers;
 }
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
