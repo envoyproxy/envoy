@@ -1,4 +1,5 @@
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 5 * * 1,2,3,4,5'
 
@@ -20,3 +21,5 @@ jobs:
           pip install -r ./.github/actions/pr_notifier/requirements.txt
       - name: Notify about PRs
         run: python ./.github/actions/pr_notifier/pr_notifier.py
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
