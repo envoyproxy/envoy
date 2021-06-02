@@ -25,7 +25,7 @@ public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
       : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
   ~FakeResourceMonitor() override;
-  void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
   void setResourcePressure(double pressure) {
     dispatcher_.post([this, pressure] { pressure_ = pressure; });
@@ -60,7 +60,7 @@ private:
 
 FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
 
-void FakeResourceMonitor::updateResourceUsage(ResourceUpdateCallbacks& callbacks) {
+void FakeResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   Server::ResourceUsage usage;
   usage.resource_pressure_ = pressure_;
   callbacks.onSuccess(usage);
