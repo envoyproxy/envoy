@@ -33,7 +33,8 @@ void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view head
       filter_metadata != metadata.filter_metadata().end()) {
     const ProtobufWkt::Struct& data_struct = filter_metadata->second;
     const auto& fields = data_struct.fields();
-    if (auto iter = fields.find(toStdStringView(key2)); iter != fields.end()) {
+    if (auto iter = fields.find(toStdStringView(key2)); // NOLINT(std::string_view)
+        iter != fields.end()) {
       if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
         header_map.setCopy(Envoy::Http::LowerCaseString(std::string(header_name)),
                            iter->second.string_value());

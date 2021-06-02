@@ -35,12 +35,12 @@ std::string accumulateToString(const ContainerT& source,
          "]";
 }
 
-inline absl::string_view toAbslStringView(std::string_view view) {
-  return absl::string_view(view.data(), view.size());
+inline absl::string_view toAbslStringView(std::string_view view) { // NOLINT(std::string_view)
+  return absl::string_view(view.data(), view.size());              // NOLINT(std::string_view)
 }
 
-inline std::string_view toStdStringView(absl::string_view view) {
-  return std::string_view(view.data(), view.size());
+inline std::string_view toStdStringView(absl::string_view view) { // NOLINT(std::string_view)
+  return std::string_view(view.data(), view.size());              // NOLINT(std::string_view)
 }
 
 } // namespace Envoy
