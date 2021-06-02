@@ -72,11 +72,6 @@ updates:
       interval: "daily"
 
   - package-ecosystem: "pip"
-    directory: "/tools/slack_tools"
-    schedule:
-      interval: "daily"
-
-  - package-ecosystem: "pip"
     directory: "/tools/testing"
     schedule:
       interval: "daily"
