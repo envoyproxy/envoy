@@ -77,6 +77,8 @@ FilterHeadersStatus GrpcStreamContextProto::onRequestHeaders(uint32_t, bool) {
   std::string grpc_service_string;
   grpc_service.SerializeToString(&grpc_service_string);
   HeaderStringPairs initial_metadata;
+  initial_metadata.push_back(
+      std::make_pair<std::string, std::string>("source", "grpc_stream_proto"));
   if (root()->grpcStreamHandler("bogus service string", "service", "method", initial_metadata,
                                 std::unique_ptr<GrpcStreamHandlerBase>(
                                     new MyGrpcStreamHandler())) != WasmResult::ParseFailure) {
@@ -105,6 +107,7 @@ static RegisterContextFactory register_GrpcStreamContext(CONTEXT_FACTORY(GrpcStr
 
 FilterHeadersStatus GrpcStreamContext::onRequestHeaders(uint32_t, bool) {
   HeaderStringPairs initial_metadata;
+  initial_metadata.push_back(std::make_pair<std::string, std::string>("source", "grpc_stream"));
   if (root()->grpcStreamHandler("bogus service string", "service", "method", initial_metadata,
                                 std::unique_ptr<GrpcStreamHandlerBase>(
                                     new MyGrpcStreamHandler())) == WasmResult::ParseFailure) {

@@ -106,7 +106,7 @@ public:
     test_client.client_dispatcher_ = api_->allocateDispatcher("test_thread");
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
-        CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
+        CodecType::HTTP1, std::move(connection), test_client.codec_,
         [this](CodecClient* codec_client) -> void {
           for (auto i = test_clients_.begin(); i != test_clients_.end(); i++) {
             if (i->codec_client_ == codec_client) {

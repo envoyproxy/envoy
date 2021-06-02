@@ -66,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {

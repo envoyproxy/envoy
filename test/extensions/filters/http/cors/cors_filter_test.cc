@@ -31,7 +31,7 @@ Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
   envoy::type::matcher::v3::StringMatcher config;
-  config.set_hidden_envoy_deprecated_regex(regex);
+  config.MergeFrom(TestUtility::createRegexMatcher(regex));
   return std::make_unique<Matchers::StringMatcherImpl>(config);
 }
 

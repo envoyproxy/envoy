@@ -33,8 +33,7 @@ class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:
-  AdmissionControlIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  AdmissionControlIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 
@@ -133,7 +132,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
 
 TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   autonomous_upstream_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   // Drop the success rate to a very low value.

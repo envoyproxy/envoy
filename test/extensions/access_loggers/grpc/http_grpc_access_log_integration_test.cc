@@ -22,11 +22,11 @@ namespace {
 class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {

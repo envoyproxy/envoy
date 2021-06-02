@@ -68,7 +68,7 @@ TEST_F(StatsMatcherTest, CheckNotRejectAll) {
 }
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   initMatcher();
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz"});
   // It really does accept all, but the impl doesn't know it.
@@ -77,7 +77,7 @@ TEST_F(StatsMatcherTest, CheckIncludeAll) {
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeAll) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   initMatcher();
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
@@ -149,7 +149,7 @@ TEST_F(StatsMatcherTest, CheckExcludeSuffix) {
 // Single regex matchers.
 
 TEST_F(StatsMatcherTest, CheckIncludeRegex) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
   expectDenied({"foo", "Envoy", "EnvoyProxy"});
@@ -158,7 +158,7 @@ TEST_F(StatsMatcherTest, CheckIncludeRegex) {
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeRegex) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   initMatcher();
   expectAccepted({"foo", "Envoy", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
@@ -237,8 +237,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeSuffix) {
 // Multiple regex matchers.
 
 TEST_F(StatsMatcherTest, CheckMultipleIncludeRegex) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*absl.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*absl.*"));
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
   expectDenied({"Abseil", "EnvoyProxy"});
@@ -247,8 +247,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludeRegex) {
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*absl.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*absl.*"));
   initMatcher();
   expectAccepted({"Abseil", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
@@ -262,7 +262,7 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
 // whichever the case may be.
 
 TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchers) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   inclusionList()->set_suffix("requests");
   inclusionList()->set_exact("regex");
   initMatcher();
@@ -273,7 +273,7 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchers) {
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   exclusionList()->set_suffix("requests");
   exclusionList()->set_exact("regex");
   initMatcher();

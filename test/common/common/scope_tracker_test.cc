@@ -18,7 +18,7 @@ using testing::_;
 TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
   Api::ApiPtr api(Api::createApiForTest());
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  MockScopedTrackedObject tracked_object;
+  MockScopeTrackedObject tracked_object;
   {
     ScopeTrackerScopeState scope(&tracked_object, *dispatcher);
     // Check that the tracked_object is on the tracked object stack

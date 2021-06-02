@@ -18,7 +18,7 @@ constexpr uint64_t MAX_BUFFERED_PLAINTEXT_LENGTH = 16384;
 using SkipEncodingEmptyTrailers = bool;
 using ContentType = std::string;
 using Accept = std::string;
-using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecClient::Type,
+using TestParams = std::tuple<Network::Address::IpVersion, Http::CodecType,
                               SkipEncodingEmptyTrailers, ContentType, Accept>;
 
 class GrpcWebFilterIntegrationTest : public testing::TestWithParam<TestParams>,
@@ -28,18 +28,18 @@ public:
       : HttpIntegrationTest(std::get<1>(GetParam()), std::get<0>(GetParam())) {}
 
   void SetUp() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     config_helper_.addFilter("name: envoy.filters.http.grpc_web");
   }
 
   void initialize() override {
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     } else {
       skipEncodingEmptyTrailers(http2_skip_encoding_empty_trailers_);
     }
 
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     HttpIntegrationTest::initialize();
   }
@@ -139,13 +139,13 @@ public:
         "{}_{}_{}_{}_{}",
         TestUtility::ipTestParamsToString(testing::TestParamInfo<Network::Address::IpVersion>(
             std::get<0>(params.param), params.index)),
-        std::get<1>(params.param) == Http::CodecClient::Type::HTTP2 ? "Http2" : "Http",
+        std::get<1>(params.param) == Http::CodecType::HTTP2 ? "Http2" : "Http",
         std::get<2>(params.param) ? "SkipEncodingEmptyTrailers" : "SubmitEncodingEmptyTrailers",
         std::get<3>(params.param) == text ? "SendText" : "SendBinary",
         std::get<4>(params.param) == text ? "AcceptText" : "AcceptBinary");
   }
 
-  const Envoy::Http::CodecClient::Type downstream_protocol_{std::get<1>(GetParam())};
+  const Envoy::Http::CodecType downstream_protocol_{std::get<1>(GetParam())};
   const bool http2_skip_encoding_empty_trailers_{std::get<2>(GetParam())};
   const ContentType content_type_{std::get<3>(GetParam())};
   const Accept accept_{std::get<4>(GetParam())};
@@ -153,12 +153,12 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(
     Params, GrpcWebFilterIntegrationTest,
-    testing::Combine(
-        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-        testing::Values(Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2),
-        testing::Values(SkipEncodingEmptyTrailers{true}, SkipEncodingEmptyTrailers{false}),
-        testing::Values(ContentType{text}, ContentType{binary}),
-        testing::Values(Accept{text}, Accept{binary})),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2),
+                     testing::Values(SkipEncodingEmptyTrailers{true},
+                                     SkipEncodingEmptyTrailers{false}),
+                     testing::Values(ContentType{text}, ContentType{binary}),
+                     testing::Values(Accept{text}, Accept{binary})),
     GrpcWebFilterIntegrationTest::testParamsToString);
 
 TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
@@ -202,12 +202,12 @@ TEST_P(GrpcWebFilterIntegrationTest, GrpcWebTrailersNotDuplicated) {
   EXPECT_TRUE(absl::StrContains(response_body, "response1:trailer1"));
   EXPECT_TRUE(absl::StrContains(response_body, "response2:trailer2"));
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     // When the downstream protocol is HTTP/1.1 we expect the trailers to be in the response-body.
     EXPECT_EQ(nullptr, response->trailers());
   }
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ == Http::CodecType::HTTP2) {
     if (http2_skip_encoding_empty_trailers_) {
       // When the downstream protocol is HTTP/2 and the feature-flag to skip encoding empty trailers
       // is turned on, expect that the trailers are included in the response-body.

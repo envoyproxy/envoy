@@ -128,6 +128,8 @@ public:
 
   static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
   static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+  static PathMatcherConstSharedPtr
+  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 
   bool match(const absl::string_view path) const override;
 

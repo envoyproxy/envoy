@@ -14,7 +14,7 @@ namespace Envoy {
 class DecompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  DecompressorIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+  DecompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
     Extensions::Compression::Gzip::Compressor::GzipCompressorLibraryFactory
         compressor_library_factory;
     envoy::extensions::compression::gzip::compressor::v3::Gzip factory_config;
@@ -29,7 +29,7 @@ public:
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     config_helper_.addFilter(config);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));

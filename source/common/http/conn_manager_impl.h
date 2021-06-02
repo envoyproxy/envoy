@@ -44,6 +44,7 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -156,7 +157,8 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks {
-    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
+    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
+                 Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
 
     const Network::Connection* connection();

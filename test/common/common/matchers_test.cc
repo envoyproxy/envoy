@@ -350,14 +350,6 @@ TEST(StringMatcher, SafeRegexValue) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher).match("bar"));
 }
 
-TEST(StringMatcher, RegexValueIgnoreCase) {
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_ignore_case(true);
-  matcher.set_hidden_envoy_deprecated_regex("foo");
-  EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher).match("foo"), EnvoyException,
-                            "ignore_case has no effect for regex.");
-}
-
 TEST(StringMatcher, SafeRegexValueIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_ignore_case(true);

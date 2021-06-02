@@ -603,10 +603,9 @@ private:
   std::string expected_transport_failure_reason_contains_;
 };
 
-const std::string testUtilV2(const TestUtilOptionsV2& options) {
+void testUtilV2(const TestUtilOptionsV2& options) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
-  std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in SslSocket anymore.
   ASSERT(options.listener().filter_chains().size() == 1);
@@ -721,14 +720,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_FALSE(server_ssl_requested_server_name.has_value());
       }
 
-      SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
-      EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
-      uint8_t* session_data;
-      size_t session_len;
-      int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
-      ASSERT(rc == 1);
-      new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
-      OPENSSL_free(session_data);
+      const uint16_t tls_version = SSL_version(client_ssl_socket);
+      if (SSL3_VERSION <= tls_version && tls_version <= TLS1_2_VERSION) {
+        // Prior to TLS 1.3, one should be able to resume the session. With TLS
+        // 1.3, tickets come after the handshake and the SSL_SESSION on the
+        // client is a dummy object.
+        SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
+        EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
+      }
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher->exit();
@@ -779,8 +778,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
   }
-
-  return new_session;
 }
 
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.

@@ -316,7 +316,7 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   envoy::config::rbac::v3::Principal::Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
-  auth.mutable_principal_name()->set_hidden_envoy_deprecated_regex(".*");
+  auth.mutable_principal_name()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 

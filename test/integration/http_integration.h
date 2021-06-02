@@ -25,7 +25,7 @@ public:
   IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                          Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
-                         Http::CodecClient::Type type);
+                         Http::CodecType type);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
@@ -89,11 +89,10 @@ using IntegrationCodecClientPtr = std::unique_ptr<IntegrationCodecClient>;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
-  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version,
+  HttpIntegrationTest(Http::CodecType downstream_protocol, Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
 
-  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+  HttpIntegrationTest(Http::CodecType downstream_protocol,
                       const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::httpProxyConfig());
@@ -118,7 +117,7 @@ protected:
 
   // Sets downstream_protocol_ and alters the HTTP connection manager codec type in the
   // config_helper_.
-  void setDownstreamProtocol(Http::CodecClient::Type type);
+  void setDownstreamProtocol(Http::CodecType type);
 
   // Enable the encoding/decoding of Http1 trailers downstream
   ConfigHelper::HttpModifierFunction setEnableDownstreamTrailersHttp1();
@@ -238,12 +237,11 @@ protected:
   void testTrailers(uint64_t request_size, uint64_t response_size, bool request_trailers_present,
                     bool response_trailers_present);
   // Test /drain_listener from admin portal.
-  void testAdminDrain(Http::CodecClient::Type admin_request_type);
+  void testAdminDrain(Http::CodecType admin_request_type);
   // Test max stream duration.
   void testMaxStreamDuration();
   void testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect);
-  Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
-  // Return the stats root for the downstream protocol.
+  Http::CodecType downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
   std::string upstreamProtocolStatsRoot() const;
@@ -267,7 +265,7 @@ protected:
   Http::TestRequestHeaderMapImpl default_request_headers_{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
-  Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  Http::CodecType downstream_protocol_{Http::CodecType::HTTP1};
   std::string access_log_name_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
 
@@ -279,7 +277,7 @@ protected:
 class Http2RawFrameIntegrationTest : public HttpIntegrationTest {
 public:
   Http2RawFrameIntegrationTest(Network::Address::IpVersion version)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, version) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, version) {}
 
 protected:
   void startHttp2Session();

@@ -25,7 +25,7 @@ namespace {
 class RatelimitIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void SetUp() override {
     XDS_DEPRECATED_FEATURE_TEST_SKIP;
@@ -34,7 +34,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {

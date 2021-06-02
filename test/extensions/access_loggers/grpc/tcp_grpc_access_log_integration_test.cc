@@ -34,7 +34,7 @@ public:
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {

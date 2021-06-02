@@ -193,7 +193,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                           Http::CodecClient::Type type)
+                           Http::CodecType type)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks) {
   conn_pool_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, absl::nullopt,
                                                  context);
@@ -209,7 +209,7 @@ HttpConnPool::~HttpConnPool() {
 
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
-  if (type_ == Http::CodecClient::Type::HTTP1) {
+  if (type_ == Http::CodecType::HTTP1) {
     upstream_ = std::make_unique<Http1Upstream>(upstream_callbacks_, config_);
   } else {
     upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_);

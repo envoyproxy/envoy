@@ -108,7 +108,9 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      if (it.first.Tag() != "!ignore") {
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      }
     }
     break;
   }

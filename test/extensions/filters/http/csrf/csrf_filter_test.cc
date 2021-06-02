@@ -42,7 +42,7 @@ public:
     add_exact_origin->set_exact("additionalhost");
 
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
-    add_regex_origin->set_hidden_envoy_deprecated_regex(R"(www\-[0-9]\.allow\.com)");
+    add_regex_origin->MergeFrom(TestUtility::createRegexMatcher(R"(www\-[0-9]\.allow\.com)"));
 
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }

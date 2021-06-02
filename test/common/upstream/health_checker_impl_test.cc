@@ -124,7 +124,7 @@ public:
   // HttpHealthCheckerImpl
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
-  Http::CodecClient::Type codecClientType() { return codec_client_type_; }
+  Http::CodecType codecClientType() { return codec_client_type_; }
 };
 
 class HttpHealthCheckerImplTest : public Event::TestUsingSimulatedTime,
@@ -584,9 +584,9 @@ public:
                   new NiceMock<Upstream::MockClusterInfo>()};
               Event::MockDispatcher dispatcher_;
               test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()), dispatcher_);
+                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                  dispatcher_);
               return test_session.codec_client_;
             }));
   }
@@ -2530,7 +2530,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithMultipleHostsAndAltPort) {
 
 TEST_F(HttpHealthCheckerImplTest, Http2ClusterUseHttp2CodecClient) {
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
 
 MATCHER_P(MetadataEq, expected, "") {
@@ -3006,7 +3006,7 @@ public:
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH1HealthChecking) {
   setupNoServiceValidationHC();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP1,
+  EXPECT_EQ(Http::CodecType::HTTP1,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
@@ -3028,7 +3028,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http1CodecClient)) {
 
   allocHealthChecker(yaml, false);
   addCompletionCallback();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP1, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP1, health_checker_->codecClientType());
 }
 
 TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
@@ -3049,7 +3049,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
 
   allocHealthChecker(yaml, false);
   addCompletionCallback();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
+  EXPECT_EQ(Http::CodecType::HTTP2, health_checker_->codecClientType());
 }
 
 TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
@@ -3120,7 +3120,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) 
 
 TEST_F(ProdHttpHealthCheckerTest, ProdHttpHealthCheckerH2HealthChecking) {
   setupNoServiceValidationHCWithHttp2();
-  EXPECT_EQ(Http::CodecClient::Type::HTTP2,
+  EXPECT_EQ(Http::CodecType::HTTP2,
             health_checker_->createCodecClientForTest(std::move(connection_))->type());
 }
 
@@ -4122,9 +4122,9 @@ public:
               Event::MockDispatcher dispatcher_;
 
               test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                  test_session.codec_, nullptr,
-                  Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()), dispatcher_);
+                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                  dispatcher_);
               return test_session.codec_client_;
             }));
   }

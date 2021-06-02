@@ -554,7 +554,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 

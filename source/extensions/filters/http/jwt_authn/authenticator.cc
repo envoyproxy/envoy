@@ -221,6 +221,7 @@ void AuthenticatorImpl::startVerify() {
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  jwks_cache_.stats().jwks_fetch_success_.inc();
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -229,7 +230,10 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   }
 }
 
-void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
+void AuthenticatorImpl::onJwksError(Failure) {
+  jwks_cache_.stats().jwks_fetch_failed_.inc();
+  doneWithStatus(Status::JwksFetchFail);
+}
 
 void AuthenticatorImpl::onDestroy() {
   if (fetcher_) {

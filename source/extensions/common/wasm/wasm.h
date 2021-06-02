@@ -24,7 +24,6 @@
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm_extension.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
-#include "source/extensions/common/wasm/well_known_names.h"
 
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"

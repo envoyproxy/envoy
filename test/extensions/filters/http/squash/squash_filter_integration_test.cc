@@ -19,7 +19,7 @@ namespace Envoy {
 class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   ~SquashFilterIntegrationTest() override {
     if (fake_squash_connection_) {
@@ -71,7 +71,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   /**

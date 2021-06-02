@@ -371,6 +371,9 @@ void UpstreamRequest::onPoolReady(
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
 
+  // Have the upstream use the account of the downstream.
+  upstream_->setAccount(parent_.callbacks()->account());
+
   if (parent_.requestVcluster()) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat

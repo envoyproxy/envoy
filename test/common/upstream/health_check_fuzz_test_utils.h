@@ -37,7 +37,7 @@ public:
   // HttpHealthCheckerImpl
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
-  Http::CodecClient::Type codecClientType() { return codec_client_type_; }
+  Http::CodecType codecClientType() { return codec_client_type_; }
 };
 
 class HttpHealthCheckerImplTestBase : public HealthCheckerTestBase {

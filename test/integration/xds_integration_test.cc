@@ -21,8 +21,8 @@ using testing::HasSubstr;
 class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void createEnvoy() override {
@@ -291,8 +291,7 @@ class LdsInplaceUpdateHttpIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
@@ -533,7 +532,7 @@ using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1}, {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Sample test making sure our config framework correctly reloads listeners.

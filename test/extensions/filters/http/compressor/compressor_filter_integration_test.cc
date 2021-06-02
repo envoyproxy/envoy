@@ -14,7 +14,7 @@ class CompressorIntegrationTest : public testing::TestWithParam<Network::Address
                                   public Event::SimulatedTimeSystem,
                                   public HttpIntegrationTest {
 public:
-  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

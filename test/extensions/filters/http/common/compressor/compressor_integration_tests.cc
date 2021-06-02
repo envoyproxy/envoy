@@ -129,7 +129,7 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 }
 
 void WebsocketWithCompressorIntegrationTest::initialize() {
-  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -140,7 +140,7 @@ void WebsocketWithCompressorIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
@@ -205,7 +205,7 @@ TEST_P(WebsocketWithCompressorIntegrationTest, NonWebsocketUpgrade) {
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
   sendBidirectionalData();
   codec_client_->sendData(*request_encoder_, "bye!", false);
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     codec_client_->close();
   } else {
     codec_client_->sendReset(*request_encoder_);
@@ -268,7 +268,7 @@ TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
     EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),

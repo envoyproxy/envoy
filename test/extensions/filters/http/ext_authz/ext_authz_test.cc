@@ -1498,7 +1498,8 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -1528,7 +1529,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1559,7 +1561,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -2137,7 +2140,8 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2163,7 +2167,8 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(*filter_callbacks_.route_, perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_,
+          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {

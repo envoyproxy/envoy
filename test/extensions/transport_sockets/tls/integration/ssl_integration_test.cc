@@ -139,7 +139,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                                     HttpConnectionManager::AUTO);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -158,7 +158,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(san_to_match_));
   };
@@ -194,7 +194,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 #if defined(__APPLE__) || defined(WIN32)
   // Skip this test on OS X + Windows: we can't detect the early close on non-Linux, and we
   // won't clean up the upstream connection until it times out. See #4294.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     return;
   }
 #endif

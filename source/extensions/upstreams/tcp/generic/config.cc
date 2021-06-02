@@ -18,8 +18,8 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
   if (config.has_value()) {
     auto pool_type =
         ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0)
-            ? Http::CodecClient::Type::HTTP2
-            : Http::CodecClient::Type::HTTP1;
+            ? Http::CodecType::HTTP2
+            : Http::CodecType::HTTP1;
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
         thread_local_cluster, context, config.value(), upstream_callbacks, pool_type);
     return (ret->valid() ? std::move(ret) : nullptr);

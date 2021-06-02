@@ -19,6 +19,8 @@
 namespace Envoy {
 namespace Http {
 
+enum class CodecType { HTTP1, HTTP2, HTTP3 };
+
 namespace Http1 {
 struct CodecStats;
 }
@@ -379,6 +381,12 @@ public:
    * small window updates as satisfying the idle timeout as this is a potential DoS vector.
    */
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * Sets the account for this stream, propagating it to all of its buffers.
+   * @param the account to assign this stream.
+   */
+  virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 };
 
 /**

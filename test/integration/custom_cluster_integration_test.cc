@@ -18,8 +18,7 @@ const int UpstreamIndex = 0;
 class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
-  CustomClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  CustomClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     setUpstreamCount(1);

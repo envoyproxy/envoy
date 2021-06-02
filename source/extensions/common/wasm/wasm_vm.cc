@@ -7,7 +7,6 @@
 #include "source/extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
 #include "source/extensions/common/wasm/wasm_extension.h"
 #include "source/extensions/common/wasm/wasm_runtime_factory.h"
-#include "source/extensions/common/wasm/well_known_names.h"
 
 #include "include/proxy-wasm/null_plugin.h"
 

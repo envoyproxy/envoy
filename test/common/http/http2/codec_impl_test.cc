@@ -1278,7 +1278,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // Now that the flow control window is full, further data causes the send buffer to back up.
   Buffer::OwnedImpl more_long_data(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(more_long_data, false);
-  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
@@ -1287,7 +1287,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl last_byte("!");
   request_encoder_->encodeData(last_byte, false);
-  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window + 1,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
 
@@ -1332,7 +1332,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_->getStream(1)->readDisable(false);
-  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
   // initial window minus the last 1 byte flush from the client to server.

@@ -117,7 +117,7 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 }
 
 void WebsocketIntegrationTest::initialize() {
-  if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -128,7 +128,7 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   }
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
@@ -195,7 +195,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
 
@@ -217,8 +217,8 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2 ||
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -255,7 +255,7 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
   auto upgrade_response_headers(upgradeResponseHeaders());
   validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // For H2, the disconnect may result in the terminal data not being proxied.
     response_->waitForBodyData(5);
   }
@@ -301,7 +301,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
   sendBidirectionalData();
   codec_client_->sendData(*request_encoder_, "bye!", false);
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     codec_client_->close();
   } else {
     codec_client_->sendReset(*request_encoder_);
@@ -331,7 +331,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));
   sendBidirectionalData();
   codec_client_->sendData(*request_encoder_, "bye!", false);
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     codec_client_->close();
   } else {
     codec_client_->sendReset(*request_encoder_);
@@ -395,7 +395,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
     performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
     codec_client_->sendData(*request_encoder_, large_req_str, false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));
@@ -407,8 +407,8 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 }
 
 TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2 ||
-      upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
 
@@ -423,7 +423,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
 
   // With content-length not present, the HTTP codec will send the request with
   // transfer-encoding: chunked.
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
   }
 

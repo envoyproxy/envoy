@@ -112,7 +112,6 @@ static_resources:
   clusters:
   - name: statsd
     type: STATIC
-    connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: statsd
@@ -126,7 +125,6 @@ static_resources:
                 protocol: TCP
   - name: backhaul
     type: STRICT_DNS
-    connect_timeout: 1s
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: backhaul
@@ -165,7 +163,6 @@ static_resources:
           http2_protocol_options: {}
   - name: lightstep_saas
     type: LOGICAL_DNS
-    connect_timeout: 1s
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: lightstep_saas

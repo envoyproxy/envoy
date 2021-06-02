@@ -16,7 +16,6 @@ envoy_cc_library(
     deps = [
         "//envoy/router:internal_redirect_interface",
         "//envoy/stream_info:filter_state_interface",
-        "//source/extensions/internal_redirect:well_known_names",
     ],
 )
 
@@ -24,17 +23,14 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.internal_redirect_predicates",
     # TODO(#9953) clean up by moving the redirect test to extensions.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":previous_routes_lib",
         "//envoy/registry",
         "//envoy/router:internal_redirect_interface",
-        "//source/extensions/internal_redirect:well_known_names",
         "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
     ],
 )

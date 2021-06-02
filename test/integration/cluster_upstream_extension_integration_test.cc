@@ -20,7 +20,7 @@ class ClusterUpstreamExtensionIntegrationTest
       public HttpIntegrationTest {
 public:
   ClusterUpstreamExtensionIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata,
                                 const std::string& key1, const std::string& key2,

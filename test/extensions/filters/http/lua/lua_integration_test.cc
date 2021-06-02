@@ -16,14 +16,14 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Create the xDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {

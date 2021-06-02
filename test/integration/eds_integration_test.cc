@@ -22,7 +22,7 @@ class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
                            public HttpIntegrationTest {
 public:
   EdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
         codec_client_type_(envoy::type::v3::HTTP1) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
@@ -94,7 +94,7 @@ public:
   void initializeTest(bool http_active_hc) {
     setUpstreamCount(4);
     if (codec_client_type_ == envoy::type::v3::HTTP2) {
-      setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+      setUpstreamProtocol(Http::CodecType::HTTP2);
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.

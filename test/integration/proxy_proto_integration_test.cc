@@ -30,7 +30,7 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
 }
 
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
 }
 

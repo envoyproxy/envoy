@@ -12,6 +12,7 @@
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
+#include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
 namespace Envoy {
@@ -148,31 +149,18 @@ TEST(UtilityTest, TestGetCertificationExtensionValue) {
 
 TEST(UtilityTest, SslErrorDescriptionTest) {
   const std::vector<std::pair<int, std::string>> test_set = {
-      {0, "NONE"},
-      {1, "SSL"},
-      {2, "WANT_READ"},
-      {3, "WANT_WRITE"},
-      {4, "WANT_X509_LOOKUP"},
-      {5, "SYSCALL"},
-      {6, "ZERO_RETURN"},
-      {7, "WANT_CONNECT"},
-      {8, "WANT_ACCEPT"},
-      {9, "WANT_CHANNEL_ID_LOOKUP"},
-      {11, "PENDING_SESSION"},
-      {12, "PENDING_CERTIFICATE"},
-      {13, "WANT_PRIVATE_KEY_OPERATION"},
-      {14, "PENDING_TICKET"},
-      {15, "EARLY_DATA_REJECTED"},
-      {16, "WANT_CERTIFICATE_VERIFY"},
-      {17, "HANDOFF"},
-      {18, "HANDBACK"},
+      {SSL_ERROR_NONE, "NONE"},
+      {SSL_ERROR_SSL, "SSL"},
+      {SSL_ERROR_WANT_READ, "WANT_READ"},
+      {SSL_ERROR_WANT_WRITE, "WANT_WRITE"},
+      {SSL_ERROR_WANT_PRIVATE_KEY_OPERATION, "WANT_PRIVATE_KEY_OPERATION"},
   };
 
   for (const auto& test_data : test_set) {
     EXPECT_EQ(test_data.second, Utility::getErrorDescription(test_data.first));
   }
 
-  EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(19), "UNKNOWN_ERROR"),
+  EXPECT_ENVOY_BUG(EXPECT_EQ(Utility::getErrorDescription(-1), "UNKNOWN_ERROR"),
                    "Unknown BoringSSL error had occurred");
 }
 
