@@ -105,11 +105,12 @@ def track_prs():
         # Add a reminder to each maintainer-assigner on the PR.
         has_maintainer_assignee = add_reminders(pr_info.assignees, maintainers_and_prs, message)
 
+
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
             # don't bother assigning maintainer WIPs.
-            if pr_info.draft and pr_info.user in maintainers_and_prs.keys():
-                continue
+            if pr_info.draft and pr_info.user.login in maintainers_and_prs.keys():
+              continue
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications}, and stalled PRs
