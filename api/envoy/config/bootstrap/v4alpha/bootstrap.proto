@@ -9,6 +9,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/event_service_config.proto";
 import "envoy/config/core/v4alpha/extension.proto";
+import "envoy/config/core/v4alpha/resolver.proto";
 import "envoy/config/core/v4alpha/socket_option.proto";
 import "envoy/config/listener/v4alpha/listener.proto";
 import "envoy/config/metrics/v4alpha/stats.proto";
@@ -36,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v3.Bootstrap";
@@ -96,9 +97,9 @@ message Bootstrap {
     core.v4alpha.ApiConfigSource ads_config = 3;
   }
 
-  reserved 10, 11, 8, 9;
+  reserved 10, 11, 8, 9, 20;
 
-  reserved "runtime", "watchdog", "tracing";
+  reserved "runtime", "watchdog", "tracing", "use_tcp_for_dns_lookups";
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
@@ -222,15 +223,11 @@ message Bootstrap {
   // :ref:`stats sinks <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
 
-  // Always use TCP queries instead of UDP queries for DNS lookups.
-  // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
-  // specified.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 20;
+  // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // This may be overridden on a per-cluster basis in cds_config, when
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // is specified.
+  core.v4alpha.DnsResolutionConfig dns_resolution_config = 30;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.

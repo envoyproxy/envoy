@@ -543,8 +543,23 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
-  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  if (bootstrap_.has_dns_resolution_config()) {
+    dns_resolver_options.CopyFrom(bootstrap_.dns_resolution_config().dns_resolver_options());
+    if (!bootstrap_.dns_resolution_config().resolvers().empty()) {
+      const auto& resolver_addrs = bootstrap_.dns_resolution_config().resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
+    // utilize bootstrap_.use_tcp_for_dns_lookups() if `bootstrap_.dns_resolver_options` is not set.
+    dns_resolver_options.set_use_tcp_for_dns_lookups(bootstrap_.use_tcp_for_dns_lookups());
+  }
+  dns_resolver_ = dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
