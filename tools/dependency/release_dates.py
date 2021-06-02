@@ -15,6 +15,7 @@ import os
 import sys
 
 import github
+
 import exports
 import utils
 
@@ -31,7 +32,8 @@ class ReleaseDateVersionError(Exception):
 def format_utc_date(date):
     # We only handle naive datetime objects right now, which is what PyGithub
     # appears to be handing us.
-    assert date.tzinfo is None
+    if date.tzinfo is not None:
+        raise ReleaseDateVersionError("Expected UTC date without timezone information. Received timezone information")
     return date.date().isoformat()
 
 
@@ -69,7 +71,6 @@ def get_tagged_release_date(repo, metadata_version, github_release):
         # Repositories can not have releases or if they have releases may not publish a latest releases. If this is the case we keep going
         latest = ''
         print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
-        pass
 
     if latest and github_release.version <= latest.tag_name:
         release = repo.get_release(github_release.version)
