@@ -57,6 +57,7 @@ envoy_cc_test(
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
