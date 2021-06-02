@@ -34,7 +34,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  explicit Filter(const FilterConfigSharedPtr& config) : config_(config) {}
+  explicit Filter(const FilterConfigSharedPtr& config);
 
   // Http::PassThroughEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& header,
@@ -42,8 +42,8 @@ public:
   void onDestroy() override;
 
 private:
-  const FilterConfigSharedPtr config_;
-  std::string hostname_; // The hostname of the URL being requested.
+  const Http::AlternateProtocolsCacheSharedPtr cache_;
+  TimeSource& time_source_;
 };
 
 } // namespace AlternateProtocolsCache

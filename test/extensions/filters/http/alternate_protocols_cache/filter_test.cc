@@ -4,6 +4,7 @@
 
 #include "test/mocks/http/alternate_protocols_cache.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
 using testing::Return;
@@ -82,6 +83,8 @@ TEST_F(FilterTest, ValidAltSvc) {
                                                        now + std::chrono::seconds(60)),
   };
 
+  std::shared_ptr<Network::MockResolvedAddress> address = std::make_shared<Network::MockResolvedAddress>("1.2.3.4:443","1.2.3.4:443");
+  Network::MockIp ip;
   std::string hostname = "host1";
   std::shared_ptr<Upstream::MockHostDescription> hd =
       std::make_shared<Upstream::MockHostDescription>();
@@ -89,6 +92,9 @@ TEST_F(FilterTest, ValidAltSvc) {
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, upstreamHost()).WillOnce(testing::Return(hd));
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
+  EXPECT_CALL(*hd, address()).WillOnce(Return(address));
+  EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
+  EXPECT_CALL(ip, port()).WillOnce(Return(443));
   EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
       .WillOnce(testing::DoAll(
           testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {

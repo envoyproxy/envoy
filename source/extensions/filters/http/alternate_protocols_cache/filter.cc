@@ -33,8 +33,11 @@ Http::AlternateProtocolsCacheSharedPtr FilterConfig::getAlternateProtocolCache()
 
 void Filter::onDestroy() {}
 
+Filter::Filter(const FilterConfigSharedPtr& config)
+    : cache_(config->getAlternateProtocolCache()), time_source_(config->timeSource()) {}
+
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  if (!config_->getAlternateProtocolCache()) {
+  if (!cache_) {
     return Http::FilterHeadersStatus::Continue;
   }
   const auto alt_svc = headers.get(Http::CustomHeaders::get().AltSvc);
@@ -50,18 +53,18 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     }
     for (size_t i = 0; i < altsvc_vector.size(); ++i) {
       MonotonicTime expiration =
-          config_->timeSource().monotonicTime() + std::chrono::seconds(altsvc_vector[i].max_age);
+          time_source_.monotonicTime() + std::chrono::seconds(altsvc_vector[i].max_age);
       Http::AlternateProtocolsCache::AlternateProtocol protocol(
           altsvc_vector[i].protocol_id, altsvc_vector[i].host, altsvc_vector[i].port, expiration);
       protocols.push_back(protocol);
     }
   }
-  StreamInfo::StreamInfo& stream_info = encoder_callbacks_->streamInfo();
-  const uint32_t port = stream_info.upstreamHost()->address()->ip()->port();
-  const std::string& hostname = stream_info.upstreamHost()->hostname();
+  Upstream::HostDescriptionConstSharedPtr host = encoder_callbacks_->streamInfo().upstreamHost();
+  const uint32_t port = host->address()->ip()->port();
+  const std::string& hostname = host->hostname();
   Http::AlternateProtocolsCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,
                                                port);
-  config_->getAlternateProtocolCache()->setAlternatives(origin, protocols);
+  cache_->setAlternatives(origin, protocols);
   return Http::FilterHeadersStatus::Continue;
 }
 
