@@ -160,7 +160,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // The body has been buffered and we need to send the buffer
       ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
-      sendBodyChunk(state, *state.bufferedData(), true);
+      sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback, true);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
       result = FilterDataStatus::StopIterationNoBuffer;
@@ -171,11 +171,26 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
 
-  case ProcessingMode::BUFFERED_PARTIAL:
   case ProcessingMode::STREAMED:
+    if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallback) {
+      ENVOY_BUG(end_stream && data.length() == 0, 
+        "Received premature body chunk");
+      // Envoy will send our EOF even though we raised the watermark
+      state.setBodyEofDelivered(true);
+    }
+    // Send the chunk, and ask that we don't get any more data callbacks until
+    // we have decided what to do with it.
+    state.setBodyChunk(&data);
+    state.requestWatermark();
+    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
+    result = FilterDataStatus::StopIterationAndWatermark;
+    break;
+
+  case ProcessingMode::BUFFERED_PARTIAL:
     ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
     result = FilterDataStatus::Continue;
     break;
+
   case ProcessingMode::NONE:
   default:
     result = FilterDataStatus::Continue;
@@ -228,7 +243,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // We would like to process the body in a buffered way, but until now the complete
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
-    sendBufferedData(state, true);
+    sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
     return FilterTrailersStatus::StopIteration;
   }
 
@@ -288,9 +303,10 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   return status;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream) {
+void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, 
+  ProcessorState::CallbackState new_state, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
-  state.setCallbackState(ProcessorState::CallbackState::BufferedBodyCallback);
+  state.setCallbackState(new_state);
   state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
   ProcessingRequest req;
   auto* body_req = state.mutableBody(req);

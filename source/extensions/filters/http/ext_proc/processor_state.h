@@ -26,13 +26,15 @@ public:
     HeadersCallback,
     // Waiting for a "body" response in buffered mode
     BufferedBodyCallback,
+    // Waiting for a streamed chunk
+    StreamedBodyCallback,
     // and waiting for a "trailers" response
     TrailersCallback,
   };
 
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), complete_body_available_(false),
-        trailers_available_(false), body_replaced_(false) {}
+        trailers_available_(false), body_replaced_(false), body_eof_delivered_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -44,6 +46,7 @@ public:
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
+  void setBodyEofDelivered(bool d) { body_eof_delivered_ = d; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -56,6 +59,7 @@ public:
 
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
+  void setBodyChunk(Buffer::Instance* chunk) { body_chunk_ = chunk; }
 
   void startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout);
   void cleanUpTimer() const;
@@ -98,6 +102,9 @@ protected:
   bool trailers_available_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
+  // If true, then we are streaming the body and got the EOF when we
+  // weren't really done with the last chunk.
+  bool body_eof_delivered_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
@@ -109,6 +116,7 @@ protected:
 
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
+  Buffer::Instance* body_chunk_ = nullptr;
   Event::TimerPtr message_timer_;
 };
 

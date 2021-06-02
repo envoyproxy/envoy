@@ -33,7 +33,6 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       filter_callbacks_->clearRouteCache();
     }
     callback_state_ = CallbackState::Idle;
-    clearWatermark();
     message_timer_->disableTimer();
 
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
@@ -59,6 +58,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       // or response to the processor. Clear flags to make sure.
       body_mode_ = ProcessingMode::NONE;
       send_trailers_ = false;
+      clearWatermark();
 
     } else {
       if (body_mode_ == ProcessingMode::BUFFERED) {
@@ -67,12 +67,23 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           // was complete, and the server wants the body. So, don't continue filter
           // processing, but send the buffered request body now.
           ENVOY_LOG(debug, "Sending buffered request body message");
-          filter_.sendBufferedData(*this, true);
+          filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback,
+                                   true);
         }
 
         // Otherwise, we're not ready to continue processing because then
         // we won't be able to modify the headers any more, so do nothing and
         // let the doData callback handle body chunks until the end is reached.
+        clearWatermark();
+        return true;
+
+      } else if (body_mode_ == ProcessingMode::STREAMED) {
+        if (bufferedData() != nullptr) {
+          requestWatermark();
+          ENVOY_LOG(debug, "Sending buffered body data in streaming mode");
+          filter_.sendBufferedData(*this, ProcessorState::CallbackState::StreamedBodyCallback,
+                                  complete_body_available_);
+        }
         return true;
       }
 
@@ -80,6 +91,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         // Trailers came in while we were waiting for this response, and the server
         // is not interested in the body, so send them now.
         filter_.sendTrailers(*this, *trailers_);
+        clearWatermark();
         return true;
       }
     }
@@ -88,23 +100,44 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
     // trailers, so we can just continue.
     headers_ = nullptr;
     continueProcessing();
+    clearWatermark();
     return true;
   }
   return false;
 }
 
 bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  if (callback_state_ == CallbackState::BufferedBodyCallback) {
-    ENVOY_LOG(debug, "Applying body response to buffered data");
-    modifyBufferedData([this, &response](Buffer::Instance& data) {
-      MutationUtils::applyCommonBodyResponse(response, headers_, data);
-    });
+  if (callback_state_ == CallbackState::BufferedBodyCallback ||
+      callback_state_ == CallbackState::StreamedBodyCallback) {
+    ENVOY_LOG(debug, "Processing body response");
+    if (callback_state_ == CallbackState::BufferedBodyCallback) {
+      ENVOY_LOG(debug, "Applying body response to buffered data. State = {}", callback_state_);
+      modifyBufferedData([this, &response](Buffer::Instance& data) {
+        MutationUtils::applyCommonBodyResponse(response, headers_, data);
+      });
+    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
+      if (body_chunk_ != nullptr) {
+        ENVOY_LOG(debug, "Applying body response to chunk of data. State = {}", callback_state_);
+        MutationUtils::applyCommonBodyResponse(response, headers_, *body_chunk_);
+      }
+      clearWatermark();
+    }
+
     if (response.response().clear_route_cache()) {
       filter_callbacks_->clearRouteCache();
     }
-    headers_ = nullptr;
-    callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
+
+    headers_ = nullptr;
+    body_chunk_ = nullptr;
+    if (body_eof_delivered_) {
+      // Allow an extra response to come back in event of streaming
+      body_eof_delivered_ = false;
+      return true;
+    } else {
+      callback_state_ = CallbackState::Idle;
+    }
+    
 
     if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server
@@ -113,9 +146,11 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       return true;
     }
 
+    ENVOY_LOG(trace, "Continuing");
     continueProcessing();
     return true;
   }
+
   return false;
 }
 
