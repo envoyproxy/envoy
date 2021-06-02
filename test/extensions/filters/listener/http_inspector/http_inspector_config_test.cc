@@ -1,5 +1,4 @@
 #include "source/extensions/filters/listener/http_inspector/http_inspector.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 
 #include "test/mocks/server/listener_factory_context.h"
 
@@ -17,9 +16,9 @@ namespace {
 TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
   Server::Configuration::NamedListenerFilterConfigFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
-          getFactory(ListenerFilters::ListenerFilterNames::get().HttpInspector);
+          getFactory("envoy.filters.listener.http_inspector");
 
-  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().HttpInspector);
+  EXPECT_EQ(factory->name(), "envoy.filters.listener.http_inspector");
 
   const std::string yaml = R"EOF(
       {}
