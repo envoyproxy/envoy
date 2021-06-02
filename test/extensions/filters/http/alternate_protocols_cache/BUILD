@@ -31,9 +31,6 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.alternate_protocols_cache",
-    # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
-    #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
-    tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/integration:http_integration_lib",
