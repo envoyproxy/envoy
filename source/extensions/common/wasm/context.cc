@@ -87,14 +87,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
-absl::string_view toAbslStringView(std::string_view view) {
-  return absl::string_view(view.data(), view.size());
-}
-
-std::string_view toStdStringView(absl::string_view view) {
-  return std::string_view(view.data(), view.size());
-}
-
 } // namespace
 
 // Test support.
@@ -1192,7 +1184,7 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
   if (stream_info->filterState()->hasData<CelState>(key)) {
     state = &stream_info->filterState()->getDataMutable<CelState>(key);
   } else {
-    const auto& it = rootContext()->state_prototypes_.find(path);
+    const auto& it = rootContext()->state_prototypes_.find(toAbslStringView(path));
     const CelStatePrototype& prototype =
         it == rootContext()->state_prototypes_.end()
             ? Filters::Common::Expr::DefaultCelStatePrototype::get()
@@ -1213,8 +1205,9 @@ WasmResult
 Context::declareProperty(std::string_view path,
                          Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype) {
   // Do not delete existing schema since it can be referenced by state objects.
-  if (state_prototypes_.find(path) == state_prototypes_.end()) {
-    state_prototypes_[path] = std::move(state_prototype);
+  // fixfix var
+  if (state_prototypes_.find(toAbslStringView(path)) == state_prototypes_.end()) {
+    state_prototypes_[toAbslStringView(path)] = std::move(state_prototype);
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;

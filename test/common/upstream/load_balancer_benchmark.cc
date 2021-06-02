@@ -538,7 +538,7 @@ public:
         envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
     auto* selector = subset_config.mutable_subset_selectors()->Add();
     selector->set_single_host_per_subset(single_host_per_subset);
-    *selector->mutable_keys()->Add() = metadata_key;
+    *selector->mutable_keys()->Add() = std::string(metadata_key);
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
     lb_ = std::make_unique<SubsetLoadBalancer>(LoadBalancerType::Random, priority_set_,
