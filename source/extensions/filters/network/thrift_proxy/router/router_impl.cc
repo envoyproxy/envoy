@@ -281,9 +281,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     passthrough_supported_ = true;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
@@ -303,7 +302,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
+      std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata, transport, protocol);
   return upstream_request_->start();
 }
 
@@ -432,10 +431,10 @@ void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
 
 void Router::cleanup() { upstream_request_.reset(); }
 
-Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                                          MessageMetadataSharedPtr& metadata,
                                          TransportType transport_type, ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
@@ -447,7 +446,7 @@ Router::UpstreamRequest::~UpstreamRequest() {
 }
 
 FilterStatus Router::UpstreamRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;

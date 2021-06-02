@@ -98,31 +98,30 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-            EXPECT_EQ(match.size(), 2);
-            auto it = match.begin();
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+        EXPECT_EQ(match.size(), 2);
+        auto it = match.begin();
 
-            // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
-            // below matters.
+        // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+        // below matters.
 
-            // `stage` was only set by the request, not by the route entry.
-            EXPECT_EQ((*it)->name(), "stage");
-            EXPECT_EQ((*it)->value().value().string_value(), "devel");
-            it++;
+        // `stage` was only set by the request, not by the route entry.
+        EXPECT_EQ((*it)->name(), "stage");
+        EXPECT_EQ((*it)->value().value().string_value(), "devel");
+        it++;
 
-            // `version` should be what came from the request, overriding the route entry.
-            EXPECT_EQ((*it)->name(), "version");
-            EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+        // `version` should be what came from the request, overriding the route entry.
+        EXPECT_EQ((*it)->name(), "version");
+        EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
 
-            // When metadataMatchCriteria() is computed from dynamic metadata, the result should
-            // be cached.
-            EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
+        // When metadataMatchCriteria() is computed from dynamic metadata, the result should
+        // be cached.
+        EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
 
-            return &cm_.thread_local_cluster_.conn_pool_;
-          }));
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();

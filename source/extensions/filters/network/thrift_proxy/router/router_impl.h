@@ -224,7 +224,7 @@ public:
 
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+    UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -247,7 +247,7 @@ private:
     void chargeResponseTiming();
 
     Router& parent_;
-    Tcp::ConnectionPool::Instance& conn_pool_;
+    Upstream::TcpPoolData& conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
