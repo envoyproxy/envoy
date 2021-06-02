@@ -1,4 +1,4 @@
-.. _arch_overview_local_rate_limit:
+.. _arch_overview_connection_limit:
 
 Connection limiting
 ===================
