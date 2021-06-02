@@ -116,7 +116,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
               context.api(), context.options());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context, *transport_factory_context.get(), std::move(stats_scope));
+      createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
