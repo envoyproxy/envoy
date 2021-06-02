@@ -29,12 +29,7 @@ public:
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
 
-    auto header = maybe_headers->get().get(name_);
-    if (header.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
-
-    auto header_string = HeaderUtility::getAllOfHeaderAsString(header, ",");
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
 
     if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
