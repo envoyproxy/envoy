@@ -10,6 +10,9 @@
 #include "common/network/socket_interface.h"
 #include "common/protobuf/utility.h"
 
+#include "envoy/server/drain_manager.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "server/configuration_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -32,8 +35,16 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::DrainableFactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), init_manager_(init_manager),
-      drain_manager_(
-          parent_context.drainManager().createChildManager(parent_context.dispatcher())) {}
+      drain_manager_(parent_context.drainManager().createChildManager(parent_context.dispatcher())),
+      tls_(parent_context.threadLocal().allocateSlot()) {
+
+  // Create a drain-manager per thread as children to the top level filter-chain drain manager.
+  // This reduces the amount of cross-thread coordination required for registering and firing
+  // on-drain callbacks.
+  tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return drain_manager_->createChildManager(dispatcher);
+  });
+}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const { return drain_manager_->drainClose(); }
 Common::ThreadSafeCallbackHandlePtr
@@ -43,7 +54,7 @@ PerFilterChainFactoryContextImpl::addOnDrainCloseCb(Event::Dispatcher& dispatche
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() {
-  return *drain_manager_;
+  return tls_->getTyped<Server::DrainManager>();
 }
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }

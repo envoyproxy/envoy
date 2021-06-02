@@ -6,6 +6,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,7 +19,7 @@ using DrainManagerSharedPtr = std::shared_ptr<DrainManager>;
  * Handles connection draining. This concept is used globally during hot restart / server draining
  * as well as on individual listeners and filter-chains when they are being dynamically removed.
  */
-class DrainManager : public Network::DrainDecision {
+class DrainManager : public Network::DrainDecision, public ThreadLocal::ThreadLocalObject {
 public:
   /**
    * @brief Create a child drain-manager. Will proxy the drain status from the parent, but can also

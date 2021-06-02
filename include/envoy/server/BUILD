@@ -63,6 +63,7 @@ envoy_cc_library(
     hdrs = ["drain_manager.h"],
     deps = [
         "//include/envoy/network:drain_decision_interface",
+        "//include/envoy/thread_local:thread_local_object",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
