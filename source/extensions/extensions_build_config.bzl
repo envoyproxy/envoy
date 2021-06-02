@@ -281,11 +281,11 @@ EXTENSIONS = {
     "envoy.http.original_ip_detection.xff":                  "//source/extensions/http/original_ip_detection/xff:config",
 
     #
-    # Quic listener
+    # Quic extensions
     #
 
-    "quic.quiche_crypto_server_stream":                 "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
-    "envoy.quic.filter_chain_proof_source":             "//source/extensions/quic:envoy_quic_proof_source_factory_impl_lib",
+    "quic.quiche_crypto_server_stream":                 "//source/extensions/quic:envoy_quic_default_crypto_server_stream",
+    "envoy.quic.filter_chain_proof_source":             "//source/extensions/quic:envoy_quic_default_proof_source",
 
 }
 

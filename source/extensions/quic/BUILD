@@ -27,7 +27,7 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "envoy_quic_default_crypto_server_stream_extension",
+    name = "envoy_quic_default_crypto_server_stream",
     extra_visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
@@ -75,7 +75,7 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "envoy_quic_default_proof_source_extension",
+    name = "envoy_quic_default_proof_source",
     extra_visibility = [
         "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
