@@ -32,6 +32,7 @@ envoy_cc_library(
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:config_provider_manager_interface",
         "//include/envoy/init:manager_interface",
+        "//include/envoy/matcher:dump_matcher_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:config_tracker_interface",
         "//include/envoy/singleton:instance_interface",
@@ -39,6 +40,7 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
+        "//source/common/matcher:config_dump_matcher",
         "//source/common/protobuf",
     ],
 )

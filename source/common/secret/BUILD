@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/matcher:config_dump_matcher",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

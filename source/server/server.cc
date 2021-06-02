@@ -17,6 +17,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
+#include "envoy/matcher/dump_matcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -513,8 +514,11 @@ void InstanceImpl::initialize(const Options& options,
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+  config_tracker_entry_ = admin_->getConfigTracker().add(
+      "bootstrap", [this](const Matcher::ConfigDump::MatchingParameters& matching_params) {
+        UNREFERENCED_PARAMETER(matching_params);
+        return dumpBootstrapConfig();
+      });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }

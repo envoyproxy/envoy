@@ -36,6 +36,35 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 
+class NameListenerDumpMatcher : public Matcher::ConfigDump::DumpMatcher {
+public:
+  using Listener = envoy::config::listener::v3::Listener;
+  bool match(const Protobuf::Message& dump_message,
+             const Matcher::ConfigDump::MatchingParameters& params) const override {
+    const Listener* listener =
+        Protobuf::DynamicCastToGenerated<envoy::config::listener::v3::Listener>(&dump_message);
+    if (listener == nullptr) {
+      return true;
+    }
+    if (const auto& name_it = params.find("name"); name_it != params.end()) {
+      return name_it->second == listener->name();
+    }
+    return true;
+  }
+};
+
+class NameListenerDumpMatcherFactory : public Matcher::ConfigDump::DumpMatcherFactory {
+public:
+  const Matcher::ConfigDump::DumpMatcher& getDumpMatcher() override { return matcher_; }
+
+  std::string name() const override {
+    return NameListenerDumpMatcher::Listener::descriptor()->full_name();
+  }
+
+private:
+  NameListenerDumpMatcher matcher_;
+};
+
 class ListenerHandle {
 public:
   ListenerHandle(bool need_local_drain_manager = true) {
@@ -263,8 +292,11 @@ protected:
                                           .value());
   }
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
+  void checkConfigDump(const std::string& expected_dump_yaml,
+                       const Matcher::ConfigDump::MatchingParameters& params =
+                           Matcher::ConfigDump::MatchingParameters()) {
+    auto message_ptr =
+        server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"](params);
     const auto& listeners_config_dump =
         dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 

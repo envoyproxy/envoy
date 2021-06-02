@@ -14,6 +14,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/matcher/dump_matcher.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/router/route_config_update_receiver.h"
@@ -241,7 +242,8 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  std::unique_ptr<envoy::admin::v3::RoutesConfigDump> dumpRouteConfigs() const;
+  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
+  dumpRouteConfigs(const Matcher::ConfigDump::MatchingParameters& matching_params) const;
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(

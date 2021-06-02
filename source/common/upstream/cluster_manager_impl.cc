@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/matcher/dump_matcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -30,6 +31,7 @@
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/http/mixed_conn_pool.h"
+#include "common/matcher/config_dump_matcher.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
@@ -271,8 +273,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
       cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
-      config_tracker_entry_(
-          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
+      config_tracker_entry_(admin.getConfigTracker().add(
+          "clusters",
+          [this](const Matcher::ConfigDump::MatchingParameters& matching_params) {
+            return dumpClusterConfigs(matching_params);
+          })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
@@ -1041,11 +1046,15 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
-ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
+ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs(
+    const Matcher::ConfigDump::MatchingParameters& matching_params) {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
+    if (!Matcher::ConfigDump::isMatch(cluster.cluster_config_, matching_params)) {
+      continue;
+    }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
       static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
@@ -1062,6 +1071,9 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
 
   for (const auto& warming_cluster_pair : warming_clusters_) {
     const auto& cluster = *warming_cluster_pair.second;
+    if (!Matcher::ConfigDump::isMatch(cluster.cluster_config_, matching_params)) {
+      continue;
+    }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
     dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));

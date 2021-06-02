@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/init/manager.h"
+#include "envoy/matcher/dump_matcher.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/config_tracker.h"
 #include "envoy/singleton/instance.h"
@@ -383,7 +384,8 @@ public:
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
    *                                   config providers.
    */
-  virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
+  virtual ProtobufTypes::MessagePtr
+  dumpConfigs(const Matcher::ConfigDump::MatchingParameters& matching_params) const PURE;
 
 protected:
   // Ordered set for deterministic config dump output.

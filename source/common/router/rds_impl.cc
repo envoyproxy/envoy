@@ -9,6 +9,7 @@
 #include "envoy/api/v2/route.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/matcher/dump_matcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
@@ -17,6 +18,7 @@
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
+#include "common/matcher/config_dump_matcher.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 
@@ -303,8 +305,9 @@ void RdsRouteConfigProviderImpl::validateConfig(
   ConfigImpl validation_config(config, optional_http_filters_, factory_context_, validator_, false);
 }
 
-// Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
-// response has been propagated to the worker thread that was the request origin.
+// Schedules a VHDS request on the main thread and queues up the callback to use
+// when the VHDS response has been propagated to the worker thread that was the
+// request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
@@ -325,10 +328,13 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
-  config_tracker_entry_ =
-      admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
-  // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
-  // from us, since the returned entry will be nullptr if the key already exists.
+  config_tracker_entry_ = admin.getConfigTracker().add(
+      "routes", [this](const Matcher::ConfigDump::MatchingParameters& matching_params) {
+        return dumpRouteConfigs(matching_params);
+      });
+  // ConfigTracker keys must be unique. We are asserting that no one has stolen
+  // the "routes" key from us, since the returned entry will be nullptr if the
+  // key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");
 }
 
@@ -377,9 +383,9 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
 }
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
+RouteConfigProviderManagerImpl::dumpRouteConfigs(
+    const Matcher::ConfigDump::MatchingParameters& matching_params) const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
-
   for (const auto& element : dynamic_route_config_providers_) {
     const auto& subscription = element.second.lock()->subscription_;
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
@@ -389,6 +395,10 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
+      if (!Matcher::ConfigDump::isMatch(subscription->routeConfigUpdate()->protobufConfiguration(),
+                                        matching_params)) {
+        continue;
+      }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
       dynamic_config->mutable_route_config()->PackFrom(
@@ -400,6 +410,9 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
+    if (!Matcher::ConfigDump::isMatch(provider->configInfo().value().config_, matching_params)) {
+      continue;
+    }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
     static_config->mutable_route_config()->PackFrom(
         API_RECOVER_ORIGINAL(provider->configInfo().value().config_));

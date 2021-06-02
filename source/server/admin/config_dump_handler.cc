@@ -2,12 +2,19 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/http/query_params.h"
+#include "envoy/matcher/dump_matcher.h"
 
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/matcher/config_dump_matcher.h"
 #include "common/network/utility.h"
 
 #include "server/admin/utils.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 
 namespace Envoy {
 namespace Server {
@@ -107,6 +114,23 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
   return Utility::queryParam(params, "mask");
 }
 
+absl::flat_hash_map<std::string, std::string>
+getMatchingParams(const Http::Utility::QueryParams& params) {
+  absl::flat_hash_map<std::string, std::string> matchers;
+  const std::string prefix = "match_";
+  for (const auto& [key, val] : params) {
+    if (absl::string_view match_key = absl::StripPrefix(key, prefix); match_key != key) {
+      matchers[match_key] = val;
+    }
+  }
+  return matchers;
+}
+
+// Helper method to get the mask parameter.
+absl::optional<std::string> filterParam(const Http::Utility::QueryParams& params) {
+  return Utility::queryParam(params, "filter");
+}
+
 // Helper method to get the eds parameter.
 bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
@@ -124,17 +148,19 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
+  const auto string_filter = filterParam(query_params);
+  Matcher::ConfigDump::MatchingParameters match_params = getMatchingParams(query_params);
 
   envoy::admin::v3::ConfigDump dump;
 
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
+    auto err = addResourceToDump(dump, mask, match_params, resource.value(), include_eds);
     if (err.has_value()) {
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask, include_eds);
+    addAllConfigToDump(dump, mask, match_params, include_eds);
   }
   MessageUtil::redact(dump);
 
@@ -146,19 +172,23 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
 absl::optional<std::pair<Http::Code, std::string>>
 ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                                      const absl::optional<std::string>& mask,
+                                     const Matcher::ConfigDump::MatchingParameters& matching_params,
                                      const std::string& resource, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint",
+                            [this](const Matcher::ConfigDump::MatchingParameters& matching_params) {
+                              return dumpEndpointConfigs(matching_params);
+                            });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(matching_params);
     ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
@@ -192,21 +222,24 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                           const absl::optional<std::string>& mask,
-                                           bool include_eds) const {
+void ConfigDumpHandler::addAllConfigToDump(
+    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+    const Matcher::ConfigDump::MatchingParameters& matching_params, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint",
+                            [this](const Matcher::ConfigDump::MatchingParameters& matching_params) {
+                              return dumpEndpointConfigs(matching_params);
+                            });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(matching_params);
     ASSERT(message);
 
     if (mask.has_value()) {
@@ -222,7 +255,8 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   }
 }
 
-ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
+ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs(
+    const Matcher::ConfigDump::MatchingParameters& matching_params) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -270,7 +304,9 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
         }
       }
     }
-
+    if (!Matcher::ConfigDump::isMatch(cluster_load_assignment, matching_params)) {
+      continue;
+    }
     if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
       dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);

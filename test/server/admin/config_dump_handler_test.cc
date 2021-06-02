@@ -1,5 +1,10 @@
+#include "envoy/matcher/dump_matcher.h"
+
 #include "test/server/admin/admin_instance.h"
 
+#include "absl/strings/str_format.h"
+
+using ::Envoy::Matcher::ConfigDump::MatchingParameters;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -39,7 +44,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
 TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto entry = admin_.getConfigTracker().add("foo", [] {
+  auto entry = admin_.getConfigTracker().add("foo", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("bar");
     return msg;
@@ -58,24 +63,63 @@ TEST_P(AdminInstanceTest, ConfigDump) {
   EXPECT_EQ(expected_json, output);
 }
 
+TEST_P(AdminInstanceTest, MatchParamsArePassedToCallback) {
+  const std::string match_key = "key";
+  const std::string empty_value = "no_value";
+  auto entry = admin_.getConfigTracker().add(
+      "foo", [match_key, empty_value](const MatchingParameters& match_params) {
+        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        if (const auto& it = match_params.find(match_key); it != match_params.end()) {
+          msg->set_value(it->second);
+        } else {
+          msg->set_value(empty_value);
+        }
+        return msg;
+      });
+  constexpr absl::string_view expected_json_template = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "%s"
+  }
+ ]
+}
+)EOF";
+
+  Buffer::OwnedImpl no_value_response;
+  Http::TestResponseHeaderMapImpl no_value_header_map;
+
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", no_value_header_map, no_value_response));
+  std::string output = no_value_response.toString();
+  EXPECT_EQ(absl::StrFormat(expected_json_template, empty_value), output);
+
+  Buffer::OwnedImpl value_response;
+  Http::TestResponseHeaderMapImpl value_header_map;
+  const std::string value = "value";
+  EXPECT_EQ(Http::Code::OK, getCallback(absl::StrFormat("/config_dump?match_key=%s", value),
+                                        value_header_map, value_response));
+  output = value_response.toString();
+  EXPECT_EQ(absl::StrFormat(expected_json_template, value), output);
+}
+
 TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   // Add configs in random order and validate config_dump dumps in the order.
-  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [] {
+  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("bootstrap_config");
     return msg;
   });
-  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+  auto route_entry = admin_.getConfigTracker().add("routes", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("routes_config");
     return msg;
   });
-  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
     return msg;
   });
-  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("clusters_config");
     return msg;
@@ -369,7 +413,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const MatchingParameters&) {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
@@ -487,7 +531,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const MatchingParameters&) {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
@@ -516,7 +560,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   EXPECT_EQ(expected_json, output);
 }
 
-ProtobufTypes::MessagePtr testDumpClustersConfig() {
+ProtobufTypes::MessagePtr testDumpClustersConfig(const MatchingParameters&) {
   auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   auto* static_cluster = msg->add_static_clusters();
   envoy::config::cluster::v3::Cluster inner_cluster;
@@ -589,7 +633,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const MatchingParameters&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
     return msg;
@@ -602,7 +646,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
 TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+  auto clusters = admin_.getConfigTracker().add("clusters", [](const MatchingParameters&) {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     msg->set_version_info("foo");
     return msg;

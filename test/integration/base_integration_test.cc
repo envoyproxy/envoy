@@ -322,9 +322,10 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   }
 }
 
-std::string getListenerDetails(Envoy::Server::Instance& server) {
+std::string getListenerDetails(Envoy::Server::Instance& server,
+                               const Matcher::ConfigDump::MatchingParameters& match_params) {
   const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
-  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
+  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(match_params);
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
@@ -361,7 +362,8 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
       if (!allow_lds_rejection) {
         RELEASE_ASSERT(rejected_counter == nullptr || rejected_counter->value() == 0,
                        absl::StrCat("Lds update failed. Details\n",
-                                    getListenerDetails(test_server_->server())));
+                                    getListenerDetails(test_server_->server(),
+                                                       Matcher::ConfigDump::MatchingParameters())));
       }
       // TODO(mattklein123): Switch to events and waitFor().
       time_system_.realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
