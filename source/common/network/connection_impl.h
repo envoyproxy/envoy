@@ -239,14 +239,6 @@ public:
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
-  // Internal socket is manufactured by its own factory.
-  ClientConnectionImpl(Event::Dispatcher& dispatcher,
-                       std::unique_ptr<Network::IoHandle> client_io_handle,
-                       const Network::Address::InstanceConstSharedPtr& address,
-                       const Network::Address::InstanceConstSharedPtr& source_address,
-                       Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
-
   // Network::ClientConnection
   void connect() override;
 
