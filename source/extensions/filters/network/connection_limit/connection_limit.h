@@ -87,7 +87,7 @@ private:
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Event::TimerPtr delay_timer_ = nullptr;
-  bool is_rejected_ = false;
+  bool is_rejected_;
 };
 
 } // namespace ConnectionLimitFilter
