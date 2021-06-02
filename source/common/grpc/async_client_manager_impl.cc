@@ -123,7 +123,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check) {
   RawAsyncClientSharedPtr client;
-  // client = raw_async_client_cache_->getCache(config);
+  client = raw_async_client_cache_->getCache(config);
   if (client != nullptr) {
     return client;
   }

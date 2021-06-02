@@ -33,6 +33,7 @@ public:
   }
 
   void createUpstreams() override {
+    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::createUpstreams();
     addFakeUpstream(FakeHttpConnection::Type::HTTP2);
   }
@@ -76,6 +77,7 @@ public:
 
   void initiateClientConnection() {
     ratelimit_requests_.resize(num_requests_);
+    upstream_requests_.resize(num_requests_);
     responses_.resize(num_requests_);
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
@@ -118,18 +120,17 @@ public:
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
-    FakeStreamPtr upstream_request;
-    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request);
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests_[request_id]);
     RELEASE_ASSERT(result, result.message());
-    result = upstream_request->waitForEndStream(*dispatcher_);
+    result = upstream_requests_[request_id]->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    upstream_request->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-    upstream_request->encodeData(response_size_, true);
+    upstream_requests_[request_id]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_requests_[request_id]->encodeData(response_size_, true);
     responses_[request_id]->waitForEndStream();
 
-    EXPECT_TRUE(upstream_request->complete());
-    EXPECT_EQ(request_size_, upstream_request->bodyLength());
+    EXPECT_TRUE(upstream_requests_[request_id]->complete());
+    EXPECT_EQ(request_size_, upstream_requests_[request_id]->bodyLength());
 
     EXPECT_TRUE(responses_[request_id]->complete());
     EXPECT_EQ("200", responses_[request_id]->headers().getStatusValue());
@@ -140,6 +141,22 @@ public:
     responses_[request_id]->waitForEndStream();
     EXPECT_TRUE(responses_[request_id]->complete());
     EXPECT_EQ(std::to_string(response_code), responses_[request_id]->headers().getStatusValue());
+  }
+
+  std::string waitForUpstreamResponse(int request_id) {
+    
+
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests_[request_id]);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_requests_[request_id]->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+    
+
+    upstream_requests_[request_id]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    responses_[request_id]->waitForEndStream();
+
+    EXPECT_TRUE(responses_[request_id]->complete());
+    return std::string(responses_[request_id]->headers().getStatusValue());
   }
 
   void sendRateLimitResponse(
@@ -206,6 +223,7 @@ public:
 
   FakeHttpConnectionPtr fake_ratelimit_connection_;
   std::vector<FakeStreamPtr> ratelimit_requests_;
+  std::vector<FakeStreamPtr> upstream_requests_;
   std::vector<IntegrationStreamDecoderPtr> responses_;
 
   const uint64_t request_size_ = 1024;
@@ -533,7 +551,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
 
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
                         Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 3);
-
+  /*
   waitForSuccessfulUpstreamResponse(0);
 
   waitForFailedUpstreamResponse(429, 1);
@@ -546,7 +564,14 @@ TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
   waitForFailedUpstreamResponse(429, 3);
   EXPECT_THAT(responses_[3].get()->headers(),
               Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
-                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+                                  Http::Headers::get().EnvoyRateLimitedValues.True));*/
+  std::map<std::string, int> status_cnt;
+  for (int i = 0; i < 4; i++) {
+    status_cnt[waitForUpstreamResponse(i)]++;
+  }        
+  EXPECT_EQ(status_cnt["200"], 2);      
+  EXPECT_EQ(status_cnt["429"], 2);                     
+                                
 
   cleanup();
 
@@ -554,6 +579,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
+
 
 } // namespace
 } // namespace Envoy
