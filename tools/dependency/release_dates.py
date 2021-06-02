@@ -33,7 +33,8 @@ def format_utc_date(date):
     # We only handle naive datetime objects right now, which is what PyGithub
     # appears to be handing us.
     if date.tzinfo is not None:
-        raise ReleaseDateVersionError("Expected UTC date without timezone information. Received timezone information")
+        raise ReleaseDateVersionError(
+            "Expected UTC date without timezone information. Received timezone information")
     return date.date().isoformat()
 
 
