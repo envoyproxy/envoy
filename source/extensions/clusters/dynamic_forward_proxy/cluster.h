@@ -8,7 +8,6 @@
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/logical_host.h"
 
-#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
@@ -115,9 +114,7 @@ private:
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig> {
 public:
-  ClusterFactory()
-      : ConfigurableClusterFactoryBase(
-            Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {}
+  ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dynamic_forward_proxy") {}
 
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

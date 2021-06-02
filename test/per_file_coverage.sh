@@ -33,7 +33,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/rbac:87.5"
 "source/extensions/filters/http/cache:92.4"
 "source/extensions/filters/http/cache/simple_http_cache:95.2"
-"source/extensions/filters/http/grpc_json_transcoder:95.7"
+"source/extensions/filters/http/grpc_json_transcoder:95.6"
 "source/extensions/filters/http/ip_tagging:91.2"
 "source/extensions/filters/http/kill_request:85.0" # Death tests don't report LCOV
 "source/extensions/filters/listener/tls_inspector:92.4"
@@ -56,7 +56,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets/tls/cert_validator:96.5"
 "source/extensions/transport_sockets/tls/private_key:76.9"
 "source/extensions/transport_sockets/tls:95.1"
-"source/extensions/wasm_runtime:50.0"
+"source/extensions/wasm_runtime:40.0"
+"source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:85.7" # Death tests within extensions

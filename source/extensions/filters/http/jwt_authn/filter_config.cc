@@ -19,8 +19,7 @@ FilterConfigImpl::FilterConfigImpl(
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 
-  jwks_cache_ =
-      JwksCache::create(proto_config_, time_source_, context.api(), context.threadLocal());
+  jwks_cache_ = JwksCache::create(proto_config_, context, Common::JwksFetcher::create, stats_);
 
   std::vector<std::string> names;
   for (const auto& it : proto_config_.requirement_map()) {
