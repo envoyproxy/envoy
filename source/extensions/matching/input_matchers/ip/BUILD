@@ -23,8 +23,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.matching.input_matchers",
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":ip_lib",
         "//include/envoy/matcher:matcher_interface",
