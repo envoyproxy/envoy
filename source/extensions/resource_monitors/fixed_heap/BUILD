@@ -29,7 +29,6 @@ envoy_cc_extension(
         ":fixed_heap_monitor",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
-        "//source/extensions/resource_monitors:well_known_names",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
