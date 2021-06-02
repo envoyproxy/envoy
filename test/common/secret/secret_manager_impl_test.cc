@@ -1049,8 +1049,7 @@ tls_certificate:
   private_key_provider:
     provider_name: test
     typed_config:
-      "@type": type.googleapis.com/test.common.secret.pkp.TestPrivateKeyMethodConfig
-      private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+      "@type": type.googleapis.com/test.common.secret.TestPrivateKeyMethodConfig
 )EOF";
   envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
