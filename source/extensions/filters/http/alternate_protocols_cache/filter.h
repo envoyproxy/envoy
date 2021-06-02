@@ -12,6 +12,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AlternateProtocolsCache {
 
+/**
+ * Configuration for the alternate protocol cache filter.
+ */
 class FilterConfig {
 public:
   FilterConfig(
@@ -20,6 +23,7 @@ public:
       Http::AlternateProtocolsCacheManagerFactory& alternate_protocol_cache_manager_factory,
       TimeSource& time_source);
 
+  // Returns the alternate protocols cache for the current thread.
   Http::AlternateProtocolsCacheSharedPtr getAlternateProtocolCache();
 
   TimeSource& timeSource() { return time_source_; }
@@ -32,6 +36,10 @@ private:
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
+/**
+ * Alternate protocol cache filter which parses the alt-svc response header and updates
+ * the cache accordingly.
+ */
 class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   explicit Filter(const FilterConfigSharedPtr& config);
