@@ -37,7 +37,7 @@ public:
   MOCK_METHOD(RequestData, requestCounts, ());
   MOCK_METHOD(void, recordSuccess, ());
   MOCK_METHOD(void, recordFailure, ());
-  MOCK_METHOD(uint32_t, lastSampleRequestCounts, ());
+  MOCK_METHOD(uint32_t, averageRps, (), (const));
 };
 
 class MockResponseEvaluator : public ResponseEvaluator {
@@ -176,7 +176,7 @@ success_criteria:
 
   // The filter is bypassed via runtime.
   EXPECT_CALL(controller_, requestCounts()).Times(0);
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).Times(0);
+  EXPECT_CALL(controller_, averageRps()).Times(0);
 
   // We expect no rejections.
   Http::TestRequestHeaderMapImpl request_headers;
@@ -195,7 +195,7 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   // We do not make admission decisions for health checks, so we expect no lookup of request success
   // counts.
   EXPECT_CALL(controller_, requestCounts()).Times(0);
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).Times(0);
+  EXPECT_CALL(controller_, averageRps()).Times(0);
 
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -213,7 +213,7 @@ TEST_F(AdmissionControlTest, HttpFailureBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isHttpSuccess(500)).WillRepeatedly(Return(false));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -233,7 +233,7 @@ TEST_F(AdmissionControlTest, HttpSuccessBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isHttpSuccess(200)).WillRepeatedly(Return(true));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -251,7 +251,7 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -271,7 +271,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehaviorTrailer) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -290,7 +290,7 @@ TEST_F(AdmissionControlTest, GrpcFailureBehaviorTrailer) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -310,7 +310,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(99));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -410,7 +410,7 @@ success_criteria:
   setupFilter(config);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 0)).WillRepeatedly(Return(10));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(1));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(1));
   EXPECT_CALL(controller_, requestCounts()).Times(0);
 
   // Continue expected.
@@ -418,7 +418,7 @@ success_criteria:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 0)).WillRepeatedly(Return(10));
-  EXPECT_CALL(controller_, lastSampleRequestCounts()).WillRepeatedly(Return(100));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(100));
 
   // We expect rejection counter to increment upon failure.
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);

@@ -38,8 +38,8 @@ public:
   // Returns the current number of requests and how many of them are successful.
   virtual RequestData requestCounts() PURE;
 
-  // return the last sampled request counts
-  virtual uint32_t lastSampleRequestCounts() PURE;
+  // return the average RPS across the sampling window
+  virtual uint32_t averageRps() const PURE;
 };
 
 /**
@@ -66,13 +66,7 @@ public:
     return global_data_;
   }
 
-  // TODO (WeavingGao): We should calculate an average RPS when the granularity can be configured in
-  // the future.
-  uint32_t lastSampleRequestCounts() override {
-    maybeUpdateHistoricalData();
-    size_t sample_number = historical_data_.size();
-    return sample_number < 2 ? 0 : historical_data_[sample_number - 2].second.requests;
-  }
+  uint32_t averageRps() const override;
 
 private:
   void recordRequest(bool success);

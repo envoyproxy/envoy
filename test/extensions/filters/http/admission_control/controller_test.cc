@@ -100,21 +100,32 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
 }
 
-// Test for function: lastSampleRequestCounts
-TEST_F(ThreadLocalControllerTest, LastSampleRequestCounts) {
-  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
+// Test for function: averageRps
+TEST_F(ThreadLocalControllerTest, AverageRps) {
+  // Validate global_data_.requests == 0
+  tlc_.requestCounts();
+  EXPECT_EQ(0, tlc_.averageRps());
 
+  // Validate historical_data_.size() < 2
   tlc_.recordSuccess();
-  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
-
   tlc_.recordFailure();
-  time_system_.advanceTimeWait(std::chrono::seconds(1));
-  tlc_.recordSuccess();
-  EXPECT_EQ(2, tlc_.lastSampleRequestCounts());
+  EXPECT_EQ(0, tlc_.averageRps());
 
-  // make all samples to be stale
+  // Validate that the sampling window is not full
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  tlc_.requestCounts();
+  EXPECT_EQ(2, tlc_.averageRps());
+
+  // Now clean up the sampling window to validate that the sampling window is full
   time_system_.advanceTimeWait(std::chrono::seconds(10));
-  EXPECT_EQ(0, tlc_.lastSampleRequestCounts());
+  for (int tick = 0; tick < window_.count(); ++tick) {
+    // 1 + 3 + 5 + 7 + 9
+    for (int record_count = 0; record_count <= tick * 2; ++record_count) {
+      tlc_.recordSuccess();
+    }
+    time_system_.advanceTimeWait(std::chrono::seconds(1));
+  }
+  EXPECT_EQ(5, tlc_.averageRps());
 }
 
 } // namespace

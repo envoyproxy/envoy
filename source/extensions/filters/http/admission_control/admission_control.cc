@@ -87,7 +87,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (config_->getController().lastSampleRequestCounts() < config_->rpsThreshold()) {
+  if (config_->getController().averageRps() < config_->rpsThreshold()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

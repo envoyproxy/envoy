@@ -92,7 +92,7 @@ message AdmissionControl {
   // results in a rejection probability of 0. Defaults to 95%.
   config.core.v3.RuntimePercent sr_threshold = 5;
 
-  // If the number of requests in the last second is less than this threshold, the request
+  // If the average RPS of the sampling window is below this threshold, the request
   // will not be rejected, even if the success rate is lower than sr_threshold.
   // Defaults to 0.
   config.core.v3.RuntimeUInt32 rps_threshold = 6;

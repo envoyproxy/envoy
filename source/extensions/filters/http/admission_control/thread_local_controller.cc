@@ -17,6 +17,16 @@ ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
                                                      std::chrono::seconds sampling_window)
     : time_source_(time_source), sampling_window_(sampling_window) {}
 
+uint32_t ThreadLocalControllerImpl::averageRps() const {
+  // In the very beginning of sampling, the average rps might be very big, so just skipping from it.
+  if (historical_data_.size() < 2 || global_data_.requests == 0) {
+    return 0;
+  }
+  std::chrono::duration<double> period_second = ageOfOldestSample();
+
+  return static_cast<uint32_t>(global_data_.requests / period_second.count());
+}
+
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
   // Purge stale samples.
   while (!historical_data_.empty() && ageOfOldestSample() >= sampling_window_) {

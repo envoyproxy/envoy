@@ -24,12 +24,7 @@ The probability that the filter will reject a request is as follows:
 
 .. math::
 
-  P_{reject} = \left\{
-  \begin{array}{cl}
-  0 & \ (rps < rps\_threshold) \\
-  min({(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}\ ,\ max\_reject\_probability) & \ (rps \geq rps\_threshold)
-  \end{array}
-  \right.
+   P_{reject} = {(\frac{n_{total} - s}{n_{total} + 1})}^\frac{1}{aggression}
 
 where,
 
@@ -38,7 +33,6 @@ where,
    s = \frac{n_{success}}{threshold}
 
 
-- *rps_threshold* is a configurable value that when RPS is lower than it, requests will pass through the filter.
 - *n* refers to a request count gathered in the sliding window.
 - *threshold* is a configurable value that dictates the lowest request success rate at which the
   filter will **not reject** requests. The value is normalized to [0,1] for the calculation.
@@ -46,6 +40,10 @@ where,
   rejection probability as the success rate decreases. As the **aggression** increases, the
   rejection probability will be higher for higher success rates. See `Aggression`_ for a more
   detailed explanation.
+
+In addition, there are two more configuration item:
+
+- *rps_threshold* is a configurable value that when RPS is lower than it, requests will pass through the filter.
 - *max_reject_probability* represents the upper limit of the rejection probability.
 
 .. note::
