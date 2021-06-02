@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/router/router.h"
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/metadata.h"
