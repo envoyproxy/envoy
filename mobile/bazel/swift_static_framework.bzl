@@ -99,7 +99,7 @@ def _swift_static_framework_impl(ctx):
         )
         apple_support.run(
             ctx,
-            inputs = archives,
+            inputs = depset(direct = archives, transitive = [ctx.attr._cc_toolchain.files]),
             outputs = [platform_archive],
             mnemonic = "LibtoolLinkedLibraries",
             progress_message = "Combining libraries for {} on {}".format(module_name, platform),
