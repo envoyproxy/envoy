@@ -137,7 +137,16 @@ Example filter configuration using descriptors:
       domains: ["*"]
       routes:
       - match: { prefix: "/foo" }
-        route: { cluster: service_protected_by_rate_limit }
+        route:
+          cluster: service_protected_by_rate_limit
+          rate_limits:
+          - actions: # any actions in here
+            - request_headers:
+                header_name: x-envoy-downstream-service-cluster
+                descriptor_key: client_cluster
+            - request_headers:
+                header_name: ":path"
+                descriptor_key: path
         typed_per_filter_config:
           envoy.filters.http.local_ratelimit:
             "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
@@ -182,14 +191,6 @@ Example filter configuration using descriptors:
                 fill_interval: 60s
       - match: { prefix: "/" }
         route: { cluster: default_service }
-      rate_limits:
-      - actions: # any actions in here
-        - request_headers:
-            header_name: x-envoy-downstream-service-cluster
-            descriptor_key: client_cluster
-        - request_headers:
-            header_name: ":path"
-            descriptor_key: path
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
 follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
