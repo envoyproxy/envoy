@@ -385,8 +385,7 @@ RedisClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Envoy::Stats::ScopePtr&& stats_scope) {
-  if (!cluster.has_cluster_type() ||
-      cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {
+  if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     throw EnvoyException("Redis cluster can only created with redis cluster type.");
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy

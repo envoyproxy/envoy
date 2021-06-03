@@ -10,6 +10,7 @@ import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/config_source.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/health_check.proto";
+import "envoy/config/core/v4alpha/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -42,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 53]
+// [#next-free-field: 54]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -630,11 +631,11 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
-  reserved 12, 15, 7, 11, 35, 46, 29, 13, 14, 26, 47;
+  reserved 12, 15, 7, 11, 35, 46, 29, 13, 14, 18, 45, 26, 47;
 
   reserved "hosts", "tls_context", "extension_protocol_options", "upstream_http_protocol_options",
       "common_http_protocol_options", "http_protocol_options", "http2_protocol_options",
-      "protocol_selection", "track_timeout_budgets";
+      "dns_resolvers", "use_tcp_for_dns_lookups", "protocol_selection", "track_timeout_budgets";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket_match* in the
@@ -798,27 +799,8 @@ message Cluster {
   // :ref:`AUTO<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.AUTO>`.
   DnsLookupFamily dns_lookup_family = 17 [(validate.rules).enum = {defined_only: true}];
 
-  // If DNS resolvers are specified and the cluster type is either
-  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
-  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
-  // this value is used to specify the cluster’s dns resolvers.
-  // If this setting is not specified, the value defaults to the default
-  // resolver, which uses /etc/resolv.conf for configuration. For cluster types
-  // other than
-  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
-  // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
-  // this setting is ignored.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
-  repeated core.v4alpha.Address dns_resolvers = 18;
-
-  // [#next-major-version: Reconcile DNS options in a single message.]
-  // Always use TCP queries instead of UDP queries for DNS lookups.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 45;
+  // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  core.v4alpha.DnsResolutionConfig dns_resolution_config = 53;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
