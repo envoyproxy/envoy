@@ -4,7 +4,6 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/access_loggers/well_known_names.h"
 #include "extensions/common/wasm/wasm.h"
 
 namespace Envoy {

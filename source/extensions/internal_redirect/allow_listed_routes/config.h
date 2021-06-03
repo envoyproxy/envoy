@@ -8,7 +8,6 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/internal_redirect/allow_listed_routes/allow_listed_routes.h"
-#include "extensions/internal_redirect/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,7 +25,7 @@ public:
   }
 
   std::string name() const override {
-    return InternalRedirectPredicateValues::get().AllowListedRoutesPredicate;
+    return "envoy.internal_redirect_predicates.allow_listed_routes";
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

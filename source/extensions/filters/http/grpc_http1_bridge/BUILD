@@ -33,14 +33,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
     # Legacy test use. TODO(#9953) clean up.
     extra_visibility = [
         "//source/exe:__pkg__",
         "//test/integration:__subpackages__",
         "//test/server:__subpackages__",
     ],
-    security_posture = "unknown",
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

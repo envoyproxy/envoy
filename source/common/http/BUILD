@@ -297,6 +297,7 @@ envoy_cc_library(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/http/match_wrapper:config",
+        "//source/common/network:proxy_protocol_filter_state_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:scoped_rds_lib",

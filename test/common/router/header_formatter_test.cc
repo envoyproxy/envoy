@@ -1438,7 +1438,7 @@ response_headers_to_remove: ["x-foo-header"]
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
-TEST(HeaderParserTest, GetHeaderTransforms) {
+TEST(HeaderParserTest, GetHeaderTransformsWithFormatting) {
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -1452,6 +1452,10 @@ response_headers_to_add:
       key: "x-bar-header"
       value: "bar"
     append: false
+  - header:
+      key: "x-per-request-header"
+      value: "%PER_REQUEST_STATE(testing)%"
+    append: false
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
@@ -1460,11 +1464,67 @@ response_headers_to_remove: ["x-baz-header"]
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
   auto transforms = resp_header_parser->getHeaderTransforms(stream_info);
   EXPECT_THAT(transforms.headers_to_append,
               ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
   EXPECT_THAT(transforms.headers_to_overwrite,
-              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                          Pair(Http::LowerCaseString("x-per-request-header"), "test_value")));
+  EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+}
+
+TEST(HeaderParserTest, GetHeaderTransformsOriginalValues) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "foo"
+    append: true
+  - header:
+      key: "x-bar-header"
+      value: "bar"
+    append: false
+  - header:
+      key: "x-per-request-header"
+      value: "%PER_REQUEST_STATE(testing)%"
+    append: false
+response_headers_to_remove: ["x-baz-header"]
+)EOF";
+
+  const auto route = parseRouteFromV3Yaml(yaml);
+  HeaderParserPtr response_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  Envoy::StreamInfo::FilterStateSharedPtr filter_state(
+      std::make_shared<Envoy::StreamInfo::FilterStateImpl>(
+          Envoy::StreamInfo::FilterState::LifeSpan::FilterChain));
+  filter_state->setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
+  ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(*filter_state));
+
+  auto transforms =
+      response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
+  EXPECT_THAT(transforms.headers_to_append,
+              ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+  EXPECT_THAT(transforms.headers_to_overwrite,
+              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar"),
+                          Pair(Http::LowerCaseString("x-per-request-header"),
+                               "%PER_REQUEST_STATE(testing)%")));
   EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
 }
 

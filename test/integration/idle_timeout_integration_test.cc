@@ -68,7 +68,7 @@ public:
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
       ASSERT_TRUE(response.waitForReset());
@@ -357,7 +357,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
   // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;
@@ -370,7 +370,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;

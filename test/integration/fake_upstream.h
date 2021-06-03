@@ -37,6 +37,7 @@
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/active_quic_listener.h"
+#include "common/quic/quic_stat_names.h"
 #endif
 
 #include "server/active_raw_udp_listener_config.h"
@@ -422,22 +423,23 @@ protected:
  */
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
-  enum class Type { HTTP1, HTTP2, HTTP3 };
-  static absl::string_view typeToString(Type type) {
+  // This is a legacy alias.
+  using Type = Envoy::Http::CodecType;
+  static absl::string_view typeToString(Http::CodecType type) {
     switch (type) {
-    case Type::HTTP1:
+    case Http::CodecType::HTTP1:
       return "http1";
-    case Type::HTTP2:
+    case Http::CodecType::HTTP2:
       return "http2";
-    case Type::HTTP3:
+    case Http::CodecType::HTTP3:
       return "http3";
     }
     return "invalid";
   }
 
   FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
-                     Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
-                     uint32_t max_request_headers_count,
+                     Http::CodecType type, Event::TestTimeSystem& time_system,
+                     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action);
 
@@ -484,7 +486,7 @@ private:
     FakeHttpConnection& parent_;
   };
 
-  const Type type_;
+  const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Random::MockRandomGenerator> random_;
@@ -568,7 +570,7 @@ struct FakeUpstreamConfig {
   }
 
   Event::TestTimeSystem& time_system_;
-  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  Http::CodecType upstream_protocol_{Http::CodecType::HTTP1};
   bool enable_half_close_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
@@ -602,7 +604,7 @@ public:
                Network::Address::IpVersion version, const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
 
-  FakeHttpConnection::Type httpType() { return http_type_; }
+  Http::CodecType httpType() { return http_type_; }
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
@@ -687,7 +689,7 @@ public:
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
-  const FakeHttpConnection::Type http_type_;
+  const Http::CodecType http_type_;
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
@@ -750,7 +752,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -839,6 +841,9 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
+#endif
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

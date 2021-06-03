@@ -121,12 +121,12 @@ common_tls_context:
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"),
       TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
   TestUtility::loadFromYaml(yaml, tls_context);
-  if (upstream_config.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP2) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
-  } else if (upstream_config.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  } else if (upstream_config.upstream_protocol_ == Http::CodecType::HTTP1) {
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
-  if (upstream_config.upstream_protocol_ != FakeHttpConnection::Type::HTTP3) {
+  if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
@@ -217,9 +217,9 @@ void BaseIntegrationTest::createEnvoy() {
   createGeneratedApiTestServer(bootstrap_path, named_ports, {false, true, false}, false);
 }
 
-void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol) {
+void BaseIntegrationTest::setUpstreamProtocol(Http::CodecType protocol) {
   upstream_config_.upstream_protocol_ = protocol;
-  if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
+  if (upstream_config_.upstream_protocol_ == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -228,7 +228,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
-  } else if (upstream_config_.upstream_protocol_ == FakeHttpConnection::Type::HTTP1) {
+  } else if (upstream_config_.upstream_protocol_ == Http::CodecType::HTTP1) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
@@ -238,7 +238,7 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP3, "");
+    RELEASE_ASSERT(protocol == Http::CodecType::HTTP3, "");
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     upstream_tls_ = true;
     config_helper_.configureUpstreamTls(false, true);
@@ -445,7 +445,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     return;
   }
   if (tls_xds_upstream_ == false) {
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   } else {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
@@ -461,7 +461,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
-    addFakeUpstream(std::move(context), FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(std::move(context), Http::CodecType::HTTP2);
   }
   xds_upstream_ = fake_upstreams_.back().get();
 }

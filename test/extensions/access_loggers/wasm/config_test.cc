@@ -6,7 +6,6 @@
 
 #include "extensions/access_loggers/wasm/config.h"
 #include "extensions/access_loggers/wasm/wasm_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
 #include "extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
@@ -42,7 +41,7 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().Wasm);
+          "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -66,7 +65,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
 #endif
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().Wasm);
+          "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
