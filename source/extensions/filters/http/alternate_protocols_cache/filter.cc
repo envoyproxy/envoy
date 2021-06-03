@@ -49,7 +49,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     spdy::SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
     if (!spdy::SpdyAltSvcWireFormat::ParseHeaderFieldValue(alt_svc[i]->value().getStringView(),
                                                            &altsvc_vector)) {
-      ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'", alt_svc[i]->value().getStringView());
+      ENVOY_LOG(trace, "Invalid Alt-Svc header received: '{}'",
+                alt_svc[i]->value().getStringView());
       return Http::FilterHeadersStatus::Continue;
     }
     for (size_t i = 0; i < altsvc_vector.size(); ++i) {
@@ -62,8 +63,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
   // The upstream host is used here, instead of the :authority request header because
   // Envoy routes request to upstream hosts not to origin servers directly. This choice would
-  // allow HTTP/3 to be used on a per-upstream host basis, even for origings which are load
-  // ballanaced across them.
+  // allow HTTP/3 to be used on a per-upstream host basis, even for origins which are load
+  // balanced across them.
   Upstream::HostDescriptionConstSharedPtr host = encoder_callbacks_->streamInfo().upstreamHost();
   const uint32_t port = host->address()->ip()->port();
   const std::string& hostname = host->hostname();
