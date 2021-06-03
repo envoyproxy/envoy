@@ -2,7 +2,6 @@
 
 #include "source/extensions/filters/network/rocketmq_proxy/config.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -365,12 +364,12 @@ route_config:
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ProtobufWkt::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
-  (*fields)[RocketmqConstants::get().ReadQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().WriteQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().ClusterName] = ValueUtil::stringValue("DefaultCluster");
-  (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
-  (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
-  (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
+  (*fields)["read_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["write_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["cluster_name"] = ValueUtil::stringValue("DefaultCluster");
+  (*fields)["broker_name"] = ValueUtil::stringValue("broker-a");
+  (*fields)["broker_id"] = ValueUtil::numberValue(0);
+  (*fields)["perm"] = ValueUtil::numberValue(6);
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);
@@ -464,12 +463,12 @@ route_config:
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ProtobufWkt::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
-  (*fields)[RocketmqConstants::get().ReadQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().WriteQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().ClusterName] = ValueUtil::stringValue("DefaultCluster");
-  (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
-  (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
-  (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
+  (*fields)["read_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["write_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["cluster_name"] = ValueUtil::stringValue("DefaultCluster");
+  (*fields)["broker_name"] = ValueUtil::stringValue("broker-a");
+  (*fields)["broker_id"] = ValueUtil::numberValue(0);
+  (*fields)["perm"] = ValueUtil::numberValue(6);
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);

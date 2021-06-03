@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/rocketmq_proxy/config.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
-#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
@@ -177,12 +176,12 @@ TEST_F(ActiveMessageTest, RecordPopRouteInfo) {
   std::string broker_name = "broker-a";
   int32_t broker_id = 0;
 
-  (*fields)[RocketmqConstants::get().ReadQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().WriteQueueNum] = ValueUtil::numberValue(4);
-  (*fields)[RocketmqConstants::get().ClusterName] = ValueUtil::stringValue("DefaultCluster");
-  (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue(broker_name);
-  (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(broker_id);
-  (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
+  (*fields)["read_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["write_queue_num"] = ValueUtil::numberValue(4);
+  (*fields)["cluster_name"] = ValueUtil::stringValue("DefaultCluster");
+  (*fields)["broker_name"] = ValueUtil::stringValue(broker_name);
+  (*fields)["broker_id"] = ValueUtil::numberValue(broker_id);
+  (*fields)["perm"] = ValueUtil::numberValue(6);
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
 

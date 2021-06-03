@@ -10,12 +10,6 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = ["//source/common/singleton:const_singleton"],
-)
-
-envoy_cc_library(
     name = "stats_interface",
     hdrs = ["stats.h"],
     deps = [
@@ -59,7 +53,6 @@ envoy_cc_library(
     srcs = ["protocol.cc"],
     deps = [
         ":protocol_interface",
-        ":well_known_names",
         "//source/common/common:enum_to_int",
     ],
 )
@@ -94,7 +87,6 @@ envoy_cc_library(
         ":protocol_lib",
         ":rocketmq_lib",
         ":stats_interface",
-        ":well_known_names",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
