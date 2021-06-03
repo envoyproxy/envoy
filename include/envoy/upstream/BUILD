@@ -128,6 +128,7 @@ envoy_cc_library(
     deps = [
         ":load_balancer_interface",
         ":upstream_interface",
+        "//include/envoy/http:async_client_interface",
     ],
 )
 

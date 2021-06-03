@@ -4,9 +4,9 @@
 #
 #    pip-compile --generate-hashes tools/dependency/requirements.txt
 #
-certifi==2020.12.5 \
-    --hash=sha256:1a4995114262bffbc2413b159f2a1a480c969de6e6eb13ee966d470af86af59c \
-    --hash=sha256:719a74fb9e33b9bd44cc7f3a8d94bc35e4049deebe19ba7d8e108280cfd59830
+certifi==2021.5.30 \
+    --hash=sha256:50b1e4f8446b06f41be7dd6338db18e0990601dce795c2b1686458aa7e8fa7d8 \
+    --hash=sha256:2bbf76fd432960138b3ef6dda3dde0544f27cbf8546c458e60baf371917ba9ee
     # via
     #   -r tools/dependency/requirements.txt
     #   requests

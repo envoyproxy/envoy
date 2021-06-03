@@ -12,11 +12,7 @@ py_binary(
     data = [
         "@com_github_bazelbuild_buildtools//buildozer:buildozer",
         "//source/extensions:extensions_metadata.yaml",
+        "//source/extensions:extensions_build_config.bzl",
+        "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
     ] + envoy_all_extensions(),
-)
-
-py_binary(
-    name = "generate_extension_rst",
-    srcs = ["generate_extension_rst.py"],
-    data = ["//source/extensions:extensions_metadata.yaml"],
 )

@@ -6,6 +6,7 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
 #include "envoy/http/header_map.h"
 
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -52,19 +53,15 @@ Http::FilterHeadersStatus KillRequestFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   // Route-level configuration overrides filter-level configuration.
-  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().KillRequest;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
+  const auto* per_route_kill_settings =
+      Http::Utility::resolveMostSpecificPerFilterConfig<KillSettings>(
+          Extensions::HttpFilters::HttpFilterNames::get().KillRequest, decoder_callbacks_->route());
 
-    const auto* per_route_kill_settings =
-        route_entry->mostSpecificPerFilterConfigTyped<KillSettings>(name);
-
-    if (per_route_kill_settings) {
-      is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
-      // Allocate the probability into kill_request in case the lifetime of
-      // per_route_kill_settings does not match that of kill_request_
-      kill_request_.mutable_probability()->CopyFrom(per_route_kill_settings->getProbability());
-    }
+  if (per_route_kill_settings) {
+    is_correct_direction = per_route_kill_settings->getDirection() == KillRequest::REQUEST;
+    // Allocate the probability into kill_request in case the lifetime of
+    // per_route_kill_settings does not match that of kill_request_
+    kill_request_.mutable_probability()->CopyFrom(per_route_kill_settings->getProbability());
   }
 
   if (is_kill_request && is_correct_direction && isKillRequestEnabled()) {

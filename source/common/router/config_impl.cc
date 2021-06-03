@@ -224,16 +224,6 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
       legacy_enabled_(config.has_hidden_envoy_deprecated_enabled()
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
-  for (const auto& origin : config.hidden_envoy_deprecated_allow_origin()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_exact(origin);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
-  for (const auto& regex : config.hidden_envoy_deprecated_allow_origin_regex()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_hidden_envoy_deprecated_regex(regex);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }
@@ -1129,19 +1119,11 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {
-  // TODO(yangminzhu): Use PathMatcher once hidden_envoy_deprecated_regex is removed.
-  if (route.match().path_specifier_case() ==
-      envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        route.match().hidden_envoy_deprecated_regex());
-    regex_str_ = route.match().hidden_envoy_deprecated_regex();
-  } else {
-    ASSERT(route.match().path_specifier_case() ==
-           envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
-    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
-    regex_str_ = route.match().safe_regex().regex();
-  }
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      regex_str_(route.match().safe_regex().regex()),
+      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+  ASSERT(route.match().path_specifier_case() ==
+         envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1149,7 +1131,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(path));
+  ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1164,7 +1146,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (regex_->match(path)) {
+    if (path_matcher_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1304,30 +1286,12 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
-  if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
-      virtual_cluster.headers().empty()) {
-    throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
+  if (virtual_cluster.headers().empty()) {
+    throw EnvoyException("virtual clusters must define 'headers'");
   }
 
-  if (!virtual_cluster.hidden_envoy_deprecated_pattern().empty()) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Path.get());
-    matcher_config.set_hidden_envoy_deprecated_regex_match(
-        virtual_cluster.hidden_envoy_deprecated_pattern());
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  } else {
-    ASSERT(!virtual_cluster.headers().empty());
-    headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
-  }
-
-  if (virtual_cluster.hidden_envoy_deprecated_method() !=
-      envoy::config::core::v3::METHOD_UNSPECIFIED) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Method.get());
-    matcher_config.set_exact_match(envoy::config::core::v3::RequestMethod_Name(
-        virtual_cluster.hidden_envoy_deprecated_method()));
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  }
+  ASSERT(!virtual_cluster.headers().empty());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }

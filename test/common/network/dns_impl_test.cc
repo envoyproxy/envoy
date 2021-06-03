@@ -348,6 +348,7 @@ protected:
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 };
 
 TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
@@ -357,7 +358,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
-  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, false);
+  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, dns_resolver_options_);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -408,7 +409,7 @@ private:
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-  auto resolver = dispatcher_->createDnsResolver({test_instance}, false);
+  auto resolver = dispatcher_->createDnsResolver({test_instance}, dns_resolver_options_);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -424,8 +425,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false), EnvoyException,
-                            "DNS resolver 'foo' is not an IP address");
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, dns_resolver_options_),
+                            EnvoyException, "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -439,12 +440,12 @@ public:
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
     listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
-
+    updateDnsResolverOptions();
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
-                                                 useTcpForDnsLookups());
+                                                 dns_resolver_options_);
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, useTcpForDnsLookups());
+      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options_);
     }
 
     // Point c-ares at the listener with no search domains and TCP-only.
@@ -547,7 +548,7 @@ protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zeroTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
-  virtual bool useTcpForDnsLookups() const { return false; }
+  virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
@@ -556,6 +557,7 @@ protected:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 };
 
 // Parameterize the DNS test server socket address.
@@ -876,7 +878,7 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, vec, false);
+  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, vec, dns_resolver_options_);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -907,7 +909,9 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
-  bool useTcpForDnsLookups() const override { return true; }
+  void updateDnsResolverOptions() override {
+    dns_resolver_options_.set_use_tcp_for_dns_lookups(true);
+  }
 };
 
 // Parameterize the DNS test server socket address.
@@ -918,14 +922,41 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForTcpTest,
 // Validate that c_ares flag `ARES_FLAG_USEVC` is set when boolean property
 // `use_tcp_for_dns_lookups` is enabled.
 TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
-  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addCName("root.cname.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr,
-            resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForNoDefaultSearchDomainTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  void updateDnsResolverOptions() override {
+    dns_resolver_options_.set_no_default_search_domain(true);
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForNoDefaultSearchDomainTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_FLAG_NOSEARCH` is set when boolean property
+// `no_default_search_domain` is enabled.
+TEST_P(DnsImplAresFlagsForNoDefaultSearchDomainTest, NoDefaultSearchDomainSet) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((opts.flags & ARES_FLAG_NOSEARCH) == ARES_FLAG_NOSEARCH);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
 }
 
@@ -942,20 +973,47 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForUdpTest,
 // Validate that c_ares flag `ARES_FLAG_USEVC` is not set when boolean property
 // `use_tcp_for_dns_lookups` is disabled.
 TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
-  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addCName("root.cname.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
   EXPECT_NE(nullptr,
-            resolveWithUnreferencedParameters("root.cnam.domain", DnsLookupFamily::Auto, true));
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForDefaultSearchDomainTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  void updateDnsResolverOptions() override {}
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForDefaultSearchDomainTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_FLAG_NOSEARCH` is not set when boolean property
+// `no_default_search_domain` is disabled.
+TEST_P(DnsImplAresFlagsForDefaultSearchDomainTest, NoDefaultSearchDomainNotSet) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_FALSE((opts.flags & ARES_FLAG_NOSEARCH) == ARES_FLAG_NOSEARCH);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
 }
 
 class DnsImplCustomResolverTest : public DnsImplTest {
   bool tcpOnly() const override { return false; }
-  bool useTcpForDnsLookups() const override { return true; }
+  void updateDnsResolverOptions() override {
+    dns_resolver_options_.set_use_tcp_for_dns_lookups(true);
+  }
   bool setResolverInConstructor() const override { return true; }
 };
 
