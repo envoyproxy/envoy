@@ -1,3 +1,5 @@
+#include "server/filter_chain_manager_impl.h"
+
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/drain_manager.h"
@@ -12,7 +14,6 @@
 #include "common/protobuf/utility.h"
 
 #include "server/configuration_impl.h"
-#include "server/filter_chain_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
