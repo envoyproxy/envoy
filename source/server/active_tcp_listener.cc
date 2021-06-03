@@ -7,6 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/event/deferred_task.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -210,8 +211,9 @@ void ActiveTcpSocket::newConnection() {
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
-    ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
-              config_->name());
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
+              socket->addressProvider().remoteAddress()->asString(), config_->name());
     socket->close();
     stats_.downstream_cx_overflow_.inc();
     return;
@@ -288,7 +290,9 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
-    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
+              socket->addressProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
@@ -307,21 +311,26 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(timeout);
   }
+
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher().timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
+  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr, "");
+
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *active_connection->connection_,
+                   active_connection->connection_->addressProvider().remoteAddress()->asString());
     active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
+                   active_connection->connection_->addressProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }

@@ -7,7 +7,6 @@
 #include "common/grpc/google_async_client_impl.h"
 
 #include "extensions/grpc_credentials/file_based_metadata/config.h"
-#include "extensions/grpc_credentials/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"
@@ -90,8 +89,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, FileBasedMetadataGrpcAuthRequ
   header_key_1_ = "header1";
   header_prefix_1_ = "prefix1";
   header_value_1_ = "secretvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
+  credentials_factory_name_ = "envoy.grpc_credentials.file_based_metadata";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -105,8 +103,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, DoubleFileBasedMetadataGrpcAu
   header_prefix_1_ = "prefix1";
   header_value_1_ = "secretvalue";
   header_value_2_ = "secret2";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
+  credentials_factory_name_ = "envoy.grpc_credentials.file_based_metadata";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -116,8 +113,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, DoubleFileBasedMetadataGrpcAu
 // Validate that FileBasedMetadata auth plugin works without a config loaded
 TEST_P(GrpcFileBasedMetadataClientIntegrationTest, EmptyFileBasedMetadataGrpcAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
+  credentials_factory_name_ = "envoy.grpc_credentials.file_based_metadata";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -131,8 +127,7 @@ TEST_P(GrpcFileBasedMetadataClientIntegrationTest, ExtraConfigFileBasedMetadataG
   header_key_1_ = "header1";
   header_prefix_1_ = "prefix1";
   header_value_1_ = "secretvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().FileBasedMetadata;
+  credentials_factory_name_ = "envoy.grpc_credentials.file_based_metadata";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

@@ -34,8 +34,8 @@ public:
 
     envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
-    policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
-        ".*cncf.io");
+    policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+        TestUtility::createRegexMatcher(".*cncf.io"));
     policy_rules->add_rules()->set_destination_port(123);
     policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);

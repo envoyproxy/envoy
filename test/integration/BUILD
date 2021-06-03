@@ -320,12 +320,12 @@ envoy_cc_test(
     deps = [
         ":autonomous_upstream_lib",
         ":http_integration_lib",
+        ":socket_interface_swap_lib",
         ":tracked_watermark_buffer_lib",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:backpressure_filter_config_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
-        "//test/integration/filters:test_socket_interface_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
@@ -363,6 +363,37 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "buffer_accounting_integration_test",
+    srcs = [
+        "buffer_accounting_integration_test.cc",
+    ],
+    deps = [
+        ":http_integration_lib",
+        ":socket_interface_swap_lib",
+        ":tracked_watermark_buffer_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "socket_interface_swap_lib",
+    srcs = [
+        "socket_interface_swap.cc",
+    ],
+    hdrs = [
+        "socket_interface_swap.h",
+    ],
+    deps = [
+        "//test/integration/filters:test_socket_interface_lib",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -455,6 +486,7 @@ envoy_cc_test_library(
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
+        "//test/integration/filters:remove_response_headers_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -857,7 +889,6 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tap:config",
         "//source/server:connection_handler_lib",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -893,7 +924,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
@@ -1054,6 +1084,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
@@ -1295,6 +1326,7 @@ envoy_cc_test_library(
     ],
     deps = [
         "//source/common/buffer:watermark_buffer_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -1720,7 +1752,6 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
-        "//source/extensions/resource_monitors/injected_resource:config",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",

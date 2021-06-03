@@ -46,11 +46,6 @@ def envoy_basic_cc_library(name, deps = [], external_deps = [], **kargs):
 
 def envoy_cc_extension(
         name,
-        security_posture,
-        category = None,
-        # Only set this for internal, undocumented extensions.
-        undocumented = False,
-        status = "stable",
         tags = [],
         extra_visibility = [],
         visibility = EXTENSION_CONFIG_VISIBILITY,

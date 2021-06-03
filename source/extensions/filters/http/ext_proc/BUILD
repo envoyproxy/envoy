@@ -38,9 +38,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":client_lib",
         ":ext_proc",
