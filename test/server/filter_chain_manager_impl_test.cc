@@ -262,7 +262,9 @@ TEST_F(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->startDraining();
 
-  EXPECT_EQ(1, drain_starts_seen);
+  // Expect to see the top-level filter-chain drain as well as the (single) per-thread
+  // child drain-manager.
+  EXPECT_EQ(2, drain_starts_seen);
   EXPECT_TRUE(context0->drainDecision().drainClose());
   EXPECT_FALSE(context1->drainDecision().drainClose());
 }
