@@ -43,6 +43,7 @@ public:
   MakeSelfIssuedConnectionIdManager() override;
 };
 
+// An implementation that issues connection IDs with stable first 4 types.
 class EnvoyQuicSelfIssuedConnectionIdManager : public quic::QuicSelfIssuedConnectionIdManager {
 public:
   using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;

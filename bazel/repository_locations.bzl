@@ -87,7 +87,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-05-15",
+        release_date = "2021-05-14",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
