@@ -1,5 +1,7 @@
 #include "extensions/filters/http/wasm/wasm_filter.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -8,7 +10,8 @@ namespace Wasm {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
     : tls_slot_(
-          ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal())) {
+          ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocalObject>::makeUnique(
+              context.threadLocal())) {
   plugin_ = std::make_shared<Common::Wasm::Plugin>(
       config.config(), context.direction(), context.localInfo(), &context.listenerMetadata());
 
@@ -16,7 +19,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     tls_slot_->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
+      return std::make_shared<PluginHandleSharedPtrThreadLocalObject>(
+          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
     });
   };
 

@@ -138,7 +138,7 @@ private:
 
 using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 
-class PluginHandle : public PluginHandleBase, public ThreadLocal::ThreadLocalObject {
+class PluginHandle : public PluginHandleBase {
 public:
   explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)
       : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle),
@@ -156,6 +156,15 @@ private:
 };
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
+
+class PluginHandleSharedPtrThreadLocalObject : public ThreadLocal::ThreadLocalObject {
+public:
+  PluginHandleSharedPtrThreadLocalObject(PluginHandleSharedPtr handle) : handle_(handle){};
+  PluginHandleSharedPtr& handle() { return handle_; }
+
+private:
+  PluginHandleSharedPtr handle_;
+};
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 

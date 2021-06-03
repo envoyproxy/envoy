@@ -1,5 +1,7 @@
 #include "extensions/bootstrap/wasm/config.h"
 
+#include <memory>
+
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
@@ -40,9 +42,11 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     auto tls_slot =
-        ThreadLocal::TypedSlot<Common::Wasm::PluginHandle>::makeUnique(context.threadLocal());
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocalObject>::makeUnique(
+            context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher);
+      return std::make_shared<Common::Wasm::PluginHandleSharedPtrThreadLocalObject>(
+          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
     });
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));
   };

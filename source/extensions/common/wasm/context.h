@@ -100,6 +100,9 @@ private:
   ::Envoy::Buffer::Instance* buffer_instance_{};
 };
 
+class PluginHandle;
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
+
 // A context which will be the target of callbacks for a particular session
 // e.g. a handler of a stream.
 class Context : public proxy_wasm::ContextBase,
@@ -111,10 +114,11 @@ class Context : public proxy_wasm::ContextBase,
                 public google::api::expr::runtime::BaseActivation,
                 public std::enable_shared_from_this<Context> {
 public:
-  Context();                                                                    // Testing.
-  Context(Wasm* wasm);                                                          // Vm Context.
-  Context(Wasm* wasm, const PluginSharedPtr& plugin);                           // Root Context.
-  Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin); // Stream context.
+  Context();                                          // Testing.
+  Context(Wasm* wasm);                                // Vm Context.
+  Context(Wasm* wasm, const PluginSharedPtr& plugin); // Root Context.
+  Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin,
+          PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
   Wasm* wasm() const;
@@ -397,6 +401,7 @@ protected:
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
+  PluginHandleSharedPtr plugin_handle_{nullptr};
 
   uint32_t next_http_call_token_ = 1;
   uint32_t next_grpc_token_ = 1; // Odd tokens are for Calls even for Streams.
