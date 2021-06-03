@@ -124,9 +124,7 @@ void ActiveTcpSocket::unlink() {
   // Emit logs if a connection is not established.
   if (!connected_) {
     // In the case of connection timeout, populate the SNI into stream info.
-    if (!socket_->requestedServerName().empty()) {
-      stream_info_->setRequestedServerName(socket_->requestedServerName());
-    }
+    stream_info_->setRequestedServerName(socket_->requestedServerName());
     emitLogs(*listener_.config_, *stream_info_);
   }
   listener_.parent_.dispatcher().deferredDelete(std::move(removed));
@@ -290,9 +288,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
                                       std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   // Set the SNI as early as possible, this ensures that it gets set even if we end up not
   // instantiating any network filters.
-  if (!socket->requestedServerName().empty()) {
-    stream_info->setRequestedServerName(socket->requestedServerName());
-  }
+  stream_info->setRequestedServerName(socket->requestedServerName());
 
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
