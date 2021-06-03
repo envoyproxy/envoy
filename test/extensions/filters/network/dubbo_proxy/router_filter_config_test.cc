@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.validate.h"
 
-#include "source/extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/config.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
