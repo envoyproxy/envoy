@@ -95,6 +95,8 @@ HotRestartMessage HotRestartingParent::Internal::shutdownAdmin() {
   HotRestartMessage wrapped_reply;
   wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
       server_->startTimeFirstEpoch());
+  wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_enable_reuse_port_default(
+      server_->enableReusePortDefault());
   return wrapped_reply;
 }
 
@@ -107,10 +109,11 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
-      if (socket_factory.sharedSocket().has_value()) {
-        // Pass the socket to the new process if it is already shared across workers.
+      if (request.pass_listen_socket().socket_index() < server_->options().concurrency()) {
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.sharedSocket()->get().ioHandle().fdDoNotUse());
+            socket_factory.getListenSocket(request.pass_listen_socket().socket_index())
+                ->ioHandle()
+                .fdDoNotUse());
       }
       break;
     }

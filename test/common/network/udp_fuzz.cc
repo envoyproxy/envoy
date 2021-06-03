@@ -61,6 +61,8 @@ public:
     server_socket_ = createServerSocket(true, ip_version_);
     server_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     server_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    EXPECT_TRUE(Network::Socket::applyOptions(server_socket_->options(), *server_socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
 
     // Create packet writer
     udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(server_socket_->ioHandle());

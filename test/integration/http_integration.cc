@@ -330,7 +330,7 @@ void HttpIntegrationTest::initialize() {
 
   // Needed to config QUIC transport socket factory, and needs to be added before base class calls
   // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(set_reuse_port_);
+  config_helper_.addQuicDownstreamTransportSocketConfig();
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"});

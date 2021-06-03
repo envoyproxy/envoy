@@ -38,9 +38,7 @@ MockListenerConfig::MockListenerConfig()
   ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
   ON_CALL(socket_factory_, localAddress())
       .WillByDefault(ReturnRef(socket_->addressProvider().localAddress()));
-  ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(socket_));
-  ON_CALL(socket_factory_, sharedSocket())
-      .WillByDefault(Return(std::reference_wrapper<Socket>(*socket_)));
+  ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(socket_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }

@@ -20,8 +20,6 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
 
-#include "absl/base/call_once.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -42,45 +40,49 @@ public:
   ListenSocketFactoryImpl(ListenerComponentFactory& factory,
                           Network::Address::InstanceConstSharedPtr address,
                           Network::Socket::Type socket_type,
-                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                          const std::string& listener_name, bool reuse_port);
+                          const Network::Socket::OptionsSharedPtr& options,
+                          const std::string& listener_name, uint32_t tcp_backlog_size,
+                          ListenerComponentFactory::BindType bind_type, uint32_t num_sockets);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
-
-  Network::SocketSharedPtr getListenSocket() override;
-
-  /**
-   * @return the socket shared by worker threads; otherwise return null.
-   */
-  Network::SocketOptRef sharedSocket() const override {
-    if (!reuse_port_) {
-      ASSERT(socket_ != nullptr);
-      return *socket_;
-    }
-    // If reuse_port is true, always return null, even socket_ is created for reserving
-    // port number.
-    return absl::nullopt;
+  Network::SocketSharedPtr getListenSocket(uint32_t socket_index) override;
+  bool reusePort() const override {
+    return bind_type_ == ListenerComponentFactory::BindType::ReusePort;
   }
-
-protected:
-  Network::SocketSharedPtr createListenSocketAndApplyOptions();
+  Network::ListenSocketFactoryPtr clone() const override {
+    return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
+  }
+  void closeAllSockets() override {
+    for (auto& socket : sockets_) {
+      socket->close();
+    }
+  }
+  void doFinalPreWorkerInit() override;
 
 private:
+  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
+
+  Network::SocketSharedPtr
+  createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
+                                    Network::Socket::Type socket_type,
+                                    const Network::Socket::OptionsSharedPtr& options,
+                                    ListenerComponentFactory::BindType bind_type,
+                                    const std::string& listener_name, uint32_t socket_index);
+
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port
   // will be set to the binding port.
   Network::Address::InstanceConstSharedPtr local_address_;
-  Network::Socket::Type socket_type_;
+  const Network::Socket::Type socket_type_;
   const Network::Socket::OptionsSharedPtr options_;
-  bool bind_to_port_;
   const std::string listener_name_;
-  const bool reuse_port_;
-  Network::SocketSharedPtr socket_;
-  absl::once_flag steal_once_;
+  const uint32_t tcp_backlog_size_;
+  ListenerComponentFactory::BindType bind_type_;
+  std::vector<Network::SocketSharedPtr> sockets_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
@@ -262,28 +264,20 @@ public:
   bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
   bool blockRemove() { return !added_via_api_; }
 
-  /**
-   * Called when a listener failed to be actually created on a worker.
-   * @return TRUE if we have seen more than one worker failure.
-   */
-  bool onListenerCreateFailure() {
-    bool ret = saw_listener_create_failure_;
-    saw_listener_create_failure_ = true;
-    return ret;
-  }
-
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
+  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
+  void setSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
+  static bool enableReusePort(Server::Instance& server,
+                              const envoy::config::listener::v3::Listener& config);
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
@@ -383,7 +377,7 @@ private:
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
 
-  Network::ListenSocketFactorySharedPtr socket_factory_;
+  Network::ListenSocketFactoryPtr socket_factory_;
   const bool bind_to_port_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
@@ -405,7 +399,6 @@ private:
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   DrainManagerPtr local_drain_manager_;
-  bool saw_listener_create_failure_{};
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
   Network::Socket::OptionsSharedPtr listen_socket_options_;
