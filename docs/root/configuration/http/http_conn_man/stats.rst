@@ -87,7 +87,12 @@ the following statistics:
 Per listener statistics
 -----------------------
 
-Additional per listener statistics are rooted at *listener.<address>.http.<stat_prefix>.* with the
+Per listener statistics are rooted at *listener.<address>*.
+
+HTTP per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Additional HTTP statistics are of the form *http.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
@@ -101,15 +106,27 @@ following statistics:
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
 
+HTTP/3 per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+HTTP/3 statistics with the form of *http3.downstream.<stat_prefix>.*:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   <tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present.
+
+
 .. _config_http_conn_man_stats_per_codec:
 
 Per codec statistics
 -----------------------
 
-Each codec has the option of adding per-codec statistics. Both http1 and http2 have codec stats.
+Each codec has the option of adding per-codec statistics. http1, http2, and http3 all have codec stats.
 
-Http1 codec statistics
-~~~~~~~~~~~~~~~~~~~~~~
+HTTP/1 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
 
 On the downstream side all http1 statistics are rooted at *http1.*
 
@@ -124,8 +141,8 @@ On the upstream side all http1 statistics are rooted at *cluster.<name>.http1.*
    response_flood, Counter, Total number of connections closed due to response flooding
    requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
 
-Http2 codec statistics
-~~~~~~~~~~~~~~~~~~~~~~
+HTTP/2 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
 
 On the downstream side all http2 statistics are rooted at *http2.*
 
@@ -160,8 +177,8 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
   `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
 
-Http3 codec statistics
-~~~~~~~~~~~~~~~~~~~~~~
+HTTP/3 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
 
 On the downstream side all http3 statistics are rooted at *http3.*
 
