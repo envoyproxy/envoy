@@ -87,22 +87,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpPlatformFilterFactories) {
-      JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
-                                       new JvmFilterFactoryContext(filterFactory));
-    }
-
-    for (Map.Entry<String, EnvoyStringAccessor> entry :
-         envoyConfiguration.stringAccessors.entrySet()) {
-      JniLibrary.registerStringAccessor(entry.getKey(),
-                                        new JvmStringAccessorContext(entry.getValue()));
-    }
-
-    return runWithResolvedYAML(
-        envoyConfiguration.resolveTemplate(
-            JniLibrary.templateString(), JniLibrary.statsSinkTemplateString(),
-            JniLibrary.platformFilterTemplateString(), JniLibrary.nativeFilterTemplateString()),
-        logLevel);
+    return runWithTemplate(JniLibrary.templateString(), envoyConfiguration, logLevel);
   }
 
   private int runWithResolvedYAML(String configurationYAML, String logLevel) {
