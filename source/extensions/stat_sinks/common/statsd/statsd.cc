@@ -141,6 +141,10 @@ const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint6
         ":", value, type);
     return message;
   }
+
+  default:
+    // unreachable
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
