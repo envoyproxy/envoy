@@ -49,7 +49,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // This arguably should not be shared across connections but as Envoy doesn't
   // support push promise it's really moot point.
   quic::QuicClientPushPromiseIndex push_promise_index_;
-  // Hard code with real crypto stream for now.
+  // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
 };
 
