@@ -58,6 +58,10 @@ bool ClientLogin::isClientSecureConnection() const {
   return client_cap_ & CLIENT_SECURE_CONNECTION;
 }
 
+void ClientLogin::addConnectionAttribute(const std::pair<std::string, std::string>& attr) {
+  conn_attr_.emplace_back(attr);
+}
+
 DecodeStatus ClientLogin::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   /* 4.0 uses 2 bytes, 4.1+ uses 4 bytes, but the proto-flag is in the lower 2
    * bytes */

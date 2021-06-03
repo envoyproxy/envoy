@@ -18,6 +18,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_session.h"
@@ -29,8 +30,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-MySQLTerminalFilter::MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router)
-    : MySQLMoniterFilter(config), router_(router), upstream_conn_data_(nullptr) {}
+MySQLTerminalFilter::MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
+                                         DecoderFactory& factory)
+    : MySQLMoniterFilter(config, factory), router_(router), upstream_conn_data_(nullptr) {}
 
 void MySQLTerminalFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;

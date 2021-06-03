@@ -38,7 +38,8 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   if (!proto_config.has_database_routes()) {
     return [filter_config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addFilter(std::make_shared<MySQLMoniterFilter>(filter_config));
+      filter_manager.addFilter(
+          std::make_shared<MySQLMoniterFilter>(filter_config, DecoderFactoryImpl::instance_));
     };
   }
 
@@ -58,7 +59,8 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
   auto router = std::make_shared<RouterImpl>(catch_all_route, std::move(routes));
 
   return [filter_config, router](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<MySQLTerminalFilter>(filter_config, router));
+    filter_manager.addReadFilter(std::make_shared<MySQLTerminalFilter>(
+        filter_config, router, DecoderFactoryImpl::instance_));
   };
 }
 

@@ -42,6 +42,9 @@ public:
   static std::string getDb() { return "mysql.db"; }
   static std::string getCommandResponse() { return "command response"; }
   static std::string getInfo() { return "info"; }
+  static int
+  bytesOfConnAtrributeLength(const std::vector<std::pair<std::string, std::string>> conn);
+  static int bytesOfEncodedInteger(int64_t len);
   static int sizeOfLengthEncodeInteger(uint64_t val);
 
   std::string encodeServerGreeting(int protocol);

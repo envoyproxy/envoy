@@ -33,7 +33,7 @@ class MySQLMoniterFilter : public Network::Filter,
                            public DecoderCallbacks,
                            public Logger::Loggable<Logger::Id::filter> {
 public:
-  MySQLMoniterFilter(MySQLFilterConfigSharedPtr config);
+  MySQLMoniterFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory);
   ~MySQLMoniterFilter() override = default;
 
   // Network::ReadFilter

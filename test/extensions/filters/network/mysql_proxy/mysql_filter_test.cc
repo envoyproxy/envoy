@@ -1,6 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 #include "extensions/filters/network/mysql_proxy/mysql_utils.h"
 
@@ -26,7 +27,7 @@ public:
   void initialize() {
     config_ = std::make_shared<MySQLFilterConfig>(stat_prefix_, scope_);
 
-    filter_ = std::make_unique<MySQLMoniterFilter>(config_);
+    filter_ = std::make_unique<MySQLMoniterFilter>(config_, DecoderFactoryImpl::instance_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 

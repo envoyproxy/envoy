@@ -10,6 +10,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
 namespace Envoy {
@@ -24,7 +25,8 @@ class MySQLTerminalFilter : public Tcp::ConnectionPool::Callbacks,
                             public MySQLMoniterFilter,
                             public Network::ConnectionCallbacks {
 public:
-  MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router);
+  MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
+                      DecoderFactory& factory);
   ~MySQLTerminalFilter() override = default;
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

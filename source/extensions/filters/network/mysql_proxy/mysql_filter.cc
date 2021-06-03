@@ -8,6 +8,7 @@
 
 #include "extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -16,8 +17,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-MySQLMoniterFilter::MySQLMoniterFilter(MySQLFilterConfigSharedPtr config)
-    : decoder_(std::make_unique<DecoderImpl>(*this)), config_(std::move(config)) {}
+MySQLMoniterFilter::MySQLMoniterFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory)
+    : decoder_(factory.create(*this)), config_(std::move(config)) {}
 
 void MySQLMoniterFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;

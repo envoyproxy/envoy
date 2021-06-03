@@ -127,6 +127,30 @@ CommandResponse MessageHelper::encodeCommandResponse(const std::string& data) {
   return resp;
 }
 
+int MySQLTestUtils::bytesOfConnAtrributeLength(
+    const std::vector<std::pair<std::string, std::string>> conn_attrs) {
+  int64_t allLen = 0;
+  for (const auto& kv : conn_attrs) {
+    allLen += bytesOfEncodedInteger(kv.first.length());
+    allLen += kv.first.length();
+    allLen += bytesOfEncodedInteger(kv.second.length());
+    allLen += kv.second.length();
+  }
+  return bytesOfEncodedInteger(allLen);
+}
+
+int MySQLTestUtils::bytesOfEncodedInteger(int64_t val) {
+  if (val < 251) {
+    return 1;
+  } else if (val < (1 << 16)) {
+    return 3;
+  } else if (val < (1 << 24)) {
+    return 4;
+  } else {
+    return 9;
+  }
+}
+
 std::string MySQLTestUtils::encodeServerGreeting(int protocol) {
   ServerGreeting mysql_greet_encode{};
   mysql_greet_encode.setProtocol(protocol);
