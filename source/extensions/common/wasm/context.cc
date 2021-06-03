@@ -1,3 +1,5 @@
+#include "extensions/common/wasm/context.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -144,9 +146,6 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, absl::string_view data)
   return proxy_wasm::BufferBase::copyFrom(start, length, data);
 }
 
-class PluginHandle;
-using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
-
 Context::Context() = default;
 Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
@@ -154,7 +153,7 @@ Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, 
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin,
                  PluginHandleSharedPtr plugin_handle)
-    : ContextBase(wasm, root_context_id, plugin), plugin_handle_(plugin_handle) {}
+    : ContextBase(wasm, root_context_id, plugin, plugin_handle), plugin_handle_(plugin_handle) {}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }

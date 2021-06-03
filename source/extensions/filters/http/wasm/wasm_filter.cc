@@ -1,7 +1,5 @@
 #include "extensions/filters/http/wasm/wasm_filter.h"
 
-#include <memory>
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

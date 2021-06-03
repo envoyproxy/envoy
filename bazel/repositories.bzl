@@ -843,10 +843,9 @@ def _proxy_wasm_cpp_sdk():
     external_http_archive(name = "proxy_wasm_cpp_sdk")
 
 def _proxy_wasm_cpp_host():
-    native.new_local_repository(
+    external_http_archive(
         name = "proxy_wasm_cpp_host",
         build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
-        path = "/home/mathetake/proxy-wasm-cpp-host",
     )
 
 def _emscripten_toolchain():

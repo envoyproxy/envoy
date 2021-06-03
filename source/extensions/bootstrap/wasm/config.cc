@@ -1,7 +1,5 @@
 #include "extensions/bootstrap/wasm/config.h"
 
-#include <memory>
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 

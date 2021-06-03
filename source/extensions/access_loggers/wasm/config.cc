@@ -10,7 +10,6 @@
 #include "extensions/access_loggers/wasm/wasm_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
 #include "extensions/common/wasm/wasm.h"
-#include <memory>
 
 namespace Envoy {
 namespace Extensions {
@@ -34,8 +33,8 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
 
   auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot =
-        ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocalObject>::makeUnique(context.threadLocal());
+    auto tls_slot = ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocalObject>::makeUnique(
+        context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
       return std::make_shared<PluginHandleSharedPtrThreadLocalObject>(
           Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));

@@ -47,10 +47,12 @@ using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestr
 using SanitizationConfig = envoy::extensions::wasm::v3::SanitizationConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
+class PluginHandle;
 class Wasm;
 
 using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
 // Opaque context object.
@@ -99,9 +101,6 @@ private:
   const ::Envoy::Buffer::Instance* const_buffer_instance_{};
   ::Envoy::Buffer::Instance* buffer_instance_{};
 };
-
-class PluginHandle;
-using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 // A context which will be the target of callbacks for a particular session
 // e.g. a handler of a stream.
