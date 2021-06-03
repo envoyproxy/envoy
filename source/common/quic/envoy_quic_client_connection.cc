@@ -97,10 +97,19 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
+  quic::QuicSocketAddress self_address =
+      envoyIpAddressToQuicSocketAddress(connection_socket->addressProvider().localAddress()->ip());
+  quic::QuicSocketAddress peer_address =
+      envoyIpAddressToQuicSocketAddress(connection_socket->addressProvider().remoteAddress()->ip());
+
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket();
-  SetQuicPacketWriter(writer.release(), true);
+  if (connection_migration_use_new_cid()) {
+    MigratePath(self_address, peer_address, writer.release(), true);
+  } else {
+    SetQuicPacketWriter(writer.release(), true);
+  }
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
