@@ -108,7 +108,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   EXPECT_CALL(listener_config_, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
 
-  // Listener1 has a listener filter in the listener filter chain.
+  // add a filter to stop the filter iteration.
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(nullptr, Network::ListenerFilterPtr{test_filter});
@@ -131,17 +131,19 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
 
+  EXPECT_CALL(balancer, pickTargetHandler(_))
+      .WillOnce(testing::DoAll(
+          testing::WithArg<0>(Invoke([](auto& target) { target.incNumConnections(); })),
+          ReturnRef(*active_listener)));
+
   // calling the onAcceptWorker() to create the ActiveTcpSocket.
-  active_listener->onAcceptWorker(std::move(accepted_socket), false, true);
+  active_listener->onAcceptWorker(std::move(accepted_socket), false, false);
   // get the ActiveTcpSocket pointer before unlink() removed from the link-list.
   ActiveTcpSocket* tcp_socket = active_listener->sockets_.front().get();
   // trigger the onTimeout event manually, since the timer is fake.
   active_listener->sockets_.front()->onTimeout();
 
   EXPECT_EQ(server_name, tcp_socket->stream_info_->requestedServerName());
-
-  // fake connection number increase, since we didn't create connection.
-  active_listener->incNumConnections();
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
