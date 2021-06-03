@@ -6,7 +6,6 @@
 
 #include "common/http/utility.h"
 
-#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -66,8 +65,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   if (!cluster_type) {
     return Http::FilterHeadersStatus::Continue;
   }
-  if (cluster_type->name() !=
-      Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {
+  if (cluster_type->name() != "envoy.clusters.dynamic_forward_proxy") {
     return Http::FilterHeadersStatus::Continue;
   }
 

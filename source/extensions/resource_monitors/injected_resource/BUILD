@@ -26,16 +26,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-        "//test/common/quic/integration:__subpackages__",
-    ],
     deps = [
         ":injected_resource_monitor",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
-        "//source/extensions/resource_monitors:well_known_names",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/injected_resource/v3:pkg_cc_proto",
     ],

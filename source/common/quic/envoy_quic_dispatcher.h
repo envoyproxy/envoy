@@ -20,6 +20,7 @@
 #include "server/connection_handler_impl.h"
 #include "server/active_listener_base.h"
 #include "common/quic/envoy_quic_crypto_stream_factory.h"
+#include "common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -44,18 +45,16 @@ public:
 
 class EnvoyQuicDispatcher : public quic::QuicDispatcher {
 public:
-  EnvoyQuicDispatcher(const quic::QuicCryptoServerConfig* crypto_config,
-                      const quic::QuicConfig& quic_config,
-                      quic::QuicVersionManager* version_manager,
-                      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
-                      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-                      uint8_t expected_server_connection_id_length,
-                      Network::ConnectionHandler& connection_handler,
-                      Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats,
-                      Server::PerHandlerListenerStats& per_worker_stats,
-                      Event::Dispatcher& dispatcher, Network::Socket& listen_socket,
-                      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+  EnvoyQuicDispatcher(
+      const quic::QuicCryptoServerConfig* crypto_config, const quic::QuicConfig& quic_config,
+      quic::QuicVersionManager* version_manager,
+      std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
+      std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
+      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
+      Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
+      Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
+      Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+      EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
@@ -83,6 +82,7 @@ private:
   Server::PerHandlerListenerStats& per_worker_stats_;
   Event::Dispatcher& dispatcher_;
   Network::Socket& listen_socket_;
+  QuicStatNames& quic_stat_names_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 

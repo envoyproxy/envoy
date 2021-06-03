@@ -316,7 +316,7 @@ bool HeaderUtility::shouldCloseConnection(Http::Protocol protocol,
   return false;
 }
 
-Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& headers) {
+Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Method()) {
     return absl::InvalidArgumentError(
         absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Method.get()));
@@ -334,6 +334,15 @@ Http::Status HeaderUtility::checkRequiredHeaders(const Http::RequestHeaderMap& h
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
+  }
+  return Http::okStatus();
+}
+
+Http::Status HeaderUtility::checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers) {
+  const absl::optional<uint64_t> status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Status.get()));
   }
   return Http::okStatus();
 }

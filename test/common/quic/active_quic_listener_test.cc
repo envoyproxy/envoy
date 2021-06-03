@@ -89,7 +89,8 @@ protected:
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           return quic::CurrentSupportedVersions();
-        }()[0]) {}
+        }()[0]),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -157,7 +158,8 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
+                                                       quic_stat_names_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -321,6 +323,7 @@ protected:
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
+  QuicStatNames quic_stat_names_;
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
@@ -341,7 +344,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
                               listener_config_, quic_config_, options, false,
                               ActiveQuicListenerFactoryPeer::runtimeEnabled(
                                   static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              32u, crypto_stream_factory, proof_source_factory),
+                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
                           Network::CreateListenerException, "Failed to apply socket options.");
 }
 
