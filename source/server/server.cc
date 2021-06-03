@@ -421,8 +421,8 @@ void InstanceImpl::initialize(const Options& options,
   // If user has set user_agent_version in the bootstrap config, use it.
   // Default to the internal server version.
   if (!bootstrap_.node().user_agent_version().empty()) {
-    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(
-        bootstrap_.node().user_agent_version());
+    std::string user_agent_version = bootstrap_.node().user_agent_version();
+    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(user_agent_version);
   } else {
     bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
   }
