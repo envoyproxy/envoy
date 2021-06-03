@@ -321,7 +321,7 @@ TEST_F(SotwSubscriptionStateTest, TypeUrlMismatch) {
             "in an individual Any does not match the message-wide type URL badtypeurl",
             e->what()));
       }));
-  EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
+  EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleResponse(response);
 }
 
