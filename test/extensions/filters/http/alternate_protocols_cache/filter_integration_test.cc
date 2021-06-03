@@ -32,6 +32,9 @@ typed_config:
   }
 
   void createUpstreams() override {
+    // The integration test infrastructure does not know how to create mixed protocol upstreams.
+    // It will have created an HTTP/3 upstream, so the test needs to create an additional
+    // HTTP/2 upstream manually.
     ASSERT_EQ(upstreamProtocol(), Http::CodecType::HTTP3);
     ASSERT_EQ(fake_upstreams_count_, 1);
     ASSERT_FALSE(autonomous_upstream_);

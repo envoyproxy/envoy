@@ -59,7 +59,6 @@ TEST_F(FilterTest, NoAltSvc) {
   Http::AlternateProtocolsCache::Origin expected_origin("https", "host1", 443);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
   filter_->onDestroy();
 }
 
@@ -67,7 +66,6 @@ TEST_F(FilterTest, InvalidAltSvc) {
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"alt-svc", "garbage"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
   filter_->onDestroy();
 }
 
@@ -108,7 +106,6 @@ TEST_F(FilterTest, ValidAltSvc) {
           }))));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
-
   filter_->onDestroy();
 }
 

@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//include/envoy/http:filter_interface",
         "//source/common/http:alternate_protocols_cache",
@@ -30,7 +29,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":filter_lib",
         "//include/envoy/registry",
