@@ -126,10 +126,8 @@ MockRateLimitPolicy::MockRateLimitPolicy() {
 }
 MockRateLimitPolicy::~MockRateLimitPolicy() = default;
 
-MockRequestMirrorPolicy::MockRequestMirrorPolicy() {
-  ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
-  ON_CALL(*this, enabled(_)).WillByDefault(enabled_);
-}
+MockRequestMirrorPolicy::MockRequestMirrorPolicy(const std::string& cluster_name)
+    : cluster_name_(cluster_name) {}
 MockRequestMirrorPolicy::~MockRequestMirrorPolicy() = default;
 
 MockRouteEntry::MockRouteEntry() {
@@ -142,6 +140,14 @@ MockRouteEntry::~MockRouteEntry() = default;
 
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() = default;
+
+MockShadowWriter::MockShadowWriter() {
+  ON_CALL(*this, submit(_, _, _, _)).WillByDefault(Return(request_handle_));
+}
+MockShadowWriter::~MockShadowWriter() = default;
+
+MockShadowRequest::MockShadowRequest() = default;
+MockShadowRequest::~MockShadowRequest() = default;
 
 } // namespace Router
 } // namespace ThriftProxy

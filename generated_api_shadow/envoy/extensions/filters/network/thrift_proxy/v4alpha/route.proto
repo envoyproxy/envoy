@@ -100,7 +100,7 @@ message RouteAction {
 
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration when the route configuration is loaded.
-    // If it disapears at runtime, the shadow request will silently be ignored.
+    // If it disappears at runtime, the shadow request will silently be ignored.
     string cluster = 1 [(validate.rules).string = {min_len: 1}];
 
     // If not specified, all requests to the target cluster will be mirrored.

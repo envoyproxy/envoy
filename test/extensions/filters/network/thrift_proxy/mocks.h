@@ -323,10 +323,11 @@ public:
 
 class MockRequestMirrorPolicy : public RequestMirrorPolicy {
 public:
-  MockRequestMirrorPolicy();
+  MockRequestMirrorPolicy(const std::string& cluster_name);
   ~MockRequestMirrorPolicy() override;
 
   MOCK_METHOD(const std::string&, clusterName, (), (const));
+  MOCK_METHOD(bool, enabled, (Runtime::Loader&), (const));
 
   std::string cluster_name_;
 };
@@ -361,6 +362,26 @@ public:
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
 
   NiceMock<MockRouteEntry> route_entry_;
+};
+
+class MockShadowWriter : public ShadowWriter {
+public:
+  MockShadowWriter();
+  ~MockShadowWriter() override;
+
+  MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRequestHandle>>, submit,
+              (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
+
+  absl::optional<std::reference_wrapper<ShadowRequestHandle>> request_handle_{absl::nullopt};
+};
+
+class MockShadowRequest : public ShadowRequestHandle {
+public:
+  MockShadowRequest();
+  ~MockShadowRequest() override;
+
+  MOCK_METHOD(void, tryWriteRequest, (const Buffer::OwnedImpl& buffer), ());
+  MOCK_METHOD(void, tryReleaseConnection, (), ());
 };
 
 } // namespace Router
