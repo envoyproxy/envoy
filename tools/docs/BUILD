@@ -24,3 +24,28 @@ genrule(
     ),
     tools = [":generate_extensions_security_rst"],
 )
+
+py_binary(
+    name = "generate_external_deps_rst",
+    srcs = [
+        "generate_external_deps_rst.py",
+    ],
+    deps = [
+        "//tools/dependency:exports",
+        "//tools/dependency:utils",
+    ],
+)
+
+genrule(
+    name = "external_deps_rst",
+    srcs = [
+        "//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+    ],
+    outs = ["external_deps_rst.tar"],
+    cmd = (
+        "$(location generate_external_deps_rst) $@"
+    ),
+    tools = [":generate_external_deps_rst"],
+)
