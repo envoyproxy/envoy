@@ -263,6 +263,16 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                   ->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
+  if (GetParam().first == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq(
+        "listener.127.0.0.1_0.http3.downstream.rx.quic_connection_close_error_"
+        "code_QUIC_NO_ERROR",
+        2u);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.http3.downstream.rx.quic_connection_close_"
+                                   "error_code_QUIC_NO_ERROR",
+                                   2u);
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support

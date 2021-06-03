@@ -422,6 +422,7 @@ envoy_cc_library(
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
+        "//source/common/quic:quic_stat_names_lib",
     ]),
 )
 
