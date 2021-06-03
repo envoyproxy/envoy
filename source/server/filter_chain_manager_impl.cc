@@ -1,7 +1,8 @@
-#include "server/filter_chain_manager_impl.h"
-
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/drain_manager.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 #include "common/common/cleanup.h"
 #include "common/common/empty_string.h"
@@ -10,10 +11,8 @@
 #include "common/network/socket_interface.h"
 #include "common/protobuf/utility.h"
 
-#include "envoy/server/drain_manager.h"
-#include "envoy/thread_local/thread_local.h"
-#include "envoy/thread_local/thread_local_object.h"
 #include "server/configuration_impl.h"
+#include "server/filter_chain_manager_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/match.h"
