@@ -28,6 +28,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "org_golang_x_text",
         ],
     ),
+    com_github_pseudomuto_protoc_gen_doc = dict(
+        project_name = "protoc-gen-doc",
+        project_desc = "protoc plugin to generate docs",
+        project_url = "https://github.com/phlax/protoc-gen-doc",
+        version = "88753f100bc316a7bffd393cb658d49013582fb1",
+        sha256 = "fd462a24d3fc608a99989998586dcfaa66369e260ec787dfc9da1a8ceb163a01",
+        strip_prefix = "protoc-gen-doc-{version}",
+        urls = ["https://github.com/phlax/protoc-gen-doc/archive/{version}.tar.gz"],
+        release_date = "2021-05-27",
+        use_category = ["api"],
+    ),
     com_github_bazelbuild_buildtools = dict(
         project_name = "Bazel build tools",
         project_desc = "Developer tools for working with Google's bazel buildtool.",

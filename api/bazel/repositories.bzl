@@ -47,6 +47,11 @@ def api_dependencies():
         name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_LOGS_BUILD_CONTENT,
     )
+    external_http_archive(
+        name = "com_github_pseudomuto_protoc_gen_doc",
+        build_file = "@envoy//bazel/external:protoc-gen-doc.BUILD",
+    )
+
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
