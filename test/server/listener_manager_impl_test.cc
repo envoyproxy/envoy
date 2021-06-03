@@ -1727,24 +1727,22 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
   // grab the child-manager created for the per-filter-chain-factory-context-impl
-  EXPECT_EQ(1, listener_foo->drain_manager_->children_.size());
-  auto drain_manager = listener_foo->drain_manager_->children_[0].lock();
-  EXPECT_NE(nullptr, drain_manager);
-  auto filter_chain_drain_manager = static_cast<MockDrainManager*>(drain_manager.get());
+  auto& filter_chain_drain_manager = const_cast<MockDrainManager&>(
+      static_cast<const MockDrainManager&>(listener_foo->context_->drainDecision()));
 
-  EXPECT_CALL(*filter_chain_drain_manager, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(filter_chain_drain_manager, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).Times(0);
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_, _));
   // validate draining flows through drain-tree
-  EXPECT_CALL(*filter_chain_drain_manager, _startDrainSequence(_));
+  EXPECT_CALL(filter_chain_drain_manager, _startDrainSequence(_));
   EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
-  EXPECT_CALL(*filter_chain_drain_manager, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(filter_chain_drain_manager, drainClose()).WillOnce(Return(true));
   EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -1752,7 +1750,7 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   server_.drain_manager_.startDrainSequence([] {});
-  EXPECT_CALL(*filter_chain_drain_manager, drainClose());
+  EXPECT_CALL(filter_chain_drain_manager, drainClose());
   EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*listener_foo, onDestroy());
