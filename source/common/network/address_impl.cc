@@ -106,7 +106,7 @@ getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_
   // address and the socket is actually v6 only, the returned address will be
   // regarded as a v6 address from dual stack socket. However, this address is not going to be
   // used to create socket. Wrong knowledge of dual stack support won't hurt.
-  ASSERT(Thread::MainThread::isNotMainThread());
+  ASSERT(Thread::MainThread::isWorkerThread());
   StatusOr<Address::InstanceConstSharedPtr> address =
       Address::addressFromSockAddr(ss, ss_len, v6only);
   if (!address.ok()) {
