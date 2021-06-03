@@ -191,11 +191,7 @@ void ShadowRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_da
 
   // Is the request buffer ready to be dispatched?
   if (request_buffer_.length() > 0) {
-    // TODO: set response timeout.
-    parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
-                                        Stats::Histogram::Unit::Bytes, request_buffer_.length());
-    conn_data_->connection().write(request_buffer_, false);
-    request_sent_ = true;
+    writeRequest(request_buffer_);
   }
 }
 
@@ -203,20 +199,26 @@ void ShadowRequest::tryWriteRequest(const Buffer::OwnedImpl& buffer) {
   ENVOY_LOG(debug, "shadow request writing");
 
   if (conn_data_ != nullptr) {
-    // TODO: set response timeout.
-
     // Make copy, write() drains.
     Buffer::OwnedImpl shadow_buffer;
     shadow_buffer.add(buffer);
 
-    parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
-                                        Stats::Histogram::Unit::Bytes, shadow_buffer.length());
-    conn_data_->connection().write(shadow_buffer, false);
-    request_sent_ = true;
+    writeRequest(shadow_buffer);
   } else {
-    // Make a copy and write when we are done.
-    request_buffer_.add(buffer);
+    // Make a copy and write when the connection becomes ready.
+    // However, don't bother if it already failed.
+    if (reset_stream_) {
+      request_buffer_.add(buffer);
+    }
   }
+}
+
+// TODO: set response timeout.
+void ShadowRequest::writeRequest(Buffer::OwnedImpl& buffer) {
+  parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
+                                      Stats::Histogram::Unit::Bytes, buffer.length());
+  conn_data_->connection().write(buffer, false);
+  request_sent_ = true;
 }
 
 void ShadowRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -293,6 +295,8 @@ void ShadowRequest::tryReleaseConnection() {
   }
 }
 
+bool ShadowRequest::waitingForConnection() const { return conn_pool_handle_ != nullptr; }
+
 void ShadowRequest::onEvent(Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
@@ -312,6 +316,8 @@ void ShadowRequest::onEvent(Network::ConnectionEvent event) {
 }
 
 void ShadowRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+  reset_stream_ = true;
+
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
     break;

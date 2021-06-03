@@ -77,6 +77,7 @@ public:
   // Router::ShadowRequestHandle
   void tryWriteRequest(const Buffer::OwnedImpl& buffer) override;
   void tryReleaseConnection() override;
+  bool waitingForConnection() const override;
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -91,6 +92,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
+  void writeRequest(Buffer::OwnedImpl& buffer);
   bool requestInProgress();
   void releaseConnection(bool close);
   void onResetStream(ConnectionPool::PoolFailureReason reason);
@@ -112,6 +114,7 @@ private:
   NullResponseDecoderPtr response_decoder_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   uint64_t response_size_{};
+  bool reset_stream_ : 1;
 };
 
 class ShadowWriterImpl : public ShadowWriter,

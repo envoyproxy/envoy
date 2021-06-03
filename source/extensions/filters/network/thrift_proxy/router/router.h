@@ -53,6 +53,11 @@ public:
    * progress.
    */
   virtual void tryReleaseConnection() PURE;
+
+  /**
+   * Are we currently waiting for an upstraem connection to become available.
+   */
+  virtual bool waitingForConnection() const PURE;
 };
 
 /**
