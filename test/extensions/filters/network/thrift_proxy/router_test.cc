@@ -1360,10 +1360,10 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   // Set up policies.
   const std::vector<std::string> shadow_clusters = {"shadow_cluster_1", "shadow_cluster_2"};
   for (int i = 0; i < 2; ++i) {
-    route_entry_.policies_.push_back(std::make_shared<MockRequestMirrorPolicy>(shadow_clusters[i]));
-    EXPECT_CALL(*route_entry_.policies_.back(), clusterName())
-        .WillOnce(ReturnRef(shadow_clusters[i]));
-    EXPECT_CALL(*route_entry_.policies_.back(), enabled(_)).WillOnce(Return(true));
+    auto policy = std::make_shared<MockRequestMirrorPolicy>(shadow_clusters[i]);
+    EXPECT_CALL(*policy, clusterName()).WillOnce(ReturnRef(shadow_clusters[i]));
+    EXPECT_CALL(*policy, enabled(_)).WillOnce(Return(true));
+    route_entry_.policies_.push_back(policy);
   }
 
   // Set up shadow requests.
@@ -1379,13 +1379,13 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
           Invoke([&](const std::string& cluster, MessageMetadataSharedPtr, TransportType,
                      ProtocolType) -> absl::optional<std::reference_wrapper<ShadowRequestHandle>> {
             EXPECT_EQ(cluster, shadow_clusters.front());
-            return shadow_requests.front();
+            return *shadow_requests.front();
           }))
       .WillOnce(
           Invoke([&](const std::string& cluster, MessageMetadataSharedPtr, TransportType,
                      ProtocolType) -> absl::optional<std::reference_wrapper<ShadowRequestHandle>> {
             EXPECT_EQ(cluster, shadow_clusters.back());
-            return shadow_requests.back();
+            return *shadow_requests.back();
           }));
 
   startRequestWithExistingConnection(MessageType::Call);
