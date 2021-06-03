@@ -157,7 +157,7 @@ private:
 
 // Helper classes for StructFormatter::StructFormatMapVisitor.
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
+template <class... Ts> StructFormatMapVisitorHelper(Ts...)->StructFormatMapVisitorHelper<Ts...>;
 
 /**
  * An formatter for structured log formats, which returns a Struct proto that
@@ -445,10 +445,22 @@ private:
 /**
  * Base formatter for formatting Metadata objects
  */
-class MetadataFormatter {
+class MetadataFormatter : public FormatterProvider {
 public:
+  using GetMetadataFunction =
+      std::function<const envoy::config::core::v3::Metadata*(const StreamInfo::StreamInfo&)>;
   MetadataFormatter(const std::string& filter_namespace, const std::vector<std::string>& path,
-                    absl::optional<size_t> max_length);
+                    absl::optional<size_t> max_length, GetMetadataFunction get);
+
+  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     absl::string_view) const override;
+
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&,
+                                 const StreamInfo::StreamInfo& stream_info,
+                                 absl::string_view) const override;
 
 protected:
   absl::optional<std::string>
@@ -459,40 +471,25 @@ private:
   std::string filter_namespace_;
   std::vector<std::string> path_;
   absl::optional<size_t> max_length_;
+  GetMetadataFunction get_func_;
 };
 
 /**
  * FormatterProvider for DynamicMetadata from StreamInfo.
  */
-class DynamicMetadataFormatter : public FormatterProvider, MetadataFormatter {
+class DynamicMetadataFormatter : public MetadataFormatter {
 public:
   DynamicMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
 };
 
 /**
  * FormatterProvider for ClusterMetadata from StreamInfo.
  */
-class ClusterMetadataFormatter : public FormatterProvider, MetadataFormatter {
+class ClusterMetadataFormatter : public MetadataFormatter {
 public:
   ClusterMetadataFormatter(const std::string& filter_namespace,
                            const std::vector<std::string>& path, absl::optional<size_t> max_length);
-
-  // FormatterProvider
-  absl::optional<std::string> format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                     absl::string_view) const override;
-  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                 absl::string_view) const override;
 };
 
 /**
