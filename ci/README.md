@@ -169,7 +169,7 @@ If you would like to run an interactive session to keep the build container runn
 ```
 
 From an interactive session, you can invoke `bazel` directly, or use the `./ci/windows_ci_steps.sh` script to build and run tests.
-Bazel will look for .bazelrc in the `${HOME}` path, which is mapped to the persistant path `${TEMP}\envoy-docker-build\` on the
+Bazel will look for .bazelrc in the `${HOME}` path, which is mapped to the persistent path `${TEMP}\envoy-docker-build\` on the
 Docker host.
 
 # Testing changes to the build image as a developer
