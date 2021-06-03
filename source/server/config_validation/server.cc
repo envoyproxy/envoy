@@ -12,6 +12,7 @@
 #include "common/singleton/manager_impl.h"
 #include "common/version/version.h"
 
+#include "server/drain_manager_impl.h"
 #include "server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -54,7 +55,9 @@ ValidationInstance::ValidationInstance(
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
-      time_system_(time_system), server_contexts_(*this) {
+      time_system_(time_system), server_contexts_(*this),
+      drain_manager_(std::make_unique<Server::DrainManagerImpl>(
+          *this, envoy::config::listener::v3::Listener::DEFAULT)) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {

@@ -97,6 +97,7 @@ envoy_cc_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/version:version_lib",
         "//source/server:configuration_lib",
+        "//source/server:drain_manager_lib",
         "//source/server:server_lib",
         "//source/server/admin:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
