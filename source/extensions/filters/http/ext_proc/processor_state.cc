@@ -78,11 +78,23 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         return true;
 
       } else if (body_mode_ == ProcessingMode::STREAMED) {
-        if (bufferedData() != nullptr) {
-          requestWatermark();
-          ENVOY_LOG(debug, "Sending buffered body data in streaming mode");
-          filter_.sendBufferedData(*this, ProcessorState::CallbackState::StreamedBodyCallback,
-                                  complete_body_available_);
+        if (complete_body_available_) {
+          // All data came in before headers callback, so act just as if we were streaming
+          ENVOY_LOG(debug, "Sending buffered body data for whole message");
+          filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback,
+                                  true);
+          clearWatermark();
+          return true;
+        }
+
+        if (hasBufferedData()) {
+          // Otherwise, treat the buffered data like any other streaming chunk
+          auto buffered_chunk = std::make_unique<QueuedChunk>();
+          buffered_chunk->buffered = true;
+          ENVOY_LOG(debug, "Sending first chunk as buffered data");
+          filter_.sendBodyChunk(*this, *bufferedData(), ProcessorState::CallbackState::StreamedBodyCallback,
+                                false);
+          enqueueStreamingChunk(std::move(buffered_chunk));
         }
         return true;
       }
@@ -107,6 +119,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
 }
 
 bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
+  bool should_continue = false;
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
       callback_state_ == CallbackState::StreamedBodyCallback) {
     ENVOY_LOG(debug, "Processing body response");
@@ -115,12 +128,36 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       modifyBufferedData([this, &response](Buffer::Instance& data) {
         MutationUtils::applyCommonBodyResponse(response, headers_, data);
       });
-    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (body_chunk_ != nullptr) {
-        ENVOY_LOG(debug, "Applying body response to chunk of data. State = {}", callback_state_);
-        MutationUtils::applyCommonBodyResponse(response, headers_, *body_chunk_);
-      }
       clearWatermark();
+      callback_state_ = CallbackState::Idle;
+      should_continue = true;
+
+    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
+      if (!streaming_chunks_.empty()) {
+        QueuedChunkPtr chunk = std::move(streaming_chunks_.front());
+        streaming_chunks_.pop_front();
+        if (chunk->buffered) {
+          // This chunk was buffered data from the start of the message
+          ENVOY_LOG(debug, "Applying body response to buffered data in streaming mode. State = {}", callback_state_);
+          modifyBufferedData([this, &response](Buffer::Instance& data) {
+            MutationUtils::applyCommonBodyResponse(response, headers_, data);
+          });
+          //should_continue = true;
+        } else {
+          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->data.length());
+          MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+          if (chunk->data.length() > 0) {
+            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain. end_stream = {}", chunk->data.length(),
+              chunk->end_stream);
+            injectDataToFilterChain(chunk->data, chunk->end_stream);
+          }
+          should_continue = chunk->end_stream;
+        }
+      }
+      if (streaming_chunks_.empty()) {
+        clearWatermark();
+        callback_state_ = CallbackState::Idle;
+      }
     }
 
     if (response.response().clear_route_cache()) {
@@ -129,15 +166,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     message_timer_->disableTimer();
 
     headers_ = nullptr;
-    body_chunk_ = nullptr;
-    if (body_eof_delivered_) {
-      // Allow an extra response to come back in event of streaming
-      body_eof_delivered_ = false;
-      return true;
-    } else {
-      callback_state_ = CallbackState::Idle;
-    }
-    
+    body_chunk_ = nullptr;  
 
     if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server
@@ -146,8 +175,10 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       return true;
     }
 
-    ENVOY_LOG(trace, "Continuing");
-    continueProcessing();
+    if (should_continue) {
+      ENVOY_LOG(trace, "Continuing");
+      continueProcessing();
+    }
     return true;
   }
 

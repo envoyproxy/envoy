@@ -1,5 +1,8 @@
 #pragma once
 
+#include <deque>
+#include <memory>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.pb.h"
@@ -7,7 +10,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
-#include "source/common/common/logger.h"
+#include "common/buffer/buffer_impl.h"
+#include "common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,6 +19,14 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 class Filter;
+
+class QueuedChunk {
+  public:
+    bool end_stream = false;
+    bool buffered = false;
+    Buffer::OwnedImpl data;
+};
+using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
 class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
 public:
@@ -34,7 +46,7 @@ public:
 
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), complete_body_available_(false),
-        trailers_available_(false), body_replaced_(false), body_eof_delivered_(false) {}
+        trailers_available_(false), body_replaced_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -46,7 +58,6 @@ public:
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
-  void setBodyEofDelivered(bool d) { body_eof_delivered_ = d; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -73,8 +84,16 @@ public:
   bool handleTrailersResponse(const envoy::service::ext_proc::v3alpha::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
+  bool hasBufferedData() const {
+    return bufferedData() != nullptr && bufferedData()->length() > 0;
+  }
   virtual void addBufferedData(Buffer::Instance& data) const PURE;
   virtual void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const PURE;
+  virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  void enqueueStreamingChunk(QueuedChunkPtr&& chunk) {
+    streaming_chunks_.push_back(std::move(chunk));
+  }
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
@@ -102,9 +121,6 @@ protected:
   bool trailers_available_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
-  // If true, then we are streaming the body and got the EOF when we
-  // weren't really done with the last chunk.
-  bool body_eof_delivered_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
@@ -118,6 +134,7 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Buffer::Instance* body_chunk_ = nullptr;
   Event::TimerPtr message_timer_;
+  std::deque<QueuedChunkPtr> streaming_chunks_;
 };
 
 class DecodingProcessorState : public ProcessorState {
@@ -146,6 +163,10 @@ public:
 
   void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const override {
     decoder_callbacks_->modifyDecodingBuffer(cb);
+  }
+
+  void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
+    decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
   Http::HeaderMap* addTrailers() override {
@@ -211,6 +232,10 @@ public:
 
   void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const override {
     encoder_callbacks_->modifyEncodingBuffer(cb);
+  }
+
+  void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
+    encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
   }
 
   Http::HeaderMap* addTrailers() override {

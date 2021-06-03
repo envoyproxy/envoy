@@ -121,6 +121,8 @@ public:
   void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state, bool end_stream) {
     sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
   }
+  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
+     ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
@@ -130,8 +132,6 @@ private:
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
-  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-     ProcessorState::CallbackState new_state, bool end_stream);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);

@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
-#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "common/buffer/buffer_impl.h"
+#include "extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
 
@@ -160,7 +161,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // The body has been buffered and we need to send the buffer
       ENVOY_LOG(debug, "Sending request body message");
       state.addBufferedData(data);
-      sendBodyChunk(state, *state.bufferedData(), ProcessorState::CallbackState::BufferedBodyCallback, true);
+      sendBodyChunk(state, *state.bufferedData(),
+                    ProcessorState::CallbackState::BufferedBodyCallback, true);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
       result = FilterDataStatus::StopIterationNoBuffer;
@@ -171,20 +173,36 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
 
-  case ProcessingMode::STREAMED:
-    if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallback) {
-      ENVOY_BUG(end_stream && data.length() == 0, 
-        "Received premature body chunk");
-      // Envoy will send our EOF even though we raised the watermark
-      state.setBodyEofDelivered(true);
+  case ProcessingMode::STREAMED: {
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterDataStatus::StopIterationNoBuffer;
+    case StreamOpenState::IgnoreError:
+      return FilterDataStatus::Continue;
+    case StreamOpenState::Ok:
+      // Fall through
+      break;
     }
-    // Send the chunk, and ask that we don't get any more data callbacks until
-    // we have decided what to do with it.
-    state.setBodyChunk(&data);
+
+    auto next_chunk = std::make_unique<QueuedChunk>();
+    // This clears the current data chunk
+    next_chunk->data.move(data);
+    next_chunk->end_stream = end_stream;
+    // Send the chunk, and ensure that we have watermarked so that we don't overflow
+    // memory while waiting for responses.
     state.requestWatermark();
-    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
-    result = FilterDataStatus::StopIterationAndWatermark;
+    sendBodyChunk(state, next_chunk->data, ProcessorState::CallbackState::StreamedBodyCallback,
+                  end_stream);
+    // Save the chunk, which we will replace or re-send later
+    state.enqueueStreamingChunk(std::move(next_chunk));
+    // At this point we will continue, but with an empty buffer and empty chunk
+    if (end_stream) {
+      result = FilterDataStatus::StopIterationNoBuffer;
+    } else {
+      result = FilterDataStatus::Continue;
+    }
     break;
+  }
 
   case ProcessingMode::BUFFERED_PARTIAL:
     ENVOY_LOG(debug, "Ignoring unimplemented request body processing mode");
@@ -303,8 +321,8 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   return status;
 }
 
-void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, 
-  ProcessorState::CallbackState new_state, bool end_stream) {
+void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
+                           ProcessorState::CallbackState new_state, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
   state.setCallbackState(new_state);
   state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
