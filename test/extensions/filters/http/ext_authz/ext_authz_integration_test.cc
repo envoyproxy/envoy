@@ -26,12 +26,11 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeConfig(bool disable_with_metadata = false) {
@@ -317,9 +316,9 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  const std::string expectedCheckRequest(Http::CodecClient::Type downstream_protocol) {
+  const std::string expectedCheckRequest(Http::CodecType downstream_protocol) {
     const std::string expected_downstream_protocol =
-        downstream_protocol == Http::CodecClient::Type::HTTP1 ? "HTTP/1.1" : "HTTP/2";
+        downstream_protocol == Http::CodecType::HTTP1 ? "HTTP/1.1" : "HTTP/2";
     constexpr absl::string_view expected_format = R"EOF(
 attributes:
   request:
@@ -336,17 +335,15 @@ attributes:
                            expected_downstream_protocol);
   }
 
-  void expectCheckRequestWithBody(Http::CodecClient::Type downstream_protocol,
-                                  uint64_t request_size) {
+  void expectCheckRequestWithBody(Http::CodecType downstream_protocol, uint64_t request_size) {
     expectCheckRequestWithBodyWithHeaders(downstream_protocol, request_size, Headers{}, Headers{},
                                           Headers{}, Http::TestRequestHeaderMapImpl{},
                                           Http::TestRequestHeaderMapImpl{});
   }
 
   void expectCheckRequestWithBodyWithHeaders(
-      Http::CodecClient::Type downstream_protocol, uint64_t request_size,
-      const Headers& headers_to_add, const Headers& headers_to_append,
-      const Headers& headers_to_remove,
+      Http::CodecType downstream_protocol, uint64_t request_size, const Headers& headers_to_add,
+      const Headers& headers_to_append, const Headers& headers_to_remove,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     initializeConfig();
@@ -379,7 +376,7 @@ attributes:
                                 const std::string& expected_status) {
     initializeConfig(disable_with_metadata);
     setDenyAtDisableRuntimeConfig(deny_at_disable, disable_with_metadata);
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     initiateClientConnection(4);
     if (!deny_at_disable) {
@@ -406,11 +403,11 @@ attributes:
 class ExtAuthzHttpIntegrationTest : public HttpIntegrationTest,
                                     public TestWithParam<Network::Address::IpVersion> {
 public:
-  ExtAuthzHttpIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  ExtAuthzHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 
   // By default, HTTP Service uses case sensitive string matcher.
@@ -580,28 +577,28 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
 // HTTP/1.1.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 4);
+  expectCheckRequestWithBody(Http::CodecType::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP1, 2048);
+  expectCheckRequestWithBody(Http::CodecType::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 4);
+  expectCheckRequestWithBody(Http::CodecType::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
-  expectCheckRequestWithBody(Http::CodecClient::Type::HTTP2, 2048);
+  expectCheckRequestWithBody(Http::CodecType::HTTP2, 2048);
 }
 
 // Verifies that the original request headers will be added and appended when the authorization
@@ -610,7 +607,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBodyWithHeaders(
-      Http::CodecClient::Type::HTTP1, 4,
+      Http::CodecType::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
       /*headers_to_append=*/Headers{{"header2", "header2"}},
       /*headers_to_remove=*/Headers{{"remove-me", "upstream-should-not-see-me"}},
@@ -646,14 +643,14 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   initializeConfig();
 
   // Use h1, set up the test.
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
+  setDownstreamProtocol(Http::CodecType::HTTP1);
   HttpIntegrationTest::initialize();
 
   // Start a client connection and request.
   initiateClientConnection(0);
 
   // Wait for the ext_authz request as a result of the client request.
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP1));
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Send back an ext_authz response with response_headers_to_add set.
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
@@ -686,12 +683,11 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
 class ExtAuthzLocalReplyIntegrationTest : public HttpIntegrationTest,
                                           public TestWithParam<Network::Address::IpVersion> {
 public:
-  ExtAuthzLocalReplyIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  ExtAuthzLocalReplyIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 
   void cleanup() {
@@ -798,7 +794,7 @@ body_format:
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
 
   int expected_grpc_client_creation_count = 0;
@@ -811,7 +807,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   }
 
   initiateClientConnection(4, Headers{}, Headers{});
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{});
 

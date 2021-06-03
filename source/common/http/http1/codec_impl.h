@@ -69,6 +69,10 @@ public:
     // require a flush timeout not already covered by other timeouts.
   }
 
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for H1.
+  }
+
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }

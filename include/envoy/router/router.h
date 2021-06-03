@@ -64,9 +64,11 @@ public:
    * process them later. Note: do not use unless you are sure that there will be no route
    * modifications later in the filter chain.
    * @param stream_info holds additional information about the request.
+   * @param do_formatting whether or not to evaluate configured transformations; if false, returns
+   * original values instead.
    */
-  virtual Http::HeaderTransforms
-  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                          bool do_formatting = true) const PURE;
 };
 
 /**
@@ -1327,6 +1329,12 @@ public:
    * @param reason supplies the reset reason.
    */
   virtual void resetStream() PURE;
+
+  /**
+   * Sets the upstream to use the following account.
+   * @param the account to assign the generic upstream.
+   */
+  virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

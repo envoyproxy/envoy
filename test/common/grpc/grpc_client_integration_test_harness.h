@@ -246,7 +246,7 @@ public:
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       FakeUpstreamConfig config(test_time_.timeSystem());
-      config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      config.upstream_protocol_ = Http::CodecType::HTTP2;
       fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
     }
     switch (clientType()) {
@@ -305,7 +305,7 @@ public:
                                                     Upstream::ResourcePriority::Default, nullptr,
                                                     nullptr, state_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-        .WillRepeatedly(Return(http_conn_pool_.get()));
+        .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cm_.thread_local_cluster_.cluster_.info_, *stats_store_, *dispatcher_, local_info_, cm_,
         runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
@@ -524,7 +524,7 @@ public:
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
-    config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =
         std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 

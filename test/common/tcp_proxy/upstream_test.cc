@@ -46,7 +46,7 @@ public:
 
 using testing::Types;
 
-typedef Types<Http1Upstream, Http2Upstream> Implementations;
+using Implementations = Types<Http1Upstream, Http2Upstream>;
 
 TYPED_TEST_SUITE(HttpUpstreamTest, Implementations);
 

@@ -26,7 +26,7 @@ public:
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
-    conn_pool_ =
+    pool_data_ =
         thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
@@ -42,13 +42,15 @@ public:
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return pool_data_.value().host();
+  }
 
-  bool valid() { return conn_pool_ != nullptr; }
+  bool valid() { return pool_data_.has_value(); }
 
 protected:
   // Points to the actual connection pool to create streams from.
-  Envoy::Http::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Envoy::Upstream::HttpPoolData> pool_data_{};
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
@@ -80,6 +82,10 @@ public:
   void resetStream() override {
     request_encoder_->getStream().removeCallbacks(*this);
     request_encoder_->getStream().resetStream(Envoy::Http::StreamResetReason::LocalReset);
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    request_encoder_->getStream().setAccount(std::move(account));
   }
 
   // Http::StreamCallbacks

@@ -7,7 +7,6 @@ using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -1190,6 +1189,47 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Observe that we strip the trailing dot.
+TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

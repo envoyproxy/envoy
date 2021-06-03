@@ -16,10 +16,10 @@ class AutoSniIntegrationTest : public testing::TestWithParam<Network::Address::I
                                public Event::TestUsingSimulatedTime,
                                public HttpIntegrationTest {
 public:
-  AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  AutoSniIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void setup() {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& cluster_config = bootstrap.mutable_static_resources()->mutable_clusters()->at(0);
@@ -41,7 +41,7 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(), Http::CodecType::HTTP1);
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {

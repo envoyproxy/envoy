@@ -8,6 +8,54 @@
 namespace Envoy {
 namespace Upstream {
 
+// HttpPoolData returns information about a given pool as well as a function
+// to create streams on that pool.
+class HttpPoolData {
+public:
+  using OnNewStreamFn = std::function<void()>;
+
+  HttpPoolData(OnNewStreamFn on_new_stream, Http::ConnectionPool::Instance* pool)
+      : on_new_stream_(on_new_stream), pool_(pool) {}
+
+  Envoy::Http::ConnectionPool::Cancellable*
+  newStream(Http::ResponseDecoder& response_decoder,
+            Envoy::Http::ConnectionPool::Callbacks& callbacks) {
+    on_new_stream_();
+    return pool_->newStream(response_decoder, callbacks);
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
+
+private:
+  friend class HttpPoolDataPeer;
+
+  OnNewStreamFn on_new_stream_;
+  Http::ConnectionPool::Instance* pool_;
+};
+
+// Tcp pool returns information about a given pool, as well as a function to
+// create connections on that pool.
+class TcpPoolData {
+public:
+  using OnNewConnectionFn = std::function<void()>;
+
+  TcpPoolData(OnNewConnectionFn on_new_connection, Tcp::ConnectionPool::Instance* pool)
+      : on_new_connection_(on_new_connection), pool_(pool) {}
+
+  Envoy::Tcp::ConnectionPool::Cancellable*
+  newConnection(Envoy::Tcp::ConnectionPool::Callbacks& callbacks) {
+    on_new_connection_();
+    return pool_->newConnection(callbacks);
+  }
+
+  Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
+
+private:
+  friend class TcpPoolDataPeer;
+  OnNewConnectionFn on_new_connection_;
+  Tcp::ConnectionPool::Instance* pool_;
+};
+
 /**
  * A thread local cluster instance that can be used for direct load balancing and host set
  * interactions. In general, an instance of ThreadLocalCluster can only be safely used in the
@@ -42,10 +90,11 @@ public:
    * @param priority the connection pool priority.
    * @param downstream_protocol the downstream protocol (if one exists) to use in protocol
    *        selection.
-   * @param context the optional load balancer context.
-   * @return the connection pool or nullptr if there is no host available in the cluster.
+   * @param context the optional load balancer context. Must continue to be
+   *        valid until newConnection is called on the pool (if it is to be called).
+   * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
-  virtual Http::ConnectionPool::Instance*
+  virtual absl::optional<HttpPoolData>
   httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
                LoadBalancerContext* context) PURE;
 
@@ -55,11 +104,12 @@ public:
    * is used is the one defined on the cluster when it was created.
    *
    * @param priority the connection pool priority.
-   * @param context the optional load balancer context.
-   * @return the connection pool or nullptr if there is no host available in the cluster.
+   * @param context the optional load balancer context. Must continue to be
+   *        valid until newConnection is called on the pool (if it is to be called).
+   * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
-  virtual Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                     LoadBalancerContext* context) PURE;
+  virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
+                                                  LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already

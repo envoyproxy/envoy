@@ -26,8 +26,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.http.original_ip_detection",
-    security_posture = "robust_to_untrusted_downstream",
     # This extension is used from core tests.
     visibility = ["//visibility:public"],
     deps = [

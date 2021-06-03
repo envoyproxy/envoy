@@ -15,8 +15,6 @@
 #include "common/upstream/logical_host.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "extensions/clusters/well_known_names.h"
-
 namespace Envoy {
 namespace Upstream {
 
@@ -80,8 +78,7 @@ private:
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  LogicalDnsClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
+  LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

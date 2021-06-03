@@ -66,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -177,6 +178,11 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
    * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
@@ -192,13 +198,20 @@ public:
    */
   static absl::string_view::size_type getPortStart(absl::string_view host);
 
-  /* Does a common header check ensuring required headers are present.
+  /* Does a common header check ensuring required request headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
    * host/authority for HTTP/1.1 or CONNECT requests.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
-  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+  static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /* Does a common header check ensuring required response headers are present.
+   * Current required response headers only includes :status.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional

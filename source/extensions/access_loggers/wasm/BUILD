@@ -17,7 +17,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//source/common/http:header_map_lib",
-        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/common/wasm:wasm_lib",
     ],
 )
@@ -26,16 +25,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.access_loggers",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":wasm_access_log_lib",
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/access_loggers/wasm/v3:pkg_cc_proto",
     ],

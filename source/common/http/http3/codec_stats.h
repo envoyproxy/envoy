@@ -11,18 +11,13 @@ namespace Http3 {
 
 /**
  * All stats for the HTTP/3 codec. @see stats_macros.h
- * TODO(danzh) populate all of them in codec.
  */
 #define ALL_HTTP3_CODEC_STATS(COUNTER, GAUGE)                                                      \
   COUNTER(dropped_headers_with_underscores)                                                        \
-  COUNTER(header_overflow)                                                                         \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
-  COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
-  COUNTER(trailers)                                                                                \
   COUNTER(tx_reset)                                                                                \
-  COUNTER(metadata_not_supported_error)                                                            \
-  GAUGE(streams_active, Accumulate)
+  COUNTER(metadata_not_supported_error)
 
 /**
  * Wrapper struct for the HTTP/3 codec stats. @see stats_macros.h
