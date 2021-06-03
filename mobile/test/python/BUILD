@@ -42,23 +42,26 @@ py_test(
     ],
 )
 
-py_test(
-    name = "benchmark_envoy_vs_requests",
-    srcs = [
-        "benchmark/__init__.py",
-        "benchmark/envoy_vs_requests.py",
-        "runner.py",
-    ],
-    args = [
-        "test/python/benchmark/envoy_vs_requests.py",
-        "-s",
-    ],
-    main = "runner.py",
-    python_version = "PY3",
-    deps = [
-        "//library/python:envoy_requests",
-        requirement("pytest"),
-        requirement("pytest-benchmark"),
-        requirement("requests"),
-    ],
-)
+# NOTE: these tests do not need to be run in CI by default
+# but we want to automatically detect new python tests
+# so uncomment to run locally
+# py_test(
+#     name = "benchmark_envoy_vs_requests",
+#     srcs = [
+#         "benchmark/__init__.py",
+#         "benchmark/envoy_vs_requests.py",
+#         "runner.py",
+#     ],
+#     args = [
+#         "test/python/benchmark/envoy_vs_requests.py",
+#         "-s",
+#     ],
+#     main = "runner.py",
+#     python_version = "PY3",
+#     deps = [
+#         "//library/python:envoy_requests",
+#         requirement("pytest"),
+#         requirement("pytest-benchmark"),
+#         requirement("requests"),
+#     ],
+# )
