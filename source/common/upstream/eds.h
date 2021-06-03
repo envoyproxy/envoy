@@ -18,7 +18,6 @@
 #include "source/common/config/subscription_base.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -88,7 +87,7 @@ using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
 
 class EdsClusterFactory : public ClusterFactoryImplBase {
 public:
-  EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
+  EdsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.eds") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

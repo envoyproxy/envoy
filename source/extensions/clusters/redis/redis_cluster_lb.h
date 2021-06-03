@@ -11,7 +11,6 @@
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
-#include "source/extensions/clusters/well_known_names.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"

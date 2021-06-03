@@ -8,6 +8,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_time.h"
 
@@ -168,6 +169,20 @@ TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoaderSingleton) {
   // runtime loader.
   ASSERT_TRUE(validateConfig(options_, local_address, component_factory_,
                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest()));
+}
+
+// Test the admin handler stubs used in validation
+TEST(ValidationTest, Admin) {
+  auto local_address =
+      Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]);
+
+  ValidationAdmin admin(local_address);
+  std::string empty = "";
+  Server::Admin::HandlerCb cb;
+  EXPECT_TRUE(admin.addHandler(empty, empty, cb, false, false));
+  EXPECT_TRUE(admin.removeHandler(empty));
+  EXPECT_EQ(1, admin.concurrency());
+  admin.socket();
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -905,41 +905,45 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-Http::ConnectionPool::Instance*
+absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = connPool(priority, protocol, context, false);
+  auto pool = connPool(priority, protocol, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // Now see if another host should be preconnected.
-  // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so preconnecting must be
-  // performed here in anticipation of the new stream.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
-    return connPool(priority, protocol, context, true);
-  });
-  return ret;
+  HttpPoolData data(
+      [this, priority, protocol, context]() -> void {
+        // Now that a new stream is being established, attempt to preconnect.
+        maybePreconnect(*this, parent_.cluster_manager_state_,
+                        [this, &priority, &protocol, &context]() {
+                          return connPool(priority, protocol, context, true);
+                        });
+      },
+      pool);
+  return data;
 }
 
-Tcp::ConnectionPool::Instance*
+absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = tcpConnPool(priority, context, false);
+  auto pool = tcpConnPool(priority, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
-  // be performed here in anticipation of the new connection.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  // Now see if another host should be preconnected.
-  maybePreconnect(*this, parent_.cluster_manager_state_,
-                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
-
-  return ret;
+  TcpPoolData data(
+      [this, priority, context]() -> void {
+        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
+          return tcpConnPool(priority, context, true);
+        });
+      },
+      pool);
+  return data;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,

@@ -12,7 +12,6 @@
 #include "source/extensions/access_loggers/grpc/config_utils.h"
 #include "source/extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
 #include "source/extensions/access_loggers/grpc/tcp_grpc_access_log_impl.h"
-#include "source/extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +36,7 @@ ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig>();
 }
 
-std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
+std::string TcpGrpcAccessLogFactory::name() const { return "envoy.access_loggers.tcp_grpc"; }
 
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.

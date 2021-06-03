@@ -6,7 +6,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/access_loggers/file/config.h"
-#include "source/extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

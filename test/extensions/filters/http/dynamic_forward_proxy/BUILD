@@ -29,7 +29,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
     deps = [
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

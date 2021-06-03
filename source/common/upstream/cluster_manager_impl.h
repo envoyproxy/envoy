@@ -413,11 +413,11 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      Http::ConnectionPool::Instance*
-      httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-                   LoadBalancerContext* context) override;
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context) override;
+      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
+                                                absl::optional<Http::Protocol> downstream_protocol,
+                                                LoadBalancerContext* context) override;
+      absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
+                                              LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
 

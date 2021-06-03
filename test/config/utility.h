@@ -328,6 +328,11 @@ public:
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
 
+  // Populate and return a Http3ProtocolOptions instance based on http2_options.
+  static envoy::config::core::v3::Http3ProtocolOptions
+  http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                              size_t http3_max_stream_receive_window);
+
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
     return api_version == envoy::config::core::v3::ApiVersion::V2;

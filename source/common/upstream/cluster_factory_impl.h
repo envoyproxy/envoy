@@ -43,7 +43,6 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {

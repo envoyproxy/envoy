@@ -28,7 +28,7 @@ class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::I
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                  const bool use_tcp_for_dns_lookups);
+                  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -106,7 +106,8 @@ private:
   Event::TimerPtr timer_;
   ares_channel channel_;
   bool dirty_channel_{};
-  const bool use_tcp_for_dns_lookups_;
+  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options_;
+
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;
 };

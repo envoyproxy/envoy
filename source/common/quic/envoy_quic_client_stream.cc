@@ -58,7 +58,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
                                                   bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
 
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   local_end_stream_ = end_stream;

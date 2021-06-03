@@ -127,6 +127,7 @@ envoy_cc_library(
         "//envoy/network:listener_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/stats:timespan_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/common:non_copyable",
         "//source/common/common:safe_memcpy_lib",
@@ -421,6 +422,7 @@ envoy_cc_library(
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
+        "//source/common/quic:quic_stat_names_lib",
     ]),
 )
 

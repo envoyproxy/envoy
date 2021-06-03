@@ -14,7 +14,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -119,8 +118,7 @@ using OriginalDstClusterSharedPtr = std::shared_ptr<OriginalDstCluster>;
 
 class OriginalDstClusterFactory : public ClusterFactoryImplBase {
 public:
-  OriginalDstClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) {}
+  OriginalDstClusterFactory() : ClusterFactoryImplBase("envoy.cluster.original_dst") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

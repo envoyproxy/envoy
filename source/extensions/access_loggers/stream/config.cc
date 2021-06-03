@@ -14,7 +14,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/access_loggers/common/stream_access_log_common_impl.h"
-#include "source/extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +33,7 @@ ProtobufTypes::MessagePtr StdoutAccessLogFactory::createEmptyConfigProto() {
       new envoy::extensions::access_loggers::stream::v3::StdoutAccessLog()};
 }
 
-std::string StdoutAccessLogFactory::name() const { return AccessLogNames::get().Stdout; }
+std::string StdoutAccessLogFactory::name() const { return "envoy.access_loggers.stdout"; }
 
 /**
  * Static registration for the file access log. @see RegisterFactory.
@@ -55,7 +54,7 @@ ProtobufTypes::MessagePtr StderrAccessLogFactory::createEmptyConfigProto() {
       new envoy::extensions::access_loggers::stream::v3::StderrAccessLog()};
 }
 
-std::string StderrAccessLogFactory::name() const { return AccessLogNames::get().Stderr; }
+std::string StderrAccessLogFactory::name() const { return "envoy.access_loggers.stderr"; }
 
 /**
  * Static registration for the `stderr` access log. @see RegisterFactory.

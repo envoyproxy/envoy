@@ -248,20 +248,18 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
         envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-  } else if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
-        http2_options.value().override_stream_error_on_invalid_http_message().value());
-  } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+#ifdef ENVOY_ENABLE_QUIC
+  } else {
+    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+        http2_options.value(), quic::kStreamReceiveWindowLimit);
+#endif
   }
   cluster->http2_options_ = http2_options.value();
-  cluster->http3_options_ = http3_options;
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
@@ -1000,20 +998,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_encoder_filter,
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
-    // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.filters.http.cors");
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* cors = virtual_host->mutable_cors();
-            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
-            cors->set_allow_headers("content-type,x-grpc-web");
-            cors->set_allow_methods("GET,POST");
-          }
-        });
+    // Add a filter to make sure 100s play well with them.
+    config_helper_.addFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

@@ -28,18 +28,18 @@ ActiveQuicListener::ActiveQuicListener(
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
     const quic::QuicConfig& quic_config, Network::Socket::OptionsSharedPtr options,
     bool kernel_worker_routing, const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
-    uint32_t packets_received_to_connection_count_ratio)
+    QuicStatNames& quic_stat_names, uint32_t packets_received_to_connection_count_ratio)
     : ActiveQuicListener(worker_index, concurrency, dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
                          quic_config, std::move(options), kernel_worker_routing, enabled,
-                         packets_received_to_connection_count_ratio) {}
+                         quic_stat_names, packets_received_to_connection_count_ratio) {}
 
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::SocketSharedPtr listen_socket,
     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
     Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
-    const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+    const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
     uint32_t packets_to_read_to_connection_count_ratio)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
@@ -87,7 +87,7 @@ ActiveQuicListener::ActiveQuicListener(
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_);
+      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -227,8 +227,9 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
 }
 
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
-    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency)
-    : concurrency_(concurrency), enabled_(config.enabled()),
+    const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
+    QuicStatNames& quic_stat_names)
+    : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
@@ -314,9 +315,10 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
   }
 #endif
 
-  return std::make_unique<ActiveQuicListener>(
-      worker_index, concurrency_, disptacher, parent, config, quic_config_, std::move(options),
-      kernel_worker_routing, enabled_, packets_to_read_to_connection_count_ratio_);
+  return std::make_unique<ActiveQuicListener>(worker_index, concurrency_, disptacher, parent,
+                                              config, quic_config_, std::move(options),
+                                              kernel_worker_routing, enabled_, quic_stat_names_,
+                                              packets_to_read_to_connection_count_ratio_);
 } // namespace Quic
 
 } // namespace Quic

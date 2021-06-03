@@ -55,7 +55,6 @@
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
-#include "source/extensions/clusters/well_known_names.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
@@ -289,8 +288,7 @@ private:
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                                 envoy::extensions::clusters::redis::v3::RedisClusterConfig> {
 public:
-  RedisClusterFactory()
-      : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Redis) {}
+  RedisClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.redis") {}
 
 private:
   friend class RedisClusterTest;

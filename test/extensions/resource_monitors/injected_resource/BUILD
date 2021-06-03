@@ -13,6 +13,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "injected_resource_monitor_integration_test",
+    srcs = ["injected_resource_monitor_integration_test.cc"],
+    deps = [
+        "//source/extensions/resource_monitors/injected_resource:config",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
     deps = [

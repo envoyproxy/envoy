@@ -17,7 +17,7 @@ MockRequestEncoder::MockRequestEncoder() {
       .WillByDefault(Invoke([](const RequestHeaderMap& headers, bool) -> Status {
         // Check to see that method is not-null. Path can be null for CONNECT and authority can be
         // null at the codec level.
-        ASSERT(HeaderUtility::checkRequiredHeaders(headers).ok());
+        ASSERT(HeaderUtility::checkRequiredRequestHeaders(headers).ok());
         return okStatus();
       }));
 }

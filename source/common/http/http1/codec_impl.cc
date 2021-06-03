@@ -402,7 +402,7 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();

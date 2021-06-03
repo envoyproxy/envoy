@@ -335,7 +335,7 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {

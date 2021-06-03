@@ -71,7 +71,6 @@ envoy_cc_extension(
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
-        "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_proto_descriptors_lib",
         "//source/extensions/access_loggers/open_telemetry:grpc_access_log_lib",
