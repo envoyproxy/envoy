@@ -412,9 +412,27 @@ void InstanceImpl::initialize(const Options& options,
     server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
-  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  bootstrap_.mutable_node()->set_user_agent_name("envoy");
-  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  // If user has set user_agent_name in the bootstrap config, use it.
+  // Default to "envoy" if unset.
+  if (bootstrap_.node().user_agent_name().empty()) {
+    bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  }
+
+  // If user has set user_agent_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_version().empty()) {
+    std::string user_agent_version = bootstrap_.node().user_agent_version();
+    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(user_agent_version);
+  } else {
+    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  }
+
+  // If user has set user_agent_build_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
+    *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  }
+
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
