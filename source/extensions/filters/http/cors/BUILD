@@ -31,10 +31,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",

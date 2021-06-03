@@ -115,7 +115,10 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2,
+                              Http::CodecClient::Type::HTTP3},
+                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
@@ -221,17 +224,29 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   updateResource(0.95);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                1);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
-  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
-  EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                         std::chrono::milliseconds(1000)));
+  IntegrationStreamDecoderPtr response;
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    // For HTTP/3, excess connections are force-rejected.
+    codec_client_ =
+        makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
+    EXPECT_TRUE(codec_client_->disconnected());
+  } else {
+    // For HTTP/2 and below, excess connection won't be accepted, but will hang out
+    // in a pending state and resume below.
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+    EXPECT_FALSE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                           std::chrono::milliseconds(1000)));
+  }
 
   // Reduce load a little to allow the connection to be accepted.
   updateResource(0.9);
   test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
                                0);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  }
   EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
