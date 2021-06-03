@@ -2,10 +2,23 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import BazelChecker, Checker, CheckerSummary, ForkingChecker
+from tools.base.runner import BazelRunner, ForkingRunner
 
 
 class DummyChecker(Checker):
+
+    def __init__(self):
+        self.args = PropertyMock()
+
+
+class DummyForkingChecker(ForkingChecker):
+
+    def __init__(self):
+        self.args = PropertyMock()
+
+
+class DummyBazelChecker(BazelChecker):
 
     def __init__(self):
         self.args = PropertyMock()
@@ -497,20 +510,6 @@ def test_checker_succeed(patches, log, success):
         assert not m_log.return_value.info.called
 
 
-# ForkingChecker tests
-
-def test_forkingchecker_fork():
-    checker = ForkingChecker("path1", "path2", "path3")
-    forking_mock = patch("tools.base.checker.runner.ForkingAdapter")
-
-    with forking_mock as m_fork:
-        assert checker.fork == m_fork.return_value
-    assert (
-        list(m_fork.call_args)
-        == [(checker,), {}])
-    assert "fork" in checker.__dict__
-
-
 # CheckerSummary tests
 
 def test_checker_summary_constructor():
@@ -639,3 +638,19 @@ def test_checker_summary_print_failed(patches, problem_type, max_display, proble
     assert (
         list(list(c) for c in m_section.call_args_list)
         == expected)
+
+
+# ForkingChecker test
+
+def test_forkingchecker_constructor():
+    checker = DummyForkingChecker()
+    assert isinstance(checker, ForkingRunner)
+    assert isinstance(checker, Checker)
+
+
+# BazelChecker test
+
+def test_bazelchecker_constructor():
+    checker = DummyBazelChecker()
+    assert isinstance(checker, BazelRunner)
+    assert isinstance(checker, Checker)

@@ -66,9 +66,9 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override;
+  Network::DnsResolverSharedPtr createDnsResolver(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
@@ -92,6 +92,7 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
+  bool trackedObjectStackIsEmpty() const override { return tracked_object_stack_.empty(); }
   MonotonicTime approximateMonotonicTime() const override;
   void updateApproximateMonotonicTime() override;
   void shutdown() override;

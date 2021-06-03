@@ -16,6 +16,14 @@
 #include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
+
+namespace Grpc {
+
+// Support parameterizing over gRPC client type.
+enum class ClientType { EnvoyGrpc, GoogleGrpc };
+
+} // namespace Grpc
+
 class TestEnvironment {
 public:
   using PortMap = absl::node_hash_map<std::string, uint32_t>;
@@ -53,6 +61,13 @@ public:
    * types to test.
    */
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
+
+  /**
+   * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
+   * `--define google_grpc=disabled`.
+   * @return a vector of Grpc versions to test.
+   */
+  static std::vector<Grpc::ClientType> getsGrpcVersionsForTest();
 
   /**
    * Obtain command-line options reference.

@@ -8,6 +8,7 @@
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/resolver.pb.h"
 #include "envoy/config/core/v3/udp_socket_config.pb.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/file_event.h"
@@ -117,6 +118,11 @@ public:
   virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
 
   /**
+   * Whether the tracked object stack is empty.
+   */
+  virtual bool trackedObjectStackIsEmpty() const PURE;
+
+  /**
    * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
@@ -203,13 +209,13 @@ public:
    * dispatcher.
    * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
    * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
-   * @param use_tcp_for_dns_lookups if set to true, tcp will be used to perform dns lookups.
-   * Otherwise, udp is used.
+   * @param dns_resolver_options supplies the aggregated area options flags needed for dns resolver
+   * init.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
   createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    bool use_tcp_for_dns_lookups) PURE;
+                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

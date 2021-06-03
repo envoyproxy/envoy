@@ -94,7 +94,7 @@ public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
                           bool client_connect_handshaker, bool capturing_handshaker = false)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
         server_connect_handshaker_(server_connect_handshaker),
         client_connect_handshaker_(client_connect_handshaker),
@@ -183,6 +183,8 @@ public:
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
     auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
+    client_tsi_socket_->setActualFrameSizeToUse(16384);
+    client_tsi_socket_->setFrameOverheadSize(4);
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                std::move(client_transport_socket), nullptr);
   }

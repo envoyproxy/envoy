@@ -2,7 +2,6 @@
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/tracers/common/ot/opentracing_driver_impl.h"

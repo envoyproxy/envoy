@@ -296,17 +296,25 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   }
 }
 
-Http::HeaderTransforms
-HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                         bool do_formatting) const {
   Http::HeaderTransforms transforms;
 
   for (const auto& [key, entry] : headers_to_add_) {
-    const std::string value = entry.formatter_->format(stream_info);
-    if (!value.empty()) {
+    if (do_formatting) {
+      const std::string value = entry.formatter_->format(stream_info);
+      if (!value.empty()) {
+        if (entry.formatter_->append()) {
+          transforms.headers_to_append.push_back({key, value});
+        } else {
+          transforms.headers_to_overwrite.push_back({key, value});
+        }
+      }
+    } else {
       if (entry.formatter_->append()) {
-        transforms.headers_to_append.push_back({key, value});
+        transforms.headers_to_append.push_back({key, entry.original_value_});
       } else {
-        transforms.headers_to_overwrite.push_back({key, value});
+        transforms.headers_to_overwrite.push_back({key, entry.original_value_});
       }
     }
   }

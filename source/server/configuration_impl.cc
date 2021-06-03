@@ -233,8 +233,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     if (layered_runtime_.layers().empty()) {
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
-  } else {
-    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
   }
   if (enable_deprecated_v2_api_) {
     auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();

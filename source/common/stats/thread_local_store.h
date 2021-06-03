@@ -445,8 +445,8 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
-    void eraseScope(uint64_t scope_id);
-    void eraseHistogram(uint64_t histogram);
+    void eraseScopes(const std::vector<uint64_t>& scope_ids);
+    void eraseHistograms(const std::vector<uint64_t>& histograms);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
@@ -472,8 +472,8 @@ private:
   }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
-  void clearHistogramFromCaches(uint64_t histogram_id);
+  void clearScopesFromCaches();
+  void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -499,6 +499,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   AllocatorImpl heap_allocator_;
+  OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
@@ -526,6 +527,19 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
+
+  // Scope IDs and central cache entries that are queued for cross-scope release.
+  // Because there can be a large number of scopes, all of which are released at once,
+  // (e.g. when a scope is deleted), it is more efficient to batch their cleanup,
+  // which would otherwise entail a post() per scope per thread.
+  std::vector<uint64_t> scopes_to_cleanup_ ABSL_GUARDED_BY(lock_);
+  std::vector<CentralCacheEntrySharedPtr> central_cache_entries_to_cleanup_ ABSL_GUARDED_BY(lock_);
+
+  // Histograms IDs that are queued for cross-scope release. Because there
+  // can be a large number of histograms, all of which are released at once,
+  // (e.g. when a scope is deleted), it is likely more efficient to batch their
+  // cleanup, which would otherwise entail a post() per histogram per thread.
+  std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

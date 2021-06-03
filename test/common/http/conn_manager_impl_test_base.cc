@@ -2,6 +2,8 @@
 
 #include "extensions/request_id/uuid/config.h"
 
+#include "test/common/http/xff_extension.h"
+
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
@@ -33,6 +35,8 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
+
+  ip_detection_extensions_.push_back(getXFFExtension(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {
@@ -259,6 +263,31 @@ void HttpConnectionManagerImplTest::doRemoteClose(bool deferred) {
   EXPECT_CALL(stream_, removeCallbacks(_));
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+void HttpConnectionManagerImplTest::testPathNormalization(
+    const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{std::make_unique<TestRequestHeaderMapImpl>(request_headers)};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        TestResponseHeaderMapImpl copy{headers};
+        copy.remove(Envoy::Http::LowerCaseString{"date"});
+        copy.remove(Envoy::Http::LowerCaseString{"server"});
+        EXPECT_THAT(&copy, HeaderMapEqualIgnoreOrder(&expected_response));
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
 }
 
 } // namespace Http

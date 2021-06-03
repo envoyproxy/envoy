@@ -116,7 +116,7 @@ public:
   static std::string baseConfig();
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig();
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter();
@@ -137,6 +137,9 @@ public:
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
+  // A cluster that uses the startTls transport socket.
+  static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address,
+                                                                  int port);
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
@@ -229,6 +232,12 @@ public:
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
 
+  // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
+  void configDownstreamTransportSocketWithTls(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context);
+
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
@@ -309,10 +318,20 @@ public:
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
 
+  // Adjust the upstream route with larger timeout if running tsan. This is the duration between
+  // whole request being processed and whole response received.
+  static void adjustUpstreamTimeoutForTsan(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
+
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+
+  // Populate and return a Http3ProtocolOptions instance based on http2_options.
+  static envoy::config::core::v3::Http3ProtocolOptions
+  http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                              size_t http3_max_stream_receive_window);
 
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {

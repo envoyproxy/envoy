@@ -1,4 +1,5 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
+#include "test/common/http/custom_header_extension.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
@@ -272,8 +273,6 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeoutNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timeout_ = (std::chrono::milliseconds(10));
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
-      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* idle_timer = setUpTimer();
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(false, "");
@@ -352,8 +351,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   max_connection_duration_ = (std::chrono::milliseconds(10));
-  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, timeout())
-      .WillByDefault(Return(std::chrono::milliseconds(0)));
   Event::MockTimer* connection_duration_timer = setUpTimer();
   EXPECT_CALL(*connection_duration_timer, enableTimer(_, _));
   setup(false, "");
@@ -1741,7 +1738,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithAllContinue) {
 }
 
 // This test verifies proper sequences of decodeData() and encodeData() are called
-// when the first filer is "stopped" and "continue" in following case:
+// when the first filter is "stopped" and "continue" in following case:
 //
 // 3 decode filters:
 //
@@ -2187,21 +2184,9 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
-class DrainH2HttpConnectionManagerImplTest : public HttpConnectionManagerImplTest,
-                                             public testing::WithParamInterface<bool> {
-public:
-  DrainH2HttpConnectionManagerImplTest() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2", "true"}});
-  }
-
-private:
-  TestScopedRuntime runtime_;
-};
-
-// Verify that, if the runtime option is enabled, HTTP2 connections will receive
-// a GOAWAY message when the overload action is triggered.
-TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
+// Verify that HTTP2 connections will receive a GOAWAY message when the overload action is
+// triggered.
+TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
   Server::OverloadActionState disable_http_keep_alive = Server::OverloadActionState::saturated();
   ON_CALL(overload_manager_.overload_state_,
           getState(Server::OverloadActionNames::get().DisableHttpKeepAlive))
@@ -2209,9 +2194,7 @@ TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded
 
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  if (GetParam()) {
-    EXPECT_CALL(*codec_, shutdownNotice);
-  }
+  EXPECT_CALL(*codec_, shutdownNotice);
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -2243,9 +2226,6 @@ TEST_P(DrainH2HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded
   Mock::VerifyAndClearExpectations(codec_);
   EXPECT_EQ(1, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
-
-INSTANTIATE_TEST_SUITE_P(WithRuntimeOverride, DrainH2HttpConnectionManagerImplTest,
-                         testing::Bool());
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
   setup(false, "envoy-custom-server", false);
@@ -3033,6 +3013,29 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   // Only scoped route config provider valid.
   EXPECT_NO_THROW(conn_manager_->onData(fake_input, false));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RequestRejectedViaIPDetection) {
+  OriginalIPRejectRequestOptions reject_options = {Http::Code::Forbidden, "ip detection failed"};
+  auto extension = getCustomHeaderExtension("x-ip", reject_options);
+  ip_detection_extensions_.push_back(extension);
+
+  use_remote_address_ = false;
+
+  setup(false, "");
+
+  // 403 direct response when IP detection fails.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("403", headers.getStatusValue());
+      }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  startRequest();
+
+  EXPECT_EQ("ip detection failed", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_rejected_via_ip_detection_.value());
 }
 
 } // namespace Http

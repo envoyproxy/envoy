@@ -23,8 +23,6 @@
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "extensions/access_loggers/well_known_names.h"
-
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -110,7 +108,7 @@ public:
   accessLogConfig(const std::string& access_log_format) {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
     envoy::config::accesslog::v3::AccessLog* access_log = config.mutable_access_log()->Add();
-    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
+    access_log->set_name("envoy.access_loggers.file");
     envoy::extensions::access_loggers::file::v3::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(

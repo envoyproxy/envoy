@@ -616,7 +616,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   filter_config_per_route.set_disabled(true);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
@@ -645,7 +645,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
@@ -733,7 +733,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 

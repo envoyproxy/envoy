@@ -8,7 +8,7 @@ namespace Quic {
 namespace {
 Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, size_t payload_len) {
   switch (quic_result.status) {
-  case quic::WRITE_STATUS_OK: {
+  case quic::WRITE_STATUS_OK:
     if (quic_result.bytes_written == 0) {
       ENVOY_LOG_MISC(trace, "sendmsg successful, message buffered to send");
     } else {
@@ -18,23 +18,20 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
     return Api::IoCallUint64Result(
         /*rc=*/payload_len,
         /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
-  }
-  case quic::WRITE_STATUS_BLOCKED_DATA_BUFFERED: {
+  case quic::WRITE_STATUS_BLOCKED_DATA_BUFFERED:
     // Data was buffered, Return payload_len as rc & nullptr as error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message buffered to send");
     return Api::IoCallUint64Result(
         /*rc=*/payload_len,
         /*err=*/Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
-  }
-  case quic::WRITE_STATUS_BLOCKED: {
+  case quic::WRITE_STATUS_BLOCKED:
     // Writer blocked, return error
     ENVOY_LOG_MISC(trace, "sendmsg blocked, message not buffered");
     return Api::IoCallUint64Result(
         /*rc=*/0,
         /*err=*/Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
                                 Network::IoSocketError::deleteIoError));
-  }
-  default: {
+  default:
     // Write Failed, return {0 and error_code}
     ENVOY_LOG_MISC(trace, "sendmsg failed with error code {}",
                    static_cast<int>(quic_result.error_code));
@@ -42,7 +39,6 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
         /*rc=*/0,
         /*err=*/Api::IoErrorPtr(new Network::IoSocketError(quic_result.error_code),
                                 Network::IoSocketError::deleteIoError));
-  }
   }
 }
 

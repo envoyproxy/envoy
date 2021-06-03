@@ -40,7 +40,6 @@ static_resources:
     type: LOGICAL_DNS
     dns_lookup_family: V4_ONLY
     lb_policy: ROUND_ROBIN
-    connect_timeout: 0.250s
     http_protocol_options: {}
     load_assignment:
       cluster_name: backend-proxy

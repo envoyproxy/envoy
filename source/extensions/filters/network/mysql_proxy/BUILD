@@ -161,9 +161,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["mysql_config.cc"],
     hdrs = ["mysql_config.h"],
-    category = "envoy.filters.network",
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":filter_lib",
         ":terminal_filter_lib",

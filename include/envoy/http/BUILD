@@ -9,6 +9,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "alternate_protocols_cache_interface",
+    hdrs = ["alternate_protocols_cache.h"],
+    deps = [
+        "//include/envoy/common:time_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
     deps = [":codec_interface"],
@@ -84,6 +93,7 @@ envoy_cc_library(
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/tracing:http_tracer_interface",
+        "//source/common/common:scope_tracked_object_stack",
     ],
 )
 
@@ -149,5 +159,17 @@ envoy_cc_library(
     hdrs = ["header_formatter.h"],
     deps = [
         "//include/envoy/config:typed_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "original_ip_detection_interface",
+    hdrs = ["original_ip_detection.h"],
+    deps = [
+        ":codes_interface",
+        ":header_map_interface",
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:address_interface",
+        "//include/envoy/server:factory_context_interface",
     ],
 )

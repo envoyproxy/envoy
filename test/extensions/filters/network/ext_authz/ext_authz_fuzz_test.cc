@@ -14,7 +14,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ReturnRef;
 using testing::WithArgs;
 
 namespace Envoy {

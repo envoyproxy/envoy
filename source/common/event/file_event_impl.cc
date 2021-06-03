@@ -85,7 +85,16 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
 
 void FileEventImpl::updateEvents(uint32_t events) {
   ASSERT(dispatcher_.isThreadSafe());
-  if (events == enabled_events_) {
+  // The update can be skipped in cases where the old and new event mask are the same if the fd is
+  // using Level or EmulatedEdge trigger modes, but not Edge trigger mode. When the fd is registered
+  // in edge trigger mode, re-registering the fd will force re-computation of the readable/writable
+  // state even in cases where the event mask is not changing. See
+  // https://github.com/envoyproxy/envoy/pull/16389 for more details.
+  // TODO(antoniovicente) Consider ways to optimize away event registration updates in edge trigger
+  // mode once setEnabled stops clearing injected_activation_events_ before calling updateEvents
+  // and/or implement optimizations at the Network::ConnectionImpl level to reduce the number of
+  // calls to setEnabled.
+  if (events == enabled_events_ && trigger_ != FileTriggerType::Edge) {
     return;
   }
   auto* base = event_get_base(&raw_event_);
