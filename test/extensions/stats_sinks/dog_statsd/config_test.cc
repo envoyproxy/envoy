@@ -6,7 +6,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
 #include "source/extensions/stat_sinks/dog_statsd/config.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -30,7 +29,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
+  const std::string name = "envoy.stat_sinks.dog_statsd";
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -66,7 +65,7 @@ TEST(DogStatsdConfigTest, ValidateFail) {
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
+  const std::string name = "envoy.stat_sinks.dog_statsd";
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   sink_config.mutable_max_bytes_per_datagram()->set_value(128);
@@ -94,7 +93,7 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
+  const std::string name = "envoy.stat_sinks.dog_statsd";
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -122,7 +121,7 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
+  const std::string name = "envoy.stat_sinks.dog_statsd";
 
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();

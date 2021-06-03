@@ -4,7 +4,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/stat_sinks/hystrix/config.h"
 #include "source/extensions/stat_sinks/hystrix/hystrix.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -23,7 +22,7 @@ namespace Hystrix {
 namespace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = StatsSinkNames::get().Hystrix;
+  const std::string name = "envoy.stat_sinks.hystrix";
 
   envoy::config::metrics::v3::HystrixSink sink_config;
 
