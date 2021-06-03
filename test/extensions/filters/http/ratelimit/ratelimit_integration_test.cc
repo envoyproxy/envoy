@@ -144,17 +144,18 @@ public:
   }
 
   std::string waitForUpstreamResponse(int request_id) {
-    
-
+      AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
     result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests_[request_id]);
     RELEASE_ASSERT(result, result.message());
     result = upstream_requests_[request_id]->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
-    
 
     upstream_requests_[request_id]->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     responses_[request_id]->waitForEndStream();
 
+    EXPECT_TRUE(upstream_requests_[request_id]->complete());
     EXPECT_TRUE(responses_[request_id]->complete());
     return std::string(responses_[request_id]->headers().getStatusValue());
   }
