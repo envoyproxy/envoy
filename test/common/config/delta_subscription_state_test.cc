@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
@@ -590,6 +591,32 @@ TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
 
   // Invoke the TTL.
   ttl_timer_->invokeCallback();
+}
+
+TEST_P(DeltaSubscriptionStateTest, TypeUrlMismatch) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse message;
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> additions;
+  auto* resource = additions.Add();
+  resource->set_name("name1");
+  resource->set_version("version1");
+  resource->mutable_resource()->set_type_url("foo");
+
+  *message.mutable_resources() = additions;
+  *message.mutable_removed_resources() = {};
+  message.set_system_version_info("version1");
+  message.set_nonce("nonce1");
+  message.set_type_url("bar");
+
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _))
+      .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+        EXPECT_TRUE(IsSubstring("", "",
+                                "type URL foo embedded in an individual Any does not match the "
+                                "message-wide type URL bar",
+                                e->what()));
+      }));
+  handleResponse(message);
 }
 
 class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {

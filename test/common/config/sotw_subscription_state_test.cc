@@ -14,6 +14,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::IsSubstring;
 using testing::NiceMock;
 using testing::Throw;
 using testing::UnorderedElementsAre;
@@ -79,7 +80,6 @@ protected:
     response.set_nonce(nonce);
     response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         envoy::config::core::v3::ApiVersion::V3));
-    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& resource_name : resource_names) {
       response.add_resources()->PackFrom(resource(resource_name));
     }
@@ -304,6 +304,25 @@ TEST_F(SotwSubscriptionStateTest, ResourceTTL) {
 
   // Invoke the TTL.
   ttl_timer_->invokeCallback();
+}
+
+TEST_F(SotwSubscriptionStateTest, TypeUrlMismatch) {
+  envoy::service::discovery::v3::DiscoveryResponse response;
+  response.set_version_info("version1");
+  response.set_nonce("nonce1");
+  response.set_type_url("badtypeurl");
+  response.add_resources()->PackFrom(resource("resource"));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _))
+      .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+        EXPECT_TRUE(IsSubstring(
+            "", "",
+            "type URL type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment embedded "
+            "in an individual Any does not match the message-wide type URL badtypeurl",
+            e->what()));
+      }));
+  EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
+  state_->handleResponse(response);
 }
 
 } // namespace
