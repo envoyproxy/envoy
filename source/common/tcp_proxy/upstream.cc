@@ -150,7 +150,7 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : upstream_callbacks_(upstream_callbacks) {
-  conn_pool_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
+  conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
 }
 
 TcpConnPool::~TcpConnPool() {
@@ -165,7 +165,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   // valid connection handle. If newConnection fails inline it may result in attempting to
   // select a new host, and a recursive call to initializeUpstreamConnection. In this case the
   // first call to newConnection will return null and the inner call will persist.
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.value().newConnection(*this);
   if (handle) {
     ASSERT(upstream_handle_ == nullptr);
     upstream_handle_ = handle;
@@ -195,8 +195,8 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecType type)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks) {
-  conn_pool_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, absl::nullopt,
-                                                 context);
+  conn_pool_data_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default,
+                                                      absl::nullopt, context);
 }
 
 HttpConnPool::~HttpConnPool() {
@@ -215,7 +215,7 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
     upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_);
   }
   Tcp::ConnectionPool::Cancellable* handle =
-      conn_pool_->newStream(upstream_->responseDecoder(), *this);
+      conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this);
   if (handle != nullptr) {
     upstream_handle_ = handle;
   }

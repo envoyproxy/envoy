@@ -123,7 +123,7 @@ TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTra
 
 // Verify downstream codec stream flush timeout.
 TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_DOWNSTREAM_HTTP3; // Need to support stream_idle_timeout.
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -147,6 +147,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
+  // TODO(#16751) Need to support keepalive.
   EXCLUDE_DOWNSTREAM_HTTP3;
   constexpr uint64_t interval_ms = 1;
   constexpr uint64_t timeout_ms = 250;
@@ -889,6 +890,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
+  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
   EXCLUDE_DOWNSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
