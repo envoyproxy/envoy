@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -14,19 +14,19 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "common/quic/platform/quic_mem_slice_span_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/common/assert.h"
-#include "common/http/header_utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {

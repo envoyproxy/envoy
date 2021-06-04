@@ -1,8 +1,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"

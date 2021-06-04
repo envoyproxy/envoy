@@ -1,7 +1,7 @@
-#include "common/http/legacy_path_canonicalizer.h"
+#include "source/common/http/legacy_path_canonicalizer.h"
 
-#include "common/chromium_url/url_canon.h"
-#include "common/chromium_url/url_canon_stdstring.h"
+#include "source/common/chromium_url/url_canon.h"
+#include "source/common/chromium_url/url_canon_stdstring.h"
 
 namespace Envoy {
 namespace Http {

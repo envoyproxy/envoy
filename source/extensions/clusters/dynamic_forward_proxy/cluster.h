@@ -5,10 +5,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/logical_host.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/logical_host.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {

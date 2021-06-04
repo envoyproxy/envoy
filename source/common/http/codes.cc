@@ -1,4 +1,4 @@
-#include "common/http/codes.h"
+#include "source/common/http/codes.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"

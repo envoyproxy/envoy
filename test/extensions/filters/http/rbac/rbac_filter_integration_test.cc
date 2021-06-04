@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_protocol_integration.h"
 

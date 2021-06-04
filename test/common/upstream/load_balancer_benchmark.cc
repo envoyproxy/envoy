@@ -4,12 +4,12 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/memory/stats.h"
-#include "common/upstream/maglev_lb.h"
-#include "common/upstream/ring_hash_lb.h"
-#include "common/upstream/subset_lb.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/memory/stats.h"
+#include "source/common/upstream/maglev_lb.h"
+#include "source/common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/subset_lb.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"

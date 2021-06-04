@@ -2,10 +2,9 @@
 
 #include "envoy/network/listener.h"
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_network_connection.h"
-
-#include "server/connection_handler_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/server/connection_handler_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push

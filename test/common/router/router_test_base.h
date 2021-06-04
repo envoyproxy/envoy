@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/context_impl.h"
-#include "common/router/router.h"
-#include "common/stream_info/uint32_accessor_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"

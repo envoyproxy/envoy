@@ -16,8 +16,8 @@ envoy_cc_library(
     name = "tap_config_interface",
     hdrs = ["tap_config.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/http:header_map_interface",
         "//source/extensions/common/tap:tap_interface",
     ],
 )
@@ -41,8 +41,8 @@ envoy_cc_library(
     hdrs = ["tap_filter.h"],
     deps = [
         ":tap_config_interface",
-        "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/http:filter_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/http:filter_interface",
         "//source/extensions/common/tap:extension_config_base",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
@@ -55,7 +55,7 @@ envoy_cc_extension(
     deps = [
         ":tap_config_impl",
         ":tap_filter_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",

@@ -1,10 +1,10 @@
-#include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/skywalking_tracer_impl.h"
 
 #include <memory>
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/path_utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/path_utility.h"
 
 #include "cpp2sky/propagation.h"
 

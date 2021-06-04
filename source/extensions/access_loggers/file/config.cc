@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/file/config.h"
+#include "source/extensions/access_loggers/file/config.h"
 
 #include <memory>
 
@@ -7,13 +7,12 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-#include "common/config/utility.h"
-#include "common/formatter/substitution_format_string.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -8,10 +8,10 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 #if defined(__linux__)
-#include "common/api/os_sys_calls_impl_linux.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
 #endif
 
 #include "test/mocks/common.h"

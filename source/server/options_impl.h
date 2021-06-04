@@ -9,7 +9,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "spdlog/spdlog.h"
 

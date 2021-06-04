@@ -1,18 +1,18 @@
-#include "common/router/header_formatter.h"
+#include "source/common/router/header_formatter.h"
 
 #include <string>
 
 #include "envoy/router/string_accessor.h"
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/stream_info/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"

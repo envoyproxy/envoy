@@ -1,12 +1,12 @@
-#include "common/config/grpc_mux_impl.h"
+#include "source/common/config/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/memory/utils.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/memory/utils.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/container/node_hash_set.h"

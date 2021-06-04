@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/hystrix/config.h"
+#include "source/extensions/stat_sinks/hystrix/config.h"
 
 #include <memory>
 
@@ -6,10 +6,9 @@
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/network/resolver_impl.h"
-
-#include "extensions/stat_sinks/hystrix/hystrix.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

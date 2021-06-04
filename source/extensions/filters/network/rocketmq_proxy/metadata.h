@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "absl/types/optional.h"
 

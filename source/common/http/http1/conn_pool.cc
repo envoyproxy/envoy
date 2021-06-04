@@ -1,4 +1,4 @@
-#include "common/http/http1/conn_pool.h"
+#include "source/common/http/http1/conn_pool.h"
 
 #include <cstdint>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
-#include "common/http/codes.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 

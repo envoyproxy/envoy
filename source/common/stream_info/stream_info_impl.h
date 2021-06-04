@@ -11,11 +11,11 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_reason.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/macros.h"
-#include "common/network/socket_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/macros.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "absl/strings/str_replace.h"
 

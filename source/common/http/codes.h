@@ -8,8 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/thread.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {

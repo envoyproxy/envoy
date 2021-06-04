@@ -1,10 +1,10 @@
-#include "common/common/base64.h"
+#include "source/common/common/base64.h"
 
 #include <cstdint>
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
 
 #include "absl/container/fixed_array.h"
 

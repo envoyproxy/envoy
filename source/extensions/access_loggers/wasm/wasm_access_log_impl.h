@@ -2,9 +2,8 @@
 
 #include "envoy/access_log/access_log.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {

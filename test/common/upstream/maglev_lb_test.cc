@@ -2,7 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/maglev_lb.h"
+#include "source/common/upstream/maglev_lb.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
