@@ -13,12 +13,11 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/c_smart_ptr.h"
-#include "common/common/matchers.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/matchers.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"

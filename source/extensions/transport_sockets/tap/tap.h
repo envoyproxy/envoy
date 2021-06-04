@@ -4,9 +4,9 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "extensions/common/tap/extension_config_base.h"
-#include "extensions/transport_sockets/common/passthrough.h"
-#include "extensions/transport_sockets/tap/tap_config.h"
+#include "source/extensions/common/tap/extension_config_base.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {

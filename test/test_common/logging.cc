@@ -1,6 +1,6 @@
 #include "test/test_common/logging.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/synchronization/mutex.h"
 

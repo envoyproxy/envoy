@@ -5,12 +5,11 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/message_impl.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"

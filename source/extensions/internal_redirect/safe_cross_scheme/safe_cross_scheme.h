@@ -3,8 +3,6 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "extensions/internal_redirect/well_known_names.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -19,7 +17,7 @@ public:
   }
 
   absl::string_view name() const override {
-    return InternalRedirectPredicateValues::get().SafeCrossSchemePredicate;
+    return "envoy.internal_redirect_predicates.safe_cross_scheme";
   }
 };
 

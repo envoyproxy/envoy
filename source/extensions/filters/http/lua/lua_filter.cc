@@ -1,16 +1,16 @@
-#include "extensions/filters/http/lua/lua_filter.h"
+#include "source/extensions/filters/http/lua/lua_filter.h"
 
 #include <atomic>
 #include <memory>
 
 #include "envoy/http/codes.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/config/datasource.h"
-#include "common/crypto/utility.h"
-#include "common/http/message_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/datasource.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
 
 #include "absl/strings/escaping.h"
 

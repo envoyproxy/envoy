@@ -8,7 +8,7 @@
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Server {

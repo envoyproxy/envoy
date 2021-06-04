@@ -1,10 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
-#include "common/common/thread.h"
-
-#include "extensions/transport_sockets/alts/config.h"
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/common/common/thread.h"
+#include "source/extensions/transport_sockets/alts/config.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #ifdef major
 #undef major

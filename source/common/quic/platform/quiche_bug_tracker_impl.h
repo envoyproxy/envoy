@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quic_logging_impl.h"
+#include "source/common/quic/platform/quic_logging_impl.h"
 
 // TODO(wub): Implement exponential back off to avoid performance problems due
 // to excessive QUIC_BUG.

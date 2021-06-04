@@ -1,4 +1,4 @@
-#include "common/protobuf/visitor.h"
+#include "source/common/protobuf/visitor.h"
 
 namespace Envoy {
 namespace ProtobufMessage {

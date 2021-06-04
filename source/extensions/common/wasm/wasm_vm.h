@@ -6,7 +6,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "absl/strings/str_cat.h"
 #include "include/proxy-wasm/wasm_vm.h"

@@ -8,9 +8,9 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/callback_impl.h"
-#include "common/config/config_provider_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"

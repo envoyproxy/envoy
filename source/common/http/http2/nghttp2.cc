@@ -1,6 +1,6 @@
-#include "common/http/http2/nghttp2.h"
+#include "source/common/http/http2/nghttp2.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 // nghttp2 fails to convey the POSIX ssize_t declaration
 // that Microsoft declines to implement. Pick up a valid

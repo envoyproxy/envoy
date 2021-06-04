@@ -18,7 +18,6 @@ envoy_cc_extension(
     deps = [
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
-        "//source/extensions/clusters:well_known_names",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/aggregate/v3:pkg_cc_proto",
     ],

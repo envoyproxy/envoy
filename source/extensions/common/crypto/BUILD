@@ -27,7 +27,7 @@ envoy_cc_extension(
         "//test/common/crypto:__subpackages__",
     ],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
         "//source/common/crypto:utility_lib",
     ],

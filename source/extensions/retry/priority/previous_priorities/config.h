@@ -3,9 +3,8 @@
 #include "envoy/extensions/retry/priority/previous_priorities/v3/previous_priorities_config.pb.h"
 #include "envoy/upstream/retry.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/retry/priority/previous_priorities/previous_priorities.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/retry/priority/previous_priorities/previous_priorities.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -13,10 +13,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/api_version.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/router/scoped_rds.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/protobuf/mocks.h"

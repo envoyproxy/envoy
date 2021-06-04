@@ -4,11 +4,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quiche_flags_impl.h"
+#include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include <set>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"

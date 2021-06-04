@@ -1,4 +1,4 @@
-#include "exe/main_common.h"
+#include "source/exe/main_common.h"
 
 #include <fstream>
 #include <iostream>
@@ -7,26 +7,24 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/perf_annotation.h"
-#include "common/network/utility.h"
-#include "common/stats/thread_local_store.h"
-
-#include "exe/platform_impl.h"
-
-#include "server/config_validation/server.h"
-#include "server/drain_manager_impl.h"
-#include "server/hot_restart_nop_impl.h"
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
-#include "server/server.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/perf_annotation.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/exe/platform_impl.h"
+#include "source/server/config_validation/server.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/hot_restart_nop_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
+#include "source/server/server.h"
 
 #include "absl/debugging/symbolize.h"
 #include "absl/strings/str_split.h"
 
 #ifdef ENVOY_HOT_RESTART
-#include "server/hot_restart_impl.h"
+#include "source/server/hot_restart_impl.h"
 #endif
 
 namespace Envoy {

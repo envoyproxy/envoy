@@ -11,11 +11,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 
-#include "common/common/assert.h"
-#include "common/stats/allocator_impl.h"
-
-#include "server/hot_restarting_child.h"
-#include "server/hot_restarting_parent.h"
+#include "source/common/common/assert.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/server/hot_restarting_child.h"
+#include "source/server/hot_restarting_parent.h"
 
 namespace Envoy {
 namespace Server {

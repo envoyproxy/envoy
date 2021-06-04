@@ -5,10 +5,9 @@
 #include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/http/message_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
