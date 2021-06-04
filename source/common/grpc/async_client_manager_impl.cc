@@ -128,7 +128,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     return client;
   }
   client = factoryForGrpcService(config, scope, skip_cluster_check)->create();
-  // raw_async_client_cache_->setCache(config, client);
+  raw_async_client_cache_->setCache(config, client);
   return client;
 }
 
