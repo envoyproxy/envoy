@@ -55,7 +55,7 @@ public:
   virtual void tryReleaseConnection() PURE;
 
   /**
-   * Checks if we currently waiting for an upstream connection to become available.
+   * Checks if the request is currently waiting for an upstream connection to become available.
    */
   virtual bool waitingForConnection() const PURE;
 };
