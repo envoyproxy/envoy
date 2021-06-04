@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "common/stats/isolated_store_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

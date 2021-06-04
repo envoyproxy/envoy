@@ -7,14 +7,13 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/common/random_generator.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/daemon_broker.h"
-#include "extensions/tracers/xray/sampling_strategy.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/xray/daemon_broker.h"
+#include "source/extensions/tracers/xray/sampling_strategy.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"

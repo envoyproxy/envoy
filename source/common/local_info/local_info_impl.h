@@ -5,9 +5,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/config/context_provider_impl.h"
-#include "common/config/version_converter.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/config/context_provider_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace LocalInfo {

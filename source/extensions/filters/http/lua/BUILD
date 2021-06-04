@@ -18,9 +18,9 @@ envoy_cc_library(
     hdrs = ["lua_filter.h"],
     deps = [
         ":wrappers_lib",
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
         "//source/common/config:datasource_lib",
@@ -40,8 +40,8 @@ envoy_cc_library(
     srcs = ["wrappers.cc"],
     hdrs = ["wrappers.h"],
     deps = [
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/stream_info:stream_info_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/crypto:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
@@ -56,7 +56,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",

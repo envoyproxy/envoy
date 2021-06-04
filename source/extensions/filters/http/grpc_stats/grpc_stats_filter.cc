@@ -1,16 +1,15 @@
-#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
+#include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

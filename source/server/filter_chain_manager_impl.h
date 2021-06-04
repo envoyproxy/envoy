@@ -12,12 +12,11 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/lc_trie.h"
-
-#include "server/filter_chain_factory_context_callback.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/lc_trie.h"
+#include "source/server/filter_chain_factory_context_callback.h"
 
 #include "absl/container/flat_hash_map.h"
 

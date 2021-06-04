@@ -2,8 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {

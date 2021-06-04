@@ -6,10 +6,9 @@
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/cleanup.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+#include "source/common/common/cleanup.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "absl/container/flat_hash_map.h"
 

@@ -16,24 +16,24 @@
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/thread_annotations.h"
-#include "common/http/headers.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread_annotations.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -998,20 +998,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_encoder_filter,
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
-    // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.filters.http.cors");
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* cors = virtual_host->mutable_cors();
-            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
-            cors->set_allow_headers("content-type,x-grpc-web");
-            cors->set_allow_methods("GET,POST");
-          }
-        });
+    // Add a filter to make sure 100s play well with them.
+    config_helper_.addFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

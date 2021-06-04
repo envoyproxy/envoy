@@ -2,7 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"

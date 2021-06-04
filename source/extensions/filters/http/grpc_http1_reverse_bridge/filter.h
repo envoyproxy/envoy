@@ -6,10 +6,9 @@
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 #include "envoy/http/filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/status.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/status.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

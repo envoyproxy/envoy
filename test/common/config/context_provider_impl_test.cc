@@ -1,4 +1,4 @@
-#include "common/config/context_provider_impl.h"
+#include "source/common/config/context_provider_impl.h"
 
 #include "test/common/config/xds_test_utility.h"
 #include "test/test_common/utility.h"

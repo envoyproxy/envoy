@@ -7,11 +7,11 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/process_context_filter.h"

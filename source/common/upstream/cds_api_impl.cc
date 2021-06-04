@@ -1,7 +1,7 @@
-#include "common/upstream/cds_api_impl.h"
+#include "source/common/upstream/cds_api_impl.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/common.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/common.h"
 
 #include "absl/strings/str_join.h"
 

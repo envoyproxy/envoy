@@ -1,4 +1,4 @@
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include <cstdint>
 #include <list>
@@ -13,17 +13,17 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"

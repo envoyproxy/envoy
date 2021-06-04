@@ -4,12 +4,11 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/simulated_time_system.h"

@@ -6,12 +6,12 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
-#include "common/common/fmt.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"

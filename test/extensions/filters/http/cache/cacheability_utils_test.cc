@@ -1,6 +1,6 @@
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "test/test_common/utility.h"
 

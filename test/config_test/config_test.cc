@@ -6,13 +6,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "server/config_validation/server.h"
-#include "server/configuration_impl.h"
-#include "server/options_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/server/config_validation/server.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/instance.h"

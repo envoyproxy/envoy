@@ -1,6 +1,6 @@
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/upstream/mocks.h"

@@ -1,13 +1,12 @@
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {

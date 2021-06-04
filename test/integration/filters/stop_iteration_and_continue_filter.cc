@@ -6,10 +6,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/scope_tracker.h"
-
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/filters/stop_and_continue_filter_config.pb.validate.h"

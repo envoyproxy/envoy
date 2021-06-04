@@ -2,10 +2,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"

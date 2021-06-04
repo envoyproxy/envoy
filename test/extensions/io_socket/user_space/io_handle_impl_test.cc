@@ -1,11 +1,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fancy_logger.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/io_socket/user_space/io_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fancy_logger.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 

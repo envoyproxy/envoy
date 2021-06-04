@@ -2,10 +2,10 @@
 
 #include "envoy/config/context_provider.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/stl_helpers.h"
-#include "common/common/thread.h"
-#include "common/config/xds_context_params.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/stl_helpers.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/xds_context_params.h"
 
 namespace Envoy {
 namespace Config {

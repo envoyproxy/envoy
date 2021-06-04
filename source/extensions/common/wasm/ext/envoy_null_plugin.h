@@ -26,7 +26,7 @@ proxy_wasm::Word resolve_dns(void* raw_context, proxy_wasm::Word dns_address,
 namespace proxy_wasm {
 namespace null_plugin {
 
-#include "extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
+#include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 using GrpcService = envoy::config::core::v3::GrpcService;
 using namespace proxy_wasm::null_plugin;
 
