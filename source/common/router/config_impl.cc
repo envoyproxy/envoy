@@ -63,6 +63,10 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
 
 } // namespace
 
+const std::string& OriginalConnectPort::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.router.original_connect_port");
+}
+
 std::string SslRedirector::newPath(const Http::RequestHeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
@@ -220,16 +224,6 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
       legacy_enabled_(config.has_hidden_envoy_deprecated_enabled()
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
-  for (const auto& origin : config.hidden_envoy_deprecated_allow_origin()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_exact(origin);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
-  for (const auto& regex : config.hidden_envoy_deprecated_allow_origin_regex()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_hidden_envoy_deprecated_regex(regex);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }
@@ -305,6 +299,7 @@ const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return cu
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
+                                       const OptionalHttpFilters& optional_http_filters,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
@@ -371,8 +366,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(),
-                          route.hidden_envoy_deprecated_per_filter_config(), factory_context,
-                          validator),
+                          route.hidden_envoy_deprecated_per_filter_config(), optional_http_filters,
+                          factory_context, validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
@@ -414,7 +409,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       auto cluster_entry = std::make_unique<WeightedClusterEntry>(
-          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster);
+          this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster,
+          optional_http_filters);
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters_.back()->clusterWeight();
     }
@@ -567,6 +563,16 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     request_headers_parser_->evaluateHeaders(headers, stream_info);
   }
 
+  // Restore the port if this was a CONNECT request.
+  // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
+  // CONNECT requests.
+  if (stream_info.filterState().hasData<OriginalConnectPort>(OriginalConnectPort::key()) &&
+      Http::HeaderUtility::getPortStart(headers.getHostValue()) == absl::string_view::npos) {
+    const OriginalConnectPort& original_port =
+        stream_info.filterState().getDataReadOnly<OriginalConnectPort>(OriginalConnectPort::key());
+    headers.setHost(absl::StrCat(headers.getHostValue(), ":", original_port.value()));
+  }
+
   if (!host_rewrite_.empty()) {
     headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
@@ -610,24 +616,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::HeaderTransforms
-RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting) const {
   Http::HeaderTransforms transforms;
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
     // virtual host level headers and finally global connection manager level headers.
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
   } else {
     // Most specific mutations (route-level) take precedence by being applied
     // last: if a header is specified at all levels, the last one applied wins.
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
   }
   return transforms;
 }
@@ -736,7 +747,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
       host_end += 1; // advance to :
     }
   } else {
-    host_end = request_host.rfind(":");
+    host_end = request_host.rfind(':');
   }
 
   if (host_end != absl::string_view::npos) {
@@ -1003,7 +1014,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase* parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
+    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
+    const OptionalHttpFilters& optional_http_filters)
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
       loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
@@ -1012,8 +1024,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.typed_per_filter_config(),
-                          cluster.hidden_envoy_deprecated_per_filter_config(), factory_context,
-                          validator) {
+                          cluster.hidden_envoy_deprecated_per_filter_config(),
+                          optional_http_filters, factory_context, validator) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1030,9 +1042,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info) const {
-  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
-  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  mergeTransforms(transforms,
+                  DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
 }
 
@@ -1044,9 +1057,11 @@ RouteEntryImplBase::WeightedClusterEntry::perFilterConfig(const std::string& nam
 
 PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator), prefix_(route.match().prefix()),
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      prefix_(route.match().prefix()),
       path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1071,9 +1086,11 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
 
 PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
+                                       const OptionalHttpFilters& optional_http_filters,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator), path_(route.match().path()),
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      path_(route.match().path()),
       path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1099,21 +1116,14 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
 
 RegexRouteEntryImpl::RegexRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator) {
-  // TODO(yangminzhu): Use PathMatcher once hidden_envoy_deprecated_regex is removed.
-  if (route.match().path_specifier_case() ==
-      envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        route.match().hidden_envoy_deprecated_regex());
-    regex_str_ = route.match().hidden_envoy_deprecated_regex();
-  } else {
-    ASSERT(route.match().path_specifier_case() ==
-           envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
-    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
-    regex_str_ = route.match().safe_regex().regex();
-  }
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      regex_str_(route.match().safe_regex().regex()),
+      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+  ASSERT(route.match().path_specifier_case() ==
+         envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1121,7 +1131,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(path));
+  ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1136,7 +1146,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (regex_->match(path)) {
+    if (path_matcher_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1145,9 +1155,10 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
 
 ConnectRouteEntryImpl::ConnectRouteEntryImpl(
     const VirtualHostImpl& vhost, const envoy::config::route::v3::Route& route,
+    const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, factory_context, validator) {}
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {}
 
 void ConnectRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                               bool insert_envoy_original_path) const {
@@ -1173,7 +1184,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
 
 VirtualHostImpl::VirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
-    const ConfigImpl& global_route_config,
+    const OptionalHttpFilters& optional_http_filters, const ConfigImpl& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
@@ -1188,8 +1199,8 @@ VirtualHostImpl::VirtualHostImpl(
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(),
-                          virtual_host.hidden_envoy_deprecated_per_filter_config(), factory_context,
-                          validator),
+                          virtual_host.hidden_envoy_deprecated_per_filter_config(),
+                          optional_http_filters, factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
@@ -1222,20 +1233,24 @@ VirtualHostImpl::VirtualHostImpl(
   for (const auto& route : virtual_host.routes()) {
     switch (route.match().path_specifier_case()) {
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
-      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, factory_context, validator));
+      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, optional_http_filters,
+                                                    factory_context, validator));
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
-      routes_.emplace_back(new PathRouteEntryImpl(*this, route, factory_context, validator));
+      routes_.emplace_back(
+          new PathRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
-      routes_.emplace_back(new RegexRouteEntryImpl(*this, route, factory_context, validator));
+      routes_.emplace_back(
+          new RegexRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));
       break;
     }
     case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
-      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, factory_context, validator));
+      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, optional_http_filters,
+                                                     factory_context, validator));
       break;
     }
     default:
@@ -1271,30 +1286,12 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
-  if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
-      virtual_cluster.headers().empty()) {
-    throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
+  if (virtual_cluster.headers().empty()) {
+    throw EnvoyException("virtual clusters must define 'headers'");
   }
 
-  if (!virtual_cluster.hidden_envoy_deprecated_pattern().empty()) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Path.get());
-    matcher_config.set_hidden_envoy_deprecated_regex_match(
-        virtual_cluster.hidden_envoy_deprecated_pattern());
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  } else {
-    ASSERT(!virtual_cluster.headers().empty());
-    headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
-  }
-
-  if (virtual_cluster.hidden_envoy_deprecated_method() !=
-      envoy::config::core::v3::METHOD_UNSPECIFIED) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Method.get());
-    matcher_config.set_exact_match(envoy::config::core::v3::RequestMethod_Name(
-        virtual_cluster.hidden_envoy_deprecated_method()));
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  }
+  ASSERT(!virtual_cluster.headers().empty());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }
@@ -1326,6 +1323,7 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
 }
 
 RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& route_config,
+                           const OptionalHttpFilters& optional_http_filters,
                            const ConfigImpl& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            ProtobufMessage::ValidationVisitor& validator, bool validate_clusters)
@@ -1336,9 +1334,9 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     validation_clusters = factory_context.clusterManager().clusters();
   }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host(new VirtualHostImpl(virtual_host_config, global_route_config,
-                                                          factory_context, *vhost_scope_, validator,
-                                                          validation_clusters));
+    VirtualHostSharedPtr virtual_host(
+        new VirtualHostImpl(virtual_host_config, optional_http_filters, global_route_config,
+                            factory_context, *vhost_scope_, validator, validation_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
       bool duplicate_found = false;
@@ -1492,6 +1490,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
 }
 
 ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
+                       const OptionalHttpFilters& optional_http_filters,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator,
                        bool validate_clusters_default)
@@ -1502,7 +1501,7 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)) {
   route_matcher_ = std::make_unique<RouteMatcher>(
-      config, *this, factory_context, validator,
+      config, optional_http_filters, *this, factory_context, validator,
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, validate_clusters, validate_clusters_default));
 
   for (const std::string& header : config.internal_only_headers()) {
@@ -1522,25 +1521,43 @@ RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
   return route_matcher_->route(cb, headers, stream_info, random_value);
 }
 
-namespace {
+RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFilterConfig(
+    const std::string& name, const ProtobufWkt::Any& typed_config,
+    const ProtobufWkt::Struct& config, const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator) {
+  bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
+  auto factory = Envoy::Config::Utility::getAndCheckFactoryByName<
+      Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
+  if (factory == nullptr) {
+    ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
+    return nullptr;
+  }
 
-RouteSpecificFilterConfigConstSharedPtr
-createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                const ProtobufWkt::Struct& config,
-                                Server::Configuration::ServerFactoryContext& factory_context,
-                                ProtobufMessage::ValidationVisitor& validator) {
-  auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Server::Configuration::NamedHttpFilterConfigFactory>(name);
-  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
-  return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  if (object == nullptr) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.check_unsupported_typed_per_filter_config") &&
+        !is_optional) {
+      throw EnvoyException(
+          fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
+    } else {
+      ENVOY_LOG(warn,
+                "The filter {} doesn't support virtual host-specific configurations. Set runtime "
+                "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
+                "true to reject any invalid virtual-host specific configuration.",
+                name);
+    }
+  }
+  return object;
 }
-
-} // namespace
 
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     const Protobuf::Map<std::string, ProtobufWkt::Struct>& configs,
+    const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   if (!typed_configs.empty() && !configs.empty()) {
@@ -1552,22 +1569,11 @@ PerFilterConfigs::PerFilterConfigs(
     const auto& name =
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createRouteSpecificFilterConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context, validator);
+    auto object =
+        createRouteSpecificFilterConfig(name, it.second, ProtobufWkt::Struct::default_instance(),
+                                        optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
-    } else {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
-        throw EnvoyException(fmt::format(
-            "The filter {} doesn't support virtual host-specific configurations", name));
-      } else {
-        ENVOY_LOG(warn,
-                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
-                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
-                  "true to reject any invalid virtual-host specific configuration.",
-                  name);
-      }
     }
   }
 
@@ -1576,22 +1582,11 @@ PerFilterConfigs::PerFilterConfigs(
     const auto& name =
         Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(),
-                                                  it.second, factory_context, validator);
+    auto object =
+        createRouteSpecificFilterConfig(name, ProtobufWkt::Any::default_instance(), it.second,
+                                        optional_http_filters, factory_context, validator);
     if (object != nullptr) {
       configs_[name] = std::move(object);
-    } else {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.check_unsupported_typed_per_filter_config")) {
-        throw EnvoyException(fmt::format(
-            "The filter {} doesn't support virtual host-specific configurations", name));
-      } else {
-        ENVOY_LOG(warn,
-                  "The filter {} doesn't support virtual host-specific configurations. Set runtime "
-                  "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
-                  "true to reject any invalid virtual-host specific configuration.",
-                  name);
-      }
     }
   }
 }

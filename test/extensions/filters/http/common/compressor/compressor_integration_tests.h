@@ -28,7 +28,7 @@ protected:
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForUpstreamDisconnectOrReset() {
-    if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+    if (upstreamProtocol() != Http::CodecType::HTTP1) {
       return upstream_request_->waitForReset();
     } else {
       return fake_upstream_connection_->waitForDisconnect();

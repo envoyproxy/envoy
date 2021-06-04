@@ -226,6 +226,13 @@ public:
    * @return Event::Dispatcher& the thread local dispatcher.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Returns whether or not global threading has been shutdown.
+   *
+   * @return true if global threading has been shutdown or false if not.
+   */
+  virtual bool isShutdown() const PURE;
 };
 
 } // namespace ThreadLocal

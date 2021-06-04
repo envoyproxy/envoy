@@ -179,10 +179,17 @@ struct ResponseCodeDetailValues {
   const std::string AdminFilterResponse = "admin_filter_response";
   // The original stream was replaced with an internal redirect.
   const std::string InternalRedirect = "internal_redirect";
-  // The request was rejected because configured filters erroneously removed required headers.
-  const std::string FilterRemovedRequiredHeaders = "filter_removed_required_headers";
+  // The request was rejected because configured filters erroneously removed required request
+  // headers.
+  const std::string FilterRemovedRequiredRequestHeaders = "filter_removed_required_request_headers";
+  // The request was rejected because configured filters erroneously removed required response
+  // headers.
+  const std::string FilterRemovedRequiredResponseHeaders =
+      "filter_removed_required_response_headers";
+  // The request was rejected because the original IP couldn't be detected.
+  const std::string OriginalIPDetectionFailed = "rejecting because detection failed";
   // Changes or additions to details should be reflected in
-  // docs/root/configuration/http/http_conn_man/response_code_details_details.rst
+  // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;

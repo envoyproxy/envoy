@@ -325,6 +325,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "scope_tracked_object_stack",
+    hdrs = ["scope_tracked_object_stack.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "stl_helpers",
     hdrs = ["stl_helpers.h"],
 )

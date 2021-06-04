@@ -65,9 +65,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     return FilterStatus::StopIteration;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     callbacks_->sendLocalReply(
         AppException(
             ResponseStatus::ServerError,
@@ -112,8 +111,9 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
   }
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(
-      *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata,
+                                                        callbacks_->serializationType(),
+                                                        callbacks_->protocolType());
   return upstream_request_->start();
 }
 
@@ -188,11 +188,11 @@ void Router::cleanup() {
   }
 }
 
-Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                                          MessageMetadataSharedPtr& metadata,
                                          SerializationType serialization_type,
                                          ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
       protocol_(
           NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(serialization_type)),
       request_complete_(false), response_started_(false), response_complete_(false),
@@ -201,7 +201,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
 Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;

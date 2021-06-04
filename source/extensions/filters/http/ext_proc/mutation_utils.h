@@ -14,8 +14,8 @@ namespace ExternalProcessing {
 class MutationUtils : public Logger::Loggable<Logger::Id::filter> {
 public:
   // Convert a header map until a protobuf
-  static void buildHttpHeaders(const Http::HeaderMap& headers_in,
-                               envoy::config::core::v3::HeaderMap& headers_out);
+  static void headersToProto(const Http::HeaderMap& headers_in,
+                             envoy::config::core::v3::HeaderMap& proto_out);
 
   // Apply mutations that are common to header responses.
   static void
@@ -25,19 +25,20 @@ public:
   // Modify header map based on a set of mutations from a protobuf
   static void
   applyHeaderMutations(const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation,
-                       Http::HeaderMap& headers);
+                       Http::HeaderMap& headers, bool replacing_message);
 
   // Apply mutations that are common to body responses.
   // Mutations will be applied to the header map if it is not null.
   static void applyCommonBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& body,
-                                      Http::HeaderMap* headers, Buffer::Instance& buffer);
+                                      Http::RequestOrResponseHeaderMap* headers,
+                                      Buffer::Instance& buffer);
 
   // Modify a buffer based on a set of mutations from a protobuf
   static void applyBodyMutations(const envoy::service::ext_proc::v3alpha::BodyMutation& mutation,
                                  Buffer::Instance& buffer);
 
 private:
-  static bool isSettableHeader(absl::string_view key);
+  static bool isSettableHeader(absl::string_view key, bool replacing_message);
 };
 
 } // namespace ExternalProcessing

@@ -197,6 +197,7 @@ public:
   // General
   WasmResult log(uint32_t level, absl::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
+  uint64_t getMonotonicTimeNanoseconds() override;
   absl::string_view getConfiguration() override;
   std::pair<uint32_t, absl::string_view> getStatus() override;
 
@@ -209,6 +210,7 @@ public:
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
   WasmResult closeStream(WasmStreamType stream_type) override;
+  void failStream(WasmStreamType stream_type) override;
   WasmResult sendLocalResponse(uint32_t response_code, absl::string_view body_text,
                                Pairs additional_headers, uint32_t grpc_status,
                                absl::string_view details) override;
@@ -352,7 +354,9 @@ protected:
 
   struct GrpcStreamClientHandler : public Grpc::RawAsyncStreamCallbacks {
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap& initial_metadata) override {
+      context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
+    }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
       context_->onGrpcReceiveInitialMetadataWrapper(token_, std::move(metadata));
     }
@@ -414,7 +418,6 @@ protected:
   ::Envoy::Buffer::Instance* network_upstream_data_buffer_{};
 
   // HTTP filter state.
-  bool http_request_started_ = false; // When decodeHeaders() is called the request is "started".
   Http::RequestHeaderMap* request_headers_{};
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};

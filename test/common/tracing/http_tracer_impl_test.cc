@@ -33,6 +33,7 @@ using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
@@ -699,6 +700,15 @@ TEST(HttpTracerUtilityTest, operationTypeToString) {
   EXPECT_EQ("egress", HttpTracerUtility::toString(OperationName::Egress));
 }
 
+TEST(EgressConfigImplTest, EgressConfigImplTest) {
+  EgressConfigImpl config_impl;
+
+  EXPECT_EQ(OperationName::Egress, config_impl.operationName());
+  EXPECT_EQ(nullptr, config_impl.customTags());
+  EXPECT_EQ(false, config_impl.verbose());
+  EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config_impl.maxPathTagLength());
+}
+
 TEST(HttpNullTracerTest, BasicFunctionality) {
   HttpNullTracer null_tracer;
   MockConfig config;
@@ -724,19 +734,22 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
 class HttpTracerImplTest : public testing::Test {
 public:
   HttpTracerImplTest() {
-    driver_ = new MockDriver();
+    driver_ = new NiceMock<MockDriver>();
     DriverPtr driver_ptr(driver_);
     tracer_ = std::make_shared<HttpTracerImpl>(std::move(driver_ptr), local_info_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}, {":authority", "test"}};
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  StreamInfo::MockStreamInfo stream_info_;
+  Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
+                                                    {"content-type", "application/grpc"},
+                                                    {"grpc-status", "7"},
+                                                    {"grpc-message", "permission denied"}};
+  Http::TestResponseTrailerMapImpl response_trailers_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  MockConfig config_;
-  MockDriver* driver_;
+  NiceMock<MockConfig> config_;
+  NiceMock<MockDriver>* driver_;
   HttpTracerSharedPtr tracer_;
 };
 
@@ -762,6 +775,58 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
 
   tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
+}
+
+TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
+  EXPECT_CALL(stream_info_, startTime());
+  EXPECT_CALL(local_info_, nodeName());
+  EXPECT_CALL(config_, operationName()).Times(2).WillRepeatedly(Return(OperationName::Egress));
+
+  NiceMock<MockSpan>* span = new NiceMock<MockSpan>();
+  const std::string operation_name = "egress test";
+  EXPECT_CALL(*driver_, startSpan_(_, _, operation_name, stream_info_.start_time_, _))
+      .WillOnce(Return(span));
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*span, setTag(Eq(Tracing::Tags::get().NodeId), Eq("node_name")));
+
+  auto parent_span =
+      tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
+
+  NiceMock<MockSpan>* second_span = new NiceMock<MockSpan>();
+
+  EXPECT_CALL(*span, spawnChild_(_, _, _)).WillOnce(Return(second_span));
+  auto child_span =
+      parent_span->spawnChild(config_, "fake child of egress test", stream_info_.start_time_);
+
+  const std::string expected_ip = "10.0.0.100";
+  const auto remote_address = Network::Address::InstanceConstSharedPtr{
+      new Network::Address::Ipv4Instance(expected_ip, 0, nullptr)};
+
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  absl::optional<uint32_t> response_code(200);
+  const std::string cluster_name = "fake cluster";
+  const std::string ob_cluster_name = "ob fake cluster";
+  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
+  EXPECT_CALL(stream_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol));
+  EXPECT_CALL(*(stream_info_.host_), address()).WillOnce(Return(remote_address));
+  EXPECT_CALL(stream_info_.host_->cluster_, name()).WillOnce(ReturnRef(cluster_name));
+  EXPECT_CALL(stream_info_.host_->cluster_, observabilityName())
+      .WillOnce(ReturnRef(ob_cluster_name));
+
+  EXPECT_CALL(*second_span, setTag(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/2")));
+  EXPECT_CALL(*second_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq(expected_ip + ":0")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake cluster")));
+  EXPECT_CALL(*second_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("ob fake cluster")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("7")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().GrpcMessage), Eq("permission denied")));
+  EXPECT_CALL(*second_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+
+  HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,
+                                          stream_info_, config_);
 }
 
 } // namespace
