@@ -29,6 +29,7 @@ public:
   void reset(size_t /*index*/) override {}
   uint64_t value(size_t /*index*/) const override { return 0; }
   size_t maxEntries() const override { return 0; }
+  absl::string_view nameSuffix(size_t /*index*/) const override { return ""; }
 
   // Metric
   bool used() const override { return false; }

@@ -197,12 +197,12 @@ public:
   /**
    * Returns the suffix for the name of the counter at the specific index.
    */
-  virtual absl::string_view nameSuffix(size_t index) PURE;
+  virtual absl::string_view nameSuffix(size_t index) const PURE;
 
   /**
    * Returns the number of counters in the group.
    */
-  virtual size_t size() PURE;
+  virtual size_t size() const PURE;
 };
 
 using CounterGroupDescriptorSharedPtr = std::shared_ptr<CounterGroupDescriptor>;
@@ -255,6 +255,13 @@ public:
    * @return The number of entries in the group.
    */
   virtual size_t maxEntries() const PURE;
+
+  /**
+   * Returns the suffix for the name of the counter at the specific index.
+   * @return the suffix for the name of the counter at the specific index.
+   */
+  virtual absl::string_view nameSuffix(size_t index) const PURE;
+
 };
 
 using CounterGroupSharedPtr = RefcountPtr<CounterGroup>;
