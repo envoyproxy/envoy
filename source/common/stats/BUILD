@@ -98,7 +98,7 @@ envoy_cc_library(
     deps = [
         ":metric_impl_lib",
         ":symbol_table_lib",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/stats:stats_interface",
     ],
 )
 
