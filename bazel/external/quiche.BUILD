@@ -73,7 +73,6 @@ test_suite(
         "http2_platform_api_test",
         "quic_platform_api_test",
         "quiche_common_test",
-        "spdy_platform_api_test",
     ],
 )
 
@@ -4047,7 +4046,6 @@ envoy_cc_library(
 envoy_cc_test_library(
     name = "quiche_common_platform_test",
     srcs = [
-        "quiche/common/platform/api/quiche_text_utils_test.cc",
         "quiche/common/platform/api/quiche_time_utils_test.cc",
     ],
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
@@ -4142,17 +4140,6 @@ envoy_cc_test(
         ":http2_platform",
         ":http2_test_tools_random",
         ":quiche_common_test_tools_test_utils_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "spdy_platform_api_test",
-    srcs = ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
-    repository = "@envoy",
-    tags = ["nofips"],
-    deps = [
-        ":quiche_common_test_tools_test_utils_lib",
-        ":spdy_platform",
     ],
 )
 
