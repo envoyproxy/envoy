@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
+        "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",

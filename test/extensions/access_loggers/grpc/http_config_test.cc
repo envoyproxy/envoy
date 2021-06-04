@@ -5,7 +5,6 @@
 #include "envoy/stats/scope.h"
 
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -26,7 +25,7 @@ public:
   void SetUp() override {
     factory_ =
         Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            AccessLogNames::get().HttpGrpc);
+            "envoy.access_loggers.http_grpc");
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();

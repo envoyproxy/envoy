@@ -1920,8 +1920,6 @@ name: passthrough-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndBuffer.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAll) {
-  // encodeMetadata() not supported in QUICHE.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
@@ -1956,8 +1954,6 @@ name: encode-headers-return-stop-all-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
-  // Metadata is not supported in QUICHE.
-  EXCLUDE_DOWNSTREAM_HTTP3
   config_helper_.addFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
@@ -2398,6 +2394,46 @@ TEST_P(DownstreamProtocolIntegrationTest, DisableStripTrailingHostDot) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+}
+
+static std::string remove_response_headers_filter = R"EOF(
+name: remove-response-headers-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
+)EOF";
+
+TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
+  config_helper_.addFilter(remove_response_headers_filter);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  // If a filter chain removes :status from the response headers, then Envoy must reply with
+  // BadGateway and must not crash.
+  ASSERT_TRUE(codec_client_->connected());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
+}
+
+TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
+  config_helper_.addFilter(remove_response_headers_filter);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  // If a filter chain removes :status from the response headers, then Envoy must reply with
+  // BadGateway and not crash.
+  ASSERT_TRUE(codec_client_->connected());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
 }
 
 } // namespace Envoy

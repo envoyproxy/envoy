@@ -33,7 +33,7 @@
 
 #include "extensions/filters/listener/well_known_names.h"
 
-#if defined(ENVOY_ENABLE_QUIC)
+#ifdef ENVOY_ENABLE_QUIC
 #include "common/quic/active_quic_listener.h"
 #include "common/quic/udp_gso_batch_writer.h"
 #endif
@@ -289,15 +289,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
           std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
           cx_limit_runtime_key_)),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
-        if (workers_started_) {
-          parent_.onListenerWarmed(*this);
-        } else {
-          // Notify Server that this listener is
-          // ready.
-          listener_init_target_.ready();
-        }
-      }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            if (workers_started_) {
+                              parent_.onListenerWarmed(*this);
+                            } else {
+                              // Notify Server that this listener is
+                              // ready.
+                              listener_init_target_.ready();
+                            }
+                          })
+#ifdef ENVOY_ENABLE_QUIC
+      ,
+      quic_stat_names_(parent_.quicStatNames())
+#endif
+{
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -360,10 +366,16 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
-        ASSERT(workers_started_);
-        parent_.inPlaceFilterChainUpdate(*this);
-      }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            ASSERT(workers_started_);
+                            parent_.inPlaceFilterChainUpdate(*this);
+                          })
+#ifdef ENVOY_ENABLE_QUIC
+      ,
+      quic_stat_names_(parent_.quicStatNames())
+#endif
+{
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -401,9 +413,9 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
 
   udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
   if (config_.udp_listener_config().has_quic_options()) {
-#if defined(ENVOY_ENABLE_QUIC)
+#ifdef ENVOY_ENABLE_QUIC
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency);
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from

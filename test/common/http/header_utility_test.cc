@@ -215,21 +215,6 @@ exact_match: value
   EXPECT_EQ("value", header_data.value_);
 }
 
-TEST(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(RegexMatchSpecifier)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-name: test-header
-regex_match: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex, header_data.header_match_type_);
-  EXPECT_EQ("", header_data.value_);
-}
-
 TEST(HeaderDataConstructorTest, RangeMatchSpecifier) {
   const std::string yaml = R"EOF(
 name: test-header
@@ -320,13 +305,14 @@ invert_match: true
   EXPECT_EQ(true, header_data.invert_match_);
 }
 
-TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(MayMatchOneOrMoreRequestHeader)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
+TEST(MatchHeadersTest, MayMatchOneOrMoreRequestHeader) {
   TestRequestHeaderMapImpl headers{{"some-header", "a"}, {"other-header", "b"}};
 
   const std::string yaml = R"EOF(
 name: match-header
-regex_match: (a|b)
+safe_regex_match:
+  google_re2: {}
+  regex: (a|b)
   )EOF";
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
@@ -428,23 +414,6 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexMatch)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
-  TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
-                                              {"match-header", "123.456"}};
-  const std::string yaml = R"EOF(
-name: match-header
-regex_match: \d{3}
-  )EOF";
-
-  std::vector<HeaderUtility::HeaderDataPtr> header_data;
-  header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml)));
-  EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
-  EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
-}
-
 TEST(MatchHeadersTest, HeaderSafeRegexMatch) {
   TestRequestHeaderMapImpl matching_headers{{"match-header", "123"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "1234"},
@@ -463,14 +432,16 @@ safe_regex_match:
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
-TEST(MatchHeadersTest, DEPRECATED_FEATURE_TEST(HeaderRegexInverseMatch)) {
+TEST(MatchHeadersTest, HeaderSafeRegexInverseMatch) {
   TestDeprecatedV2Api _deprecated_v2_api;
   TestRequestHeaderMapImpl matching_headers{{"match-header", "1234"}, {"match-header", "123.456"}};
   TestRequestHeaderMapImpl unmatching_headers{{"match-header", "123"}};
 
   const std::string yaml = R"EOF(
 name: match-header
-regex_match: \d{3}
+safe_regex_match:
+  google_re2: {}
+  regex: \d{3}
 invert_match: true
   )EOF";
 

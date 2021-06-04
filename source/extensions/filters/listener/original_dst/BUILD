@@ -44,12 +44,10 @@ envoy_cc_extension(
     hdrs = [
         "config_factory.h",
     ],
-    category = "envoy.filters.listener",
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":config_lib",
         ":original_dst_lib",

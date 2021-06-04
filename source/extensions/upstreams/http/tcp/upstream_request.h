@@ -26,11 +26,11 @@ public:
               const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
               Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
-    conn_pool_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
+    conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
-    upstream_handle_ = conn_pool_->newConnection(*this);
+    upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
 
   bool cancelAnyPendingStream() override {
@@ -41,9 +41,11 @@ public:
     }
     return false;
   }
-  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return conn_pool_data_.value().host();
+  }
 
-  bool valid() { return conn_pool_ != nullptr; }
+  bool valid() { return conn_pool_data_.has_value(); }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -56,7 +58,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  Envoy::Tcp::ConnectionPool::Instance* conn_pool_;
+  absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };

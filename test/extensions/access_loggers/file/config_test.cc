@@ -7,7 +7,6 @@
 
 #include "extensions/access_loggers/common/file_access_log_impl.h"
 #include "extensions/access_loggers/file/config.h"
-#include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
