@@ -3,13 +3,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/server/instance.h"
 
-#include "common/event/real_time_system.h"
-
-#include "exe/main_common.h"
-#include "exe/platform_impl.h"
-
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
+#include "source/common/event/real_time_system.h"
+#include "source/exe/main_common.h"
+#include "source/exe/platform_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
 
 namespace Envoy {
 

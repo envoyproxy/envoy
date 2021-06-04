@@ -2,7 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "library/common/data/utility.h"
 

@@ -7,8 +7,8 @@
 #include "pybind11/stl.h"
 #include "pybind11/complex.h"
 
-#include "common/common/base_logger.h"
-#include "common/http/headers.h"
+#include "source/common/common/base_logger.h"
+#include "source/common/http/headers.h"
 
 #include "library/cc/engine.h"
 #include "library/cc/engine_builder.h"

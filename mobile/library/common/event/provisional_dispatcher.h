@@ -3,8 +3,8 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread_synchronizer.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread_synchronizer.h"
 
 #include "library/common/types/c_types.h"
 

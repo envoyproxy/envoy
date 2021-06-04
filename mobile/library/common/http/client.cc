@@ -1,10 +1,10 @@
 #include "library/common/http/client.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/lock_guard.h"
-#include "common/http/codes.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "library/common/buffer/bridge_fragment.h"
 #include "library/common/data/utility.h"

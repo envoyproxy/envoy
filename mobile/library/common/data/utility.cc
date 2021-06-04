@@ -2,8 +2,8 @@
 
 #include <stdlib.h>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
 
 #include "library/common/buffer/bridge_fragment.h"
 

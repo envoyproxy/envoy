@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"

@@ -2,7 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/non_copyable.h"
+#include "source/common/common/non_copyable.h"
 
 #include "library/common/types/c_types.h"
 

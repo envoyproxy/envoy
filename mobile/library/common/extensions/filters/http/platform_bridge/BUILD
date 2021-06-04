@@ -24,9 +24,7 @@ envoy_cc_extension(
         "c_types.h",
         "filter.h",
     ],
-    category = "envoy.filters.http",
     repository = "@envoy",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":filter_cc_proto",
         "//library/common/api:external_api_lib",
@@ -34,7 +32,7 @@ envoy_cc_extension(
         "//library/common/http:header_utility_lib",
         "//library/common/http:internal_headers_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//include/envoy/http:filter_interface",
+        "@envoy//envoy/http:filter_interface",
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
@@ -44,9 +42,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
     repository = "@envoy",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":platform_bridge_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",

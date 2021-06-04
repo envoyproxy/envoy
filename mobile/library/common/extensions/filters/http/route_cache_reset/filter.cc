@@ -2,8 +2,8 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {

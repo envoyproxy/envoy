@@ -2,7 +2,7 @@
 
 #include "envoy/stats/histogram.h"
 
-#include "common/common/lock_guard.h"
+#include "source/common/common/lock_guard.h"
 
 #include "library/common/config_internal.h"
 #include "library/common/data/utility.h"

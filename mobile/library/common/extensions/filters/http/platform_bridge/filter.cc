@@ -2,9 +2,9 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
 
 #include "library/common/api/external.h"
 #include "library/common/buffer/bridge_fragment.h"

@@ -2,9 +2,8 @@
 
 #include "envoy/http/filter.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 

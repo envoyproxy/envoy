@@ -1,6 +1,6 @@
 #include "external.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
 

@@ -10,6 +10,6 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "//library/common/types:c_types_lib",
-        "@envoy//include/envoy/buffer:buffer_interface",
+        "@envoy//envoy/buffer:buffer_interface",
     ],
 )

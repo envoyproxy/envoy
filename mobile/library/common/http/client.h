@@ -8,8 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-#include "common/http/codec_helper.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codec_helper.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
