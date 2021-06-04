@@ -35,10 +35,10 @@ proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
   }
 }
 
-void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(error, message); }
-void EnvoyWasmVmIntegration::trace(absl::string_view message) { ENVOY_LOG(trace, message); }
+void EnvoyWasmVmIntegration::error(std::string_view message) { ENVOY_LOG(error, message); }
+void EnvoyWasmVmIntegration::trace(std::string_view message) { ENVOY_LOG(trace, message); }
 
-bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, bool returns_word,
+bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, bool returns_word,
                                                int number_of_arguments,
                                                proxy_wasm::NullPlugin* plugin,
                                                void* ptr_to_function_return) {

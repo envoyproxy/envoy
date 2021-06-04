@@ -55,8 +55,9 @@ public:
         zone_stat_name_(zone_stat_name_storage_.statName()),
         dynamic_update_callback_handle_(context_provider_.addDynamicContextUpdateCallback(
             [this](absl::string_view resource_type_url) {
-              (*node_.mutable_dynamic_parameters())[resource_type_url].CopyFrom(
-                  context_provider_.dynamicContext(resource_type_url));
+              (*node_.mutable_dynamic_parameters())
+                  [toStdStringView(resource_type_url)] // NOLINT(std::string_view)
+                      .CopyFrom(context_provider_.dynamicContext(resource_type_url));
             })) {}
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }

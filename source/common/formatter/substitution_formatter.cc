@@ -415,7 +415,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     }
 
     if (serialize_type.empty()) {
-      serialize_type = TYPED_SERIALIZATION;
+      serialize_type = std::string(TYPED_SERIALIZATION);
     }
     if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
       throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");

@@ -136,7 +136,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
                                          absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr), regex_(regex) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(std::string(regex)) {}
 
 bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
@@ -186,7 +186,7 @@ TagExtractorTokensImpl::TagExtractorTokensImpl(absl::string_view name, absl::str
   if (!tokens_.empty()) {
     const absl::string_view first = tokens_[0];
     if (first != "$" && first != "*" && first != "**") {
-      prefix_ = first;
+      prefix_ = std::string(first);
     }
   }
 }
@@ -236,7 +236,7 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTag(tags) = tag_value;
+  addTag(tags) = std::string(tag_value);
   remove_characters.insert(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);
