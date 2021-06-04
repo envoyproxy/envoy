@@ -1,6 +1,24 @@
 Version history
 ---------------
 
+0.4.1 (May 28, 2021)
+====================
+
+Bugfixes:
+
+- Fixes platform-bridged filters crash when resumed asynchronously after stream termination.
+- Disables route timeout by default.
+
+Features:
+
+- Connection classes will open minimum of 2 under most circumstances to a given endpoint and distribute requests between them (previously, only 1).
+- Adds Pulse support for stats tags.
+- Enables configuration of stream idle timeout.
+- Introduces a Python interface compatible with the popular Requests library.
+- Adds experimental QUIC integration test.
+- Adds pure JVM support.
+
+
 0.4.0 (March 23, 2021)
 ======================
 
