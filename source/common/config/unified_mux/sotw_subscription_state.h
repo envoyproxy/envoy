@@ -3,10 +3,10 @@
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/unified_mux/subscription_state.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/unified_mux/subscription_state.h"
 
 #include "absl/types/optional.h"
 

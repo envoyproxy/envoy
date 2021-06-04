@@ -41,9 +41,9 @@ envoy_cc_library(
     name = "subscription_state_lib",
     hdrs = ["subscription_state.h"],
     deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/local_info:local_info_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/local_info:local_info_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:ttl_lib",
         "//source/common/config:update_ack_lib",

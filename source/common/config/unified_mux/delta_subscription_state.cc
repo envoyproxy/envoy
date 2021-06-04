@@ -1,12 +1,11 @@
-#include "common/config/unified_mux/delta_subscription_state.h"
+#include "source/common/config/unified_mux/delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/config/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/hash.h"
+#include "source/common/config/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {

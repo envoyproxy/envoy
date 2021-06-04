@@ -1,8 +1,5 @@
-#include "common/config/unified_mux/sotw_subscription_state.h"
-
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/config/utility.h"
+#include "source/common/config/unified_mux/sotw_subscription_state.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Config {

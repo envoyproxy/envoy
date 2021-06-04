@@ -8,10 +8,10 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/ttl.h"
-#include "common/config/update_ack.h"
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/ttl.h"
+#include "source/common/config/update_ack.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 

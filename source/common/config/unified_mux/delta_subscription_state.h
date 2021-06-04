@@ -2,10 +2,10 @@
 
 #include "envoy/grpc/status.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/unified_mux/subscription_state.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/unified_mux/subscription_state.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
