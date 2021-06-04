@@ -847,7 +847,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(NonRoutableConnection)) {
 
   // Expect filter to try to open a connection to the fallback cluster.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   filter_->onNewConnection();
 
@@ -870,7 +870,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(RoutableConnection)) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   filter_->onNewConnection();
 
@@ -891,7 +891,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   filter_->onNewConnection();
 }
@@ -910,16 +910,14 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-server-name
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(
-          Invoke([](Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            Network::TransportSocketOptionsSharedPtr transport_socket_options =
-                context->upstreamTransportSocketOptions();
-            EXPECT_NE(transport_socket_options, nullptr);
-            EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
-            EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
-            return nullptr;
-          }));
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+            context->upstreamTransportSocketOptions();
+        EXPECT_NE(transport_socket_options, nullptr);
+        EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
+        EXPECT_EQ(transport_socket_options->serverNameOverride().value(), "www.example.com");
+        return absl::nullopt;
+      }));
 
   // Port 9999 is within the specified destination port range.
   connection_.stream_info_.downstream_address_provider_->setLocalAddress(
@@ -942,18 +940,16 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   // Expect filter to try to open a connection to a cluster with the transport socket options with
   // override-application-protocol
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(
-          Invoke([](Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            Network::TransportSocketOptionsSharedPtr transport_socket_options =
-                context->upstreamTransportSocketOptions();
-            EXPECT_NE(transport_socket_options, nullptr);
-            EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
-            EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
-            return nullptr;
-          }));
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+            context->upstreamTransportSocketOptions();
+        EXPECT_NE(transport_socket_options, nullptr);
+        EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());
+        EXPECT_EQ(transport_socket_options->applicationProtocolListOverride().size(), 2);
+        EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[0], "foo");
+        EXPECT_EQ(transport_socket_options->applicationProtocolListOverride()[1], "bar");
+        return absl::nullopt;
+      }));
 
   // Port 9999 is within the specified destination port range.
   connection_.stream_info_.downstream_address_provider_->setLocalAddress(
@@ -986,7 +982,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
       .WillOnce(
@@ -1036,12 +1032,10 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup();
   initializeFilter();
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(
-          Invoke([](Upstream::ResourcePriority,
-                    Upstream::LoadBalancerContext* context) -> Tcp::ConnectionPool::Instance* {
-            EXPECT_TRUE(context->computeHashKey().has_value());
-            return nullptr;
-          }));
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        EXPECT_TRUE(context->computeHashKey().has_value());
+        return absl::nullopt;
+      }));
 
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));

@@ -763,6 +763,10 @@ is present for debugging purposes only.
 - As an ACK or NACK response to a previous :ref:`DeltaDiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryResponse>`. In this case the :ref:`response_nonce <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` is set to the nonce value in the Response. ACK or NACK is determined by the absence or presence of :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>`.
 - Spontaneous :ref:`DeltaDiscoveryRequests <envoy_v3_api_msg_service.discovery.v3.DeltaDiscoveryRequest>` from the client. This can be done to dynamically add or remove elements from the tracked :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set. In this case :ref:`response_nonce <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` must be omitted.
 
+Note that while a :ref:`response_nonce <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` may
+be set on the request, the server must honor changes to the subscription state even if the nonce is stale. The nonce
+may be used to correlate an ack/nack with a server response, but should *not* be used to reject stale requests.
+
 In this first example the client connects and receives a first update
 that it ACKs. The second update fails and the client NACKs the update.
 Later the xDS client spontaneously requests the "wc" resource.

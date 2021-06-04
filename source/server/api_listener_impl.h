@@ -146,7 +146,7 @@ protected:
       bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
       // ScopeTrackedObject
-      void dumpState(std::ostream&, int) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 
       SyntheticReadCallbacks& parent_;
       Network::SocketAddressSetterSharedPtr address_provider_;
