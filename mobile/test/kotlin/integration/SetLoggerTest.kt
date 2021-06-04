@@ -13,43 +13,43 @@ private const val apiListenerType =
   "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
 private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private const val config =
-  """
-    static_resources:
-      listeners:
-      - name: base_api_listener
-        address:
-          socket_address:
-            protocol: TCP
-            address: 0.0.0.0
-            port_value: 10000
-        api_listener:
-          api_listener:
-            "@type": $apiListenerType
-            stat_prefix: hcm
-            route_config:
-              name: api_router
-              virtual_hosts:
-                - name: api
-                  domains:
-                    - "*"
-                  routes:
-                    - match:
-                        prefix: "/"
-                      direct_response:
-                        status: 200
-            http_filters:
-              - name: envoy.filters.http.assertion
-                typed_config:
-                  "@type": $assertionFilterType
-                  match_config:
-                    http_request_headers_match:
-                      headers:
-                        - name: ":authority"
-                          exact_match: example.com
-              - name: envoy.router
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-    """
+"""
+static_resources:
+  listeners:
+  - name: base_api_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    api_listener:
+      api_listener:
+        "@type": $apiListenerType
+        stat_prefix: hcm
+        route_config:
+          name: api_router
+          virtual_hosts:
+            - name: api
+              domains:
+                - "*"
+              routes:
+                - match:
+                    prefix: "/"
+                  direct_response:
+                    status: 200
+        http_filters:
+          - name: envoy.filters.http.assertion
+            typed_config:
+              "@type": $assertionFilterType
+              match_config:
+                http_request_headers_match:
+                  headers:
+                    - name: ":authority"
+                      exact_match: example.com
+          - name: envoy.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+"""
 
 class SetLoggerTest {
 
