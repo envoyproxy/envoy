@@ -33,7 +33,7 @@ public:
     if (populate_config) {
       proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
       EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_))
-              .WillOnce(Return(alternate_protocols_cache_));
+          .WillOnce(Return(alternate_protocols_cache_));
     }
     filter_config_ = std::make_shared<FilterConfig>(
         proto_config, alternate_protocols_cache_manager_factory_, simTime());
@@ -64,7 +64,7 @@ TEST_F(FilterTest, NoCache) {
   initialize(false);
 
   Http::TestResponseHeaderMapImpl headers{
-    {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+      {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   filter_->onDestroy();
