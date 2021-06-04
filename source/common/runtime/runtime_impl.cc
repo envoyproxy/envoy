@@ -456,7 +456,8 @@ RtdsSubscription::RtdsSubscription(
     : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
           rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
-      stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
+      stats_scope_(store_.createScope("runtime." + rtds_layer.name())),
+      resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}
 
 void RtdsSubscription::createSubscription() {

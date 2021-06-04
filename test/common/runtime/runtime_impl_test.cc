@@ -866,11 +866,16 @@ public:
       rtds_layer->mutable_rtds_config();
     }
     EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
+    size_t layer_index = 0;
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillByDefault(testing::Invoke(
-            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
-                   const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+        .WillByDefault(
+            testing::Invoke([&](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                Stats::Scope& scope, Config::SubscriptionCallbacks& callbacks,
+                                Config::OpaqueResourceDecoder&,
+                                const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+              // Verify that we pass the correct scope to the subscription factory.
+              EXPECT_EQ(scope.counterFromString("foo").name(),
+                        fmt::format("runtime.{}.foo", layers_[layer_index++]));
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());
               rtds_callbacks_.push_back(&callbacks);
