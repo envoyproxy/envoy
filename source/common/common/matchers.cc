@@ -66,14 +66,7 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
 StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher)
     : matcher_(matcher) {
   if (matcher.match_pattern_case() ==
-      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
-    if (matcher.ignore_case()) {
-      throw EnvoyException("ignore_case has no effect for regex.");
-    }
-    regex_ =
-        Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
-  } else if (matcher.match_pattern_case() ==
-             envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
+      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
     if (matcher.ignore_case()) {
       throw EnvoyException("ignore_case has no effect for safe_regex.");
     }
@@ -161,6 +154,13 @@ PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, b
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix(prefix);
   matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
+PathMatcherConstSharedPtr
+PathMatcher::createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->MergeFrom(regex_matcher);
   return std::make_shared<const PathMatcher>(matcher);
 }
 

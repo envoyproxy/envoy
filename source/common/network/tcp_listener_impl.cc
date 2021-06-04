@@ -42,6 +42,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() {
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
+  ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
   // TODO(fcoras): Add limit on number of accepted calls per wakeup
@@ -95,6 +96,8 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 }
 
 void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
+  ASSERT(bind_to_port_);
+
   socket.ioHandle().listen(backlog_size_);
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
@@ -114,15 +117,27 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::Rand
                                  SocketSharedPtr socket, TcpListenerCallbacks& cb,
                                  bool bind_to_port, uint32_t backlog_size)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
-      random_(random), reject_fraction_(0.0) {
+      random_(random), bind_to_port_(bind_to_port), reject_fraction_(0.0) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }
 }
 
-void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be enabled since it's not bind to port.");
+  }
+}
 
-void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
+void TcpListenerImpl::disable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(0);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be disable since it's not bind to port.");
+  }
+}
 
 void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
   reject_fraction_ = reject_fraction;

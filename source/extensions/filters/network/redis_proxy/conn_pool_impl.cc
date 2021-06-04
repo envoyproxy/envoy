@@ -153,8 +153,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   const auto& cluster_type = info->clusterType();
   is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
-                      cluster_type.has_value() &&
-                      cluster_type->name() == Extensions::Clusters::ClusterTypes::get().Redis;
+                      cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {

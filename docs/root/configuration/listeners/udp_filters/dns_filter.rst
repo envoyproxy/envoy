@@ -39,13 +39,17 @@ Example Configuration
       stat_prefix: "dns_filter_prefix"
       client_config:
         resolution_timeout: 5s
-        upstream_resolvers:
-        - socket_address:
-            address: "8.8.8.8"
-            port_value: 53
-        - socket_address:
-            address: "8.8.4.4"
-            port_value: 53
+        dns_resolution_config:
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
+          resolvers:
+          - socket_address:
+              address: "8.8.8.8"
+              port_value: 53
+          - socket_address:
+              address: "8.8.4.4"
+              port_value: 53
         max_pending_lookups: 256
       server_config:
         inline_dns_table:
