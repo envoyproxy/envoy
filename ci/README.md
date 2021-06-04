@@ -34,7 +34,7 @@ Currently there are three build images for Linux and one for Windows:
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 10 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 10 compiler, this image is experimental and not well tested.
-* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows 2019 LTS with VS 2019 Build Tools.
+* `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
 
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
@@ -148,15 +148,15 @@ An example basic invocation to build the Envoy static binary and run tests is:
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
-You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well
+You can pass additional command line arguments to `./ci/windows_ci_steps.sh` to list specific `bazel` arguments and build/test targets.
 as set environment variables to adjust your container build environment as described above.
 
-The Envoy binary can be found in `C:\Windows\Temp\envoy-docker-build\envoy\source\exe` on the Docker host. You
+The Envoy binary can be found in `${TEMP}\envoy-docker-build\envoy\source\exe` on the Docker host. You
 can control this by setting `ENVOY_DOCKER_BUILD_DIR` in the environment, e.g. to
 generate the binary in `C:\Users\foo\build\envoy\source\exe` you can run:
 
 ```bash
-ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.dev'
+ENVOY_DOCKER_BUILD_DIR="C:\Users\foo\build" ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
 ```
 
 Note the quotations around the `ENVOY_DOCKER_BUILD_DIR` value to preserve the backslashes in the
@@ -168,7 +168,9 @@ If you would like to run an interactive session to keep the build container runn
 ./ci/run_envoy_docker.sh 'bash'
 ```
 
-From an interactive session, you can invoke `bazel` manually or use the `./ci/windows_ci_steps.sh` script to build and run tests.
+From an interactive session, you can invoke `bazel` directly, or use the `./ci/windows_ci_steps.sh` script to build and run tests.
+Bazel will look for .bazelrc in the `${HOME}` path, which is mapped to the persistent path `${TEMP}\envoy-docker-build\` on the
+Docker host.
 
 # Testing changes to the build image as a developer
 
