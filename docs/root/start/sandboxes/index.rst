@@ -70,4 +70,5 @@ The following sandboxes are available:
     udp
     wasm-cc
     websocket
+    win32_front_proxy
     zipkin_tracing

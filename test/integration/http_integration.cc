@@ -998,20 +998,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_encoder_filter,
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
-    // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.filters.http.cors");
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* cors = virtual_host->mutable_cors();
-            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
-            cors->set_allow_headers("content-type,x-grpc-web");
-            cors->set_allow_methods("GET,POST");
-          }
-        });
+    // Add a filter to make sure 100s play well with them.
+    config_helper_.addFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

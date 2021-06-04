@@ -42,7 +42,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "0.31.2",
         sha256 = "c84962b64d9ae4472adfb01ec2cf1aa73cb2ee8308242add55fa7cc38602d882",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
-        release_date = "2021-05-04",
+        release_date = "2021-05-07",
         use_category = ["build"],
     ),
     rules_fuzzing = dict(
@@ -185,7 +185,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "fmt-{version}",
         urls = ["https://github.com/fmtlib/fmt/releases/download/{version}/fmt-{version}.zip"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-08-06",
+        release_date = "2020-08-07",
         cpe = "cpe:2.3:a:fmt:fmt:*",
     ),
     com_github_gabime_spdlog = dict(
@@ -208,7 +208,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "792f250fb546bde8590e72d64311ea00a70c175fd77df6bb5e02328fa15fe28e",
         strip_prefix = "libprotobuf-mutator-{version}",
         urls = ["https://github.com/google/libprotobuf-mutator/archive/v{version}.tar.gz"],
-        release_date = "2020-11-06",
+        release_date = "2020-11-13",
         use_category = ["test_only"],
     ),
     com_github_google_tcmalloc = dict(
@@ -244,7 +244,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-12-01",
+        release_date = "2020-12-02",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
     com_github_luajit_luajit = dict(
@@ -328,7 +328,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "8.4.0",
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-01-20",
+        release_date = "2021-02-01",
         cpe = "N/A",
     ),
     com_github_skyapm_cpp2sky = dict(
@@ -341,7 +341,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/SkyAPM/cpp2sky/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-03-17",
+        release_date = "2021-03-24",
         cpe = "N/A",
     ),
     com_github_datadog_dd_opentracing_cpp = dict(
@@ -354,7 +354,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/DataDog/dd-opentracing-cpp/archive/v{version}.tar.gz"],
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.datadog"],
-        release_date = "2021-01-26",
+        release_date = "2021-01-27",
         cpe = "N/A",
     ),
     com_github_google_benchmark = dict(
@@ -603,7 +603,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-05-06",
+        release_date = "2021-05-07",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
     grpc_httpjson_transcoding = dict(
@@ -671,11 +671,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     six = dict(
         project_name = "Six",
         project_desc = "Python 2 and 3 compatibility library",
-        project_url = "https://pypi.org/project/six",
+        project_url = "https://github.com/benjaminp/six",
         version = "1.12.0",
-        sha256 = "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73",
-        urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-{version}.tar.gz"],
-        release_date = "2018-12-09",
+        sha256 = "0ce7aef70d066b8dda6425c670d00c25579c3daad8108b3e3d41bef26003c852",
+        urls = ["https://github.com/benjaminp/six/archive/{version}.tar.gz"],
+        release_date = "2018-12-10",
         use_category = ["other"],
     ),
     org_llvm_llvm = dict(
@@ -686,7 +686,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "df83a44b3a9a71029049ec101fb0077ecbbdf5fe41e395215025779099a98fdf",
         strip_prefix = "llvm-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-{version}.src.tar.xz"],
-        release_date = "2020-03-23",
+        release_date = "2020-03-24",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.wasm.runtime.wamr",
@@ -887,7 +887,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2020-12-18",
+        release_date = "2021-01-06",
         use_category = ["test_only"],
     ),
     upb = dict(
@@ -934,7 +934,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "05f7c6eecb402f11fcb7e524c903f1ba1c38d3bdc9bf42bc8ec3cf7567b9f979",
         strip_prefix = "kafka-python-{version}",
         urls = ["https://github.com/dpkp/kafka-python/archive/{version}.tar.gz"],
-        release_date = "2020-02-20",
+        release_date = "2020-09-30",
         use_category = ["test_only"],
     ),
     proxy_wasm_cpp_sdk = dict(

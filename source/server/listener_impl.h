@@ -23,6 +23,10 @@
 
 #include "absl/base/call_once.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "common/quic/quic_stat_names.h"
+#endif
+
 namespace Envoy {
 namespace Server {
 
@@ -424,12 +428,15 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
+      transport_factory_context_;
+
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames& quic_stat_names_;
+#endif
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
-
-  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
-      transport_factory_context_;
 };
 
 } // namespace Server

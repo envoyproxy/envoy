@@ -37,6 +37,7 @@
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "common/quic/active_quic_listener.h"
+#include "common/quic/quic_stat_names.h"
 #endif
 
 #include "server/active_raw_udp_listener_config.h"
@@ -751,7 +752,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -840,6 +841,9 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
+#endif
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

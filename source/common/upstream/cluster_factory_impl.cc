@@ -89,15 +89,32 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  if (!cluster.dns_resolvers().empty()) {
-    const auto& resolver_addrs = cluster.dns_resolvers();
+  if ((cluster.has_dns_resolution_config() &&
+       !cluster.dns_resolution_config().resolvers().empty()) ||
+      !cluster.dns_resolvers().empty()) {
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    resolvers.reserve(resolver_addrs.size());
-    for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> resolver_addrs;
+    if (cluster.has_dns_resolution_config()) {
+      dns_resolver_options.CopyFrom(cluster.dns_resolution_config().dns_resolver_options());
+      resolver_addrs.CopyFrom(cluster.dns_resolution_config().resolvers());
+    } else {
+      /* if `cluster.dns_resolution_config` is not set. */
+      // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+      // compatible utilize cluster.use_tcp_for_dns_lookups().
+      dns_resolver_options.set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
+      // Field repeated Address `dns_resolvers` will be deprecated in future. To be backward
+      // compatible utilize cluster.dns_resolvers().
+      resolver_addrs.CopyFrom(cluster.dns_resolvers());
     }
-    const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
-    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups);
+
+    if (!resolver_addrs.empty()) {
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+    return context.dispatcher().createDnsResolver(resolvers, dns_resolver_options);
   }
 
   return context.dnsResolver();
