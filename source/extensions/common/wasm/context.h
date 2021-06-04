@@ -11,12 +11,11 @@
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/filters/common/expr/cel_state.h"
-#include "extensions/filters/common/expr/evaluator.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/filters/common/expr/cel_state.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "eval/public/activation.h"
 #include "include/proxy-wasm/wasm.h"

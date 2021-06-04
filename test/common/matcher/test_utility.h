@@ -3,7 +3,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/ext_authz/config.h"
+#include "source/extensions/filters/http/ext_authz/config.h"
 
 #include <chrono>
 #include <string>
@@ -8,13 +8,12 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-#include "common/grpc/google_async_client_cache.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
-#include "extensions/filters/http/ext_authz/ext_authz.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/google_async_client_cache.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {

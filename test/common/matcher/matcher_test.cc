@@ -6,9 +6,9 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
-#include "common/matcher/list_matcher.h"
-#include "common/matcher/matcher.h"
-#include "common/protobuf/utility.h"
+#include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"

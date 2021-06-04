@@ -8,9 +8,8 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"

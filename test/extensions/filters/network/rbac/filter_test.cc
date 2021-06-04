@@ -3,11 +3,10 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/network/rbac/rbac_filter.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/network/rbac/rbac_filter.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
 

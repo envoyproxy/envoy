@@ -9,9 +9,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/common/factory_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filter_manager_integration_test.pb.h"
 #include "test/integration/filter_manager_integration_test.pb.validate.h"

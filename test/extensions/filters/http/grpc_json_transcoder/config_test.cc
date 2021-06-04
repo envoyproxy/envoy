@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 
-#include "extensions/filters/http/grpc_json_transcoder/config.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

@@ -1,8 +1,8 @@
-#include "extensions/filters/http/common/compressor/compressor.h"
+#include "source/extensions/filters/http/common/compressor/compressor.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {

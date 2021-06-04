@@ -6,12 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"

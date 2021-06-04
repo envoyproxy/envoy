@@ -20,14 +20,14 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "server/configuration_impl.h"
-#include "common/common/logger.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/quic/active_quic_listener.h"
-#include "common/http/utility.h"
+#include "source/server/configuration_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/http/utility.h"
 #include "test/common/quic/test_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
@@ -40,9 +40,9 @@
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
-#include "common/quic/platform/envoy_quic_clock.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -88,7 +88,8 @@ protected:
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
           SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
-        }()[0]) {}
+        }()[0]),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -156,7 +157,8 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
+                                                       quic_stat_names_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -312,6 +314,7 @@ protected:
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
+  QuicStatNames quic_stat_names_;
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
@@ -330,7 +333,7 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
                               listener_config_, quic_config_, options, false,
                               ActiveQuicListenerFactoryPeer::runtimeEnabled(
                                   static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              32u),
+                              quic_stat_names_, 32u),
                           Network::CreateListenerException, "Failed to apply socket options.");
 }
 

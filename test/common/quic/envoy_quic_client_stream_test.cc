@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"

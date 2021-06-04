@@ -2,7 +2,7 @@
 
 #include "envoy/tracing/trace_driver.h"
 
-#include "common/common/empty_string.h"
+#include "source/common/common/empty_string.h"
 
 namespace Envoy {
 namespace Tracing {

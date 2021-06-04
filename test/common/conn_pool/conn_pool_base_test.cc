@@ -1,4 +1,4 @@
-#include "common/conn_pool/conn_pool_base.h"
+#include "source/common/conn_pool/conn_pool_base.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"

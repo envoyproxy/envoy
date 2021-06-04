@@ -1,8 +1,6 @@
-#include "common/common/logger.h"
-
+#include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)
 #include "eval/public/builtin_func_registrar.h"

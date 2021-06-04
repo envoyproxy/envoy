@@ -1,4 +1,4 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -17,9 +17,9 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/filter_manager_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/connection.h"

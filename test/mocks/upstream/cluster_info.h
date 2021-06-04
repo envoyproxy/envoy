@@ -13,11 +13,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/thread.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
