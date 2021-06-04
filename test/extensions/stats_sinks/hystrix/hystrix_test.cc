@@ -2,9 +2,8 @@
 #include <memory>
 #include <sstream>
 
-#include "common/json/json_loader.h"
-
-#include "extensions/stat_sinks/hystrix/hystrix.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/admin.h"

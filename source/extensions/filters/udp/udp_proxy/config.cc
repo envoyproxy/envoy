@@ -1,4 +1,4 @@
-#include "extensions/filters/udp/udp_proxy/config.h"
+#include "source/extensions/filters/udp/udp_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {

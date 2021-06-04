@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/simulated_time_system.h"

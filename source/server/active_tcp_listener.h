@@ -4,10 +4,9 @@
 #include "envoy/event/timer.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/linked_object.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "server/active_listener_base.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {

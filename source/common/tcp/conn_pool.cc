@@ -1,4 +1,4 @@
-#include "common/tcp/conn_pool.h"
+#include "source/common/tcp/conn_pool.h"
 
 #include <memory>
 
@@ -6,8 +6,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Tcp {

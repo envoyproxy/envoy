@@ -10,11 +10,10 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/basic_resource_impl.h"
-#include "common/upstream/resource_manager_impl.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {

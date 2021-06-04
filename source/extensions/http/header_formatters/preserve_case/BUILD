@@ -13,7 +13,7 @@ envoy_cc_extension(
     srcs = ["preserve_case_formatter.cc"],
     hdrs = ["preserve_case_formatter.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
     ],
 )

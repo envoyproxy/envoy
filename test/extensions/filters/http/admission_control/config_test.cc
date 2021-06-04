@@ -3,11 +3,10 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/config.h"
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/admission_control/admission_control.h"
+#include "source/extensions/filters/http/admission_control/config.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"

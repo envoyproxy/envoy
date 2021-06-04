@@ -2,10 +2,9 @@
 
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/fmt.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/common/rbac/engine_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,14 +1,14 @@
-#include "common/stats/tag_extractor_impl.h"
+#include "source/common/stats/tag_extractor_impl.h"
 
 #include <cstring>
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/perf_annotation.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/perf_annotation.h"
+#include "source/common/common/regex.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"

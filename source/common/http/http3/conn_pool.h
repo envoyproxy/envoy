@@ -4,13 +4,13 @@
 
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/conn_pool_base.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif

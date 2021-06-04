@@ -5,10 +5,10 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/linked_object.h"
-#include "common/conn_pool/conn_pool_base.h"
-#include "common/http/codec_client.h"
-#include "common/http/utility.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/conn_pool/conn_pool_base.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/string_view.h"
 

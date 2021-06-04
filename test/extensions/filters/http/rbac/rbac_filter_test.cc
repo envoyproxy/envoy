@@ -1,12 +1,11 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/http/rbac/rbac_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"
@@ -34,8 +33,8 @@ public:
 
     envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
-    policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
-        ".*cncf.io");
+    policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+        TestUtility::createRegexMatcher(".*cncf.io"));
     policy_rules->add_rules()->set_destination_port(123);
     policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);

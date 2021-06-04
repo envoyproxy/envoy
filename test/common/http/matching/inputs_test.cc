@@ -1,7 +1,7 @@
 #include "envoy/http/filter.h"
 
-#include "common/http/matching/data_impl.h"
-#include "common/http/matching/inputs.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/http/matching/inputs.h"
 
 #include "test/test_common/utility.h"
 

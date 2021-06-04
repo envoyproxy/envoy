@@ -6,8 +6,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/http/rest_api_fetcher.h"
+#include "source/common/config/api_version.h"
+#include "source/common/http/rest_api_fetcher.h"
 
 namespace Envoy {
 namespace Config {

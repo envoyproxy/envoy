@@ -1,4 +1,4 @@
-#include "extensions/grpc_credentials/file_based_metadata/config.h"
+#include "source/extensions/grpc_credentials/file_based_metadata/config.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/file_based_metadata.pb.h"
@@ -6,11 +6,11 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/datasource.h"
-#include "common/config/utility.h"
-#include "common/grpc/google_grpc_creds_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
