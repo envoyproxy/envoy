@@ -26,7 +26,8 @@ typed_config:
     config_helper_.addFilter(filter);
 
     upstream_tls_ = true;
-    config_helper_.configureUpstreamTls(/*use_alpn=*/true, /*http3=*/true);
+    config_helper_.configureUpstreamTls(/*use_alpn=*/true, /*http3=*/true,
+                                        /*use_alternate_protocols_cache=*/true);
 
     HttpProtocolIntegrationTest::initialize();
   }

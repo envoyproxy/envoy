@@ -44,12 +44,12 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
 };
 
-std::string DumpOrigin(const Http::AlternateProtocolsCache::Origin& origin) {
+std::string dumpOrigin(const Http::AlternateProtocolsCache::Origin& origin) {
   return "{ scheme: '" + origin.scheme_ + "' host: '" + origin.hostname_ +
          "' port: " + absl::StrCat(origin.port_) + " }\n";
 }
 
-std::string DumpAlternative(const Http::AlternateProtocolsCache::AlternateProtocol& origin) {
+std::string dumpAlternative(const Http::AlternateProtocolsCache::AlternateProtocol& origin) {
   return "{ alpn: '" + origin.alpn_ + "' host: '" + origin.hostname_ +
          "' port: " + absl::StrCat(origin.port_) + " }\n";
 }
@@ -98,10 +98,10 @@ TEST_F(FilterTest, ValidAltSvc) {
       .WillOnce(testing::DoAll(
           testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
             EXPECT_EQ(expected_origin, actual_origin)
-                << DumpOrigin(expected_origin) << DumpOrigin(actual_origin);
+                << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
           })),
           testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
-            EXPECT_EQ(expected_protocols, actual_protocols) << DumpAlternative(actual_protocols[0]);
+            EXPECT_EQ(expected_protocols, actual_protocols) << dumpAlternative(actual_protocols[0]);
             ;
           }))));
 

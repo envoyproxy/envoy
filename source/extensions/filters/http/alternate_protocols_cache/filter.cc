@@ -53,11 +53,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
                 alt_svc[i]->value().getStringView());
       return Http::FilterHeadersStatus::Continue;
     }
-    for (size_t i = 0; i < altsvc_vector.size(); ++i) {
+    for (const auto& alt_svc : altsvc_vector) {
       MonotonicTime expiration =
-          time_source_.monotonicTime() + std::chrono::seconds(altsvc_vector[i].max_age);
-      Http::AlternateProtocolsCache::AlternateProtocol protocol(
-          altsvc_vector[i].protocol_id, altsvc_vector[i].host, altsvc_vector[i].port, expiration);
+          time_source_.monotonicTime() + std::chrono::seconds(alt_svc.max_age);
+      Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
+                                                                alt_svc.port, expiration);
       protocols.push_back(protocol);
     }
   }
