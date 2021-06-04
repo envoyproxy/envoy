@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 
 #include <memory>
 

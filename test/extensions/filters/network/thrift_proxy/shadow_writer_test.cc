@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

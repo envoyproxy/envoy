@@ -6,8 +6,7 @@
 
 #include "envoy/router/router.h"
 
-#include "common/buffer/buffer_impl.h"
-
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {

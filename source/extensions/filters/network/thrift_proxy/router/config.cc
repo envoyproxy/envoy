@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
