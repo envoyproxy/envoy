@@ -33,7 +33,8 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       text_readouts_([this](StatName name, TextReadout::Type) -> TextReadoutSharedPtr {
         return alloc_.makeTextReadout(name, name, StatNameTagVector{});
       }),
-      counter_groups_([this](StatName name, CounterGroupDescriptorSharedPtr descriptor) -> CounterGroupSharedPtr {
+      counter_groups_([this](StatName name,
+                             CounterGroupDescriptorSharedPtr descriptor) -> CounterGroupSharedPtr {
         return alloc_.makeCounterGroup(name, name, StatNameTagVector{}, descriptor);
       }),
       null_counter_(new NullCounterImpl(symbol_table)),

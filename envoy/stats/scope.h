@@ -185,7 +185,8 @@ public:
    * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
-  CounterGroup& counterGroupFromStatName(const StatName& name, CounterGroupDescriptorSharedPtr descriptor) {
+  CounterGroup& counterGroupFromStatName(const StatName& name,
+                                         CounterGroupDescriptorSharedPtr descriptor) {
     return counterGroupFromStatNameWithTags(name, absl::nullopt, descriptor);
   }
 
@@ -197,9 +198,9 @@ public:
    * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
-  virtual CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                         StatNameTagVectorOptConstRef tags,
-                                                         CounterGroupDescriptorSharedPtr descriptor) PURE;
+  virtual CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterGroupFromStatName.
@@ -207,7 +208,8 @@ public:
    * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
-  virtual CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) PURE;
+  virtual CounterGroup& counterGroupFromString(const std::string& name,
+                                               CounterGroupDescriptorSharedPtr descriptor) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.

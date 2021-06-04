@@ -145,16 +145,17 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override;
+  CounterGroup& counterGroupFromString(const std::string& name,
+                                       CounterGroupDescriptorSharedPtr descriptor) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override;
   Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags,
-                                                 CounterGroupDescriptorSharedPtr descriptor) override;
+  CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;

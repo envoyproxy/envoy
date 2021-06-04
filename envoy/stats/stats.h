@@ -191,7 +191,7 @@ public:
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
 class CounterGroupDescriptor {
- public:
+public:
   virtual ~CounterGroupDescriptor() = default;
 
   /**

@@ -262,7 +262,8 @@ private:
 class CounterGroupImpl : public StatsSharedImpl<CounterGroup> {
 public:
   CounterGroupImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,
-                   const StatNameTagVector& stat_name_tags, CounterGroupDescriptorSharedPtr descriptor)
+                   const StatNameTagVector& stat_name_tags,
+                   CounterGroupDescriptorSharedPtr descriptor)
       : StatsSharedImpl(name, alloc, tag_extracted_name, stat_name_tags), descriptor_(descriptor),
         values_(std::make_unique<std::atomic<uint64_t>[]>(descriptor_->size())),
         pending_values_(std::make_unique<std::atomic<uint64_t>[]>(descriptor_->size())) {}

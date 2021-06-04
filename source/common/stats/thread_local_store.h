@@ -185,12 +185,13 @@ public:
   TextReadout& textReadoutFromString(const std::string& name) override {
     return default_scope_->textReadoutFromString(name);
   }
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags,
-                                                 CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) override {
     return default_scope_->counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
-  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup& counterGroupFromString(const std::string& name,
+                                       CounterGroupDescriptorSharedPtr descriptor) override {
     return default_scope_->counterGroupFromString(name, descriptor);
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
@@ -360,9 +361,9 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                   StatNameTagVectorOptConstRef tags,
-                                                   CounterGroupDescriptorSharedPtr descriptor) override;
+    CounterGroup&
+    counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                     CounterGroupDescriptorSharedPtr descriptor) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
@@ -390,7 +391,8 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }
-    CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+    CounterGroup& counterGroupFromString(const std::string& name,
+                                         CounterGroupDescriptorSharedPtr descriptor) override {
       StatNameManagedStorage storage(name, symbolTable());
       return counterGroupFromStatName(storage.statName(), descriptor);
     }

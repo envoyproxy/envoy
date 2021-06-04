@@ -208,7 +208,8 @@ Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
   return *histogram_ref;
 }
 
-CounterGroup& TestStore::counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) {
+CounterGroup& TestStore::counterGroupFromString(const std::string& name,
+                                                CounterGroupDescriptorSharedPtr descriptor) {
   CounterGroup*& counter_group_ref = counter_group_map_[name];
   if (counter_group_ref == nullptr) {
     counter_group_ref = &IsolatedStoreImpl::counterGroupFromString(name, descriptor);
@@ -216,9 +217,10 @@ CounterGroup& TestStore::counterGroupFromString(const std::string& name, Counter
   return *counter_group_ref;
 }
 
-CounterGroup& TestStore::counterGroupFromStatNameWithTags(const StatName& stat_name,
-                                                          StatNameTagVectorOptConstRef tags,
-                                                          CounterGroupDescriptorSharedPtr descriptor) {
+CounterGroup&
+TestStore::counterGroupFromStatNameWithTags(const StatName& stat_name,
+                                            StatNameTagVectorOptConstRef tags,
+                                            CounterGroupDescriptorSharedPtr descriptor) {
   std::string name = symbolTable().toString(stat_name);
   CounterGroup*& counter_group_ref = counter_group_map_[name];
   if (counter_group_ref == nullptr) {

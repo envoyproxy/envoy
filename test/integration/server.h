@@ -112,9 +112,9 @@ public:
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
   }
 
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags,
-                                                 CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
@@ -139,7 +139,8 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }
-  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup& counterGroupFromString(const std::string& name,
+                                       CounterGroupDescriptorSharedPtr descriptor) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterGroupFromStatName(storage.statName(), descriptor);
   }
@@ -341,13 +342,14 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadoutFromString(name);
   }
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags,
-                                                 CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
     return store_.counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
-  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup& counterGroupFromString(const std::string& name,
+                                       CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
     return store_.counterGroupFromString(name, descriptor);
   }

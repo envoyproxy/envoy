@@ -252,7 +252,7 @@ public:
 };
 
 class MockCounterGroupDescriptor : public Envoy::Stats::CounterGroupDescriptor {
- public:
+public:
   MockCounterGroupDescriptor() = default;
   ~MockCounterGroupDescriptor() override = default;
   MOCK_METHOD(absl::string_view, nameSuffix, (size_t index));

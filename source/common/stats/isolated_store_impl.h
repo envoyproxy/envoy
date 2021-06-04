@@ -30,7 +30,8 @@ public:
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
   using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
-  using CounterGroupAllocator = std::function<RefcountPtr<Base>(StatName name, CounterGroupDescriptorSharedPtr descriptor)>;
+  using CounterGroupAllocator =
+      std::function<RefcountPtr<Base>(StatName name, CounterGroupDescriptorSharedPtr descriptor)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
@@ -180,9 +181,9 @@ public:
         text_readouts_.get(joiner.nameWithTags(), TextReadout::Type::Default);
     return text_readout;
   }
-  CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
-                                                 StatNameTagVectorOptConstRef tags,
-                                                 CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup&
+  counterGroupFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+                                   CounterGroupDescriptorSharedPtr descriptor) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
     CounterGroup& counter_group = counter_groups_.get(joiner.nameWithTags(), descriptor);
     return counter_group;
@@ -245,7 +246,8 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }
-  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+  CounterGroup& counterGroupFromString(const std::string& name,
+                                       CounterGroupDescriptorSharedPtr descriptor) override {
     StatNameManagedStorage storage(name, symbolTable());
     return counterGroupFromStatName(storage.statName(), descriptor);
   }

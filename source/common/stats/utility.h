@@ -246,7 +246,8 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  * @param tags optionally specified tags.
  * @return A counter group named using the joined elements.
  */
-CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, CounterGroupDescriptorSharedPtr descriptor,
+CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements,
+                                       CounterGroupDescriptorSharedPtr descriptor,
                                        StatNameTagVectorOptConstRef tags = absl::nullopt);
 
 /**
