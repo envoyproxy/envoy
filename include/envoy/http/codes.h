@@ -101,7 +101,7 @@ public:
    * routine also looks for the x-envoy-upstream-canary header and if it is set, also charges
    * canary stats.
    */
-  virtual void chargeResponseStat(const ResponseStatInfo& info) const PURE;
+  virtual void chargeResponseStat(const ResponseStatInfo& info, bool exclude_http_code_stats = false) const PURE;
 
   /**
    * Charge a response timing to the various dynamic stat postfixes.

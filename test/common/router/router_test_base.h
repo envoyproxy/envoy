@@ -51,6 +51,7 @@ public:
 class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                 bool suppress_grpc_request_failure_code_stats,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
   void expectResponseTimerCreate();
