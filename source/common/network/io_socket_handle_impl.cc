@@ -599,7 +599,6 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   if (result.rc_ != 0) {
     throw EnvoyException(
         fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
-    return nullptr;
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {

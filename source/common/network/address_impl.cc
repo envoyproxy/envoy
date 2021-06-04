@@ -307,9 +307,7 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t 
     pipe_.address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
   absl::Status status = initHelper(address, mode);
-  if (!status.ok()) {
-    throw EnvoyException(status.ToString());
-  }
+  throwOnError(status);
 }
 
 PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode,
