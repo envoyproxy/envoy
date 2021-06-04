@@ -5,10 +5,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/listener_manager.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/printers.h"
 

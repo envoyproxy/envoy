@@ -257,7 +257,7 @@ envoy_cc_test_library(
     srcs = ["http_subscription_test_harness.h"],
     deps = [
         ":subscription_test_harness",
-        "//include/envoy/http:async_client_interface",
+        "//envoy/http:async_client_interface",
         "//source/common/common:utility_lib",
         "//source/common/config:http_subscription_lib",
         "//source/common/config:utility_lib",
@@ -353,7 +353,7 @@ envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     deps = [
-        "//include/envoy/common:base_includes",
+        "//envoy/common:base_includes",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
@@ -403,7 +403,7 @@ envoy_cc_test(
     name = "registry_test",
     srcs = ["registry_test.cc"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
+        "//envoy/config:typed_config_interface",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],

@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/config/trace/v3/lightstep.pb.validate.h"
 
-#include "extensions/tracers/lightstep/config.h"
+#include "source/extensions/tracers/lightstep/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"

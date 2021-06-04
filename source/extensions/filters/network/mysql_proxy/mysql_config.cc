@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/mysql_config.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
 
 #include <string>
 
@@ -7,9 +7,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,17 +1,17 @@
-#include "common/config/new_grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_context_params.h"
-#include "common/config/xds_resource.h"
-#include "common/memory/utils.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_context_params.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/memory/utils.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {

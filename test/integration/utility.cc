@@ -9,20 +9,20 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
 #include "test/common/upstream/utility.h"

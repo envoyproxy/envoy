@@ -1,13 +1,12 @@
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "envoy/network/listener.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/config/datasource.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
 namespace Extensions {

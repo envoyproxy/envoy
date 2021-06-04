@@ -8,9 +8,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"

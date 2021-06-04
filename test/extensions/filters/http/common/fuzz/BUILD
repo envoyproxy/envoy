@@ -27,7 +27,7 @@ envoy_cc_test_library(
     name = "http_filter_fuzzer_lib",
     hdrs = ["http_filter_fuzzer.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/http:utility_lib",
         "//test/fuzz:common_proto_cc_proto",
         "//test/fuzz:utility_lib",

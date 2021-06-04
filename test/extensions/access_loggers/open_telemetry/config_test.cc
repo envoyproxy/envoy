@@ -4,8 +4,8 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
-#include "extensions/access_loggers/open_telemetry/config.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

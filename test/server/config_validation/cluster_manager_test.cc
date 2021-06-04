@@ -2,14 +2,12 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/api/api_impl.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/context_impl.h"
-#include "common/singleton/manager_impl.h"
-
-#include "server/config_validation/cluster_manager.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/server/config_validation/cluster_manager.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"

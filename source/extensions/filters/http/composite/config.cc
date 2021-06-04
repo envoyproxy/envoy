@@ -1,9 +1,9 @@
-#include "extensions/filters/http/composite/config.h"
+#include "source/extensions/filters/http/composite/config.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
 namespace Extensions {

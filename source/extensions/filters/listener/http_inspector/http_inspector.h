@@ -8,7 +8,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
 

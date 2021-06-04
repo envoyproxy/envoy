@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include <zlib.h>
 
@@ -6,7 +6,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 
