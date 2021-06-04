@@ -48,7 +48,7 @@ public:
   using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;
 
   // quic::QuicSelfIssuedConnectionIdManager
-  // Overridden to return a new routable CID.
+  // Overridden to return a new CID with the same first 4 bytes.
   quic::QuicConnectionId
   GenerateNewConnectionId(const quic::QuicConnectionId& old_connection_id) const override;
 };
