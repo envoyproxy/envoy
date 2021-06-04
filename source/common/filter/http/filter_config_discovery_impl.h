@@ -12,10 +12,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/assert.h"
-#include "common/config/subscription_base.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"

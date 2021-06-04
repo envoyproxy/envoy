@@ -13,8 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
-#include "common/http/exception.h"
-#include "common/http/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -487,9 +487,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  const Router::RouteSpecificFilterConfig* generic_config =
-      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
-  return dynamic_cast<const ConfigType*>(generic_config);
+  if (!route || !route->routeEntry()) {
+    return nullptr;
+  }
+  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
 }
 
 /**

@@ -16,24 +16,24 @@
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/thread_annotations.h"
-#include "common/http/headers.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread_annotations.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
@@ -55,15 +55,15 @@ namespace {
 using testing::HasSubstr;
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::CodecType
-typeToCodecType(Http::CodecClient::Type type) {
+typeToCodecType(Http::CodecType type) {
   switch (type) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP1;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP2;
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
         HTTP3;
   default:
@@ -76,7 +76,7 @@ typeToCodecType(Http::CodecClient::Type type) {
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
-    CodecClient::Type type)
+    Http::CodecType type)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
       dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
@@ -208,7 +208,7 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
-    if (parent_.type() == CodecClient::Type::HTTP3 && !parent_.connected_) {
+    if (parent_.type() == Http::CodecType::HTTP3 && !parent_.connected_) {
       // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
       // connection may fail of INVALID_VERSION if both this client doesn't support any of the
       // versions the server advertised before handshake established. In this case the connection is
@@ -221,7 +221,7 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
 
 Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOptions(
     uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) {
-  if (downstream_protocol_ <= Http::CodecClient::Type::HTTP2) {
+  if (downstream_protocol_ <= Http::CodecType::HTTP2) {
     return BaseIntegrationTest::makeClientConnectionWithOptions(port, options);
   }
 #ifdef ENVOY_ENABLE_QUIC
@@ -248,20 +248,18 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options;
   if (!http2_options.has_value()) {
     http2_options = Http2::Utility::initializeAndValidateOptions(
         envoy::config::core::v3::Http2ProtocolOptions());
     http2_options.value().set_allow_connect(true);
     http2_options.value().set_allow_metadata(true);
-  } else if (http2_options.value().has_override_stream_error_on_invalid_http_message()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
-        http2_options.value().override_stream_error_on_invalid_http_message().value());
-  } else if (http2_options.value().stream_error_on_invalid_http_messaging()) {
-    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+#ifdef ENVOY_ENABLE_QUIC
+  } else {
+    cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+        http2_options.value(), quic::kStreamReceiveWindowLimit);
+#endif
   }
   cluster->http2_options_ = http2_options.value();
-  cluster->http3_options_ = http3_options;
   cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
@@ -270,7 +268,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
                                                         host_description, downstream_protocol_);
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP3 && codec->disconnected()) {
+  if (downstream_protocol_ == Http::CodecType::HTTP3 && codec->disconnected()) {
     // Connection may get closed during version negotiation or handshake.
     // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
     // INVALID_VERSION error to caller and let caller to use server advertised version list to
@@ -288,7 +286,7 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   return codec;
 }
 
-HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : HttpIntegrationTest::HttpIntegrationTest(
@@ -299,7 +297,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
           },
           version, config) {}
 
-HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
@@ -321,7 +319,7 @@ void HttpIntegrationTest::useAccessLog(
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
 
 void HttpIntegrationTest::initialize() {
-  if (downstream_protocol_ != Http::CodecClient::Type::HTTP3) {
+  if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
 #ifdef ENVOY_ENABLE_QUIC
@@ -356,7 +354,7 @@ void HttpIntegrationTest::initialize() {
 #endif
 }
 
-void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
+void HttpIntegrationTest::setDownstreamProtocol(Http::CodecType downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
@@ -369,7 +367,7 @@ ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrail
 ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
   return [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_explicit_http_config()
           ->mutable_http_protocol_options()
@@ -671,7 +669,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -699,7 +697,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response->waitForReset());
@@ -727,7 +725,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   codec_client_->close();
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -746,7 +744,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
 #if defined(__APPLE__) || defined(WIN32)
   // Skip this test on OS/X + Windows: we can't detect the early close, and we
   // won't clean up the upstream connection until it times out. See #4294.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     return;
   }
 #endif
@@ -760,7 +758,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   response->waitForBodyData(512);
   codec_client_->close();
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -788,7 +786,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -796,7 +794,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -824,7 +822,7 @@ void HttpIntegrationTest::testRetry() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -866,7 +864,7 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
 
   EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 1);
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -905,7 +903,7 @@ void HttpIntegrationTest::testGrpcRetry() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}}, false);
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -914,9 +912,8 @@ void HttpIntegrationTest::testGrpcRetry() {
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  upstream_request_->encodeData(512,
-                                fake_upstreams_[0]->httpType() != FakeHttpConnection::Type::HTTP2);
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  upstream_request_->encodeData(512, fake_upstreams_[0]->httpType() != Http::CodecType::HTTP2);
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2) {
     upstream_request_->encodeTrailers(response_trailers);
   }
 
@@ -927,7 +924,7 @@ void HttpIntegrationTest::testGrpcRetry() {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(512U, response->body().size());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
   }
 }
@@ -1001,20 +998,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_encoder_filter,
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
-    // Because 100-continue only affects encoder filters, make sure it plays well with one.
-    config_helper_.addFilter("name: envoy.filters.http.cors");
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* cors = virtual_host->mutable_cors();
-            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
-            cors->set_allow_headers("content-type,x-grpc-web");
-            cors->set_allow_methods("GET,POST");
-          }
-        });
+    // Add a filter to make sure 100s play well with them.
+    config_helper_.addFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1091,7 +1076,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
   )EOF",
-                    downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
+                    downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
   }
   initialize();
 
@@ -1148,9 +1133,9 @@ void HttpIntegrationTest::testLargeRequestUrl(uint32_t url_size, uint32_t max_he
     auto encoder_decoder = codec_client_->startRequest(big_headers);
     auto response = std::move(encoder_decoder.second);
 
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
       ASSERT_TRUE(response->waitForReset());
@@ -1197,9 +1182,9 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
     auto encoder_decoder = codec_client_->startRequest(big_headers);
     auto response = std::move(encoder_decoder.second);
 
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
-      EXPECT_TRUE(response->complete());
+      ASSERT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
     } else {
       ASSERT_TRUE(response->waitForReset());
@@ -1239,7 +1224,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   if (size >= max_size) {
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("431", response->headers().getStatusValue());
@@ -1316,7 +1301,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   response->waitForBodyData(512);
   codec_client_->sendReset(*request_encoder_);
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -1376,7 +1361,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   }
 }
 
-void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_type) {
+void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   initialize();
 
   uint32_t http_port = lookupPort("http");
@@ -1413,7 +1398,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecClient::Type admin_request_t
   // Validate that port is closed and can be bound by other sockets.
   // This does not work for HTTP/3 because the port is not closed until the listener is completely
   // destroyed. TODO(danzh) Match TCP behavior as much as possible.
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
+  if (downstreamProtocol() != Http::CodecType::HTTP3) {
     ASSERT_TRUE(waitForPortAvailable(http_port));
   }
 }
@@ -1440,7 +1425,7 @@ void HttpIntegrationTest::testMaxStreamDuration() {
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response->waitForEndStream());
@@ -1472,7 +1457,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
@@ -1485,7 +1470,7 @@ void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstr
 
   if (invoke_retry_upstream_disconnect) {
     test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
       ASSERT_TRUE(response->waitForEndStream());
@@ -1556,8 +1541,8 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
 }
 
 void Http2RawFrameIntegrationTest::beginSession() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
   config_helper_.setDownstreamOutboundFramesLimits(1000, 100);
   initialize();

@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,8 +82,12 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 class MetricsFlusher {
 public:
-  MetricsFlusher(bool report_counters_as_deltas, bool emit_labels)
-      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels) {}
+  MetricsFlusher(
+      bool report_counters_as_deltas, bool emit_labels,
+      std::function<bool(const Stats::Metric&)> predicate =
+          [](const auto& metric) { return metric.used(); })
+      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
+        predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -105,6 +109,7 @@ private:
 
   const bool report_counters_as_deltas_;
   const bool emit_labels_;
+  const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
 /**

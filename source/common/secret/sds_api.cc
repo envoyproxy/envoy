@@ -1,13 +1,13 @@
-#include "common/secret/sds_api.h"
+#include "source/common/secret/sds_api.h"
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/config/api_version.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/api_version.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Secret {

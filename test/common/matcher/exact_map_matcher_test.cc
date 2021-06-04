@@ -2,8 +2,8 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 

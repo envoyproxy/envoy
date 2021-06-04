@@ -1,13 +1,12 @@
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include <vector>
 
-#include "common/common/utility.h"
-
-#include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_json_field_names.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/zipkin/span_context.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 namespace Envoy {
 namespace Extensions {

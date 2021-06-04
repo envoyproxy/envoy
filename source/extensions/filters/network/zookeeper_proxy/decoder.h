@@ -5,10 +5,9 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/zookeeper_proxy/utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/zookeeper_proxy/utils.h"
 
 #include "absl/container/node_hash_map.h"
 

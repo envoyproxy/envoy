@@ -29,6 +29,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
@@ -134,8 +135,8 @@ envoy_cc_test(
         "abseil_strings",
     ],
     deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/init:manager_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/init:manager_interface",
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",

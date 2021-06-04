@@ -7,7 +7,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/debug_recursion_checker.h"
+#include "source/common/common/debug_recursion_checker.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"

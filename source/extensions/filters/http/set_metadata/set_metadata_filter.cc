@@ -1,12 +1,11 @@
-#include "extensions/filters/http/set_metadata/set_metadata_filter.h"
+#include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 
-#include "common/config/well_known_names.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_format.h"
 

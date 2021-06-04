@@ -1,4 +1,4 @@
-#include "extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/api/mocks.h"

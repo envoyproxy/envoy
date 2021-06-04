@@ -4,13 +4,13 @@
 #include <list>
 #include <string>
 
-#include "extensions/common/redis/cluster_refresh_manager.h"
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec_impl.h"
-#include "extensions/filters/network/common/redis/fault.h"
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "source/extensions/common/redis/cluster_refresh_manager.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec_impl.h"
+#include "source/extensions/filters/network/common/redis/fault.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool.h"
+#include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
 

@@ -6,8 +6,8 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
 

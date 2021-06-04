@@ -2,7 +2,7 @@
 #include "envoy/server/guarddog_config.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/watchdog/abort_action_config.h"
+#include "source/common/watchdog/abort_action_config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
