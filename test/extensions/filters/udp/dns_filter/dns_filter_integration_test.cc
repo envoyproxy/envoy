@@ -88,10 +88,14 @@ listener_filters:
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
-      upstream_resolvers:
-      - socket_address:
-          address: {}
-          port_value: {}
+      dns_resolution_config:
+        resolvers:
+        - socket_address:
+            address: {}
+            port_value: {}
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: false
+          no_default_search_domain: false
       max_pending_lookups: 256
     server_config:
       inline_dns_table:

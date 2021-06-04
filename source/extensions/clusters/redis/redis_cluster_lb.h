@@ -13,7 +13,6 @@
 
 #include "source/extensions/clusters/redis/crc16.h"
 
-#include "extensions/clusters/well_known_names.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"

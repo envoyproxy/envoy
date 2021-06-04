@@ -29,6 +29,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     QuicStatNames& quic_stat_names,
                      uint32_t packets_to_read_to_connection_count_ratio);
 
   ActiveQuicListener(uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
@@ -36,6 +37,7 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      Network::Socket::OptionsSharedPtr options, bool kernel_worker_routing,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
+                     QuicStatNames& quic_stat_names,
                      uint32_t packets_to_read_to_connection_count_ratio);
 
   ~ActiveQuicListener() override;
@@ -87,7 +89,7 @@ class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
                                   Logger::Loggable<Logger::Id::quic> {
 public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
-                            uint32_t concurrency);
+                            uint32_t concurrency, QuicStatNames& quic_stat_names);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -102,6 +104,7 @@ private:
   const uint32_t concurrency_;
   absl::once_flag install_bpf_once_;
   envoy::config::core::v3::RuntimeFeatureFlag enabled_;
+  QuicStatNames& quic_stat_names_;
   const uint32_t packets_to_read_to_connection_count_ratio_;
 };
 

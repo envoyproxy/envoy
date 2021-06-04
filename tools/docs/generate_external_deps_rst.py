@@ -6,6 +6,7 @@ from collections import defaultdict, namedtuple
 import os
 import pathlib
 import sys
+import tarfile
 import urllib.parse
 
 from tools.dependency import utils as dep_utils
@@ -67,13 +68,13 @@ def get_version_url(metadata):
     return f'{github_repo}/tree/{github_release.version}'
 
 
-if __name__ == '__main__':
-    try:
-        generated_rst_dir = os.getenv("GENERATED_RST_DIR") or sys.argv[1]
-    except IndexError:
-        raise SystemExit(
-            "Output dir path must be either specified as arg or with GENERATED_RST_DIR env var")
+def csv_row(dep):
+    return [dep.name, dep.version, dep.release_date, dep.cpe]
 
+
+def main():
+    output_filename = sys.argv[1]
+    generated_rst_dir = os.path.dirname(output_filename)
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
@@ -97,9 +98,6 @@ if __name__ == '__main__':
             for ext in v.get('extensions', ['core']):
                 use_categories[category][ext].append(dep)
 
-    def csv_row(dep):
-        return [dep.name, dep.version, dep.release_date, dep.cpe]
-
     # Generate per-use category RST with CSV tables.
     for category, exts in use_categories.items():
         content = ''
@@ -110,3 +108,10 @@ if __name__ == '__main__':
             content += csv_table(['Name', 'Version', 'Release date', 'CPE'], [2, 1, 1, 2],
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
+
+    with tarfile.open(output_filename, "w") as tar:
+        tar.add(generated_rst_dir, arcname=".")
+
+
+if __name__ == '__main__':
+    sys.exit(main())

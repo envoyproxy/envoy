@@ -5,7 +5,6 @@
 #include "envoy/server/resource_monitor_config.h"
 
 #include "extensions/resource_monitors/common/factory_base.h"
-#include "extensions/resource_monitors/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ class InjectedResourceMonitorFactory
     : public Common::FactoryBase<
           envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig> {
 public:
-  InjectedResourceMonitorFactory() : FactoryBase(ResourceMonitorNames::get().InjectedResource) {}
+  InjectedResourceMonitorFactory() : FactoryBase("envoy.resource_monitors.injected_resource") {}
 
 private:
   Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(

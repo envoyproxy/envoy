@@ -52,6 +52,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_stat_names_lib",
+    srcs = ["quic_stat_names.cc"],
+    hdrs = ["quic_stat_names.h"],
+    tags = ["nofips"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
+        "@com_googlesource_quiche//:quic_core_error_codes_lib",
+        "@com_googlesource_quiche//:quic_core_types_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_quic_proof_source_base_lib",
     srcs = ["envoy_quic_proof_source_base.cc"],
     hdrs = ["envoy_quic_proof_source_base.h"],
@@ -314,6 +327,7 @@ envoy_cc_library(
     hdrs = ["envoy_quic_dispatcher.h"],
     tags = ["nofips"],
     deps = [
+        "quic_stat_names_lib",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_connection_lib",
         ":envoy_quic_server_session_lib",
