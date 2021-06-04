@@ -48,14 +48,14 @@ Route configs for transcoded requests
 -------------------------------------
 
 The route configs to be used with the gRPC-JSON transcoder should be identical to the gRPC route.
-The requests processed by the transcoder filter will have `/<package>.<service>/<method>` path and
-`POST` method. The route configs for those requests should match on `/<package>.<service>/<method>`,
+The requests processed by the transcoder filter will have ``/<package>.<service>/<method>`` path and
+``POST`` method. The route configs for those requests should match on ``/<package>.<service>/<method>``,
 not the incoming request path. This allows the routes to be used for both gRPC requests and
 gRPC-JSON transcoded requests.
 
-For example, with the following proto example, the router will process `/helloworld.Greeter/SayHello`
-as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
-match the incoming request path, set `match_incoming_request_route` to true.
+For example, with the following proto example, the router will process ``/helloworld.Greeter/SayHello``
+as the path, so the route config prefix ``/say`` won't match requests to ``SayHello``. If you want to
+match the incoming request path, set ``match_incoming_request_route`` to true.
 
 .. literalinclude:: _include/helloworld.proto
     :language: proto
@@ -73,17 +73,17 @@ Sending arbitrary content
 -------------------------
 
 By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
+JSON and sets the HTTP response ``Content-Type`` header to ``application/json``. To send arbitrary content,
 a gRPC service method can use
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 as its output message type. The implementation needs to set
 `content_type <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L68>`_
-(which sets the value of the HTTP response `Content-Type` header) and
+(which sets the value of the HTTP response ``Content-Type`` header) and
 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
 (which sets the HTTP response body) accordingly.
 Multiple `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 can be send by the gRPC server in the server streaming case.
-In this case, HTTP response header `Content-Type` will use the `content-type` from the first
+In this case, HTTP response header ``Content-Type`` will use the ``content-type`` from the first
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 
 Headers
@@ -91,8 +91,8 @@ Headers
 
 gRPC-JSON forwards the following headers to the gRPC server:
 
-* `x-envoy-original-path`, containing the value of the original path of HTTP request
-* `x-envoy-original-method`, containing the value of the original method of HTTP request
+* ``x-envoy-original-path``, containing the value of the original path of HTTP request
+* ``x-envoy-original-method``, containing the value of the original method of HTTP request
 
 
 Sample Envoy configuration

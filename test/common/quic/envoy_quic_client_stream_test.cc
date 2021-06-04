@@ -39,7 +39,10 @@ public:
         quic_session_(quic_config_, {quic_version_}, quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
         stream_id_(quic::VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
-        quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
+                                               stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setResponseDecoder(stream_decoder_);
@@ -61,6 +64,7 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
+    quic_connection_->setEnvoyConnection(quic_session_);
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
     quic_connection_->setUpConnectionSocket();
@@ -136,6 +140,9 @@ protected:
   EnvoyQuicClientConnection* quic_connection_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
+  Stats::IsolatedStoreImpl scope_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientStream* quic_stream_;
   Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
@@ -568,6 +575,44 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
         /*fin=*/!quic::VersionUsesHttp3(quic_version_.transport_version),
         trailers_.uncompressed_header_bytes(), trailers_);
   }
+}
+
+TEST_P(EnvoyQuicClientStreamTest, MetadataNotSupported) {
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  quic_stream_->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1, TestUtility::findCounter(scope_, "http3.metadata_not_supported_error")->value());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+}
+
+// Tests that posted stream block callback won't cause use-after-free crash.
+TEST_P(EnvoyQuicClientStreamTest, ReadDisabledBeforeClose) {
+  const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
+  EXPECT_TRUE(result.ok());
+
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/!quic::VersionUsesHttp3(
+                                                  quic_version_.transport_version)))
+      .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers, bool) {
+        EXPECT_EQ("200", headers->getStatusValue());
+        quic_stream_->readDisable(true);
+      }));
+  if (quic_version_.UsesHttp3()) {
+    EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
+    std::string payload = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+    quic::QuicStreamFrame frame(stream_id_, true, 0, payload);
+    quic_stream_->OnStreamFrame(frame);
+  } else {
+    quic_stream_->OnStreamHeaderList(/*fin=*/true, response_headers_.uncompressed_header_bytes(),
+                                     response_headers_);
+  }
+  // Reset to close the stream.
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(1u, quic_session_.closed_streams()->size());
+  quic_session_.closed_streams()->clear();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace Quic

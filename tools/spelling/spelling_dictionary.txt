@@ -34,6 +34,9 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RCVBUF
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
@@ -273,6 +276,7 @@ RPC
 RSA
 RST
 RTDS
+RTOS
 RTTI
 RUNDIR
 RW
@@ -440,6 +444,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -1131,6 +1137,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1237,6 +1244,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll

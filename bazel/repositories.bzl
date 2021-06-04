@@ -144,6 +144,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nghttp2_nghttp2()
     _com_github_skyapm_cpp2sky()
     _com_github_nodejs_http_parser()
+    _com_github_alibaba_hessian2_codec()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
@@ -185,6 +186,7 @@ def envoy_dependencies(skip_targets = []):
     _kafka_deps()
 
     _org_llvm_llvm()
+    _com_github_wamr()
     _com_github_wavm_wavm()
     _com_github_wasmtime()
     _com_github_wasm_c_api()
@@ -355,6 +357,9 @@ def _com_github_zlib_ng_zlib_ng():
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
+# If you're looking for envoy-filter-example / envoy_filter_example
+# the hash is in ci/filter_example_setup.sh
+
 def _org_brotli():
     external_http_archive(
         name = "org_brotli",
@@ -476,6 +481,17 @@ def _com_github_nodejs_http_parser():
     native.bind(
         name = "http_parser",
         actual = "@com_github_nodejs_http_parser//:http_parser",
+    )
+
+def _com_github_alibaba_hessian2_codec():
+    external_http_archive("com_github_alibaba_hessian2_codec")
+    native.bind(
+        name = "hessian2_codec_object_codec_lib",
+        actual = "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
+    )
+    native.bind(
+        name = "hessian2_codec_codec_impl",
+        actual = "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
     )
 
 def _com_github_ncopa_suexec():
@@ -910,6 +926,16 @@ def _org_llvm_llvm():
     native.bind(
         name = "llvm",
         actual = "@envoy//bazel/foreign_cc:llvm",
+    )
+
+def _com_github_wamr():
+    external_http_archive(
+        name = "com_github_wamr",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "wamr",
+        actual = "@envoy//bazel/foreign_cc:wamr",
     )
 
 def _com_github_wavm_wavm():

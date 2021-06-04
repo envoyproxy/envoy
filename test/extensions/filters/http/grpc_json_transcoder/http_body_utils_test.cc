@@ -20,7 +20,7 @@ public:
 
   void setBodyFieldPath(const std::vector<int>& body_field_path) {
     for (int field_number : body_field_path) {
-      Protobuf::Field field;
+      ProtobufWkt::Field field;
       field.set_number(field_number);
       raw_body_field_path_.emplace_back(std::move(field));
     }
@@ -76,8 +76,8 @@ public:
     EXPECT_FALSE(HttpBodyUtils::parseMessageByFieldPath(&stream, body_field_path_, &http_body));
   }
 
-  std::vector<Protobuf::Field> raw_body_field_path_;
-  std::vector<const Protobuf::Field*> body_field_path_;
+  std::vector<ProtobufWkt::Field> raw_body_field_path_;
+  std::vector<const ProtobufWkt::Field*> body_field_path_;
 };
 
 TEST_F(HttpBodyUtilsTest, EmptyFieldsList) {

@@ -7,7 +7,6 @@ using testing::An;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
@@ -383,6 +382,7 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("404", headers.getStatusValue());
@@ -424,6 +424,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(*filter, encodeComplete());
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -453,6 +454,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_path, header_map.getPathValue());
@@ -516,6 +518,103 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   conn_manager_->onData(fake_input, false);
 
   // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Paths with escaped slashes rejected with 400 when configured.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::REJECT_REQUEST;
+  testPathNormalization(
+      TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%5c../"}, {":method", "GET"}},
+      TestResponseHeaderMapImpl{{":status", "400"}, {"connection", "close"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// Paths with escaped slashes redirected when configured.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRedirected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  testPathNormalization(
+      TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%2f../"}, {":method", "GET"}},
+      TestResponseHeaderMapImpl{{":status", "307"}, {"location", "/abc/../"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+}
+
+// Paths with escaped slashes rejected with 400 instead of redirected for gRPC request.
+TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejectedIfGRPC) {
+  // This test is slightly weird as it sends gRPC "request" over H/1 client of the
+  // HttpConnectionManagerImplTest. However it is sufficient to test the behavior of path
+  // normalization as it is determined by the content type only.
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
+                                                 {":path", "/abc%2fdef"},
+                                                 {":method", "GET"},
+                                                 {"content-type", "application/grpc"}},
+                        TestResponseHeaderMapImpl{{":status", "200"},
+                                                  {"connection", "close"},
+                                                  {"grpc-status", "13"},
+                                                  {"content-type", "application/grpc"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
+}
+
+// Test that requests with escaped slashes are redirected when configured. Redirection
+// occurs after Chromium URL normalization or merge slashes operations.
+TEST_F(HttpConnectionManagerImplTest, EscapedSlashesRedirectedAfterOtherNormalizations) {
+  normalize_path_ = true;
+  merge_slashes_ = true;
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  // Both Chromium URL normalization and merge slashes should happen if request is redirected
+  // due to escaped slash sequences.
+  testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
+                                                 {":path", "/abc%2f../%5cdef//"},
+                                                 {":method", "GET"}},
+                        TestResponseHeaderMapImpl{{":status", "307"}, {"location", "/def/"}});
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForwarded) {
+  setup(false, "");
+  // Enable path sanitizer
+  normalize_path_ = true;
+  merge_slashes_ = true;
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
+  const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
+  const std::string normalized_path = "/z/def";
+
+  auto* filter = new MockStreamFilter();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*filter, decodeComplete());
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(normalized_path, header_map.getPathValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*filter, onStreamComplete());
+  EXPECT_CALL(*filter, onDestroy());
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -719,6 +818,298 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// The router observes the cached route as a DelegatingRoute (with upstream cluster foo), not the
+// original route returned by route config (upstream cluster default), when the setRoute filter
+// callback is applied.
+TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithClusterOverride) {
+  setup(false, "");
+  setupFilterChain(2, 0);
+
+  // Cluster mocks: default and foo
+  const std::string default_cluster_name = "default";
+  const std::string foo_cluster_name = "foo";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(default_cluster.get()));
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(foo_cluster.get()));
+
+  // Route mock: default
+  std::shared_ptr<Router::MockRoute> default_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(default_route->route_entry_, clusterName())
+      .Times(2) // Expected call twice: once from refreshCachedRoute, once from EXPECT_EQ macro
+      .WillRepeatedly(ReturnRef(default_cluster_name));
+
+  // RouteConstSharedPtr of DelegatingRoute for foo
+  // Initialization separate from declaration to be in scope for both decoder_filters_
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
+
+  // Route config mock
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(default_route));
+
+  // Filter that performs setRoute (sets cached_route_ & cached_cluster_info_)
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Calls ConnectionManagerImpl::ActiveStream::route(cb), which calls
+        // refreshCachedRoute(cb), which (1) calls route_config_->route(_, _, _, _) mock to set
+        // default_route as cached_route_, and (2) calls getThreadLocalCluster mock to set
+        // cached_cluster_info_.
+        EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
+        EXPECT_EQ(default_cluster_name,
+                  decoder_filters_[0]->callbacks_->route()->routeEntry()->clusterName());
+        EXPECT_EQ(default_route->routeEntry(),
+                  decoder_filters_[0]->callbacks_->streamInfo().routeEntry());
+        EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+        // Instantiate a DelegatingRoute child class object and invoke setRoute from
+        // StreamFilterCallbacks to manually override the cached route for the current request.
+        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+            decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
+        decoder_filters_[0]->callbacks_->setRoute(foo_route_override);
+
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Router filter
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Returns cached_route, does not invoke route(cb)
+        EXPECT_EQ(foo_route_override, decoder_filters_[1]->callbacks_->route());
+        // Note: The route filter determines the finalized route's upstream cluster name via
+        // routeEntry()->clusterName(), so that's the key piece to check.
+        // This should directly call the ExampleDerivedDelegatingRouteEntry overridden
+        // clusterName() method.
+        EXPECT_EQ(foo_cluster_name,
+                  decoder_filters_[1]->callbacks_->route()->routeEntry()->clusterName());
+        EXPECT_EQ(foo_route_override->routeEntry(),
+                  decoder_filters_[1]->callbacks_->streamInfo().routeEntry());
+        // Tests that setRoute correctly sets cached_cluster_info_
+        EXPECT_EQ(foo_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data. end_stream set to true to indicate this is a header only request.
+  startRequest(true);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that all methods supported by DelegatingRouteEntry delegate correctly
+TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
+  setup(false, "");
+  setupFilterChain(2, 0);
+
+  // Cluster mock: foo
+  // For when decoder_filters_[0] invokes setRoute
+  const std::string foo_cluster_name = "foo";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> foo_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{foo_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(foo_cluster.get()));
+
+  // Cluster mock: default
+  // For decoder_filters_[0] invokes decodeHeaders and subsequently refreshCachedRoute
+  const std::string default_cluster_name = "default";
+  std::shared_ptr<Upstream::MockThreadLocalCluster> default_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{default_cluster_name}))
+      .Times(1)
+      .WillRepeatedly(Return(default_cluster.get()));
+
+  // Route mock: default
+  // For when decoder_filters_[0] invokes decodeHeaders and subsequently refreshCachedRoute
+  std::shared_ptr<Router::MockRoute> default_route =
+      std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .Times(1)
+      .WillRepeatedly(Return(default_route));
+  EXPECT_CALL(default_route->route_entry_, clusterName())
+      .Times(1)
+      .WillRepeatedly(ReturnRef(default_cluster_name));
+
+  // DelegatingRoute: foo
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> delegating_route_foo(nullptr);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Instantiate a DelegatingRoute child class object and invoke setRoute from
+        // StreamFilterCallbacks to manually override the cached route for the current request.
+        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+            default_route, foo_cluster_name);
+        decoder_filters_[0]->callbacks_->setRoute(delegating_route_foo);
+
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Check that cached_route was correctly set to the delegating route.
+        EXPECT_EQ(delegating_route_foo, decoder_filters_[1]->callbacks_->route());
+
+        // Check that delegating route correctly overrides the routeEntry()->clusterName()
+        EXPECT_EQ(foo_cluster_name, delegating_route_foo->routeEntry()->clusterName());
+
+        // Check that all other routeEntry calls are delegated correctly
+        EXPECT_EQ(default_route->routeEntry()->clusterNotFoundResponseCode(),
+                  delegating_route_foo->routeEntry()->clusterNotFoundResponseCode());
+        EXPECT_EQ(default_route->routeEntry()->corsPolicy(),
+                  delegating_route_foo->routeEntry()->corsPolicy());
+
+        auto test_req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.choice.com"},
+                                                               {":path", "/new_endpoint/foo"},
+                                                               {":method", "GET"},
+                                                               {"x-forwarded-proto", "http"}};
+        EXPECT_EQ(default_route->routeEntry()->currentUrlPathAfterRewrite(test_req_headers),
+                  delegating_route_foo->routeEntry()->currentUrlPathAfterRewrite(test_req_headers));
+
+        EXPECT_EQ(default_route->routeEntry()->hashPolicy(),
+                  delegating_route_foo->routeEntry()->hashPolicy());
+
+        // HedgePolicy objects don't have valid comparison operator, so compare 2 attributes at
+        // random. Will apply this strategy for all objects that don't have a valid comparison
+        // operator (next example being RetryPolicy).
+        EXPECT_EQ(default_route->routeEntry()->hedgePolicy().additionalRequestChance().numerator(),
+                  delegating_route_foo->routeEntry()
+                      ->hedgePolicy()
+                      .additionalRequestChance()
+                      .numerator());
+        EXPECT_EQ(default_route->routeEntry()->hedgePolicy().initialRequests(),
+                  delegating_route_foo->routeEntry()->hedgePolicy().initialRequests());
+
+        EXPECT_EQ(default_route->routeEntry()->priority(),
+                  delegating_route_foo->routeEntry()->priority());
+
+        EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().empty(),
+                  delegating_route_foo->routeEntry()->rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->routeEntry()->rateLimitPolicy().getApplicableRateLimit(0).empty(),
+                  delegating_route_foo->routeEntry()
+                      ->rateLimitPolicy()
+                      .getApplicableRateLimit(0)
+                      .empty());
+
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy().numRetries(),
+                  delegating_route_foo->routeEntry()->retryPolicy().numRetries());
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy().retryOn(),
+                  delegating_route_foo->routeEntry()->retryPolicy().retryOn());
+
+        EXPECT_EQ(default_route->routeEntry()->internalRedirectPolicy().enabled(),
+                  delegating_route_foo->routeEntry()->internalRedirectPolicy().enabled());
+        EXPECT_EQ(
+            default_route->routeEntry()->internalRedirectPolicy().shouldRedirectForResponseCode(
+                Code::OK),
+            delegating_route_foo->routeEntry()
+                ->internalRedirectPolicy()
+                .shouldRedirectForResponseCode(Code::OK));
+
+        EXPECT_EQ(default_route->routeEntry()->retryShadowBufferLimit(),
+                  delegating_route_foo->routeEntry()->retryShadowBufferLimit());
+        EXPECT_EQ(default_route->routeEntry()->shadowPolicies().empty(),
+                  delegating_route_foo->routeEntry()->shadowPolicies().empty());
+        EXPECT_EQ(default_route->routeEntry()->timeout(),
+                  delegating_route_foo->routeEntry()->timeout());
+        EXPECT_EQ(default_route->routeEntry()->idleTimeout(),
+                  delegating_route_foo->routeEntry()->idleTimeout());
+        EXPECT_EQ(default_route->routeEntry()->usingNewTimeouts(),
+                  delegating_route_foo->routeEntry()->usingNewTimeouts());
+        EXPECT_EQ(default_route->routeEntry()->maxStreamDuration(),
+                  delegating_route_foo->routeEntry()->maxStreamDuration());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutHeaderMax(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutHeaderMax());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutHeaderOffset(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutHeaderOffset());
+        EXPECT_EQ(default_route->routeEntry()->maxGrpcTimeout(),
+                  delegating_route_foo->routeEntry()->maxGrpcTimeout());
+        EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
+                  delegating_route_foo->routeEntry()->grpcTimeoutOffset());
+        EXPECT_EQ(default_route->routeEntry()->virtualCluster(test_req_headers),
+                  delegating_route_foo->routeEntry()->virtualCluster(test_req_headers));
+
+        EXPECT_EQ(default_route->routeEntry()->virtualHost().corsPolicy(),
+                  delegating_route_foo->routeEntry()->virtualHost().corsPolicy());
+        EXPECT_EQ(default_route->routeEntry()->virtualHost().rateLimitPolicy().empty(),
+                  delegating_route_foo->routeEntry()->virtualHost().rateLimitPolicy().empty());
+
+        EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
+                  delegating_route_foo->routeEntry()->autoHostRewrite());
+        EXPECT_EQ(default_route->routeEntry()->metadataMatchCriteria(),
+                  delegating_route_foo->routeEntry()->metadataMatchCriteria());
+        EXPECT_EQ(default_route->routeEntry()->opaqueConfig(),
+                  delegating_route_foo->routeEntry()->opaqueConfig());
+        EXPECT_EQ(default_route->routeEntry()->includeVirtualHostRateLimits(),
+                  delegating_route_foo->routeEntry()->includeVirtualHostRateLimits());
+
+        // NOTE: no coverage for routeEntry()->typedMetadata()
+        // "The mock function has no default action set, and its return type has no default value
+        // set"
+
+        EXPECT_EQ(default_route->routeEntry()->metadata().filter_metadata().size(),
+                  delegating_route_foo->routeEntry()->metadata().filter_metadata().size());
+        EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
+                  delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
+
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matcher(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matcher());
+        EXPECT_EQ(default_route->routeEntry()->pathMatchCriterion().matchType(),
+                  delegating_route_foo->routeEntry()->pathMatchCriterion().matchType());
+
+        EXPECT_EQ(default_route->routeEntry()->perFilterConfig("bar"),
+                  delegating_route_foo->routeEntry()->perFilterConfig("bar"));
+        EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInRequest(),
+                  delegating_route_foo->routeEntry()->includeAttemptCountInRequest());
+        EXPECT_EQ(default_route->routeEntry()->includeAttemptCountInResponse(),
+                  delegating_route_foo->routeEntry()->includeAttemptCountInResponse());
+        EXPECT_EQ(default_route->routeEntry()->upgradeMap(),
+                  delegating_route_foo->routeEntry()->upgradeMap());
+
+        EXPECT_EQ(default_route->routeEntry()->connectConfig().has_value(),
+                  delegating_route_foo->routeEntry()->connectConfig().has_value());
+        if (default_route->routeEntry()->connectConfig().has_value()) {
+          EXPECT_EQ(default_route->routeEntry()->connectConfig().value().allow_post(),
+                    delegating_route_foo->routeEntry()->connectConfig().value().allow_post());
+        }
+
+        EXPECT_EQ(default_route->routeEntry()->routeName(),
+                  delegating_route_foo->routeEntry()->routeName());
+
+        // Coverage for finalizeRequestHeaders
+        NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+        delegating_route_foo->routeEntry()->finalizeRequestHeaders(test_req_headers, stream_info,
+                                                                   true);
+        EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));
+
+        // Coverage for finalizeResponseHeaders
+        Http::TestResponseHeaderMapImpl test_resp_headers;
+        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers, stream_info);
+        EXPECT_EQ(test_resp_headers, Http::TestResponseHeaderMapImpl{});
+
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+
+  // Kick off the incoming data. end_stream set to true to indicate this is a header only request.
+  startRequest(true);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Filters observe host header w/o port's part when port's removal is configured
 TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
   setup(false, "");
@@ -734,6 +1125,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseNormalizedHost) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
 
+  EXPECT_CALL(*filter, decodeComplete());
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& header_map, bool) -> FilterHeadersStatus {
         EXPECT_EQ(normalized_host, header_map.getHostValue());
@@ -797,6 +1189,47 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Observe that we strip the trailing dot.
+TEST_F(HttpConnectionManagerImplTest, StripTrailingHostDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host.";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HostWithoutTrailingDot) {
+  setup(false, "");
+  // Enable removal of host's trailing dot.
+  strip_trailing_host_dot_ = true;
+  const std::string original_host = "host";
+  const std::string updated_host = "host";
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->createCodec(fake_input);
+  // Create a new stream.
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+  RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+      {":authority", original_host}, {":path", "/"}, {":method", "GET"}}};
+  RequestHeaderMap* updated_headers = headers.get();
+  decoder_->decodeHeaders(std::move(headers), true);
+  EXPECT_EQ(updated_host, updated_headers->getHostValue());
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -1747,6 +2180,7 @@ public:
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
         .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
         .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -2225,6 +2659,19 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
+    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->clusterInfo();
+  }
+
+  // With an invalid gRPC timeout, refreshing cached route will not use header and use stream
+  // duration.
+  latched_headers->setGrpcTimeout("6666666666666H");
+  {
+    // 25ms used already from previous case so timer is set to be 5ms.
+    EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(5), _));
+    EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
+        .Times(2)
+        .WillRepeatedly(Return(std::chrono::milliseconds(30)));
     decoder_filters_[0]->callbacks_->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }

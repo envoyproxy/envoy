@@ -38,7 +38,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    // TODO(lambdai): Remove the dependency of ActiveTcpListener.
     auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
     details.typed_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
@@ -89,12 +88,13 @@ void ConnectionHandlerImpl::removeFilterChains(
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
       listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
-      // Completion is deferred because the above removeFilterChains() may defer delete connection.
-      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
-      return;
+      break;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // Reach here if the target listener is found or the target listener was removed by a full
+  // listener update. In either case, the completion must be deferred so that any active connection
+  // referencing the filter chain can finish prior to deletion.
+  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
@@ -211,16 +211,6 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                        .get())
              : absl::nullopt;
 }
-
-ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
-    Network::ConnectionHandler& parent, Network::ListenerConfig* config)
-    : stats_({ALL_LISTENER_STATS(POOL_COUNTER(config->listenerScope()),
-                                 POOL_GAUGE(config->listenerScope()),
-                                 POOL_HISTOGRAM(config->listenerScope()))}),
-      per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
-          POOL_COUNTER_PREFIX(config->listenerScope(), parent.statPrefix()),
-          POOL_GAUGE_PREFIX(config->listenerScope(), parent.statPrefix()))}),
-      config_(config) {}
 
 } // namespace Server
 } // namespace Envoy

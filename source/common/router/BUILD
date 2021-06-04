@@ -417,3 +417,12 @@ envoy_cc_library(
         "//include/envoy/router:string_accessor_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "delegating_route_lib",
+    srcs = ["delegating_route_impl.cc"],
+    hdrs = ["delegating_route_impl.h"],
+    deps = [
+        "//include/envoy/router:router_interface",
+    ],
+)

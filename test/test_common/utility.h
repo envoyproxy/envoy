@@ -362,10 +362,16 @@ public:
    *
    * @param lhs JSON string on LHS.
    * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
    * @return bool indicating whether the JSON strings are equal.
    */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
-    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
   }
 
   /**
@@ -548,7 +554,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -637,6 +645,15 @@ public:
   static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
     return message;
   }
 
@@ -1085,6 +1102,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& rando
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Useful for testing ScopeTrackedObject order of deletion.
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);

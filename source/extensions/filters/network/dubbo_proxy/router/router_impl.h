@@ -42,9 +42,12 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  // This function is for testing only.
+  Envoy::Buffer::Instance& upstreamRequestBufferForTest() { return upstream_request_buffer_; }
+
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+    UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, SerializationType serialization_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -66,7 +69,7 @@ private:
     void onResetStream(ConnectionPool::PoolFailureReason reason);
 
     Router& parent_;
-    Tcp::ConnectionPool::Instance& conn_pool_;
+    Upstream::TcpPoolData conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};

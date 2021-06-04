@@ -1,7 +1,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "extensions/clusters/well_known_names.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -53,7 +52,7 @@ public:
     // Configure upstream cluster to be a Dynamic Forward Proxy since that's the
     // kind we need to do DNS entries for.
     CustomClusterType cluster_type;
-    cluster_type.set_name(Envoy::Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy);
+    cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
     cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
 
     // Configure max pending to 1 so we can test circuit breaking.
@@ -262,7 +261,7 @@ TEST_F(ProxyFilterTest, NoClusterType) {
 // Cluster that isn't a dynamic forward proxy cluster
 TEST_F(ProxyFilterTest, NonDynamicForwardProxy) {
   CustomClusterType cluster_type;
-  cluster_type.set_name(Envoy::Extensions::Clusters::ClusterTypes::get().Static);
+  cluster_type.set_name("envoy.cluster.static");
   cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
 
   InSequence s;

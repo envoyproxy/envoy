@@ -19,6 +19,7 @@ namespace Configuration {
 class FactoryContext;
 }
 } // namespace Server
+
 namespace Matcher {
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
@@ -66,9 +67,9 @@ public:
   /**
    * Helper to convert this action to its underlying type.
    */
-  template <class T> T& getTyped() {
-    ASSERT(dynamic_cast<T*>(this) != nullptr);
-    return static_cast<T&>(*this);
+  template <class T> const T& getTyped() const {
+    ASSERT(dynamic_cast<const T*>(this) != nullptr);
+    return static_cast<const T&>(*this);
   }
 };
 
@@ -78,8 +79,8 @@ using ActionFactoryCb = std::function<ActionPtr()>;
 class ActionFactory : public Config::TypedFactory {
 public:
   virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        Server::Configuration::FactoryContext& factory_context) PURE;
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -201,7 +202,8 @@ struct DataInputGetResult {
 };
 
 /**
- * Interface for types providing a way to extract a string from the DataType to perform matching on.
+ * Interface for types providing a way to extract a string from the DataType to perform matching
+ * on.
  */
 template <class DataType> class DataInput {
 public:
@@ -234,6 +236,32 @@ public:
                   "DataType must implement valid name() function");
     return fmt::format("envoy.matching.{}.input", DataType::name());
   }
+};
+
+/**
+ * Interface for types providing a way to use a string for matching without depending on protocol
+ * data. As a result, these can be used for all protocols.
+ */
+class CommonProtocolInput {
+public:
+  virtual ~CommonProtocolInput() = default;
+  virtual absl::optional<absl::string_view> get() PURE;
+};
+using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
+
+/**
+ * Factory for CommonProtocolInput.
+ */
+class CommonProtocolInputFactory : public Config::TypedFactory {
+public:
+  /**
+   * Creates a CommonProtocolInput from the provided config.
+   */
+  virtual CommonProtocolInputPtr
+  createCommonProtocolInput(const Protobuf::Message& config,
+                            Server::Configuration::FactoryContext& factory_context) PURE;
+
+  std::string category() const override { return "envoy.matching.common_inputs"; }
 };
 
 } // namespace Matcher

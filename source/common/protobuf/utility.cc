@@ -108,7 +108,9 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      if (it.first.Tag() != "!ignore") {
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      }
     }
     break;
   }
@@ -741,7 +743,7 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
   return ProtobufUtil::Status(code, "").ToString();
 }
 
@@ -1043,4 +1045,56 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+
+std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
+  return "type.googleapis.com/" + std::string(type);
+}
+
+void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
+  auto& obj_fields = *obj.mutable_fields();
+
+  for (const auto& [key, val] : with.fields()) {
+    auto& obj_key = obj_fields[key];
+
+    // If the types are different, the last one wins.
+    const auto val_kind = val.kind_case();
+    if (val_kind != obj_key.kind_case()) {
+      obj_key = val;
+      continue;
+    }
+
+    // Otherwise, the strategy depends on the value kind.
+    switch (val.kind_case()) {
+    // For scalars, the last one wins.
+    case ProtobufWkt::Value::kNullValue:
+    case ProtobufWkt::Value::kNumberValue:
+    case ProtobufWkt::Value::kStringValue:
+    case ProtobufWkt::Value::kBoolValue:
+      obj_key = val;
+      break;
+    // If we got a structure, recursively update.
+    case ProtobufWkt::Value::kStructValue:
+      update(*obj_key.mutable_struct_value(), val.struct_value());
+      break;
+    // For lists, append the new values.
+    case ProtobufWkt::Value::kListValue: {
+      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
+      const auto& vals = val.list_value().values();
+      obj_key_vec.MergeFrom(vals);
+      break;
+    }
+    case ProtobufWkt::Value::KIND_NOT_SET:
+      break;
+    }
+  }
+}
+
 } // namespace Envoy

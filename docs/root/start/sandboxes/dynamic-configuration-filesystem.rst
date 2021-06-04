@@ -90,7 +90,7 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-fs/configs/cds.yaml
    :language: yaml
    :linenos:
-   :lines: 6-14
+   :lines: 6-13
    :lineno-start: 6
    :emphasize-lines: 8
 

@@ -58,8 +58,8 @@ Triggers connect resource monitors to actions. There are two types of triggers s
   * - :ref:`scaled <envoy_v3_api_msg_config.overload.v3.ScaledTrigger>`
     - Sets the action state to 0 when the resource pressure is below the
       :ref:`scaling_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold>`,
-      `(pressure - scaling_threshold)/(saturation_threshold - scaling_threshold)` when
-      `scaling_threshold < pressure < saturation_threshold`, and to 1 (*saturated*) when the
+      ``(pressure - scaling_threshold)/(saturation_threshold - scaling_threshold)`` when
+      ``scaling_threshold < pressure < saturation_threshold``, and to 1 (*saturated*) when the
       pressure is above the
       :ref:`saturation_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.saturation_threshold>`."
 
@@ -101,7 +101,7 @@ The following overload actions are supported:
 Reducing timeouts
 ^^^^^^^^^^^^^^^^^
 
-The `envoy.overload_actions.reduce_timeouts` overload action will reduce the amount of time Envoy
+The ``envoy.overload_actions.reduce_timeouts`` overload action will reduce the amount of time Envoy
 will spend waiting for some interactions to finish in response to resource pressure. The amount of
 reduction can be configured per timeout type by specifying the minimum timer value to use when the
 triggering resource monitor detects saturation. The minimum value for each timeout can be specified
@@ -129,14 +129,14 @@ to remain idle before being closed in response to heap size. When the heap usage
 idle connections will time out at their usual time, which is configured through
 :ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`.
 When the heap usage is at or above 95%, idle connections will be closed after the specified
-`min_timeout`, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
+``min_timeout``, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
 will vary between those two based on the formula for the :ref:`scaled trigger <config_overload_manager_triggers>`
-So if `RouteAction.idle_timeout = 600 seconds` and heap usage is at 92%, idle connections will time
+So if ``RouteAction.idle_timeout = 600 seconds`` and heap usage is at 92%, idle connections will time
 out after :math:`2s + (600s - 2s) \cdot (95\% - 92\%) / (95\% - 85\%) = 181.4s`.
 
 Note in the example that the minimum idle time is specified as an absolute duration. If, instead,
-`min_timeout: 2s` were to be replaced with `min_scale: { value: 10 }`, the minimum timer value
-would be computed based on the maximum (specified elsewhere). So if `idle_timeout` is
+``min_timeout: 2s`` were to be replaced with ``min_scale: { value: 10 }``, the minimum timer value
+would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
 Limiting Active Connections

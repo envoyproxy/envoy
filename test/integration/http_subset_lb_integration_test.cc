@@ -49,8 +49,7 @@ public:
   }
 
   HttpSubsetLbIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
-                            TestEnvironment::getIpVersionsForTest().front(),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()),
         is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
                     GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
@@ -137,8 +136,8 @@ public:
   };
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   // Runs a subset lb test with the given request headers, expecting the x-host-type header to
@@ -155,7 +154,7 @@ public:
 
       // Send header only request.
       IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-      response->waitForEndStream();
+      ASSERT_TRUE(response->waitForEndStream());
 
       // Expect a response from a host in the correct subset.
       EXPECT_EQ(response->headers()
@@ -246,7 +245,7 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetad
                                                                           {":authority", "host"},
                                                                           {"x-type", "a"},
                                                                           {"x-hash", "hash-a"}});
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
 }

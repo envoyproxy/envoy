@@ -13,6 +13,8 @@
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
 
+#include "exe/platform_impl.h"
+
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
@@ -45,7 +47,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                                ListenerHooks& listener_hooks,
                                Server::ComponentFactory& component_factory,
-                               std::unique_ptr<PlatformImpl> platform_impl,
+                               std::unique_ptr<Server::Platform> platform_impl,
                                std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                std::unique_ptr<ProcessContext> process_context)
     : platform_impl_(std::move(platform_impl)), options_(options),

@@ -192,24 +192,41 @@ def _comment(config, results, assignees, sender, force=False):
       lines.append('CC %s: FYI only%s.' % (mention, match_description))
 
     if mode != 'skip' and spec.auto_assign:
-      api_assignee = None
-      # Find owners via github.team_get_by_name, github.team_list_members
-      team_name = owner.split('/')[1]
-      team = github.team_get_by_name(team_name)
-      # Exclude author from assignment.
-      members = [m['login'] for m in github.team_list_members(team['id']) if m['login'] != sender]
-      # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
-      # Starlark doesn't have sets, n is small.
-      for assignee in assignees:
-        if assignee in members:
-          api_assignee = assignee
-          break
-      # Otherwise, pick at random.
-      if not api_assignee:
-        api_assignee = members[randint(len(members))]
-      lines.append('API shepherd assignee is @%s' % api_assignee)
-      github.issue_assign(api_assignee)
+      assigned = _assign_from_team(owner, assignees, [sender])
+      lines.append('%s assignee is @%s' % (owner, assigned))
 
+  if lines:
+    github.issue_create_comment('\n'.join(lines))
+
+
+def _assign_from_team(team_name, assignees, exclude_users):
+  if '/' not in team_name:
+    return None
+  assigned = None
+  # Find owners via github.team_get_by_name, github.team_list_members
+  team_slug = team_name.split('/')[1]
+  team = github.team_get_by_name(team_slug, success_codes=[200, 404])
+  if not team:
+    return None
+  members = [m['login'] for m in github.team_list_members(team['id']) if m['login'] not in exclude_users]
+  # Is a team member already assigned? The first assigned team member is picked. Bad O(n^2) as
+  # Starlark doesn't have sets, n is small.
+  for assignee in assignees:
+    if assignee in members:
+      assigned = assignee
+      break
+  # Otherwise, pick at random.
+  if not assigned:
+    assigned = members[randint(len(members))]
+  github.issue_assign(assigned)
+  return assigned
+
+
+def _assign_from(command, assignees):
+  lines = []
+  for team_name in command.args:
+    assigned = _assign_from_team(team_name, assignees, [])
+    lines.append('%s assignee is @%s' % (team_name, assigned))
   if lines:
     github.issue_create_comment('\n'.join(lines))
 
@@ -264,3 +281,4 @@ handlers.pull_request_review(func=_pr_review)
 handlers.command(name='checkowners', func=_reconcile)
 handlers.command(name='checkowners!', func=_force_reconcile_and_comment)
 handlers.command(name='lgtm', func=_lgtm_by_comment)
+handlers.command(name='assign-from', func=_assign_from)

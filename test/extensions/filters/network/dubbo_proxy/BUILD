@@ -56,6 +56,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "message_impl_test",
+    srcs = ["message_impl_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        "//source/extensions/filters/network/dubbo_proxy:message_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "dubbo_protocol_impl_test",
     srcs = ["dubbo_protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.dubbo_proxy",
@@ -123,6 +134,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
         ":mocks_lib",
+        ":utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_hessian2_serializer_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
@@ -143,6 +155,20 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_hessian2_serializer_impl_lib",
         "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "heartbeat_response_test",
+    srcs = ["heartbeat_response_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        ":utility_lib",
+        "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:heartbeat_response_lib",
         "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
     ],

@@ -20,7 +20,7 @@ class ClusterUpstreamExtensionIntegrationTest
       public HttpIntegrationTest {
 public:
   ClusterUpstreamExtensionIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata,
                                 const std::string& key1, const std::string& key2,
@@ -84,7 +84,7 @@ TEST_P(ClusterUpstreamExtensionIntegrationTest,
     EXPECT_EQ("host-value", host_header_values[0]->value().getStringView());
   }
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

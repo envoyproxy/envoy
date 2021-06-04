@@ -28,9 +28,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.network",
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":proxy_filter_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",

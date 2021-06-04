@@ -12,6 +12,7 @@
 #include "common/config/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -993,40 +994,12 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
-                "A flag has been added. Fix this code.");
-
-  const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
-      StreamInfo::ResponseFlag::FailedLocalHealthCheck,
-      StreamInfo::ResponseFlag::NoHealthyUpstream,
-      StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-      StreamInfo::ResponseFlag::LocalReset,
-      StreamInfo::ResponseFlag::UpstreamRemoteReset,
-      StreamInfo::ResponseFlag::UpstreamConnectionFailure,
-      StreamInfo::ResponseFlag::UpstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamOverflow,
-      StreamInfo::ResponseFlag::NoRouteFound,
-      StreamInfo::ResponseFlag::DelayInjected,
-      StreamInfo::ResponseFlag::FaultInjected,
-      StreamInfo::ResponseFlag::RateLimited,
-      StreamInfo::ResponseFlag::UnauthorizedExternalService,
-      StreamInfo::ResponseFlag::RateLimitServiceError,
-      StreamInfo::ResponseFlag::DownstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded,
-      StreamInfo::ResponseFlag::StreamIdleTimeout,
-      StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
-      StreamInfo::ResponseFlag::DownstreamProtocolError,
-      StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter,
-      StreamInfo::ResponseFlag::NoFilterConfigFound,
-      StreamInfo::ResponseFlag::DurationTimeout,
-      StreamInfo::ResponseFlag::UpstreamProtocolError,
-      StreamInfo::ResponseFlag::NoClusterFound,
-  };
-
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto response_flag : all_response_flags) {
+  for (const auto& [flag_string, response_flag] :
+       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
+    UNREFERENCED_PARAMETER(flag_string);
+
     TestStreamInfo stream_info;
     stream_info.setResponseFlag(response_flag);
     EXPECT_CALL(*file_, write(_));
@@ -1231,11 +1204,11 @@ typed_config:
       {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
-  for (const auto& pair : statusMapping) {
-    stream_info_.response_code_ = pair.second;
+  for (const auto& [response_string, response_code] : statusMapping) {
+    stream_info_.response_code_ = response_code;
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
-        parseAccessLogFromV3Yaml(fmt::format(yaml_template, pair.first)), context_);
+        parseAccessLogFromV3Yaml(fmt::format(yaml_template, response_string)), context_);
 
     EXPECT_CALL(*file_, write(_));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);

@@ -25,6 +25,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "containers_lib",
+    hdrs = ["containers.h"],
+    deps = [
+        ":cleanup_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "debug_recursion_checker_lib",
     hdrs = ["debug_recursion_checker.h"],
     deps = [":assert_lib"],
@@ -200,6 +208,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "win32_event_logger_impl_lib",
+    srcs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:windows_x86_64": ["win32/event_logger_impl.h"],
+        "//conditions:default": [],
+    }),
+    deps = [":base_logger_lib"],
+)
+
+envoy_cc_library(
     name = "mutex_tracer_lib",
     srcs = ["mutex_tracer_impl.cc"],
     hdrs = ["mutex_tracer_impl.h"],
@@ -300,6 +321,14 @@ envoy_cc_library(
     deps = [
         "//include/envoy/common:scope_tracker_interface",
         "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "scope_tracked_object_stack",
+    hdrs = ["scope_tracked_object_stack.h"],
+    deps = [
+        "//include/envoy/common:scope_tracker_interface",
     ],
 )
 

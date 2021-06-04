@@ -23,7 +23,7 @@ public:
     Command mysql_cmd_encode{};
     Command mysql_cmd_decode{};
     uint8_t seq = 0u;
-    uint32_t len = 0u;
+    uint32_t len;
     mysql_cmd_encode.setCmd(Command::Cmd::Query);
     mysql_cmd_encode.setData(query);
 

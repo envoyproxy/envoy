@@ -13,6 +13,15 @@ namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
 
+class MockCallbacks : public Callbacks {
+  MOCK_METHOD(void, onPoolFailure,
+              (PoolFailureReason reason, absl::string_view transport_failure_reason,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (RequestEncoder & encoder, Upstream::HostDescriptionConstSharedPtr host,
+               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();
@@ -26,6 +35,7 @@ public:
   MOCK_METHOD(Cancellable*, newStream, (ResponseDecoder & response_decoder, Callbacks& callbacks));
   MOCK_METHOD(bool, maybePreconnect, (float));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+  MOCK_METHOD(absl::string_view, protocolDescription, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
 };

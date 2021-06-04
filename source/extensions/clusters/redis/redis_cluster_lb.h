@@ -13,13 +13,11 @@
 
 #include "source/extensions/clusters/redis/crc16.h"
 
-#include "extensions/clusters/well_known_names.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/btree_map.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -37,11 +35,11 @@ public:
   int64_t start() const { return start_; }
   int64_t end() const { return end_; }
   Network::Address::InstanceConstSharedPtr primary() const { return primary_; }
-  const absl::flat_hash_set<Network::Address::InstanceConstSharedPtr>& replicas() const {
+  const absl::btree_map<std::string, Network::Address::InstanceConstSharedPtr>& replicas() const {
     return replicas_;
   }
   void addReplica(Network::Address::InstanceConstSharedPtr replica_address) {
-    replicas_.insert(std::move(replica_address));
+    replicas_.emplace(replica_address->asString(), std::move(replica_address));
   }
 
   bool operator==(const ClusterSlot& rhs) const;
@@ -50,7 +48,7 @@ private:
   int64_t start_;
   int64_t end_;
   Network::Address::InstanceConstSharedPtr primary_;
-  absl::flat_hash_set<Network::Address::InstanceConstSharedPtr> replicas_;
+  absl::btree_map<std::string, Network::Address::InstanceConstSharedPtr> replicas_;
 };
 
 using ClusterSlotsPtr = std::unique_ptr<std::vector<ClusterSlot>>;

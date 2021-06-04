@@ -92,6 +92,36 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SslIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Test that Envoy behaves correctly when receiving an SSLAlert for an unspecified code. The codes
+// are defined in the standard, and assigned codes have a string associated with them in BoringSSL,
+// which is included in logs. For an unknown code, verify that no crash occurs.
+TEST_P(SslIntegrationTest, UnknownSslAlert) {
+  initialize();
+  Network::ClientConnectionPtr connection = makeSslClientConnection({});
+  ConnectionStatusCallbacks callbacks;
+  connection->addConnectionCallbacks(callbacks);
+  connection->connect();
+  while (!callbacks.connected()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl_info = connection->ssl();
+  SSL* ssl =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(ssl_info.get())
+          ->ssl();
+  ASSERT_EQ(connection->state(), Network::Connection::State::Open);
+  ASSERT_NE(ssl, nullptr);
+  SSL_send_fatal_alert(ssl, 255);
+  while (!callbacks.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  const std::string counter_name = listenerStatPrefix("ssl.connection_error");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
+  connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
@@ -109,7 +139,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                                     HttpConnectionManager::AUTO);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
@@ -128,7 +158,7 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferVerifySAN) {
 }
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2VerifySAN) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true).setSan(san_to_match_));
   };
@@ -164,7 +194,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 #if defined(__APPLE__) || defined(WIN32)
   // Skip this test on OS X + Windows: we can't detect the early close on non-Linux, and we
   // won't clean up the upstream connection until it times out. See #4294.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     return;
   }
 #endif
@@ -701,7 +731,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   auto result = codec_client_->startRequest(request_headers);
-  auto decoder = std::move(result.second);
+  auto response = std::move(result.second);
   Buffer::OwnedImpl data1("one");
   result.first.encodeData(data1, false);
   Buffer::OwnedImpl data2("two");
@@ -711,10 +741,10 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   upstream_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl data3("three");
   upstream_request_->encodeData(data3, false);
-  decoder->waitForBodyData(5);
+  response->waitForBodyData(5);
   Buffer::OwnedImpl data4("four");
   upstream_request_->encodeData(data4, true);
-  decoder->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   checkStats();
   codec_client_->close();

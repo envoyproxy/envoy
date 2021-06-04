@@ -52,7 +52,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/network/common/utility.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_cat.h"
@@ -284,7 +283,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, *cluster_, address_, socket_factory_, options,
+  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -314,8 +313,8 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
 
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
-                            : socket_factory_;
-  return {createConnection(dispatcher, *cluster_, healthCheckAddress(), factory, nullptr,
+                            : transportSocketFactory();
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -742,7 +741,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
@@ -898,12 +897,11 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           config.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 
@@ -925,16 +923,21 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
   if (downstream_protocol.has_value() &&
       features_ & Upstream::ClusterInfo::Features::USE_DOWNSTREAM_PROTOCOL) {
     return {downstream_protocol.value()};
-  } else if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
-    ASSERT(!(features_ & Upstream::ClusterInfo::Features::HTTP3));
-    return {Http::Protocol::Http2, Http::Protocol::Http11};
-  } else {
-    if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
-      return {Http::Protocol::Http3};
-    }
-    return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
-                                                                 : Http::Protocol::Http11};
   }
+
+  if (features_ & Upstream::ClusterInfo::Features::USE_ALPN) {
+    if (!(features_ & Upstream::ClusterInfo::Features::HTTP3)) {
+      return {Http::Protocol::Http2, Http::Protocol::Http11};
+    }
+    return {Http::Protocol::Http3, Http::Protocol::Http2, Http::Protocol::Http11};
+  }
+
+  if (features_ & Upstream::ClusterInfo::Features::HTTP3) {
+    return {Http::Protocol::Http3};
+  }
+
+  return {(features_ & Upstream::ClusterInfo::Features::HTTP2) ? Http::Protocol::Http2
+                                                               : Http::Protocol::Http11};
 }
 
 ClusterImplBase::ClusterImplBase(
@@ -1254,6 +1257,10 @@ Http::Http1::CodecStats& ClusterInfoImpl::http1CodecStats() const {
 
 Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
   return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
+}
+
+Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

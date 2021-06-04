@@ -1,8 +1,11 @@
 #include "common/quic/envoy_quic_utils.h"
 
+#include <memory>
+
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
+#include "common/http/utility.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
@@ -100,11 +103,25 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
   }
 }
 
-Http::StreamResetReason quicErrorCodeToEnvoyResetReason(quic::QuicErrorCode error) {
-  if (error == quic::QUIC_NO_ERROR) {
-    return Http::StreamResetReason::ConnectionTermination;
-  } else {
+Http::StreamResetReason quicErrorCodeToEnvoyLocalResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
     return Http::StreamResetReason::ConnectionFailure;
+  case quic::QUIC_HTTP_FRAME_ERROR:
+    return Http::StreamResetReason::ProtocolError;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
+  }
+}
+
+Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCode error) {
+  switch (error) {
+  case quic::QUIC_HANDSHAKE_FAILED:
+  case quic::QUIC_HANDSHAKE_TIMEOUT:
+    return Http::StreamResetReason::ConnectionFailure;
+  default:
+    return Http::StreamResetReason::ConnectionTermination;
   }
 }
 
@@ -207,6 +224,47 @@ int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::strin
     *error_details = "Invalid leaf cert, only RSA and ECDSA certificates are supported";
   }
   return sign_alg;
+}
+
+Network::ConnectionSocketPtr
+createServerConnectionSocket(Network::IoHandle& io_handle,
+                             const quic::QuicSocketAddress& self_address,
+                             const quic::QuicSocketAddress& peer_address,
+                             const std::string& hostname, absl::string_view alpn) {
+  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+      std::make_unique<QuicIoHandleWrapper>(io_handle),
+      quicAddressToEnvoyAddressInstance(self_address),
+      quicAddressToEnvoyAddressInstance(peer_address));
+  connection_socket->setDetectedTransportProtocol("quic");
+  connection_socket->setRequestedServerName(hostname);
+  connection_socket->setRequestedApplicationProtocols({alpn});
+  return connection_socket;
+}
+
+void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
+                                        quic::QuicConfig& quic_config) {
+  size_t stream_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_stream_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  if (stream_flow_control_window_to_send < quic::kMinimumFlowControlSendWindow) {
+    // If the configured value is smaller than 16kB, only use it for IETF QUIC, because Google QUIC
+    // requires minimum 16kB stream flow control window. The QUICHE default 16kB will be used for
+    // Google QUIC connections.
+    quic_config.SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+        stream_flow_control_window_to_send);
+  } else {
+    // Both Google QUIC and IETF Quic can be configured from this.
+    quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
+  }
+
+  uint32_t session_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_connection_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  // Config connection level flow control window shouldn't be smaller than the minimum flow control
+  // window supported in QUICHE which is 16kB.
+  quic_config.SetInitialSessionFlowControlWindowToSend(
+      std::max(quic::kMinimumFlowControlSendWindow,
+               static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
 }
 
 } // namespace Quic

@@ -16,7 +16,6 @@
 #include "quiche/quic/core/crypto/crypto_protocol.h"
 #include "quiche/quic/platform/api/quic_reference_counted.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -24,7 +23,6 @@
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
-#include "server/backtrace.h"
 #include "common/common/logger.h"
 
 namespace Envoy {

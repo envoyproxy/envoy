@@ -27,11 +27,6 @@
 #include "gtest/gtest.h"
 
 using testing::HasSubstr;
-using testing::Invoke;
-using testing::NiceMock;
-using testing::Return;
-using testing::ReturnPointee;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -51,11 +46,34 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
                       EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
+TEST_P(AdminInstanceTest, Getters) {
+  EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
+  EXPECT_EQ(1, admin_.concurrency());
+  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  EXPECT_EQ(nullptr, admin_.tracer());
+  EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
+}
+
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
   EXPECT_EQ(admin_.socket().addressProvider().localAddress()->asString(), address_from_file);
+}
+
+TEST_P(AdminInstanceTest, AdminAddress) {
+  std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
+  AdminImpl admin_address_out_path(cpu_profile_path_, server_);
+  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
+  access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+      file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      server_.accessLogManager()));
+  EXPECT_LOG_CONTAINS("info", "admin address:",
+                      admin_address_out_path.startHttpListener(
+                          access_logs, address_out_path,
+                          Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr,
+                          listener_scope_.createScope("listener.admin.")));
 }
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {

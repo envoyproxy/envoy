@@ -20,7 +20,6 @@ envoy_cc_library(
         "default_validator.h",
         "factory.h",
         "utility.h",
-        "well_known_names.h",
     ],
     external_deps = [
         "ssl",

@@ -302,8 +302,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
             "error_code={}, hostname={}",
             dns_name_, flags, flags & kDNSServiceFlagsMoreComing ? "yes" : "no",
             flags & kDNSServiceFlagsAdd ? "yes" : "no", interface_index, error_code, hostname);
-  RELEASE_ASSERT(interface_index == 0,
-                 fmt::format("unexpected interface_index={}", interface_index));
 
   if (!pending_cb_) {
     pending_cb_ = {ResolutionStatus::Success, {}};

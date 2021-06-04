@@ -2,6 +2,11 @@ version: 2
 updates:
 
   - package-ecosystem: "pip"
+    directory: "/.github/actions/pr_notifier"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
     directory: "/test/extensions/filters/network/thrift_proxy"
     schedule:
       interval: "daily"
@@ -18,6 +23,11 @@ updates:
 
   - package-ecosystem: "pip"
     directory: "/docs"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/docs"
     schedule:
       interval: "daily"
 
@@ -70,3 +80,19 @@ updates:
     directory: "/configs"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/tools/testing"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "docker"
+    directory: "/ci"
+    schedule:
+      interval: daily
+
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: daily
+

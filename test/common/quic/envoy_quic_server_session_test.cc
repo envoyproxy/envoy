@@ -1,3 +1,5 @@
+#include <memory>
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -28,7 +30,6 @@
 #include "common/quic/envoy_quic_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "extensions/transport_sockets/well_known_names.h"
 
 #include "envoy/stats/stats_macros.h"
 #include "common/event/libevent_scheduler.h"
@@ -52,28 +53,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
-
-class TestEnvoyQuicServerConnection : public EnvoyQuicServerConnection {
-public:
-  TestEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
-                                quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
-                                const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Socket& listen_socket)
-      : EnvoyQuicServerConnection(quic::test::TestConnectionId(),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
-                                  quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345),
-                                  helper, alarm_factory, &writer, /*owns_writer=*/false,
-                                  supported_versions, listen_socket) {}
-
-  Network::Connection::ConnectionStats& connectionStats() const {
-    return EnvoyQuicConnection::connectionStats();
-  }
-
-  MOCK_METHOD(void, SendConnectionClosePacket,
-              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
-  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-};
 
 // Derive to have simpler priority mechanism.
 class TestEnvoyQuicServerSession : public EnvoyQuicServerSession {
@@ -152,17 +131,18 @@ public:
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
-        quic_connection_(new TestEnvoyQuicServerConnection(
+        quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
         envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicServerConnection>(quic_connection_),
+                            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
-                            listener_config_),
-        read_filter_(new Network::MockReadFilter()) {
+                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
+        stats_({ALL_HTTP3_CODEC_STATS(
+            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
+            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
 
     EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
     EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
@@ -210,6 +190,7 @@ public:
 
   bool installReadFilter() {
     // Setup read filter.
+    read_filter_ = std::make_shared<Network::MockReadFilter>(),
     envoy_quic_session_.addReadFilter(read_filter_);
     EXPECT_EQ(Http::Protocol::Http3,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
@@ -221,8 +202,9 @@ public:
     EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
     EXPECT_CALL(*read_filter_, onNewConnection()).WillOnce(Invoke([this]() {
       // Create ServerConnection instance and setup callbacks for it.
-      http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
-                                                                        http_connection_callbacks_);
+      http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(
+          envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_, 64 * 1024, 100,
+          envoy::config::core::v3::HttpProtocolOptions::ALLOW);
       EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
@@ -264,7 +246,7 @@ protected:
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  TestEnvoyQuicServerConnection* quic_connection_;
+  MockEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
   testing::NiceMock<quic::test::MockQuicCryptoServerStreamHelper> crypto_stream_helper_;
@@ -279,10 +261,25 @@ protected:
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::ServerConnectionPtr http_connection_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
 };
 
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicServerSessionTests, EnvoyQuicServerSessionTest,
                          testing::ValuesIn({true, false}));
+
+TEST_P(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
+  quic::QuicStreamId stream_id =
+      quic::VersionUsesHttp3(quic_version_[0].transport_version) ? 4u : 5u;
+  EXPECT_ENVOY_BUG(envoy_quic_session_.GetOrCreateStream(stream_id),
+                   fmt::format("attempts to create stream", envoy_quic_session_.id(), stream_id));
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+      .Times(testing::AtMost(1))
+      .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));
+  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+}
 
 TEST_P(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
@@ -779,28 +776,8 @@ TEST_P(EnvoyQuicServerSessionTest, GoAway) {
   http_connection_->goAway();
 }
 
-TEST_P(EnvoyQuicServerSessionTest, InitializeFilterChain) {
-  Network::MockFilterChain filter_chain;
-  crypto_stream_->setProofSourceDetails(
-      std::make_unique<EnvoyQuicProofSourceDetails>(filter_chain));
-  std::vector<Network::FilterFactoryCb> filter_factory{[this](
-                                                           Network::FilterManager& filter_manager) {
-    filter_manager.addReadFilter(read_filter_);
-    read_filter_->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
-    read_filter_->callbacks_->connection().setConnectionStats(
-        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
-  }};
-  EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
-  EXPECT_CALL(*read_filter_, onNewConnection())
-      // Stop iteration to avoid calling getRead/WriteBuffer().
-      .WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const std::vector<Network::FilterFactoryCb>& filter_factories) {
-        EXPECT_EQ(1u, filter_factories.size());
-        Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
-        return true;
-      }));
+TEST_P(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
+  installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
   if (!quic_version_[0].UsesTls()) {
     envoy_quic_session_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);

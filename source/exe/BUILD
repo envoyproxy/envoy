@@ -111,6 +111,7 @@ envoy_cc_library(
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
+        "//include/envoy/server:platform_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
@@ -150,8 +151,7 @@ envoy_cc_library(
     name = "platform_header_lib",
     hdrs = ["platform_impl.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/thread:thread_interface",
+        "//include/envoy/server:platform_interface",
     ],
 )
 
@@ -212,6 +212,7 @@ envoy_cc_library(
             ":main_common_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
+            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/common:thread_lib",
             "//source/common/event:signal_lib",
         ],
