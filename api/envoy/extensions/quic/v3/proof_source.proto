@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC proof source config]
-// [#extension: envoy.quic.filter_chain_proof_source]
+// [#extension: envoy.quic.proof_source.filter_chain]
 
 // Configuration for the default QUIC proof source.
 message ProofSourceConfig {

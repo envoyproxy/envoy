@@ -13,7 +13,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::quic::v3::CryptoServerStreamConfig>();
   }
-  std::string name() const override { return "quic.quiche_crypto_server_stream"; }
+  std::string name() const override { return "envoy.quic.server.crypto_stream.quiche"; }
   std::unique_ptr<quic::QuicCryptoServerStreamBase>
   createEnvoyQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
                                     quic::QuicCompressedCertsCache* compressed_certs_cache,

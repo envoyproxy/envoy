@@ -284,8 +284,8 @@ EXTENSIONS = {
     # Quic extensions
     #
 
-    "quic.quiche_crypto_server_stream":                 "//source/extensions/quic:envoy_quic_default_crypto_server_stream",
-    "envoy.quic.filter_chain_proof_source":             "//source/extensions/quic:envoy_quic_default_proof_source",
+    "envoy.quic.server.crypto_stream.quiche":                 "//source/extensions/quic:envoy_quic_default_crypto_server_stream",
+    "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic:envoy_quic_default_proof_source",
 
 }
 

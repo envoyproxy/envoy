@@ -14,7 +14,7 @@ public:
     return std::make_unique<envoy::extensions::quic::v3::ProofSourceConfig>();
   }
 
-  std::string name() const override { return "envoy.quic.filter_chain_proof_source"; }
+  std::string name() const override { return "envoy.quic.proof_source.filter_chain"; }
 
   std::unique_ptr<quic::ProofSource>
   createQuicProofSource(Network::Socket& listen_socket,

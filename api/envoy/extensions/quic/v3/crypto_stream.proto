@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC server crypto stream config]
-// [#extension: quic.quiche_crypto_server_stream]
+// [#extension: envoy.quic.server.crypto_stream.quiche]
 
 // Configuration for the default QUIC server crypto stream provided by QUICHE.
 message CryptoServerStreamConfig {

@@ -261,30 +261,30 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.
-  envoy::config::core::v3::TypedExtensionConfig crypto_stream;
-  if (!config.has_crypto_stream()) {
+  envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;
+  if (!config.has_crypto_stream_config()) {
     // If not specified, use the quic crypto stream created by QUICHE.
-    crypto_stream.set_name("quic.quiche_crypto_server_stream");
-    envoy::extensions::quic::v3::CryptoServerStreamConfig crypto_stream_config;
-    crypto_stream.mutable_typed_config()->PackFrom(crypto_stream_config);
+    crypto_stream_config.set_name("envoy.quic.server.crypto_stream.quiche");
+    envoy::extensions::quic::v3::CryptoServerStreamConfig empty_crypto_stream_config;
+    crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
   } else {
-    crypto_stream = config.crypto_stream();
+    crypto_stream_config = config.crypto_stream_config();
   }
   crypto_server_stream_factory_ =
       Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactoryInterface>(
-          crypto_stream);
+          crypto_stream_config);
 
   // Initialize proof source factory.
-  envoy::config::core::v3::TypedExtensionConfig proof_source;
-  if (!config.has_proof_source()) {
-    proof_source.set_name("envoy.quic.filter_chain_proof_source");
-    envoy::extensions::quic::v3::ProofSourceConfig proof_source_config;
-    proof_source.mutable_typed_config()->PackFrom(proof_source_config);
+  envoy::config::core::v3::TypedExtensionConfig proof_source_config;
+  if (!config.has_proof_source_config()) {
+    proof_source_config.set_name("envoy.quic.proof_source.filter_chain");
+    envoy::extensions::quic::v3::ProofSourceConfig empty_proof_source_config;
+    proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
   } else {
-    proof_source = config.proof_source();
+    proof_source_config = config.proof_source_config();
   }
-  proof_source_factory_ =
-      Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(proof_source);
+  proof_source_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(
+      proof_source_config);
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(

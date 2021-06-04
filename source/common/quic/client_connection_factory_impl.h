@@ -6,7 +6,6 @@
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
-
 #include "source/extensions/quic/envoy_quic_crypto_client_stream.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 

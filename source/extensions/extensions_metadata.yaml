@@ -489,12 +489,12 @@ envoy.matching.input_matchers.consistent_hashing:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.quic.filter_chain_proof_source:
+envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
   status: alpha
-quic.quiche_crypto_server_stream:
+envoy.quic.server.crypto_stream.quiche:
   categories:
   - envoy.quic.server.crypto_stream
   security_posture: robust_to_untrusted_downstream

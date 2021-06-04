@@ -272,12 +272,12 @@ protected:
       default_value: true
       runtime_key: quic.enabled
     packets_to_read_to_connection_count_ratio: 50
-    crypto_stream:
-      name: "envoy.quic.quiche_crypto_server_stream"
+    crypto_stream_config:
+      name: "envoy.quic.server.crypto_stream.quiche"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.v3.CryptoServerStreamConfig
-    proof_source:
-      name: "envoy.quic.filter_chain_proof_source"
+    proof_source_config:
+      name: "envoy.quic.proof_source.filter_chain"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.v3.ProofSourceConfig
 )EOF",
