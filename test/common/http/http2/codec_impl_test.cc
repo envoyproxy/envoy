@@ -1804,6 +1804,41 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   }
 }
 
+TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreams) {
+  http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
+  http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
+      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
+      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        return request_decoder_;
+      }));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
+  absl::InlinedVector<nghttp2_settings_entry, 1> settings{
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}};
+  EXPECT_EQ(0, nghttp2_submit_settings(server_->session(), NGHTTP2_FLAG_NONE, settings.data(),
+                                       settings.size()));
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+}
+
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(                                                                              \
       ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),                   \
