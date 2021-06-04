@@ -11,7 +11,7 @@ Connection Limit Filter
 Overview
 --------
 
-The filter is based on per listener and per worker, it can protect for resources such as connections, CPU, memory, etc. 
+The filter is based on per listener and per worker, it can protect for resources such as connections, CPU, memory, etc.
 by making sure every filter chain gets fair share of connection resources and prevent any single entity based on filter chain match
 or descriptors from consuming a large number of connections to ensure fair share of the connections.
 The connection limit filter applies a connection limit to incoming connections that are processed by the filter's filter chain.
