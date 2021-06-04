@@ -13,6 +13,8 @@
 namespace Envoy {
 namespace {
 
+#ifdef ENVOY_ENABLE_QUIC
+
 class FilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void initialize() override {
@@ -78,6 +80,8 @@ INSTANTIATE_TEST_SUITE_P(Protocols, FilterIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+#endif
 
 } // namespace
 } // namespace Envoy

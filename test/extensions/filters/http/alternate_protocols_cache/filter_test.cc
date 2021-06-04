@@ -22,13 +22,19 @@ public:
       : alternate_protocols_cache_manager_(
             std::make_shared<Http::MockAlternateProtocolsCacheManager>()),
         alternate_protocols_cache_(std::make_shared<Http::MockAlternateProtocolsCache>()) {
+    initialize(true);
+  }
+
+  void initialize(bool populate_config) {
     EXPECT_CALL(alternate_protocols_cache_manager_factory_, get())
         .WillOnce(Return(alternate_protocols_cache_manager_));
-    EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_))
-        .WillOnce(Return(alternate_protocols_cache_));
 
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
-    proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
+    if (populate_config) {
+      proto_config.mutable_alternate_protocols_cache_options()->set_name("foo");
+      EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_))
+              .WillOnce(Return(alternate_protocols_cache_));
+    }
     filter_config_ = std::make_shared<FilterConfig>(
         proto_config, alternate_protocols_cache_manager_factory_, simTime());
     filter_ = std::make_unique<Filter>(filter_config_);
@@ -52,6 +58,16 @@ std::string dumpOrigin(const Http::AlternateProtocolsCache::Origin& origin) {
 std::string dumpAlternative(const Http::AlternateProtocolsCache::AlternateProtocol& origin) {
   return "{ alpn: '" + origin.alpn_ + "' host: '" + origin.hostname_ +
          "' port: " + absl::StrCat(origin.port_) + " }\n";
+}
+
+TEST_F(FilterTest, NoCache) {
+  initialize(false);
+
+  Http::TestResponseHeaderMapImpl headers{
+    {":status", "200"}, {"alt-svc", "h3-29=\":443\"; ma=86400, h3=\":443\"; ma=60"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  filter_->onDestroy();
 }
 
 TEST_F(FilterTest, NoAltSvc) {
