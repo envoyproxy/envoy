@@ -140,7 +140,7 @@ New Features
 * grpc_json_transcoder: added :ref:`request_validation_options <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.request_validation_options>` to reject invalid requests early.
 * grpc_json_transcoder: filter can now be configured on per-route/per-vhost level as well. Leaving empty list of services in the filter configuration disables transcoding on the specific route.
 * http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 dispatching. Crashes while inside the dispatching loop should dump debug information.
-* http: added support for :ref:`max_requests_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_connection>` for downstream connection.
+* http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for downstream connection.
 * http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 and HTTP/2 dispatching. Crashes while inside the dispatching loop should dump debug information.
 * http: added an option to not add content-length: 0 for requests which should not have bodies. This behavior can be enabled by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` true.
 * http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 and HTTP/2 dispatching. Crashes while inside the dispatching loop should dump debug information. Furthermore, HTTP/1 and HTTP/2 clients now dumps the originating request whose response from the upstream caused Envoy to crash.

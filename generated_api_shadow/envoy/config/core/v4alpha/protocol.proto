@@ -119,7 +119,7 @@ message HttpProtocolOptions {
 
   // Optional maximum requests for a downstream connection.
   // If not specified, there is no limit.
-  uint32 max_requests_connection = 6;
+  uint32 max_requests_per_connection = 6;
 }
 
 // [#next-free-field: 8]

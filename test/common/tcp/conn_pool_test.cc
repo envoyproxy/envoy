@@ -862,7 +862,7 @@ TEST_P(TcpConnPoolImplTest, MaxConnections) {
 TEST_P(TcpConnPoolImplTest, MaxRequestsConnection) {
   initialize();
 
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   // Request 1 should kick off a new connection.
   ConnPoolCallbacks callbacks;
@@ -1047,7 +1047,7 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
     return;
   }
   cluster_->resetResourceManager(5, 1024, 1024, 1, 1);
-  cluster_->max_requests_connection_ = 100;
+  cluster_->max_requests_per_connection_ = 100;
 
   ConnPoolCallbacks callbacks1;
   ConnPoolCallbacks callbacks2;

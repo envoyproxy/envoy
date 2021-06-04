@@ -34,6 +34,7 @@ namespace Http {
   COUNTER(downstream_cx_http3_total)                                                               \
   COUNTER(downstream_cx_idle_timeout)                                                              \
   COUNTER(downstream_cx_max_duration_reached)                                                      \
+  COUNTER(downstream_cx_max_requests)                                                              \
   COUNTER(downstream_cx_overload_disable_keepalive)                                                \
   COUNTER(downstream_cx_protocol_error)                                                            \
   COUNTER(downstream_cx_rx_bytes_total)                                                            \

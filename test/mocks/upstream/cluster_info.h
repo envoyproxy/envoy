@@ -158,7 +158,7 @@ public:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
-  uint64_t max_requests_connection_{};
+  uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStatNames stat_names_;

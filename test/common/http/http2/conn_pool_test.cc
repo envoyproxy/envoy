@@ -589,7 +589,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   // Test drain connections call prior to any connections being created.
   pool_->drainConnections();
@@ -728,7 +728,7 @@ TEST_F(Http2ConnPoolImplTest, PendingStreams) {
 // Verifies that the correct number of CONNECTING connections are created for
 // the pending requests, when the total requests per connection is limited
 TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingTotalRequestsPerConnection) {
-  cluster_->max_requests_connection_ = 2;
+  cluster_->max_requests_per_connection_ = 2;
   InSequence s;
 
   // Create three requests. The 3rd should create a 2nd connection due to the limit
@@ -817,7 +817,7 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsNumberConnectingConcurrentRequestsPe
 // fails to be established.
 TEST_F(Http2ConnPoolImplTest, PendingStreamsFailure) {
   InSequence s;
-  cluster_->max_requests_connection_ = 10;
+  cluster_->max_requests_per_connection_ = 10;
 
   // Create three requests. These should be queued up.
   expectClientCreate();
@@ -849,7 +849,7 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsFailure) {
 // Verifies resets due to local connection closes are tracked correctly.
 TEST_F(Http2ConnPoolImplTest, LocalFailure) {
   InSequence s;
-  cluster_->max_requests_connection_ = 10;
+  cluster_->max_requests_per_connection_ = 10;
 
   // Create three requests. These should be queued up.
   expectClientCreate();
@@ -1078,7 +1078,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   InSequence s;
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -1105,7 +1105,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -1148,7 +1148,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -1191,7 +1191,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -1373,7 +1373,7 @@ TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
 
 // Show that if connections are draining, they're still considered active.
 TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -1387,7 +1387,7 @@ TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
 
 // Show that once we've drained all connections, there are no longer any active.
 TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -1684,7 +1684,7 @@ TEST_F(Http2ConnPoolImplTest, MaybePreconnect) {
 
 TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
-  cluster_->max_requests_connection_ = 4;
+  cluster_->max_requests_per_connection_ = 4;
 
   expectClientsCreate(1);
   ActiveTestRequest r1(*this, 0, false);

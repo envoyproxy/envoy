@@ -864,7 +864,7 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
 TEST_F(Http1ConnPoolImplTest, MaxRequestsConnection) {
   InSequence s;
 
-  cluster_->max_requests_connection_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   // Request 1 should kick off a new connection.
   NiceMock<MockResponseDecoder> outer_decoder;

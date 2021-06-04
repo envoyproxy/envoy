@@ -74,7 +74,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
-  ON_CALL(*this, maxRequestsConnection()).WillByDefault(ReturnPointee(&max_requests_connection_));
+  ON_CALL(*this, maxRequestsConnection()).WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
   // TODO(incfly): The following is a hack because it's not possible to directly embed
