@@ -11,11 +11,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
 

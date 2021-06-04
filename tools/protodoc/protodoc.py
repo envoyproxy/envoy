@@ -6,8 +6,6 @@
 from collections import defaultdict
 import json
 import functools
-import os
-import pathlib
 import sys
 
 from google.protobuf import json_format
@@ -50,10 +48,6 @@ RPC_NAMESPACE_PREFIX = '.google.rpc.'
 
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
-
-# Template for data plane API URLs.
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
-    os.environ['ENVOY_BLOB_SHA'])
 
 # Template for formating extension descriptions.
 EXTENSION_TEMPLATE = Template(
@@ -119,7 +113,10 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+r = runfiles.Create()
+
+with open(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml")) as f:
+    EXTENSION_DB = yaml.safe_load(f.read())
 
 # create an index of extension categories from extension db
 EXTENSION_CATEGORIES = {}
@@ -149,7 +146,7 @@ def hide_not_implemented(comment):
     return annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION in comment.annotations
 
 
-def github_url(type_context):
+def github_url(text, type_context):
     """Obtain data plane API Github URL by path from a TypeContext.
 
     Args:
@@ -158,10 +155,7 @@ def github_url(type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
-    if type_context.location is not None:
-        return DATA_PLANE_API_URL_FMT % (
-            type_context.source_code_info.name, type_context.location.span[0])
-    return ''
+    return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 
 def format_comment_with_annotations(comment, type_name=''):
@@ -175,6 +169,12 @@ def format_comment_with_annotations(comment, type_name=''):
     Returns:
         A string with additional RST from annotations.
     """
+    alpha_warning = ''
+    if annotations.ALPHA_ANNOTATION in comment.annotations:
+        experimental_warning = (
+            '.. warning::\n   This API is alpha and is not covered by the :ref:`threat model <arch_overview_threat_model>`.\n\n'
+        )
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -184,7 +184,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return alpha_warning + comment + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -242,7 +242,7 @@ def format_extension(extension):
     """
     try:
         extension_metadata = EXTENSION_DB[extension]
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
         security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
         categories = extension_metadata["categories"]
     except KeyError as e:
@@ -663,8 +663,6 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        r = runfiles.Create()
-
         with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
             self.v2_mapping = json.load(f)
 
@@ -679,8 +677,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_enum_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
         if hide_not_implemented(leading_comment):
@@ -695,8 +692,7 @@ class RstFormatVisitor(visitor.Visitor):
         normal_msg_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(message_cross_ref_label(normal_msg_type))
         header = format_header('-', normal_msg_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_msg_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_msg_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
         formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
         if hide_not_implemented(leading_comment):

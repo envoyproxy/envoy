@@ -1,14 +1,13 @@
-#include "server/admin/stats_handler.h"
+#include "source/server/admin/stats_handler.h"
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/html/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "server/admin/prometheus_stats.h"
-#include "server/admin/utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/html/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/server/admin/prometheus_stats.h"
+#include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

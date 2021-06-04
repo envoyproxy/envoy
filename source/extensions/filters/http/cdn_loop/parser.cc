@@ -1,6 +1,6 @@
-#include "extensions/filters/http/cdn_loop/parser.h"
+#include "source/extensions/filters/http/cdn_loop/parser.h"
 
-#include "common/common/statusor.h"
+#include "source/common/common/statusor.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"

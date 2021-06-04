@@ -1,11 +1,10 @@
 #include "test/fuzz/fuzz_runner.h"
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
-
-#include "exe/process_wide.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/libevent.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/exe/process_wide.h"
 
 #include "test/test_common/environment.h"
 

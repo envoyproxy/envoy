@@ -72,7 +72,6 @@ static_resources:
             typed_config: {}
   clusters:
   - name: backend_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -82,7 +81,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: backendservice
+                address: backend-service
                 port_value: 8000
 
 admin:

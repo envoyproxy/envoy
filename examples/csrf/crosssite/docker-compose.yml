@@ -5,8 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
-    networks:
-      - envoymesh
     ports:
       - "8002:8000"
 
@@ -14,10 +12,3 @@ services:
     build:
       context: ..
       dockerfile: crosssite/Dockerfile-service
-    volumes:
-      - ../service-envoy.yaml:/etc/service-envoy.yaml
-    networks:
-      - envoymesh
-
-networks:
-  envoymesh: {}

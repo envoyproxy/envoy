@@ -9,12 +9,12 @@
 #include "envoy/http/codes.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/matchers.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 

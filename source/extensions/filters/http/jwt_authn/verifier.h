@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
 
 namespace Envoy {
 namespace Extensions {

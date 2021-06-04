@@ -2,7 +2,7 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/inlined_vector.h"
 

@@ -2,9 +2,9 @@
 
 #include "envoy/stats/store.h"
 
-#include "common/common/logger.h"
-#include "common/memory/stats.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/memory/stats.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/global.h"
 

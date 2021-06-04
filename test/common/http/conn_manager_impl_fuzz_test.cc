@@ -14,14 +14,14 @@
 // * Fuzz config settings
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/conn_manager_impl.h"
-#include "common/http/context_impl.h"
-#include "common/http/date_provider_impl.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/http/date_provider_impl.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -198,12 +198,23 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
+  bool shouldStripTrailingHostDot() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
     return envoy::config::core::v3::HttpProtocolOptions::ALLOW;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        KEEP_UNCHANGED;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return ip_detection_extensions_;
+  }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -249,6 +260,7 @@ public:
   Http::DefaultInternalAddressConfig internal_address_config_;
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

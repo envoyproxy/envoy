@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,15 +11,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_join.h"
 

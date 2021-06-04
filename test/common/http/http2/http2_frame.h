@@ -6,7 +6,7 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 

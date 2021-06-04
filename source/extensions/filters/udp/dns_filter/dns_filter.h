@@ -5,13 +5,12 @@
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/matchers.h"
-#include "common/config/config_provider_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_resolver.h"
-#include "extensions/filters/udp/dns_filter/dns_parser.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
+#include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -93,6 +92,9 @@ public:
   uint64_t retryCount() const { return retry_count_; }
   Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
+  const envoy::config::core::v3::DnsResolverOptions& dnsResolverOptions() const {
+    return dns_resolver_options_;
+  }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -120,6 +122,7 @@ private:
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;

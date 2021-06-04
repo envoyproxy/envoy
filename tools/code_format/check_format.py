@@ -323,11 +323,15 @@ class FormatChecker:
     # look_path searches for the given executable in all directories in PATH
     # environment variable. If it cannot be found, empty string is returned.
     def look_path(self, executable):
+        if executable is None:
+            return ''
         return shutil.which(executable) or ''
 
     # path_exists checks whether the given path exists. This function assumes that
     # the path is absolute and evaluates environment variables.
     def path_exists(self, executable):
+        if executable is None:
+            return False
         return os.path.exists(os.path.expandvars(executable))
 
     # executable_by_others checks whether the given path has execute permission for
@@ -831,12 +835,12 @@ class FormatChecker:
             report_error(
                 "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
             )
-        if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
+        if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
-                "in include/envoy/common/platform.h instead")
+                "in envoy/common/platform.h instead")
         if DESIGNATED_INITIALIZER_REGEX.search(line):
             # Designated initializers are not part of the C++14 standard and are not supported
             # by MSVC

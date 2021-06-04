@@ -1,15 +1,13 @@
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include <memory>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/http/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -237,8 +235,7 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
       std::make_unique<QuicIoHandleWrapper>(io_handle),
       quicAddressToEnvoyAddressInstance(self_address),
       quicAddressToEnvoyAddressInstance(peer_address));
-  connection_socket->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connection_socket->setDetectedTransportProtocol("quic");
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});
   return connection_socket;

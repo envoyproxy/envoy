@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@deps_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
@@ -7,7 +7,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_binary(
+py_library(
     name = "exports",
     srcs = ["exports.py"],
     data = [
@@ -17,15 +17,10 @@ py_binary(
     ],
 )
 
-py_binary(
-    name = "generate_external_dep_rst",
-    srcs = [
-        "generate_external_dep_rst.py",
-        "utils.py",
-    ],
-    data = [
-        ":exports",
-    ],
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    deps = [":exports"],
 )
 
 py_binary(

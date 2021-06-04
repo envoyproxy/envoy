@@ -15,9 +15,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -144,49 +144,6 @@ std::string ConfigHelper::startTlsConfig() {
 )EOF",
                   TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
-}
-
-envoy::config::cluster::v3::Cluster ConfigHelper::buildStartTlsCluster(const std::string& address,
-                                                                       int port) {
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  auto config_str = fmt::format(
-      R"EOF(
-      name: dummy_cluster
-      connect_timeout: 5s
-      type: STATIC
-      load_assignment:
-        cluster_name: dummy_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: {}
-                  port_value: {}
-      transport_socket:
-        name: "starttls"
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig
-          cleartext_socket_config:
-          tls_socket_config:
-            common_tls_context:
-              tls_certificates:
-                certificate_chain:
-                  filename: {}
-                private_key:
-                  filename: {}
-      lb_policy: ROUND_ROBIN
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {{}}
-    )EOF",
-      address, port, TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"),
-      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-
-  TestUtility::loadFromYaml(config_str, cluster);
-  return cluster;
 }
 
 std::string ConfigHelper::tlsInspectorFilter() {
@@ -811,7 +768,8 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    protocol_options.MergeFrom(old_options);
+    old_options.MergeFrom(protocol_options);
+    protocol_options.CopyFrom(old_options);
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -1424,6 +1382,27 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // upstream_response_timeout.
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+}
+
+envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    size_t http3_max_stream_receive_window) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  if (http2_options.has_initial_stream_window_size() &&
+      http2_options.initial_stream_window_size().value() < http3_max_stream_receive_window) {
+    // Set http3 stream flow control window only if the configured http2 stream flow control
+    // window is smaller than the upper limit of flow control window supported by QUICHE which is
+    // also the default for http3 streams.
+    http3_options.mutable_quic_protocol_options()->mutable_initial_stream_window_size()->set_value(
+        http2_options.initial_stream_window_size().value());
+  }
+  if (http2_options.has_override_stream_error_on_invalid_http_message()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        http2_options.override_stream_error_on_invalid_http_message().value());
+  } else if (http2_options.stream_error_on_invalid_http_messaging()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  }
+  return http3_options;
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

@@ -58,7 +58,6 @@ static_resources:
             - name: envoy.filters.http.router
   clusters:
   - name: some_service
-    connect_timeout: 5s
     # Upstream TLS configuration.
     transport_socket:
       name: envoy.transport_sockets.tls
@@ -86,7 +85,6 @@ static_resources:
           http2_protocol_options:
             max_concurrent_streams: 100
   - name: some_statsd_sink
-    connect_timeout: 5s
     # The rest of the configuration for statsd sink cluster.
 # statsd sink.
 stats_sinks:

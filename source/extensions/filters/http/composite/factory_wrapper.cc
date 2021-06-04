@@ -1,6 +1,6 @@
-#include "extensions/filters/http/composite/factory_wrapper.h"
+#include "source/extensions/filters/http/composite/factory_wrapper.h"
 
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
 namespace Envoy {
 namespace Extensions {

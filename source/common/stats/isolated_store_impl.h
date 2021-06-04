@@ -7,14 +7,14 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
-#include "common/common/utility.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/null_counter.h"
-#include "common/stats/null_gauge.h"
-#include "common/stats/store_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_utility.h"
-#include "common/stats/utility.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
+#include "source/common/stats/store_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_utility.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 

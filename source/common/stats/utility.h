@@ -5,8 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/thread.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"

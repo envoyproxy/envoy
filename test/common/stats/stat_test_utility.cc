@@ -1,7 +1,7 @@
 #include "test/common/stats/stat_test_utility.h"
 
-#include "common/common/assert.h"
-#include "common/memory/stats.h"
+#include "source/common/common/assert.h"
+#include "source/common/memory/stats.h"
 
 namespace Envoy {
 namespace Stats {
