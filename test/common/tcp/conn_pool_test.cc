@@ -859,7 +859,7 @@ TEST_P(TcpConnPoolImplTest, MaxConnections) {
 /**
  * Test when we reach max requests per connection.
  */
-TEST_P(TcpConnPoolImplTest, MaxRequestsConnection) {
+TEST_P(TcpConnPoolImplTest, MaxRequestsPerConnection) {
   initialize();
 
   cluster_->max_requests_per_connection_ = 1;

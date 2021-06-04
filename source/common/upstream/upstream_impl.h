@@ -613,7 +613,7 @@ public:
     return upstream_config_;
   }
   bool maintenanceMode() const override;
-  uint64_t maxRequestsConnection() const override { return max_requests_per_connection_; }
+  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   const std::string& name() const override { return name_; }
   const std::string& observabilityName() const override { return observability_name_; }

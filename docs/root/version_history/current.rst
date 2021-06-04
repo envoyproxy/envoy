@@ -67,64 +67,6 @@ Removed Config or Runtime
 New Features
 ------------
 
-* access log: added a new :ref:`OpenTelemetry access logger <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>` extension, allowing a flexible log structure with native Envoy access log formatting.
-* access log: added the new response flag `NC` for upstream cluster not found. The error flag is set when the http or tcp route is found for the request but the cluster is not available.
-* access log: added the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point for custom formatters (command operators).
-* access log: added support for cross platform writing to :ref:`standard output <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>` and :ref:`standard error <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`.
-* access log: support command operator: %FILTER_CHAIN_NAME% for the downstream tcp and http request.
-* access log: support command operator: %REQUEST_HEADERS_BYTES%, %RESPONSE_HEADERS_BYTES%, and %RESPONSE_TRAILERS_BYTES%.
-* admin: added support for :ref:`access loggers <envoy_v3_api_msg_config.accesslog.v3.AccessLog>` to the admin interface.
-* compression: add brotli :ref:`compressor <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>` and :ref:`decompressor <envoy_v3_api_msg_extensions.compression.brotli.decompressor.v3.Brotli>`.
-* compression: extended the compression allow compressing when the content length header is not present. This behavior may be temporarily reverted by setting `envoy.reloadable_features.enable_compression_without_content_length_header` to false.
-* config: add `envoy.features.fail_on_any_deprecated_feature` runtime key, which matches the behaviour of compile-time flag `ENVOY_DISABLE_DEPRECATED_FEATURES`, i.e. use of deprecated fields will cause a crash.
-* config: the ``Node`` :ref:`dynamic context parameters <envoy_v3_api_field_config.core.v3.Node.dynamic_parameters>` are populated in discovery requests when set on the server instance.
-* dispatcher: supports a stack of `Envoy::ScopeTrackedObject` instead of a single tracked object. This will allow Envoy to dump more debug information on crash.
-* ext_authz: added :ref:`response_headers_to_add <envoy_v3_api_field_service.auth.v3.OkHttpResponse.response_headers_to_add>` to support sending response headers to downstream clients on OK authorization checks via gRPC.
-* ext_authz: added :ref:`allowed_client_headers_on_success <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers_on_success>` to support sending response headers to downstream clients on OK external authorization checks via HTTP.
-* grpc_json_transcoder: added :ref:`request_validation_options <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.request_validation_options>` to reject invalid requests early.
-* grpc_json_transcoder: filter can now be configured on per-route/per-vhost level as well. Leaving empty list of services in the filter configuration disables transcoding on the specific route.
-* http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 dispatching. Crashes while inside the dispatching loop should dump debug information.
-* http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for downstream connection.
-* http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 and HTTP/2 dispatching. Crashes while inside the dispatching loop should dump debug information.
-* http: added an option to not add content-length: 0 for requests which should not have bodies. This behavior can be enabled by setting `envoy.reloadable_features.dont_add_content_length_for_bodiless_requests` true.
-* http: added support for `Envoy::ScopeTrackedObject` for HTTP/1 and HTTP/2 dispatching. Crashes while inside the dispatching loop should dump debug information. Furthermore, HTTP/1 and HTTP/2 clients now dumps the originating request whose response from the upstream caused Envoy to crash.
-* http: added support for :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>`. Preconnecting is off by default, but recommended for clusters serving latency-sensitive traffic, especially if using HTTP/1.1.
-* http: added new runtime config `envoy.reloadable_features.check_unsupported_typed_per_filter_config`, the default value is true. When the value is true, envoy will reject virtual host-specific typed per filter config when the filter doesn't support it.
-* http: added the ability to preserve HTTP/1 header case across the proxy. See the :ref:`header casing <config_http_conn_man_header_casing>` documentation for more information.
-* http: change frame flood and abuse checks to the upstream HTTP/2 codec to ON by default. It can be disabled by setting the `envoy.reloadable_features.upstream_http2_flood_checks` runtime key to false.
-* json: introduced new JSON parser (https://github.com/nlohmann/json) to replace RapidJSON. The new parser is disabled by default. To test the new RapidJSON parser, enable the runtime feature `envoy.reloadable_features.remove_legacy_json`.
-* kill_request: :ref:`Kill Request <config_http_filters_kill_request>` Now supports bidirection killing.
-* loadbalancer: added the ability to specify the hash_key for a host when using a consistent hashing loadbalancer (ringhash, maglev) using the :ref:`LbEndpoint.Metadata <envoy_api_field_endpoint.LbEndpoint.metadata>` e.g.: ``"envoy.lb": {"hash_key": "..."}``.
-* log: added a new custom flag ``%j`` to the log pattern to print the actual message to log as JSON escaped string.
-* oauth filter: added the optional parameter :ref:`resources <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.resources>`. Set this value to add multiple "resource" parameters in the Authorization request sent to the OAuth provider. This acts as an identifier representing the protected resources the client is requesting a token for.
-* original_dst: added support for :ref:`Original Destination <config_listener_filters_original_dst>` on Windows. This enables the use of Envoy as a sidecar proxy on Windows.
-* overload: add support for scaling :ref:`transport connection timeouts<envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.TRANSPORT_SOCKET_CONNECT>`. This can be used to reduce the TLS handshake timeout in response to overload.
-* postgres: added ability to :ref:`terminate SSL<envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.terminate_ssl>`.
-* rbac: added :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>` to allow adding custom prefix to the stats emitted by shadow rules.
-* route config: added :ref:`allow_post field <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.ConnectConfig.allow_post>` for allowing POST payload as raw TCP.
-* route config: added :ref:`max_direct_response_body_size_bytes <envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>` to set maximum :ref:`direct response body <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size in bytes. If not specified the default remains 4096 bytes.
-* server: added *fips_mode* to :ref:`server compilation settings <server_compilation_settings_statistics>` related statistic.
-* server: added :option:`--enable-core-dump` flag to enable core dumps via prctl (Linux-based systems only).
-* tcp_proxy: add support for converting raw TCP streams into HTTP/1.1 CONNECT requests. See :ref:`upgrade documentation <tunneling-tcp-over-http>` for details.
-* tcp_proxy: added a :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>` for using HTTP POST to proxy TCP streams.
-* tcp_proxy: added a :ref:`headers_to_add field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.headers_to_add>` for setting additional headers to the HTTP requests for TCP proxing.
-* thrift_proxy: added a :ref:`max_requests_per_connection field <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.max_requests_per_connection>` for setting maximum requests for per downstream connection.
-* tls peer certificate validation: added :ref:`SPIFFE validator <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig>` for supporting isolated multiple trust bundles in a single listener or cluster.
-* tracing: added the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
-  field as well as explicit configuration for the built-in :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
-  request ID implementation. See the trace context propagation :ref:`architecture overview
-  <arch_overview_tracing_context_propagation>` for more information.
-* udp: added :ref:`downstream <config_listener_stats_udp>` and
-  :ref:`upstream <config_udp_listener_filters_udp_proxy_stats>` statistics for dropped datagrams.
-* udp: added :ref:`downstream_socket_config <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.downstream_socket_config>`
-  listener configuration to allow configuration of downstream max UDP datagram size. Also added
-  :ref:`upstream_socket_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config>`
-  UDP proxy configuration to allow configuration of upstream max UDP datagram size. The defaults for
-  both remain 1500 bytes.
-* udp: added configuration for :ref:`GRO
-  <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>`. The default is disabled for
-  :ref:`downstream sockets <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.downstream_socket_config>`
-  and enabled for :ref:`upstream sockets <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_socket_config>`.
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
 * bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query.
 * cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
@@ -138,6 +80,7 @@ New Features
   in the typed per filter config. For more information, please reference
   :ref:`HttpFilter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`.
 * http: added :ref:`stripping trailing host dot from host header<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_trailing_host_dot>` support.
+* http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for downstream connection.
 * http: added support for :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.
   Two initial extensions were added, the :ref:`custom header <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension and the
   :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` extension.
@@ -159,5 +102,6 @@ Deprecated
 
 * bootstrap: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
 * cluster: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` and :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` are deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
+* cluster: :ref:`max_requests_per_connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` is deprecated in favor of :ref:`max_requests_per_connection <envoy_api_field_core.HttpProtocolOptions.max_requests_per_connection>`
 * dynamic_forward_proxy: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
 * http: :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` is deprecated in favor of :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.

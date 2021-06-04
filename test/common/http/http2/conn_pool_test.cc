@@ -536,19 +536,19 @@ TEST_F(Http2ConnPoolImplTest, CloseExcessMixedMultiplexing) {
   // Create clients with in-order capacity:
   // 3  2  6
   // Connection capacity is min(max requests per connection, max concurrent streams).
-  // Use maxRequestsConnection here since max requests is tested above.
-  EXPECT_CALL(*cluster_, maxRequestsConnection).WillOnce(Return(3));
+  // Use maxRequestsPerConnection here since max requests is tested above.
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(3));
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   ActiveTestRequest r2(*this, 0, false);
   ActiveTestRequest r3(*this, 0, false);
 
-  EXPECT_CALL(*cluster_, maxRequestsConnection).WillOnce(Return(2));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(2));
   expectClientCreate();
   ActiveTestRequest r4(*this, 0, false);
   ActiveTestRequest r5(*this, 0, false);
 
-  EXPECT_CALL(*cluster_, maxRequestsConnection).WillOnce(Return(6));
+  EXPECT_CALL(*cluster_, maxRequestsPerConnection).WillOnce(Return(6));
   expectClientCreate();
   ActiveTestRequest r6(*this, 0, false);
 

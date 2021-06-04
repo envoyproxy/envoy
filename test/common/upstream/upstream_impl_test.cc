@@ -356,7 +356,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(3U, cluster.info()->maxRequestsConnection());
+  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
             cluster.info()->http1Settings().header_key_format_);
@@ -701,7 +701,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(3U, cluster.info()->maxRequestsConnection());
+  EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
 
   cluster.info()->stats().upstream_rq_total_.inc();
@@ -1898,7 +1898,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
   EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
-  EXPECT_EQ(0U, cluster.info()->maxRequestsConnection());
+  EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(::Envoy::Http2::Utility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE,
             cluster.info()->http2Options().hpack_table_size().value());
   EXPECT_EQ(LoadBalancerType::Random, cluster.info()->lbType());

@@ -365,7 +365,7 @@ OriginalConnPoolImpl::PendingRequest::~PendingRequest() {
 OriginalConnPoolImpl::ActiveConn::ActiveConn(OriginalConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
-      remaining_requests_(parent_.host_->cluster().maxRequestsConnection()), timed_out_(false) {
+      remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()), timed_out_(false) {
   parent_.conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
 

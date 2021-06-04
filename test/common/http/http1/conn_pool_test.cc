@@ -867,7 +867,7 @@ TEST_F(Http1ConnPoolImplTest, Http10NoConnectionKeepAlive) {
 /**
  * Test when we reach max requests per connection.
  */
-TEST_F(Http1ConnPoolImplTest, MaxRequestsConnection) {
+TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
   InSequence s;
 
   cluster_->max_requests_per_connection_ = 1;

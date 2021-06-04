@@ -452,6 +452,10 @@ private:
   TimeSource& time_source_;
   bool remote_close_{};
   bool enable_internal_redirects_with_body_{};
+
+  // The number of requests accumulated on the current connection.
+  uint64_t accumulated_requests_{};
+  bool requests_overflow_{false};
 };
 
 } // namespace Http

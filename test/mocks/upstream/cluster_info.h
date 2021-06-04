@@ -122,7 +122,7 @@ public:
               (), (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
-  MOCK_METHOD(uint64_t, maxRequestsConnection, (), (const));
+  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));

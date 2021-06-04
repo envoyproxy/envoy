@@ -491,6 +491,10 @@ public:
    * header.
    */
   virtual bool shouldStripTrailingHostDot() const PURE;
+  /**
+   * @return maximum requests for downstream.
+   */
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

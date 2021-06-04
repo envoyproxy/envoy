@@ -855,7 +855,7 @@ public:
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
    */
-  virtual uint64_t maxRequestsConnection() const PURE;
+  virtual uint64_t maxRequestsPerConnection() const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a

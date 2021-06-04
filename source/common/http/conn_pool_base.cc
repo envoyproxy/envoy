@@ -175,7 +175,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& p
                                                          uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsConnection()),
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           max_concurrent_streams) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
@@ -187,7 +187,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(HttpConnPoolImplBase& p
                                                          Stats::Counter& cx_total,
                                                          Upstream::Host::CreateConnectionData& data)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsConnection()),
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
@@ -199,7 +199,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(Envoy::Http::HttpConnPo
                                                          uint32_t max_concurrent_streams,
                                                          Stats::Counter& cx_total)
     : Envoy::Http::ActiveClient(
-          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsConnection()),
+          parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
           max_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);

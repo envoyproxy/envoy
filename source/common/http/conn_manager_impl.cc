@@ -263,12 +263,22 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   if (connection_idle_timer_ && streams_.empty()) {
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
+  if (requests_overflow_ && streams_.empty()) {
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
+  }
 }
 
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
+  }
+  accumulated_requests_++;
+  if (config_.maxRequestsPerConnection() > 0 &&
+      accumulated_requests_ >= config_.maxRequestsPerConnection()) {
+    read_callbacks_->connection().readDisable(true);
+    requests_overflow_ = true;
+    stats_.named_.downstream_cx_max_requests_.inc();
   }
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
