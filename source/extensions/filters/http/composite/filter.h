@@ -4,9 +4,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/composite/action.h"
-#include "extensions/filters/http/composite/factory_wrapper.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/factory_wrapper.h"
 
 #include "absl/types/variant.h"
 

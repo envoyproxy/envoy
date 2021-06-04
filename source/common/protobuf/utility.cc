@@ -1,4 +1,4 @@
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include <limits>
 #include <numeric>
@@ -7,16 +7,16 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/documentation_url.h"
-#include "common/common/fmt.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"

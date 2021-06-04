@@ -1,4 +1,4 @@
-#include "common/router/config_utility.h"
+#include "source/common/router/config_utility.h"
 
 #include <string>
 #include <vector>
@@ -7,8 +7,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Router {

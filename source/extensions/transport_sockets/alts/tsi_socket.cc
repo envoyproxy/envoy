@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
 
 namespace Envoy {
 namespace Extensions {

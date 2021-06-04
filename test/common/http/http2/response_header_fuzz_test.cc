@@ -2,7 +2,7 @@
 // stateless and focuses only on HEADERS. This technique also plays well with
 // uncompressed HEADERS fuzzing.
 
-#include "common/http/exception.h"
+#include "source/common/http/exception.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/codec_impl_test_util.h"

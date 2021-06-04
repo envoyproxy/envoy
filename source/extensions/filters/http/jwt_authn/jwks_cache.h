@@ -6,9 +6,9 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/filters/http/common/jwks_fetcher.h"
-#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
-#include "extensions/filters/http/jwt_authn/stats.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/stats.h"
 
 #include "jwt_verify_lib/jwks.h"
 

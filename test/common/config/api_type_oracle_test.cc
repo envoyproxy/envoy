@@ -1,7 +1,7 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
-#include "common/config/api_type_oracle.h"
+#include "source/common/config/api_type_oracle.h"
 
 #include "gtest/gtest.h"
 

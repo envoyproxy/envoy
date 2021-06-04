@@ -1,6 +1,6 @@
-#include "common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Http {

@@ -4,14 +4,13 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/crypto/utility.h"
-#include "common/http/utility.h"
-
-#include "extensions/common/utility.h"
-#include "extensions/filters/common/lua/wrappers.h"
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/lua/wrappers.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/utility.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/lua/wrappers.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

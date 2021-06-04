@@ -20,9 +20,9 @@
 // BM_LookupsNoEvictions       45662 ns        45662 ns        15329
 // BM_LookupsAllEvictions      83015 ns        83015 ns         8435
 
-#include "common/common/random_generator.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/recent_lookups.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/recent_lookups.h"
 
 #include "absl/strings/str_cat.h"
 #include "benchmark/benchmark.h"

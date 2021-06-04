@@ -1,6 +1,6 @@
 #include <string>
 
-#include "common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "test/mocks/stats/mocks.h"
 

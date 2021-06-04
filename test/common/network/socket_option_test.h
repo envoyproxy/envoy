@@ -2,9 +2,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"

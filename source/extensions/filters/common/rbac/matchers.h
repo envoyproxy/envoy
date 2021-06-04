@@ -10,11 +10,10 @@
 #include "envoy/type/matcher/v3/path.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/matchers.h"
-#include "common/http/header_utility.h"
-#include "common/network/cidr_range.h"
-
-#include "extensions/filters/common/expr/evaluator.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/network/cidr_range.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
