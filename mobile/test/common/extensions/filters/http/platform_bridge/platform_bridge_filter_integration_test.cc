@@ -1,4 +1,4 @@
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"

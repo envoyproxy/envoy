@@ -1,6 +1,6 @@
 #include "mobile_grpc_streamer.h"
 
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 namespace Envoy {
 namespace Extensions {

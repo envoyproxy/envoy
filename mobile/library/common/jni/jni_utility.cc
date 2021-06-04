@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "library/common/jni/jni_support.h"
 #include "library/common/jni/jni_version.h"

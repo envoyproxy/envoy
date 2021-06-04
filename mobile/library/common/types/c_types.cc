@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 const int kEnvoySuccess = ENVOY_SUCCESS;
 const int kEnvoyFailure = ENVOY_FAILURE;

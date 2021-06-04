@@ -2,7 +2,7 @@
 
 #include "envoy/http/filter.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "library/common/api/c_types.h"
 #include "library/common/api/external.h"

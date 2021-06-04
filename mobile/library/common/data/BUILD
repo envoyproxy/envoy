@@ -12,7 +12,7 @@ envoy_cc_library(
     deps = [
         "//library/common/buffer:bridge_fragment_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//include/envoy/buffer:buffer_interface",
+        "@envoy//envoy/buffer:buffer_interface",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:empty_string",
     ],

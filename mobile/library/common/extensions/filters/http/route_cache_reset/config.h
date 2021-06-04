@@ -1,6 +1,6 @@
 #include <string>
 
-#include "extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 #include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/route_cache_reset/filter.pb.validate.h"

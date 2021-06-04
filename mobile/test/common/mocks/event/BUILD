@@ -15,7 +15,7 @@ envoy_cc_mock(
     repository = "@envoy",
     deps = [
         "//library/common/event:provisional_dispatcher_lib",
-        "@envoy//include/envoy/event:deferred_deletable",
-        "@envoy//include/envoy/event:dispatcher_interface",
+        "@envoy//envoy/event:deferred_deletable",
+        "@envoy//envoy/event:dispatcher_interface",
     ],
 )

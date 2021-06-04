@@ -1,8 +1,7 @@
 #include "library/common/extensions/stat_sinks/metrics_service/config.h"
 
-#include "common/grpc/async_client_impl.h"
-
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "library/common/extensions/stat_sinks/metrics_service/config.pb.h"
 #include "library/common/extensions/stat_sinks/metrics_service/config.pb.validate.h"

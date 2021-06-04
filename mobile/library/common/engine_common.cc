@@ -1,7 +1,7 @@
 #include "library/common/engine_common.h"
 
-#include "common/common/random_generator.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/runtime/runtime_impl.h"
 
 namespace Envoy {
 

@@ -1,8 +1,8 @@
 #include <atomic>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/context_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/mocks/event/mocks.h"

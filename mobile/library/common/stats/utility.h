@@ -1,7 +1,7 @@
 #pragma once
 
 // From upstream Envoy
-#include "common/stats/utility.h"
+#include "source/common/stats/utility.h"
 
 #include "library/common/types/c_types.h"
 

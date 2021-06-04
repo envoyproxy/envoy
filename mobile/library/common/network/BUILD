@@ -9,7 +9,7 @@ envoy_cc_library(
     hdrs = ["synthetic_address_impl.h"],
     repository = "@envoy",
     deps = [
-        "@envoy//include/envoy/network:address_interface",
+        "@envoy//envoy/network:address_interface",
         "@envoy//source/common/network:socket_interface_lib",
     ],
 )

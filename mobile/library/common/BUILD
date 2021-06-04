@@ -45,7 +45,7 @@ envoy_cc_library(
         "//library/common/http:header_utility_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",
-        "@envoy//include/envoy/server:lifecycle_notifier_interface",
+        "@envoy//envoy/server:lifecycle_notifier_interface",
         "@envoy_build_config//:extension_registry",
     ],
 )

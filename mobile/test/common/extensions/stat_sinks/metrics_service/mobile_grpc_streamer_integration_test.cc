@@ -1,8 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/stats/histogram_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/stats/histogram_impl.h"
 
 #include "test/integration/http_integration.h"
 

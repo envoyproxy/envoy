@@ -3,11 +3,11 @@
 #include "envoy/http/codes.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 #include "library/common/http/headers.h"
 #include "library/common/types/c_types.h"

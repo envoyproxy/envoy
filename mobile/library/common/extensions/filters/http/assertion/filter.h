@@ -2,8 +2,8 @@
 
 #include "envoy/http/filter.h"
 
-#include "extensions/common/matcher/matcher.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/common/matcher/matcher.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "library/common/extensions/filters/http/assertion/filter.pb.h"
 

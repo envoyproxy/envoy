@@ -9,7 +9,7 @@ envoy_cc_library(
     hdrs = ["lock_guard.h"],
     repository = "@envoy",
     deps = [
-        "@envoy//include/envoy/thread:thread_interface",
+        "@envoy//envoy/thread:thread_interface",
         "@envoy//source/common/common:thread_annotations",
     ],
 )
