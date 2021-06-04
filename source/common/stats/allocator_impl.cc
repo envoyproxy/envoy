@@ -286,8 +286,9 @@ public:
   void reset(size_t index) override { values_[index] = 0; }
   uint64_t value(size_t index) const override { return values_[index]; }
   size_t maxEntries() const override { return descriptor_->size(); }
-  absl::string_view nameSuffix(size_t index) const override { return descriptor_->nameSuffix(index); }
-
+  absl::string_view nameSuffix(size_t index) const override {
+    return descriptor_->nameSuffix(index);
+  }
 
 private:
   const CounterGroupDescriptorSharedPtr descriptor_;

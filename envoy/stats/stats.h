@@ -261,7 +261,6 @@ public:
    * @return the suffix for the name of the counter at the specific index.
    */
   virtual absl::string_view nameSuffix(size_t index) const PURE;
-
 };
 
 using CounterGroupSharedPtr = RefcountPtr<CounterGroup>;

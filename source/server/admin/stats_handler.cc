@@ -106,7 +106,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
 
   for (const Stats::CounterGroupSharedPtr& counter : server_.stats().counterGroups()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
-      for (size_t i = 0; i < counter->maxEntries(); ++ i) {
+      for (size_t i = 0; i < counter->maxEntries(); ++i) {
         all_stats.emplace(absl::StrCat(counter->name(), counter->nameSuffix(i)), counter->value(i));
       }
     }
