@@ -41,7 +41,7 @@ where,
   rejection probability will be higher for higher success rates. See `Aggression`_ for a more
   detailed explanation.
 
-In addition, there are two more configuration item:
+Note that there are additional parameters that affect the rejection probability:
 
 - *rps_threshold* is a configurable value that when RPS is lower than it, requests will pass through the filter.
 - *max_reject_probability* represents the upper limit of the rejection probability.

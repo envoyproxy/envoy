@@ -88,6 +88,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
   }
 
   if (config_->getController().averageRps() < config_->rpsThreshold()) {
+    ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue");
     return Http::FilterHeadersStatus::Continue;
   }
 

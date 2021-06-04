@@ -100,7 +100,7 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
 }
 
-// Test for function: averageRps
+// Test for function: averageRps.
 TEST_F(ThreadLocalControllerTest, AverageRps) {
   // Validate global_data_.requests == 0
   tlc_.requestCounts();

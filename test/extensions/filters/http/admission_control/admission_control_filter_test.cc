@@ -434,6 +434,44 @@ success_criteria:
   TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
 }
 
+// Validate max rejection probability.
+TEST_F(AdmissionControlTest, MaxRejectionProbability) {
+  std::string yaml = R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+sr_threshold:
+  default_value:
+    value: 100.0
+  runtime_key: "foo.threshold"
+aggression:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+max_rejection_probability:
+  default_value:
+    value: 80.0
+  runtime_key: "foo.max_rejection_probability"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  auto config = makeConfig(yaml);
+  setupFilter(config);
+
+  // Validate max rejection probability
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(1.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(100.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 80.0))
+      .WillRepeatedly(Return(10.0));
+
+  verifyProbabilities(100, 0.0);
+  verifyProbabilities(95, 0.05);
+  verifyProbabilities(80, 0.1);
+  verifyProbabilities(0, 0.1);
+}
+
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters
