@@ -34,6 +34,7 @@ Minor Behavior Changes
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+* runtime: rtds stats will now include the layer name, making it possible to differentiate RTDS stats for each layer.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
 
 Bug Fixes
