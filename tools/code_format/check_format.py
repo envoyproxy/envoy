@@ -123,6 +123,10 @@ RAW_TRY_ALLOWLIST = (
     "./source/common/network/utility.cc",
 )
 
+# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+# now this is just WASM which makes use of std::string_view heavily so we need to convert to
+# absl::string_view internally. Everywhere else should be using absl::string_view for additional
+# safety.
 STD_STRING_VIEW_ALLOWLIST = (
     "./source/extensions/common/wasm/context.h",
     "./source/extensions/common/wasm/context.cc",
