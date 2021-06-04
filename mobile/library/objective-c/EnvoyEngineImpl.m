@@ -433,22 +433,8 @@ static envoy_data ios_get_string(const void *context) {
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {
-
   NSString *templateYAML = [[NSString alloc] initWithUTF8String:config_template];
-  NSString *resolvedYAML = [config resolveTemplate:templateYAML];
-  if (resolvedYAML == nil) {
-    return kEnvoyFailure;
-  }
-
-  for (EnvoyHTTPFilterFactory *filterFactory in config.httpPlatformFilterFactories) {
-    [self registerFilterFactory:filterFactory];
-  }
-
-  for (NSString *name in config.stringAccessors) {
-    [self registerStringAccessor:name accessor:config.stringAccessors[name]];
-  }
-
-  return [self runWithConfigYAML:resolvedYAML logLevel:logLevel];
+  return [self runWithTemplate:templateYAML config:config logLevel:logLevel];
 }
 
 - (int)runWithTemplate:(NSString *)yaml
