@@ -22,7 +22,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/common/c_smart_ptr.h"
+#include "source/common/common/c_smart_ptr.h"
 
 namespace Envoy {
 namespace Extensions {

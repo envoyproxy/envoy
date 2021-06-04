@@ -17,7 +17,7 @@ envoy_cc_library(
     srcs = ["csrf_filter.cc"],
     hdrs = ["csrf_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:matchers_lib",
         "//source/common/http:header_map_lib",
@@ -34,7 +34,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/csrf:csrf_filter_lib",

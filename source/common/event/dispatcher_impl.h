@@ -14,11 +14,11 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include "absl/container/inlined_vector.h"
 

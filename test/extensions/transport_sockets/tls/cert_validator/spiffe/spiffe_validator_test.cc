@@ -5,11 +5,10 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/c_smart_ptr.h"
-#include "common/event/real_time_system.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/event/real_time_system.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"

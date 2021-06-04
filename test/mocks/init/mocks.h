@@ -2,8 +2,8 @@
 
 #include "envoy/init/manager.h"
 
-#include "common/init/target_impl.h"
-#include "common/init/watcher_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"

@@ -2,7 +2,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include "test/config/utility.h"
 #include "test/integration/integration.h"

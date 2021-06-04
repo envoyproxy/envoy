@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 
-#include "common/grpc/common.h"
-
-#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/common/stream_info/test_util.h"

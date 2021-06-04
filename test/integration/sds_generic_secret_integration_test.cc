@@ -6,8 +6,8 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"

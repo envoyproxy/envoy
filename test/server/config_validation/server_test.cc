@@ -2,7 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "server/config_validation/server.h"
+#include "source/server/config_validation/server.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/options.h"

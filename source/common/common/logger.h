@@ -9,12 +9,12 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/base_logger.h"
-#include "common/common/fancy_logger.h"
-#include "common/common/fmt.h"
-#include "common/common/logger_impl.h"
-#include "common/common/macros.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/base_logger.h"
+#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"

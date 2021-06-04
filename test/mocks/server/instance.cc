@@ -1,6 +1,6 @@
 #include "instance.h"
 
-#include "common/singleton/manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

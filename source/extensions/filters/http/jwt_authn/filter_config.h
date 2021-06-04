@@ -8,9 +8,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/filters/http/jwt_authn/matcher.h"
-#include "extensions/filters/http/jwt_authn/stats.h"
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/extensions/filters/http/jwt_authn/matcher.h"
+#include "source/extensions/filters/http/jwt_authn/stats.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "absl/container/flat_hash_map.h"
 

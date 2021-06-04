@@ -1,10 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/http/original_src/original_src.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"

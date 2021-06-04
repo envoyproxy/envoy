@@ -1,4 +1,4 @@
-#include "common/network/dns_impl.h"
+#include "source/common/network/dns_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,11 +8,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"

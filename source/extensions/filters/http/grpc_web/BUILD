@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["grpc_web_filter.cc"],
     hdrs = ["grpc_web_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:codec_lib",
@@ -33,8 +33,8 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",

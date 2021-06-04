@@ -3,14 +3,14 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"

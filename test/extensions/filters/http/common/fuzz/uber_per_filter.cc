@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/common/utility.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/http/common/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
