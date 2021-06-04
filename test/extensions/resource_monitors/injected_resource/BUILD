@@ -15,6 +15,8 @@ envoy_package()
 envoy_cc_test(
     name = "injected_resource_monitor_integration_test",
     srcs = ["injected_resource_monitor_integration_test.cc"],
+    # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/injected_resource:config",
         "//test/common/config:dummy_config_proto_cc_proto",
