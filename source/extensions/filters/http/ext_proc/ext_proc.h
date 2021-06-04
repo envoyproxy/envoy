@@ -12,11 +12,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/ext_proc/client.h"
-#include "extensions/filters/http/ext_proc/processor_state.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
 namespace Extensions {

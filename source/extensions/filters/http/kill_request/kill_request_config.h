@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -10,10 +10,10 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/http/date_provider.h"
-#include "common/local_reply/local_reply.h"
-#include "common/network/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/date_provider.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {

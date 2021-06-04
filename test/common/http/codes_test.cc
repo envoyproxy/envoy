@@ -5,9 +5,9 @@
 
 #include "envoy/stats/stats.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"

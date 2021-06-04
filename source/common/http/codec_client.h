@@ -12,11 +12,11 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/http/codec_wrappers.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codec_wrappers.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Http {

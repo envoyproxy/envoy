@@ -1,4 +1,4 @@
-#include "extensions/filters/http/compressor/compressor_filter.h"
+#include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/runtime/mocks.h"

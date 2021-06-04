@@ -6,11 +6,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {

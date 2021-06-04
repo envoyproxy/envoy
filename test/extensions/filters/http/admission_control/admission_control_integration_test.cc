@@ -1,4 +1,4 @@
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"

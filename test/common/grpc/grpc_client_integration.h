@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

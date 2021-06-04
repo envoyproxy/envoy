@@ -1,18 +1,18 @@
-#include "common/config/subscription_factory_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/config/filesystem_subscription_impl.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_subscription_impl.h"
-#include "common/config/http_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/type_to_endpoint.h"
-#include "common/config/utility.h"
-#include "common/config/xds_resource.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/grpc_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/type_to_endpoint.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {

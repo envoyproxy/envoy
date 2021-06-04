@@ -14,9 +14,9 @@ envoy_cc_library(
     srcs = ["compressor.cc"],
     hdrs = ["compressor.h"],
     deps = [
-        "//include/envoy/compression/compressor:compressor_interface",
-        "//include/envoy/stats:stats_macros",
-        "//include/envoy/stream_info:filter_state_interface",
+        "//envoy/compression/compressor:compressor_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",

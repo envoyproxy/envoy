@@ -1,12 +1,11 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/http/rbac/rbac_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"

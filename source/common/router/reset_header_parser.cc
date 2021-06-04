@@ -1,8 +1,8 @@
-#include "common/router/reset_header_parser.h"
+#include "source/common/router/reset_header_parser.h"
 
 #include <cstdint>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/numbers.h"
 

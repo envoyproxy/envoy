@@ -1,16 +1,14 @@
-#include "server/api_listener_impl.h"
+#include "source/server/api_listener_impl.h"
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/conn_manager_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "server/drain_manager_impl.h"
-#include "server/listener_manager_impl.h"
-
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 namespace Envoy {
 namespace Server {

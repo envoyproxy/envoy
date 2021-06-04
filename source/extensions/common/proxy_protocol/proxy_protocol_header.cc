@@ -1,11 +1,11 @@
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include <sstream>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Extensions {
