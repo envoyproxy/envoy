@@ -33,7 +33,7 @@ struct ConnectionLimitStats {
 };
 
 /**
- * Configuration shared across all connections. Must be thread safe.
+ * Configuration shared across all connections on a filter chain basis.
  */
 class Config : Logger::Loggable<Logger::Id::filter> {
 public:

@@ -125,13 +125,13 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
+    "envoy.filters.network.connection_limit":           "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":            "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.kafka_broker":               "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
-    "envoy.filters.network.connection_limit":           "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.local_ratelimit":            "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",

@@ -3,22 +3,17 @@
 Connection Limit Filter
 =======================
 
-Background
-----------
-
-Network connections are a limited resource that we need some functionality to protect.
-Envoy has the capability to limit the rate of new connections via the L4 `local rate limit filter <https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/local_rate_limit_filter>`_.
-It would be useful to be able to limit the number of connections on a filter chain basis or based on some descriptors from the request.
-
-Goals
------
-
-1. Protection for resources such as connections, CPU, memory, etc. by making sure every filter chain gets fair share of connection resources.
-2. Preventing any single entity based on filter chain match or descriptors from consuming a large number of connections to ensure fair share of the connections.
+* Connection limiting :ref:`architecture overview <arch_overview_connection_limit>`
+* :ref:`v3 API reference
+  <envoy_v3_api_msg_extensions.filters.network.connection_limit.v3.ConnectionLimit>`
+* This filter should be configured with the name *envoy.filters.network.connection_limit*.
 
 Overview
 --------
 
+The filter is based on per listener and per worker, it can protect for resources such as connections, CPU, memory, etc. 
+by making sure every filter chain gets fair share of connection resources and prevent any single entity based on filter chain match
+or descriptors from consuming a large number of connections to ensure fair share of the connections.
 The connection limit filter applies a connection limit to incoming connections that are processed by the filter's filter chain.
 Each connection processed by the filter marked as an active connection, and if the number of active connections reaches the max connections limit,
 the connection will be closed without further filter iteration.
@@ -48,59 +43,24 @@ The filter will use the reference counting algorithm to keep trace of active con
 
    -  Close the new connection request after configured delay time.
 
-API Reference
--------------
-
-[extensions.filters.network.connection_limit.v3.ConnectionLimit proto]
-
-{
-
-**“stat_prefix”**: “…”,
-
-**“max_connections”**: “…”,
-
-**“delay”**: “{…}”,
-
-**“runtime_enabled”**: “{…}”
-
-}
-
-**stat_prefix**
-
-(`string <https://developers.google.com/protocol-buffers/docs/proto#scalar>`_)
-The prefix to use when emitting statistics.
-
-**max_connections**
-
-(`uint64 <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.UInt64Value>`_)
-The limit supplied in max connections.
-
-**delay**
-
-(`Duration <https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration>`_)
-The delay in milliseconds for the slow rejection connections. If not set, this defaults to 0ms.
-
-**runtime_enabled**
-
-(`config.core.v3.RuntimeFeatureFlag <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-runtimefeatureflag>`_)
-Runtime flag that controls whether the filter is enabled or not. If not specified, defaults to enabled.
-
 .. _config_network_filters_connection_limit_stats:
 
 Statistics
 ----------
 
-The connection limit filter outputs statistics in the *<stat_prefix>.connection_limit* namespace.
+Every configured connection limit filter has statistics rooted at *connection_limit.<stat_prefix>.*
+with the following statistics:
 
-+-----------------------+-----------------------+-----------------------+
-| **Name**              | **Type**              | **Description**       |
-+=======================+=======================+=======================+
-| limited_connections   | Counter               | Total number of       |
-|                       |                       | connections got       |
-|                       |                       | rejected by this      |
-|                       |                       | connection limit      |
-|                       |                       | filter                |
-+-----------------------+-----------------------+-----------------------+
-| active_connections    | Gauge                 | Number of currently   |
-|                       |                       | active connections    |
-+-----------------------+-----------------------+-----------------------+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  limited_connections, Counter, Total connections that have been rejected due to connection limit exceeded
+  active_connections, Gauge, Number of currently active connections in the scope of this network filter chain
+
+Runtime
+-------
+
+The connection limit filter can be runtime feature flagged via the :ref:`enabled
+<envoy_v3_api_field_extensions.filters.network.connection_limit.v3.ConnectionLimit.runtime_enabled>`
+configuration field.

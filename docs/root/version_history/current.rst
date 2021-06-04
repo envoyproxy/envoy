@@ -68,6 +68,7 @@ New Features
 ------------
 
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
+* connection_limit: added new :ref:`Network connection limit filter <config_network_filters_connection_limit>`.
 * crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
 * dynamic_forward_proxy: added :ref:`dns_resolver<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver>` option to the DNS cache config in order use custom DNS resolvers instead of the system default resolvers.
 * http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
