@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "data_impl_lib",
     hdrs = ["data_impl.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
     ],
 )
 
@@ -22,8 +22,8 @@ envoy_cc_library(
     srcs = ["inputs.cc"],
     hdrs = ["inputs.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:header_utility_lib",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

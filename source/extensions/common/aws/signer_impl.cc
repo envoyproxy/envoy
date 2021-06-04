@@ -1,14 +1,13 @@
-#include "extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-
-#include "extensions/common/aws/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
 

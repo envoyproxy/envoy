@@ -1,4 +1,4 @@
-#include "extensions/quic/envoy_quic_crypto_client_stream.h"
+#include "source/extensions/quic/envoy_quic_crypto_client_stream.h"
 
 namespace Envoy {
 namespace Quic {

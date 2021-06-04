@@ -1,8 +1,8 @@
 #include "envoy/extensions/quic/v3/proof_source.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_proof_source_factory_interface.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
 
 namespace Envoy {
 namespace Quic {

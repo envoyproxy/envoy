@@ -12,14 +12,13 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_client_session.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/codec_impl.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/quic/envoy_quic_crypto_client_stream.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/quic/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
 

@@ -4,8 +4,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/http/codec_client.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codec_client.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"

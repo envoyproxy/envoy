@@ -7,11 +7,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/rds_impl.h"
-
-#include "server/admin/admin.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/rds_impl.h"
+#include "source/server/admin/admin.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"

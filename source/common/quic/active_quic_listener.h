@@ -6,13 +6,12 @@
 #include "envoy/network/socket.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/protobuf/utility.h"
-#include "common/quic/envoy_quic_dispatcher.h"
-#include "common/quic/envoy_quic_proof_source_factory_interface.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "server/active_udp_listener.h"
-#include "server/connection_handler_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_proof_source_factory_interface.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/server/active_udp_listener.h"
+#include "source/server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Quic {

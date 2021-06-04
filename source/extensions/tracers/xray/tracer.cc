@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/tracer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -7,10 +7,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/listener.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {

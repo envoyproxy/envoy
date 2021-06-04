@@ -1,4 +1,4 @@
-#include "extensions/quic/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/quic/envoy_quic_proof_source_factory_impl.h"
 
 namespace Envoy {
 namespace Quic {

@@ -17,7 +17,7 @@ envoy_cc_library(
     srcs = ["aws_request_signing_filter.cc"],
     hdrs = ["aws_request_signing_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:signer_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -31,7 +31,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":aws_request_signing_filter_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:signer_impl_lib",
         "//source/extensions/filters/http:well_known_names",

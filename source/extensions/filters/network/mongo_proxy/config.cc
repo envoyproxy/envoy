@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/config.h"
+#include "source/extensions/filters/network/mongo_proxy/config.h"
 
 #include <memory>
 
@@ -7,9 +7,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
 
 namespace Envoy {
 namespace Extensions {

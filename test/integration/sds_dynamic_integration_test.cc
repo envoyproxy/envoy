@@ -9,19 +9,19 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/http/utility.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"

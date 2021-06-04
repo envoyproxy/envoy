@@ -19,11 +19,11 @@
 
 #include <memory>
 
-#include "common/quic/send_buffer_monitor.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_stream.h"
-#include "common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {

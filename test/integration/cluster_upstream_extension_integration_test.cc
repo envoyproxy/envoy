@@ -3,7 +3,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"

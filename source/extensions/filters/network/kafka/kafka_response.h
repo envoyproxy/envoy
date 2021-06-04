@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/network/kafka/external/serialization_composite.h"
-#include "extensions/filters/network/kafka/serialization.h"
-#include "extensions/filters/network/kafka/tagged_fields.h"
+#include "source/extensions/filters/network/kafka/external/serialization_composite.h"
+#include "source/extensions/filters/network/kafka/serialization.h"
+#include "source/extensions/filters/network/kafka/tagged_fields.h"
 
 namespace Envoy {
 namespace Extensions {

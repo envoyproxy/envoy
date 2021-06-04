@@ -5,8 +5,8 @@
 
 #include "envoy/common/scope_tracker.h"
 
-#include "common/signal/fatal_error_handler.h"
-#include "common/signal/signal_action.h"
+#include "source/common/signal/fatal_error_handler.h"
+#include "source/common/signal/signal_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/utility.h"
