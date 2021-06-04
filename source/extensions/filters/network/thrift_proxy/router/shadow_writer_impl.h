@@ -28,7 +28,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     initProtocolConverter(protocol, response_buffer_);
   }
 
-  bool onData(Buffer::Instance& data);
+  virtual bool onData(Buffer::Instance& data);
 
   // ProtocolConverter
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
@@ -73,6 +73,9 @@ public:
   void resetStream();
   void cleanup();
   void maybeCleanup();
+  void setResponseDecoder(NullResponseDecoderPtr&& decoder) {
+    response_decoder_ = std::move(decoder);
+  }
 
   // Router::ShadowRequestHandle
   void tryWriteRequest(const Buffer::OwnedImpl& buffer) override;
