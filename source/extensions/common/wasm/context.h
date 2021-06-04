@@ -66,7 +66,7 @@ public:
   size_t size() const override;
   WasmResult copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t ptr_ptr,
                     uint64_t size_ptr) const override;
-  WasmResult copyFrom(size_t start, size_t length, absl::string_view data) override;
+  WasmResult copyFrom(size_t start, size_t length, std::string_view data) override;
 
   // proxy_wasm::BufferBase
   void clear() override {
@@ -74,7 +74,7 @@ public:
     const_buffer_instance_ = nullptr;
     buffer_instance_ = nullptr;
   }
-  Buffer* set(absl::string_view data) {
+  Buffer* set(std::string_view data) {
     return static_cast<Buffer*>(proxy_wasm::BufferBase::set(data));
   }
   Buffer* set(std::unique_ptr<char[]> owned_data, uint32_t owned_data_size) {
@@ -122,7 +122,7 @@ public:
   Upstream::ClusterManager& clusterManager() const;
 
   // proxy_wasm::ContextBase
-  void error(absl::string_view message) override;
+  void error(std::string_view message) override;
 
   // Retrieves the stream info associated with the request (a.k.a active stream).
   // It selects a value based on the following order: encoder callback, decoder
@@ -141,7 +141,7 @@ public:
   //
   // VM level down-calls into the Wasm code on Context(id == 0).
   //
-  virtual bool validateConfiguration(absl::string_view configuration,
+  virtual bool validateConfiguration(std::string_view configuration,
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
@@ -194,25 +194,25 @@ public:
   // proxy_wasm::ContextBase
 
   // General
-  WasmResult log(uint32_t level, absl::string_view message) override;
+  WasmResult log(uint32_t level, std::string_view message) override;
   uint64_t getCurrentTimeNanoseconds() override;
   uint64_t getMonotonicTimeNanoseconds() override;
-  absl::string_view getConfiguration() override;
-  std::pair<uint32_t, absl::string_view> getStatus() override;
+  std::string_view getConfiguration() override;
+  std::pair<uint32_t, std::string_view> getStatus() override;
 
   // State accessors
-  WasmResult getProperty(absl::string_view path, std::string* result) override;
-  WasmResult setProperty(absl::string_view path, absl::string_view value) override;
-  WasmResult declareProperty(absl::string_view path,
+  WasmResult getProperty(std::string_view path, std::string* result) override;
+  WasmResult setProperty(std::string_view path, std::string_view value) override;
+  WasmResult declareProperty(std::string_view path,
                              Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 
   // Continue
   WasmResult continueStream(WasmStreamType stream_type) override;
   WasmResult closeStream(WasmStreamType stream_type) override;
   void failStream(WasmStreamType stream_type) override;
-  WasmResult sendLocalResponse(uint32_t response_code, absl::string_view body_text,
+  WasmResult sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                Pairs additional_headers, uint32_t grpc_status,
-                               absl::string_view details) override;
+                               std::string_view details) override;
   void clearRouteCache() override {
     if (decoder_callbacks_) {
       decoder_callbacks_->clearRouteCache();
@@ -220,16 +220,16 @@ public:
   }
 
   // Header/Trailer/Metadata Maps
-  WasmResult addHeaderMapValue(WasmHeaderMapType type, absl::string_view key,
-                               absl::string_view value) override;
-  WasmResult getHeaderMapValue(WasmHeaderMapType type, absl::string_view key,
-                               absl::string_view* value) override;
+  WasmResult addHeaderMapValue(WasmHeaderMapType type, std::string_view key,
+                               std::string_view value) override;
+  WasmResult getHeaderMapValue(WasmHeaderMapType type, std::string_view key,
+                               std::string_view* value) override;
   WasmResult getHeaderMapPairs(WasmHeaderMapType type, Pairs* result) override;
   WasmResult setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs) override;
 
-  WasmResult removeHeaderMapValue(WasmHeaderMapType type, absl::string_view key) override;
-  WasmResult replaceHeaderMapValue(WasmHeaderMapType type, absl::string_view key,
-                                   absl::string_view value) override;
+  WasmResult removeHeaderMapValue(WasmHeaderMapType type, std::string_view key) override;
+  WasmResult replaceHeaderMapValue(WasmHeaderMapType type, std::string_view key,
+                                   std::string_view value) override;
 
   WasmResult getHeaderMapSize(WasmHeaderMapType type, uint32_t* size) override;
 
@@ -239,28 +239,28 @@ public:
   bool endOfStream(WasmStreamType /* stream_type */) override { return end_of_stream_; }
 
   // HTTP
-  WasmResult httpCall(absl::string_view cluster, const Pairs& request_headers,
-                      absl::string_view request_body, const Pairs& request_trailers,
+  WasmResult httpCall(std::string_view cluster, const Pairs& request_headers,
+                      std::string_view request_body, const Pairs& request_trailers,
                       int timeout_millisconds, uint32_t* token_ptr) override;
 
   // Stats/Metrics
-  WasmResult defineMetric(uint32_t type, absl::string_view name, uint32_t* metric_id_ptr) override;
+  WasmResult defineMetric(uint32_t type, std::string_view name, uint32_t* metric_id_ptr) override;
   WasmResult incrementMetric(uint32_t metric_id, int64_t offset) override;
   WasmResult recordMetric(uint32_t metric_id, uint64_t value) override;
   WasmResult getMetric(uint32_t metric_id, uint64_t* value_ptr) override;
 
   // gRPC
-  WasmResult grpcCall(absl::string_view grpc_service, absl::string_view service_name,
-                      absl::string_view method_name, const Pairs& initial_metadata,
-                      absl::string_view request, std::chrono::milliseconds timeout,
+  WasmResult grpcCall(std::string_view grpc_service, std::string_view service_name,
+                      std::string_view method_name, const Pairs& initial_metadata,
+                      std::string_view request, std::chrono::milliseconds timeout,
                       uint32_t* token_ptr) override;
-  WasmResult grpcStream(absl::string_view grpc_service, absl::string_view service_name,
-                        absl::string_view method_name, const Pairs& initial_metadat,
+  WasmResult grpcStream(std::string_view grpc_service, std::string_view service_name,
+                        std::string_view method_name, const Pairs& initial_metadat,
                         uint32_t* token_ptr) override;
 
   WasmResult grpcClose(uint32_t token) override;
   WasmResult grpcCancel(uint32_t token) override;
-  WasmResult grpcSend(uint32_t token, absl::string_view message, bool end_stream) override;
+  WasmResult grpcSend(uint32_t token, std::string_view message, bool end_stream) override;
 
   // Envoy specific ABI
   void onResolveDns(uint32_t token, Envoy::Network::DnsResolver::ResolutionStatus status,
@@ -387,7 +387,7 @@ protected:
   void onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr response);
   void onGrpcReceiveTrailingMetadataWrapper(uint32_t token, Http::HeaderMapPtr&& metadata);
   void onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus& status,
-                          const absl::string_view message);
+                          const std::string_view message);
 
   bool isGrpcStreamToken(uint32_t token) { return (token & 1) == 0; }
   bool isGrpcCallToken(uint32_t token) { return (token & 1) == 1; }

@@ -240,7 +240,7 @@ public:
 
       secret_config_ecdsa->set_name(server_cert_ecdsa_);
       auto* config_source = secret_config_ecdsa->mutable_sds_config();
-      constexpr absl::string_view sds_template =
+      const std::string sds_template =
           R"EOF(
 ---
 version_info: "0"
