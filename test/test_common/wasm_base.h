@@ -33,8 +33,8 @@ namespace Wasm {
 
 #define MOCK_CONTEXT_LOG_                                                                          \
   using Context::log;                                                                              \
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {                 \
-    log_(static_cast<spdlog::level::level_enum>(level), message);                                  \
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {                  \
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));                \
     return proxy_wasm::WasmResult::Ok;                                                             \
   }                                                                                                \
   MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message))
