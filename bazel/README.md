@@ -23,9 +23,6 @@ powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/lat
 set PATH=%PATH%;%USERPROFILE%\bazel
 ```
 
-If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
-to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
-
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
@@ -156,9 +153,9 @@ for how to update or override dependencies.
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
     ```cmd
-    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python38
-    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
+    set PATH=%PATH%;%USERPROFILE%\Python39
+    set PATH=%PATH%;%USERPROFILE%\Python39\Scripts
     pip install wheel
     ```
 
