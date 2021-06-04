@@ -63,26 +63,26 @@ protected:
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed) {
     if (should_use_unified_) {
-      std::get<1>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
+      absl::get<1>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
     } else {
-      std::get<0>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
+      absl::get<0>(state_)->updateSubscriptionInterest(cur_added, cur_removed);
     }
   }
 
   std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> getNextRequestAckless() {
     if (should_use_unified_) {
-      return std::get<1>(state_)->getNextRequestAckless();
+      return absl::get<1>(state_)->getNextRequestAckless();
     }
     return std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryRequest>(
-        std::get<0>(state_)->getNextRequestAckless());
+        absl::get<0>(state_)->getNextRequestAckless());
   }
 
   UpdateAck
   handleResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& response_proto) {
     if (should_use_unified_) {
-      return std::get<1>(state_)->handleResponse(response_proto);
+      return absl::get<1>(state_)->handleResponse(response_proto);
     }
-    return std::get<0>(state_)->handleResponse(response_proto);
+    return absl::get<0>(state_)->handleResponse(response_proto);
   }
 
   UpdateAck deliverDiscoveryResponse(
@@ -122,17 +122,17 @@ protected:
 
   void markStreamFresh() {
     if (should_use_unified_) {
-      std::get<1>(state_)->markStreamFresh();
+      absl::get<1>(state_)->markStreamFresh();
     } else {
-      std::get<0>(state_)->markStreamFresh();
+      absl::get<0>(state_)->markStreamFresh();
     }
   }
 
   bool subscriptionUpdatePending() {
     if (should_use_unified_) {
-      return std::get<1>(state_)->subscriptionUpdatePending();
+      return absl::get<1>(state_)->subscriptionUpdatePending();
     }
-    return std::get<0>(state_)->subscriptionUpdatePending();
+    return absl::get<0>(state_)->subscriptionUpdatePending();
   }
 
   NiceMock<MockUntypedConfigUpdateCallbacks> callbacks_;
@@ -171,7 +171,7 @@ TEST_F(InitialFetchTimeoutSubscriptionStateTest, InitialFetchTimeoutTimerCreated
 
 TEST_F(InitialFetchTimeoutSubscriptionStateTest, InitialFetchTimeoutTimerCanBeCancelled) {
   EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
-  std::get<1>(state_)->disableInitFetchTimeoutTimer();
+  absl::get<1>(state_)->disableInitFetchTimeoutTimer();
 }
 
 class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
