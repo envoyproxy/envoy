@@ -58,8 +58,11 @@ message FaultDelay {
   // The percentage of operations/connections/requests on which the delay will be injected.
   type.v3.FractionalPercent percentage = 4;
 
-  FaultDelayType hidden_envoy_deprecated_type = 1
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  FaultDelayType hidden_envoy_deprecated_type = 1 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // Describes a rate limit to be applied.

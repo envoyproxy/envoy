@@ -4,8 +4,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 

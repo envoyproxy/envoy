@@ -7,8 +7,8 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +51,7 @@ private:
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 } // namespace Wasm
 } // namespace NetworkFilters

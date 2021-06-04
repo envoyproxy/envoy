@@ -2,8 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/quic_listeners/quiche/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -33,8 +33,8 @@ public:
         auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
             dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
                 decoder_callbacks_->connection()));
-        quic_connection->write_buffer_watermark_simulation_.checkHighWatermark(
-            quic_connection->write_buffer_watermark_simulation_.highWatermark() + 1u);
+        quic_connection->write_buffer_watermark_simulation_.checkLowWatermark(
+            quic_connection->write_buffer_watermark_simulation_.lowWatermark() - 1u);
       }
     }
     return PassThroughFilter::decodeData(buf, end_stream);

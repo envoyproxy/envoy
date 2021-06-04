@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -82,8 +82,12 @@ using GrpcMetricsStreamerImplPtr = std::unique_ptr<GrpcMetricsStreamerImpl>;
 
 class MetricsFlusher {
 public:
-  explicit MetricsFlusher(const bool report_counters_as_deltas)
-      : report_counters_as_deltas_(report_counters_as_deltas) {}
+  MetricsFlusher(
+      bool report_counters_as_deltas, bool emit_labels,
+      std::function<bool(const Stats::Metric&)> predicate =
+          [](const auto& metric) { return metric.used(); })
+      : report_counters_as_deltas_(report_counters_as_deltas), emit_labels_(emit_labels),
+        predicate_(predicate) {}
 
   MetricsPtr flush(Stats::MetricSnapshot& snapshot) const;
 
@@ -98,7 +102,14 @@ private:
                       const Stats::ParentHistogram& envoy_histogram,
                       int64_t snapshot_time_ms) const;
 
+  io::prometheus::client::Metric*
+  populateMetricsFamily(io::prometheus::client::MetricFamily& metrics_family,
+                        io::prometheus::client::MetricType type, int64_t snapshot_time_ms,
+                        const Stats::Metric& metric) const;
+
   const bool report_counters_as_deltas_;
+  const bool emit_labels_;
+  const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
 /**
@@ -109,8 +120,9 @@ public:
   // MetricsService::Sink
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
-      const bool report_counters_as_deltas)
-      : flusher_(report_counters_as_deltas), grpc_metrics_streamer_(grpc_metrics_streamer) {}
+      bool report_counters_as_deltas, bool emit_labels)
+      : flusher_(report_counters_as_deltas, emit_labels),
+        grpc_metrics_streamer_(grpc_metrics_streamer) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
     grpc_metrics_streamer_->send(flusher_.flush(snapshot));

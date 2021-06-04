@@ -1,9 +1,10 @@
-#include "extensions/filters/network/dubbo_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
 
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,9 +65,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     return FilterStatus::StopIteration;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     callbacks_->sendLocalReply(
         AppException(
             ResponseStatus::ServerError,
@@ -76,10 +76,44 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   ENVOY_STREAM_LOG(debug, "dubbo router: decoding request", *callbacks_);
-  upstream_request_buffer_.move(ctx->messageOriginData(), ctx->messageSize());
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(
-      *this, *conn_pool, metadata, callbacks_->serializationType(), callbacks_->protocolType());
+  const auto* invocation_impl = dynamic_cast<const RpcInvocationImpl*>(&invocation);
+  ASSERT(invocation_impl);
+
+  if (invocation_impl->hasAttachment() && invocation_impl->attachment().attachmentUpdated()) {
+    constexpr size_t body_length_size = sizeof(uint32_t);
+
+    const size_t attachment_offset = invocation_impl->attachment().attachmentOffset();
+    const size_t request_header_size = ctx->headerSize();
+
+    ASSERT(attachment_offset <= ctx->originMessage().length());
+
+    // Move the other parts of the request headers except the body size to the upstream request
+    // buffer.
+    upstream_request_buffer_.move(ctx->originMessage(), request_header_size - body_length_size);
+    // Discard the old body size.
+    ctx->originMessage().drain(body_length_size);
+
+    // Re-serialize the updated attachment.
+    Buffer::OwnedImpl attachment_buffer;
+    Hessian2::Encoder encoder(std::make_unique<BufferWriter>(attachment_buffer));
+    encoder.encode(invocation_impl->attachment().attachment());
+
+    size_t new_body_size = attachment_offset - request_header_size + attachment_buffer.length();
+
+    upstream_request_buffer_.writeBEInt<uint32_t>(new_body_size);
+    upstream_request_buffer_.move(ctx->originMessage(), attachment_offset - request_header_size);
+    upstream_request_buffer_.move(attachment_buffer);
+
+    // Discard the old attachment.
+    ctx->originMessage().drain(ctx->messageSize() - attachment_offset);
+  } else {
+    upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
+  }
+
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata,
+                                                        callbacks_->serializationType(),
+                                                        callbacks_->protocolType());
   return upstream_request_->start();
 }
 
@@ -154,11 +188,11 @@ void Router::cleanup() {
   }
 }
 
-Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                                          MessageMetadataSharedPtr& metadata,
                                          SerializationType serialization_type,
                                          ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
       protocol_(
           NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(serialization_type)),
       request_complete_(false), response_started_(false), response_complete_(false),
@@ -167,7 +201,7 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
 Router::UpstreamRequest::~UpstreamRequest() = default;
 
 FilterStatus Router::UpstreamRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;

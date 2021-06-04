@@ -47,7 +47,7 @@ gRPC
 * Envoy can send access log messages to a gRPC access logging service.
 
 
-Stdoutput
+Stdout
 *********
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
@@ -57,7 +57,7 @@ Stdoutput
 * Writes to the standard output of the process. It works in all platforms.
 
 
-Stderror
+Stderr
 ********
 
 * Asynchronous IO flushing architecture. Access logging will never block the main network processing
@@ -74,5 +74,5 @@ Further reading
 * gRPC :ref:`Access Log Service (ALS) <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig>`
   sink.
 * OpenTelemetry (gRPC) :ref:`LogsService <envoy_v3_api_msg_extensions.access_loggers.open_telemetry.v3alpha.OpenTelemetryAccessLogConfig>`
-* Stdoutput :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stdoutput.v3.StdoutputAccessLog>`
-* Stderror :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stderror.v3.StderrorAccessLog>`
+* Stdout :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StdoutAccessLog>`
+* Stderr :ref:`access log sink <envoy_v3_api_msg_extensions.access_loggers.stream.v3.StderrAccessLog>`

@@ -1,7 +1,8 @@
+#include "envoy/network/transport_socket.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"
@@ -46,13 +47,15 @@ public:
   WasmNetworkFilterTest() = default;
   ~WasmNetworkFilterTest() override = default;
 
-  void setupConfig(const std::string& code, std::string vm_configuration, bool fail_open = false,
+  void setupConfig(const std::string& code, std::string root_id = "",
+                   std::string vm_configuration = "", bool fail_open = false,
                    proxy_wasm::AllowedCapabilitiesMap allowed_capabilities = {}) {
     if (code.empty()) {
-      setupWasmCode(vm_configuration);
+      setupWasmCode(root_id, vm_configuration);
     } else {
       code_ = code;
     }
+    setRootId(root_id);
     setVmConfiguration(vm_configuration);
     setFailOpen(fail_open);
     setAllowedCapabilities(allowed_capabilities);
@@ -67,7 +70,7 @@ public:
   TestFilter& filter() { return *static_cast<TestFilter*>(context_.get()); }
 
 private:
-  void setupWasmCode(std::string vm_configuration) {
+  void setupWasmCode(std::string root_id, std::string vm_configuration) {
     if (std::get<0>(GetParam()) == "null") {
       code_ = "NetworkTestCpp";
     } else {
@@ -75,8 +78,9 @@ private:
         code_ = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
             "test/extensions/filters/network/wasm/test_data/test_cpp.wasm"));
       } else {
+        auto filename = !root_id.empty() ? root_id : vm_configuration;
         code_ = TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(absl::StrCat(
-            "test/extensions/filters/network/wasm/test_data/", vm_configuration + "_rust.wasm")));
+            "test/extensions/filters/network/wasm/test_data/", filename + "_rust.wasm")));
       }
     }
     EXPECT_FALSE(code_.empty());
@@ -91,7 +95,7 @@ INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmNetworkFilterTest,
 
 // Bad code in initial config.
 TEST_P(WasmNetworkFilterTest, BadCode) {
-  setupConfig("bad code", "");
+  setupConfig("bad code");
   EXPECT_EQ(wasm_, nullptr);
   setupFilter();
   filter().isFailed();
@@ -101,7 +105,7 @@ TEST_P(WasmNetworkFilterTest, BadCode) {
 }
 
 TEST_P(WasmNetworkFilterTest, BadCodeFailOpen) {
-  setupConfig("bad code", "", true);
+  setupConfig("bad code", "", "", true);
   EXPECT_EQ(wasm_, nullptr);
   setupFilter();
   filter().isFailed();
@@ -110,7 +114,7 @@ TEST_P(WasmNetworkFilterTest, BadCodeFailOpen) {
 
 // Test happy path.
 TEST_P(WasmNetworkFilterTest, HappyPath) {
-  setupConfig("", "logging");
+  setupConfig("", "", "logging");
   setupFilter();
 
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
@@ -140,7 +144,7 @@ TEST_P(WasmNetworkFilterTest, HappyPath) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseDownstreamFirst) {
-  setupConfig("", "logging");
+  setupConfig("", "", "logging");
   setupFilter();
 
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))));
@@ -153,7 +157,7 @@ TEST_P(WasmNetworkFilterTest, CloseDownstreamFirst) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseStream) {
-  setupConfig("", "logging");
+  setupConfig("", "", "logging");
   setupFilter();
 
   // No Context, does nothing.
@@ -177,7 +181,7 @@ TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }
-  setupConfig("", "logging", true);
+  setupConfig("", "", "logging", true);
   EXPECT_TRUE(plugin_->fail_open_);
   setupFilter();
 
@@ -202,7 +206,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnNewConnection) {
       {"proxy_get_property", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()},
       {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()}};
-  setupConfig("", "logging", false, allowed_capabilities);
+  setupConfig("", "", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Expect this call, because proxy_on_new_connection is allowed
@@ -228,7 +232,7 @@ TEST_P(WasmNetworkFilterTest, RestrictOnDownstreamConnectionClose) {
       {"proxy_get_property", proxy_wasm::SanitizationConfig()},
       {"proxy_log", proxy_wasm::SanitizationConfig()},
       {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
-  setupConfig("", "logging", false, allowed_capabilities);
+  setupConfig("", "", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Do not expect this call, because proxy_on_new_connection is not allowed
@@ -254,14 +258,19 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
       {"proxy_get_property", proxy_wasm::SanitizationConfig()},
       {"proxy_on_new_connection", proxy_wasm::SanitizationConfig()},
       {"proxy_on_downstream_connection_close", proxy_wasm::SanitizationConfig()}};
-  setupConfig("", "logging", false, allowed_capabilities);
+  setupConfig("", "", "logging", false, allowed_capabilities);
   setupFilter();
 
   // Do not expect this call, because proxy_log is not allowed
   EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onNewConnection 2"))))
       .Times(0);
-  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
-
+  if (std::get<1>(GetParam()) == "rust") {
+    // Rust code panics on WasmResult::InternalFailure returned by restricted calls, and
+    // that eventually results in calling failStream on post VM failure check after onNewConnection.
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
+  } else {
+    EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+  }
   // Do not expect this call, because proxy_log is not allowed
   EXPECT_CALL(filter(),
               log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamConnectionClose 2 1"))))
@@ -270,6 +279,192 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
   // Noop.
   read_filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
   filter().testClose();
+}
+
+TEST_P(WasmNetworkFilterTest, StopAndResumeDownstreamViaAsyncCall) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): not yet supported in the Rust SDK.
+    return;
+  }
+
+  setupConfig("", "resume_call");
+  setupFilter();
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                      {":path", "/"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "6"}}),
+                      message->headers());
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onDownstreamData 2"))))
+      .WillOnce(Invoke([&](uint32_t, absl::string_view) -> proxy_wasm::WasmResult {
+        Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        NiceMock<Tracing::MockSpan> span;
+        Http::TestResponseHeaderMapImpl response_header{{":status", "200"}};
+        callbacks->onBeforeFinalizeUpstreamSpan(span, &response_header);
+        callbacks->onSuccess(request, std::move(response_message));
+        return proxy_wasm::WasmResult::Ok;
+      }));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("continueDownstream"))));
+
+  EXPECT_CALL(read_filter_callbacks_, continueReading()).WillOnce(Invoke([&]() {
+    // Verify that we're not resuming processing from within Wasm callback.
+    EXPECT_EQ(proxy_wasm::current_context_, nullptr);
+  }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+  Buffer::OwnedImpl fake_downstream_data("");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onData(fake_downstream_data, false));
+
+  EXPECT_NE(callbacks, nullptr);
+}
+
+TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): not yet supported in the Rust SDK.
+    return;
+  }
+  setupConfig("", "resume_call");
+  setupFilter();
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ((Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                      {":path", "/"},
+                                                      {":authority", "foo"},
+                                                      {"content-length", "6"}}),
+                      message->headers());
+            callbacks = &cb;
+            return &request;
+          }));
+
+  EXPECT_CALL(filter(), log_(spdlog::level::trace, Eq(absl::string_view("onUpstreamData 2"))))
+      .WillOnce(Invoke([&](uint32_t, absl::string_view) -> proxy_wasm::WasmResult {
+        Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        NiceMock<Tracing::MockSpan> span;
+        Http::TestResponseHeaderMapImpl response_header{{":status", "200"}};
+        callbacks->onBeforeFinalizeUpstreamSpan(span, &response_header);
+        callbacks->onSuccess(request, std::move(response_message));
+        return proxy_wasm::WasmResult::Ok;
+      }));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::info, Eq(absl::string_view("continueUpstream unimplemented"))));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
+  Buffer::OwnedImpl fake_upstream_data("");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onWrite(fake_upstream_data, false));
+
+  EXPECT_NE(callbacks, nullptr);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnNewConnection) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
+
+  // Should close both up and down streams.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnDownstreamData) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onData(fake_downstream_data, false));
+
+  // Should close both up and down streams.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupConfig("", "panic");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::critical, _))
+      .Times(testing::AtMost(1)); // Rust logs on panic.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onWrite(fake_downstream_data, false));
+
+  // Should close both up and down streams.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, CloseDownstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupConfig("", "close_stream");
+  setupFilter();
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_downstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onWrite(fake_downstream_data, false));
+
+  // Should close downstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+}
+
+TEST_P(WasmNetworkFilterTest, CloseUpstream) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupConfig("", "close_stream");
+  setupFilter();
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
+  Buffer::OwnedImpl fake_upstream_data("Fake");
+  filter().onCreate(); // Create context without calling OnNewConnection.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter().onData(fake_upstream_data, false));
+
+  // Should close downstream.
+  EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Closed);
+  EXPECT_EQ(write_filter_callbacks_.connection().state(), Network::Connection::State::Open);
 }
 
 } // namespace Wasm

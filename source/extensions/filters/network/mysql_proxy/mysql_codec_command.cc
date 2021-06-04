@@ -1,11 +1,11 @@
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,24 +35,18 @@ DecodeStatus Command::parseMessage(Buffer::Instance& buffer, uint32_t len) {
   case Command::Cmd::InitDb:
   case Command::Cmd::CreateDb:
   case Command::Cmd::DropDb: {
-    std::string db = "";
+    std::string db;
     BufferHelper::readStringBySize(buffer, len - 1, db);
     setDb(db);
     break;
   }
-
   case Command::Cmd::Query:
     is_query_ = true;
-    // query string starts after one byte for comm type
-    BufferHelper::readStringBySize(buffer, len - 1, data_);
-    setDb("");
-    break;
-
+    FALLTHRU;
   default:
-    setDb("");
+    BufferHelper::readStringBySize(buffer, len - 1, data_);
     break;
   }
-
   return DecodeStatus::Success;
 }
 
@@ -60,7 +54,17 @@ void Command::setData(const std::string& data) { data_.assign(data); }
 
 void Command::encode(Buffer::Instance& out) const {
   BufferHelper::addUint8(out, static_cast<int>(cmd_));
-  BufferHelper::addString(out, data_);
+  switch (cmd_) {
+  case Command::Cmd::InitDb:
+  case Command::Cmd::CreateDb:
+  case Command::Cmd::DropDb: {
+    BufferHelper::addString(out, db_);
+    break;
+  }
+  default:
+    BufferHelper::addString(out, data_);
+    break;
+  }
 }
 
 DecodeStatus CommandResponse::parseMessage(Buffer::Instance& buffer, uint32_t len) {

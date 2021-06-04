@@ -1,38 +1,40 @@
-#include "server/listener_impl.h"
+#include "source/server/listener_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
-#include "envoy/network/udp_packet_writer_config.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/listener/well_known_names.h"
+#include "source/server/active_raw_udp_listener_config.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/listener_manager_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
-#include "server/configuration_impl.h"
-#include "server/drain_manager_impl.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/listener_manager_impl.h"
-#include "server/transport_socket_config_impl.h"
-
-#include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
+#endif
 
 namespace Envoy {
 namespace Server {
@@ -181,8 +183,11 @@ ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
     : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
       global_scope_(server.stats().createScope("")),
-      listener_scope_(server_.stats().createScope(fmt::format(
-          "listener.{}.", Network::Address::resolveProtoAddress(config.address())->asString()))),
+      listener_scope_(server_.stats().createScope(
+          fmt::format("listener.{}.",
+                      !config.stat_prefix().empty()
+                          ? config.stat_prefix()
+                          : Network::Address::resolveProtoAddress(config.address())->asString()))),
       validation_visitor_(validation_visitor), drain_manager_(std::move(drain_manager)) {}
 
 AccessLog::AccessLogManager& ListenerFactoryContextBaseImpl::accessLogManager() {
@@ -282,15 +287,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
           std::numeric_limits<uint64_t>::max(), listener_factory_context_->runtime(),
           cx_limit_runtime_key_)),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
-        if (workers_started_) {
-          parent_.onListenerWarmed(*this);
-        } else {
-          // Notify Server that this listener is
-          // ready.
-          listener_init_target_.ready();
-        }
-      }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            if (workers_started_) {
+                              parent_.onListenerWarmed(*this);
+                            } else {
+                              // Notify Server that this listener is
+                              // ready.
+                              listener_init_target_.ready();
+                            }
+                          })
+#ifdef ENVOY_ENABLE_QUIC
+      ,
+      quic_stat_names_(parent_.quicStatNames())
+#endif
+{
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -308,13 +319,12 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-  if (socket_type == Network::Socket::Type::Datagram) {
-    return;
+  if (socket_type != Network::Socket::Type::Datagram) {
+    buildSocketOptions();
+    buildOriginalDstListenerFilter();
+    buildProxyProtocolListenerFilter();
+    buildTlsInspectorListenerFilter();
   }
-  buildSocketOptions();
-  buildOriginalDstListenerFilter();
-  buildProxyProtocolListenerFilter();
-  buildTlsInspectorListenerFilter();
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
     // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
@@ -354,10 +364,16 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name), [this] {
-        ASSERT(workers_started_);
-        parent_.inPlaceFilterChainUpdate(*this);
-      }) {
+      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
+                          [this] {
+                            ASSERT(workers_started_);
+                            parent_.inPlaceFilterChainUpdate(*this);
+                          })
+#ifdef ENVOY_ENABLE_QUIC
+      ,
+      quic_stat_names_(parent_.quicStatNames())
+#endif
+{
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -392,38 +408,34 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
                          "unstable packet proxying. Configure the reuse_port listener option or "
                          "set concurrency = 1.");
   }
-  auto udp_config = config_.udp_listener_config();
-  if (udp_config.listener_config().typed_config().type_url().empty()) {
-    const std::string default_type_url =
-        "type.googleapis.com/envoy.config.listener.v3.ActiveRawUdpListenerConfig";
-    udp_config.mutable_listener_config()->mutable_typed_config()->set_type_url(default_type_url);
+
+  udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(config_.udp_listener_config());
+  if (config_.udp_listener_config().has_quic_options()) {
+#ifdef ENVOY_ENABLE_QUIC
+    udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
+#if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
+    // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
+    // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
+    // looking at the GSO code there are substantial copying inefficiency so I don't think it's
+    // wise to enable to globally for now. I will circle back and fix both of the above with
+    // a non-QUICHE GSO implementation.
+    if (Api::OsSysCallsSingleton::get().supportsUdpGso()) {
+      udp_listener_config_->writer_factory_ = std::make_unique<Quic::UdpGsoBatchWriterFactory>();
+    }
+#endif
+#else
+    throw EnvoyException("QUIC is configured but not enabled in the build.");
+#endif
+  } else {
+    udp_listener_config_->listener_factory_ =
+        std::make_unique<Server::ActiveRawUdpListenerFactory>(concurrency);
   }
-
-  auto& listener_config_factory =
-      Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-          udp_config.listener_config());
-  ProtobufTypes::MessagePtr listener_typed_config = Config::Utility::translateAnyToFactoryConfig(
-      udp_config.listener_config().typed_config(), validation_visitor_, listener_config_factory);
-
-  udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
-  udp_listener_config_->listener_factory_ =
-      listener_config_factory.createActiveUdpListenerFactory(*listener_typed_config, concurrency);
   udp_listener_config_->listener_worker_router_ =
       std::make_unique<Network::UdpListenerWorkerRouterImpl>(concurrency);
-
-  auto writer_config = udp_config.writer_config();
-  if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
-      writer_config.typed_config().type_url().empty()) {
-    const std::string default_type_url =
-        "type.googleapis.com/envoy.config.listener.v3.UdpDefaultWriterOptions";
-    writer_config.mutable_typed_config()->set_type_url(default_type_url);
+  if (udp_listener_config_->writer_factory_ == nullptr) {
+    udp_listener_config_->writer_factory_ = std::make_unique<Network::UdpDefaultWriterFactory>();
   }
-  auto& writer_config_factory =
-      Config::Utility::getAndCheckFactory<Network::UdpPacketWriterConfigFactory>(writer_config);
-  ProtobufTypes::MessagePtr writer_typed_config = Config::Utility::translateAnyToFactoryConfig(
-      writer_config.typed_config(), validation_visitor_, writer_config_factory);
-  udp_listener_config_->writer_factory_ =
-      writer_config_factory.createUdpPacketWriterFactory(*writer_typed_config);
 }
 
 void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {

@@ -9,13 +9,13 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/conn_manager_utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
@@ -368,7 +368,13 @@ public:
         }
       }
       // Perform the stream action.
-      directionalAction(request_, stream_action.request());
+      // The request_.request_encoder_ is initialized from the response_.response_decoder_.
+      // Fuzz test codec_impl_fuzz_test-5766628005642240 created a situation where the response
+      // stream was in closed state leading to the state.request_encoder_ in directionalAction()
+      // kData case no longer being a valid address.
+      if (response_.stream_state_ != HttpStream::StreamState::Closed) {
+        directionalAction(request_, stream_action.request());
+      }
       break;
     }
     case test::common::http::StreamAction::kResponse: {

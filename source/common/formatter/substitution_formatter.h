@@ -10,7 +10,7 @@
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -38,29 +38,63 @@ public:
                                  absl::optional<size_t>& max_length);
 
   /**
-   * General parse command utility. Will parse token from start position. Token is expected to end
-   * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
-   * contain multiple values separated by "separator" string. First value will be populated in
-   * "main" and any additional sub values will be set in the vector "subitems". For example token
-   * of: "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the
-   * following:
-   * - main: com.test.my_filter
-   * - subitems: {test_object, inner_key}
-   * - max_length: 100
+   * General tokenize utility. Will parse command from start position. Command is expected to end
+   * with ')'. An optional ":max_length" may be specified after the closing ')' char. Command may
+   * contain multiple values separated by "separator" character. Those values will be places
+   * into tokens container. If no separator is found, entire command (up to ')') will be
+   * placed as only item in the container.
    *
-   * @param token the token to parse
+   * @param command the command to parse
    * @param start the index to start parsing from
    * @param separator separator between values
-   * @param main the first value
-   * @param sub_items any additional values
+   * @param tokens values found in command separated by separator
    * @param max_length optional max_length will be populated if specified
    *
    * TODO(glicht) Rewrite with a parser library. See:
    * https://github.com/envoyproxy/envoy/issues/2967
    */
-  static void parseCommand(const std::string& token, const size_t start,
-                           const std::string& separator, std::string& main,
-                           std::vector<std::string>& sub_items, absl::optional<size_t>& max_length);
+  static void tokenizeCommand(const std::string& command, const size_t start, const char separator,
+                              std::vector<absl::string_view>& tokens,
+                              absl::optional<size_t>& max_length);
+
+  /* Variadic function template which invokes tokenizeCommand method to parse the
+     token command and assigns found tokens to sequence of params.
+     params must be a sequence of std::string& with optional container storing std::string. Here are
+     examples of params:
+     - std::string& token1
+     - std::string& token1, std::string& token2
+     - std::string& token1, std::string& token2, std::vector<std::string>& remaining
+
+     If command contains more tokens than number of passed params, unassigned tokens will be
+     ignored. If command contains less tokens than number of passed params, some params will be left
+     untouched.
+  */
+  template <typename... Tokens>
+  static void parseCommand(const std::string& command, const size_t start, const char separator,
+                           absl::optional<size_t>& max_length, Tokens&&... params) {
+    std::vector<absl::string_view> tokens;
+    tokenizeCommand(command, start, separator, tokens, max_length);
+    std::vector<absl::string_view>::iterator it = tokens.begin();
+    (
+        [&](auto& param) {
+          if (it != tokens.end()) {
+            if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
+                                         std::string>) {
+              // Compile time handler for std::string.
+              param = std::string(*it);
+              it++;
+            } else {
+              // Compile time handler for container type. It will catch all remaining tokens and
+              // move iterator to the end.
+              do {
+                param.push_back(std::string(*it));
+                it++;
+              } while (it != tokens.end());
+            }
+          }
+        }(params),
+        ...);
+  }
 
   /**
    * Return a FormatterProviderPtr if a built-in command is parsed from the token. This method
@@ -135,6 +169,8 @@ class StructFormatter {
 public:
   StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                   bool omit_empty_values);
+  StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                  bool omit_empty_values, const std::vector<CommandParserPtr>& commands);
 
   ProtobufWkt::Struct format(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& response_headers,
@@ -168,9 +204,19 @@ private:
       const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatListWrapper&)>>;
 
   // Methods for building the format map.
-  std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
-  StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
-  StructFormatListWrapper toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+  class FormatBuilder {
+  public:
+    explicit FormatBuilder(const std::vector<CommandParserPtr>& commands) : commands_(commands) {}
+    explicit FormatBuilder() : commands_(absl::nullopt) {}
+    std::vector<FormatterProviderPtr> toFormatStringValue(const std::string& string_format) const;
+    StructFormatMapWrapper toFormatMapValue(const ProtobufWkt::Struct& struct_format) const;
+    StructFormatListWrapper
+    toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const;
+
+  private:
+    using CommandsRef = std::reference_wrapper<const std::vector<CommandParserPtr>>;
+    const absl::optional<CommandsRef> commands_;
+  };
 
   // Methods for doing the actual formatting.
   ProtobufWkt::Value providersCallback(const std::vector<FormatterProviderPtr>& providers,
@@ -189,8 +235,9 @@ private:
   const bool omit_empty_values_;
   const bool preserve_types_;
   const std::string empty_value_;
+
   const StructFormatMapWrapper struct_output_format_;
-}; // namespace Formatter
+};
 
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
 
@@ -199,6 +246,9 @@ public:
   JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                     bool omit_empty_values)
       : struct_formatter_(format_mapping, preserve_types, omit_empty_values) {}
+  JsonFormatterImpl(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                    bool omit_empty_values, const std::vector<CommandParserPtr>& commands)
+      : struct_formatter_(format_mapping, preserve_types, omit_empty_values, commands) {}
 
   // Formatter::format
   std::string format(const Http::RequestHeaderMap& request_headers,

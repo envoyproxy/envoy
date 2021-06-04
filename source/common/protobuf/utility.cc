@@ -1,4 +1,4 @@
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include <limits>
 #include <numeric>
@@ -7,16 +7,16 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/documentation_url.h"
-#include "common/common/fmt.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
@@ -108,7 +108,9 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      if (it.first.Tag() != "!ignore") {
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      }
     }
     break;
   }
@@ -168,21 +170,23 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   Protobuf::DynamicMessageFactory dmf;
   auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
   ASSERT(earlier_message != nullptr);
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
     f(*earlier_message, MessageVersion::EarlierVersion);
     // If we succeed at the earlier version, we ask the counterfactual, would this have worked at a
     // later version? If not, this is v2 only and we need to warn. This is a waste of CPU cycles but
     // we expect that JSON/YAML fragments will not be in use by any CPU limited use cases.
-    try {
-      f(message, MessageVersion::LatestVersionValidate);
-    } catch (EnvoyException& e) {
+    TRY_ASSERT_MAIN_THREAD { f(message, MessageVersion::LatestVersionValidate); }
+    END_TRY
+    catch (EnvoyException& e) {
       MessageUtil::onVersionUpgradeDeprecation(e.what());
     }
     // Now we do the real work of upgrading.
     Config::VersionConverter::upgrade(*earlier_message, message);
-  } catch (ApiBoostRetryException&) {
+  }
+  END_TRY
+  catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
     f(message, MessageVersion::LatestVersion);
@@ -423,7 +427,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     // Attempt to parse the binary format.
     auto read_proto_binary = [&contents, &validation_visitor](Protobuf::Message& message,
                                                               MessageVersion message_version) {
-      try {
+      TRY_ASSERT_MAIN_THREAD {
         if (message.ParseFromString(contents)) {
           MessageUtil::checkForUnexpectedFields(
               message, message_version == MessageVersion::LatestVersionValidate
@@ -431,7 +435,9 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                            : validation_visitor);
         }
         return;
-      } catch (EnvoyException& ex) {
+      }
+      END_TRY
+      catch (EnvoyException& ex) {
         if (message_version == MessageVersion::LatestVersion ||
             message_version == MessageVersion::LatestVersionValidate) {
           // Failed reading the latest version - pass the same error upwards
@@ -611,17 +617,16 @@ std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& messa
     throw EnvoyException(json_or_error.status().ToString());
   }
   YAML::Node node;
-  try {
-    node = YAML::Load(json_or_error.value());
-  } catch (YAML::ParserException& e) {
+  TRY_ASSERT_MAIN_THREAD { node = YAML::Load(json_or_error.value()); }
+  END_TRY
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
-    // There is a potentially wide space of exceptions thrown by the YAML parser,
-    // and enumerating them all may be difficult. Envoy doesn't work well with
-    // unhandled exceptions, so we capture them and record the exception name in
-    // the Envoy Exception text.
+  }
+  catch (std::exception& e) {
+    // Catch unknown YAML parsing exceptions.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
   if (block_print) {
@@ -738,7 +743,7 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std:
   return struct_obj;
 }
 
-std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+std::string MessageUtil::codeEnumToString(ProtobufUtil::StatusCode code) {
   return ProtobufUtil::Status(code, "").ToString();
 }
 
@@ -884,13 +889,15 @@ void MessageUtil::redact(Protobuf::Message& message) {
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
-  try {
-    return parseYamlNode(YAML::Load(yaml));
-  } catch (YAML::ParserException& e) {
+  TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
+  catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
-  } catch (YAML::BadConversion& e) {
+  }
+  catch (YAML::BadConversion& e) {
     throw EnvoyException(e.what());
-  } catch (std::exception& e) {
+  }
+  catch (std::exception& e) {
     // There is a potentially wide space of exceptions thrown by the YAML parser,
     // and enumerating them all may be difficult. Envoy doesn't work well with
     // unhandled exceptions, so we capture them and record the exception name in
@@ -1038,4 +1045,56 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
           .time_since_epoch()
           .count()));
 }
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
+}
+
+std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
+  return "type.googleapis.com/" + std::string(type);
+}
+
+void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
+  auto& obj_fields = *obj.mutable_fields();
+
+  for (const auto& [key, val] : with.fields()) {
+    auto& obj_key = obj_fields[key];
+
+    // If the types are different, the last one wins.
+    const auto val_kind = val.kind_case();
+    if (val_kind != obj_key.kind_case()) {
+      obj_key = val;
+      continue;
+    }
+
+    // Otherwise, the strategy depends on the value kind.
+    switch (val.kind_case()) {
+    // For scalars, the last one wins.
+    case ProtobufWkt::Value::kNullValue:
+    case ProtobufWkt::Value::kNumberValue:
+    case ProtobufWkt::Value::kStringValue:
+    case ProtobufWkt::Value::kBoolValue:
+      obj_key = val;
+      break;
+    // If we got a structure, recursively update.
+    case ProtobufWkt::Value::kStructValue:
+      update(*obj_key.mutable_struct_value(), val.struct_value());
+      break;
+    // For lists, append the new values.
+    case ProtobufWkt::Value::kListValue: {
+      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
+      const auto& vals = val.list_value().values();
+      obj_key_vec.MergeFrom(vals);
+      break;
+    }
+    case ProtobufWkt::Value::KIND_NOT_SET:
+      break;
+    }
+  }
+}
+
 } // namespace Envoy

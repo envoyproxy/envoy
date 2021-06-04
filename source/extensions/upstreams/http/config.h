@@ -8,14 +8,15 @@
 #include <string>
 
 #include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,14 +26,16 @@ namespace Http {
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
-      const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options);
+      const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
   // Constructor for legacy (deprecated) config.
   ProtocolOptionsConfigImpl(
       const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
-      bool use_downstream_protocol, bool use_http2);
+      bool use_downstream_protocol, bool use_http2,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Given the supplied cluster config, and protocol options configuration,
   // returns a unit64_t representing the enabled Upstream::ClusterInfo::Features.
@@ -50,6 +53,8 @@ public:
   bool use_http2_{};
   bool use_http3_{};
   bool use_alpn_{};
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocol_cache_options_;
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {
@@ -60,7 +65,8 @@ public:
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::upstreams::http::v3::HttpProtocolOptions&>(
         config, context.messageValidationVisitor());
-    return std::make_shared<ProtocolOptionsConfigImpl>(typed_config);
+    return std::make_shared<ProtocolOptionsConfigImpl>(typed_config,
+                                                       context.messageValidationVisitor());
   }
   std::string category() const override { return "envoy.upstream_options"; }
   std::string name() const override {

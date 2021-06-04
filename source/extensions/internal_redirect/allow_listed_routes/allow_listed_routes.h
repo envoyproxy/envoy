@@ -4,8 +4,6 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "extensions/internal_redirect/well_known_names.h"
-
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
@@ -26,7 +24,7 @@ public:
   }
 
   absl::string_view name() const override {
-    return InternalRedirectPredicateValues::get().AllowListedRoutesPredicate;
+    return "envoy.internal_redirect_predicates.allow_listed_routes";
   }
 
   const absl::flat_hash_set<std::string> allowed_routes_;

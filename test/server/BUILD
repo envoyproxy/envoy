@@ -78,7 +78,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
-        "//source/common/network:udp_default_writer_config",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/stats:stats_lib",
         "//source/server:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
@@ -89,6 +89,25 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "active_tcp_listener_test",
+    srcs = ["active_tcp_listener_test.cc"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:connection_balancer_lib",
+        "//source/common/stats:stats_lib",
+        "//source/server:active_raw_udp_listener_config",
+        "//source/server:connection_handler_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 
@@ -106,7 +125,7 @@ envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/mocks/server:server_mocks",
     ],
@@ -154,7 +173,7 @@ envoy_cc_test(
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
-        "//include/envoy/common:time_interface",
+        "//envoy/common:time_interface",
         "//source/common/api:api_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
@@ -174,8 +193,8 @@ envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http:well_known_names",
@@ -198,7 +217,7 @@ envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
@@ -300,7 +319,6 @@ envoy_cc_test(
     deps = [
         ":listener_manager_impl_test_lib",
         ":utility_lib",
-        "//source/extensions/quic_listeners/quiche:quic_factory_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -354,6 +372,7 @@ envoy_cc_fuzz_test(
     ] + select({
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:gcc_build": [],
         "//conditions:default": envoy_all_extensions(),
     }),
 )

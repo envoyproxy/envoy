@@ -1,4 +1,4 @@
-#include "server/active_tcp_listener.h"
+#include "source/server/active_tcp_listener.h"
 
 #include <chrono>
 
@@ -7,14 +7,11 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/event/deferred_task.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/timespan_impl.h"
-
-#include "server/connection_handler_impl.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,25 +24,6 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
   }
 }
 } // namespace
-
-void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
-  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveConnections& active_connections = connection.active_connections_;
-  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
-  parent_.dispatcher().deferredDelete(std::move(removed));
-  // Delete map entry only iff connections becomes empty.
-  if (active_connections.connections_.empty()) {
-    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
-    ASSERT(iter != connections_by_context_.end());
-    // To cover the lifetime of every single connection, Connections need to be deferred deleted
-    // because the previously contained connection is deferred deleted.
-    parent_.dispatcher().deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_context_ during the deletion.
-    if (!is_deleting_) {
-      connections_by_context_.erase(iter);
-    }
-  }
-}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
@@ -62,12 +40,6 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {
   config.connectionBalancer().registerHandler(*this);
-}
-
-void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
-  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
-  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
-  config_ = &config;
 }
 
 ActiveTcpListener::~ActiveTcpListener() {
@@ -96,7 +68,33 @@ ActiveTcpListener::~ActiveTcpListener() {
   // for now. If it becomes a problem (developers hitting this assert when using debug builds) we
   // can revisit. This case, if it happens, should be benign on production builds. This case is
   // covered in ConnectionHandlerTest::RemoveListenerDuringRebalance.
-  ASSERT(num_listener_connections_ == 0);
+  ASSERT(num_listener_connections_ == 0, fmt::format("destroyed listener {} has {} connections",
+                                                     config_->name(), numConnections()));
+}
+
+void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+  parent_.dispatcher().deferredDelete(std::move(removed));
+  // Delete map entry only iff connections becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    parent_.dispatcher().deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
+void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
+  ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
+  ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
+  config_ = &config;
 }
 
 void ActiveTcpSocket::onTimeout() {
@@ -190,19 +188,16 @@ void ActiveTcpSocket::newConnection() {
   if (new_listener.has_value()) {
     // Hands off connections redirected by iptables to the listener associated with the
     // original destination address. Pass 'hand_off_restored_destination_connections' as false to
-    // prevent further redirection as well as 'rebalanced' as true since the connection has
-    // already been balanced if applicable inside onAcceptWorker() when the connection was
-    // initially accepted. Note also that we must account for the number of connections properly
-    // across both listeners.
+    // prevent further redirection.
+    // Leave the new listener to decide whether to execute re-balance.
+    // Note also that we must account for the number of connections properly across both listeners.
     // TODO(mattklein123): See note in ~ActiveTcpSocket() related to making this accounting better.
     listener_.decNumConnections();
-    new_listener.value().get().incNumConnections();
-    new_listener.value().get().onAcceptWorker(std::move(socket_), false, true);
+    new_listener.value().get().onAcceptWorker(std::move(socket_), false, false);
   } else {
     // Set default transport protocol if none of the listener filters did it.
     if (socket_->detectedTransportProtocol().empty()) {
-      socket_->setDetectedTransportProtocol(
-          Extensions::TransportSockets::TransportProtocolNames::get().RawBuffer);
+      socket_->setDetectedTransportProtocol("raw_buffer");
     }
     // TODO(lambdai): add integration test
     // TODO: Address issues in wider scope. See https://github.com/envoyproxy/envoy/issues/8925
@@ -216,8 +211,9 @@ void ActiveTcpSocket::newConnection() {
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   if (listenerConnectionLimitReached()) {
-    ENVOY_LOG(trace, "closing connection: listener connection limit reached for {}",
-              config_->name());
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
+              socket->addressProvider().remoteAddress()->asString(), config_->name());
     socket->close();
     stats_.downstream_cx_overflow_.inc();
     return;
@@ -252,7 +248,7 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),
                                                          hand_off_restored_destination_connections);
 
-  // Create and run the filters
+  // Create and run the filters.
   config_->filterChainFactory().createListenerFilterChain(*active_socket);
   active_socket->continueFilterChain(true);
 
@@ -294,7 +290,9 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
   // Find matching filter chain.
   const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
   if (filter_chain == nullptr) {
-    ENVOY_LOG(debug, "closing connection: no matching filter chain found");
+    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
+    ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
+              socket->addressProvider().remoteAddress()->asString());
     stats_.no_filter_chain_match_.inc();
     stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
@@ -313,21 +311,26 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(timeout);
   }
+
   ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               parent_.dispatcher().timeSource(), std::move(stream_info)));
   active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
 
+  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr, "");
+
   const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
       *active_connection->connection_, filter_chain->networkFilterFactories());
   if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection: no filters", *active_connection->connection_);
+    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *active_connection->connection_,
+                   active_connection->connection_->addressProvider().remoteAddress()->asString());
     active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
-    ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
+    ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
+                   active_connection->connection_->addressProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
   }

@@ -1,18 +1,17 @@
-#include "server/config_validation/server.h"
+#include "source/server/config_validation/server.h"
 
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/event/real_time_system.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/version/version.h"
-
-#include "server/ssl_context_manager.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/version/version.h"
+#include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -24,14 +23,16 @@ bool validateConfig(const Options& options,
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
                               component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     return false;
   }
 }
@@ -53,9 +54,9 @@ ValidationInstance::ValidationInstance(
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this) {
-  try {
-    initialize(options, local_address, component_factory);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
+  END_TRY
+  catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
@@ -90,8 +91,9 @@ void ValidationInstance::initialize(const Options& options,
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       dispatcher(), stats(), threadLocal(), bootstrap.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   Configuration::InitialImpl initial_config(bootstrap, options, *this);
+  admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));

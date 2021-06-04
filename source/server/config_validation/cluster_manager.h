@@ -6,8 +6,8 @@
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/context_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {

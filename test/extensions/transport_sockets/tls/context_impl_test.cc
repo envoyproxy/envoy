@@ -6,14 +6,13 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/base64.h"
-#include "common/json/json_loader.h"
-#include "common/secret/sds_api.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/base64.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -669,13 +668,13 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);
     if (pos != std::string::npos) {
-      valid_from = detail.substr(pos + this_update.size());
+      valid_from = std::string(detail.substr(pos + this_update.size()));
       continue;
     }
 
     pos = detail.find(next_update);
     if (pos != std::string::npos) {
-      expiration = detail.substr(pos + next_update.size());
+      expiration = std::string(detail.substr(pos + next_update.size()));
       continue;
     }
   }

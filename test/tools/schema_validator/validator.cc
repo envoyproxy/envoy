@@ -5,7 +5,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.validate.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "tclap/CmdLine.h"
 

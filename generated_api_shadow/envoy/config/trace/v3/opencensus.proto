@@ -6,6 +6,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 
 import "opencensus/proto/trace/v1/trace_config.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -73,12 +74,14 @@ message OpenCensusConfig {
   // Enables the Zipkin exporter if set to true. The url and service name must
   // also be set. This is deprecated, prefer to use Envoy's :ref:`native Zipkin
   // tracer <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`.
-  bool zipkin_exporter_enabled = 5 [deprecated = true];
+  bool zipkin_exporter_enabled = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The URL to Zipkin, e.g. "http://127.0.0.1:9411/api/v2/spans". This is
   // deprecated, prefer to use Envoy's :ref:`native Zipkin tracer
   // <envoy_v3_api_msg_config.trace.v3.ZipkinConfig>`.
-  string zipkin_url = 6 [deprecated = true];
+  string zipkin_url = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Enables the OpenCensus Agent exporter if set to true. The ocagent_address or
   // ocagent_grpc_service must also be set.

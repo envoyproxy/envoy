@@ -1,4 +1,4 @@
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include <http_parser.h>
 
@@ -10,20 +10,20 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/status.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -34,28 +34,6 @@
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
-namespace Http {
-namespace Utility {
-Http::Status exceptionToStatus(std::function<Http::Status(Buffer::Instance&)> dispatch,
-                               Buffer::Instance& data) {
-  Http::Status status;
-  try {
-    status = dispatch(data);
-    // TODO(#10878): Remove this when exception removal is complete. It is currently in migration,
-    // so dispatch may either return an error status or throw an exception. Soon we won't need to
-    // catch these exceptions, as all codec errors will be migrated to using error statuses that are
-    // returned from dispatch.
-  } catch (FrameFloodException& e) {
-    status = bufferFloodError(e.what());
-  } catch (CodecProtocolException& e) {
-    status = codecProtocolError(e.what());
-  } catch (PrematureResponseException& e) {
-    status = prematureResponseError(e.what(), e.responseCode());
-  }
-  return status;
-}
-} // namespace Utility
-} // namespace Http
 namespace Http2 {
 namespace Utility {
 
@@ -150,9 +128,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
                              bool hcm_stream_error_set,
                              const Protobuf::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.hcm_stream_error_on_invalid_message") &&
-      !options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
+  if (!options.has_override_stream_error_on_invalid_http_message() && hcm_stream_error_set) {
     ret.mutable_override_stream_error_on_invalid_http_message()->set_value(
         hcm_stream_error.value());
   }
@@ -224,6 +200,32 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 } // namespace Utility
 } // namespace Http2
 
+namespace Http3 {
+namespace Utility {
+
+const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
+const uint32_t OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE;
+
+envoy::config::core::v3::Http3ProtocolOptions
+initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
+                             bool hcm_stream_error_set,
+                             const Protobuf::BoolValue& hcm_stream_error) {
+  if (options.has_override_stream_error_on_invalid_http_message()) {
+    return options;
+  }
+  envoy::config::core::v3::Http3ProtocolOptions options_clone(options);
+  if (hcm_stream_error_set) {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        hcm_stream_error.value());
+  } else {
+    options_clone.mutable_override_stream_error_on_invalid_http_message()->set_value(false);
+  }
+  return options_clone;
+}
+
+} // namespace Utility
+} // namespace Http3
+
 namespace Http {
 
 static const char kDefaultPath[] = "/";
@@ -250,6 +252,46 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   // HTTP parser ensures that any [ has a closing ]
   ASSERT(absolute_url.length() >= offset + len);
   return true;
+}
+
+std::string parseCookie(const HeaderMap& headers, const std::string& key,
+                        const std::string& cookie) {
+
+  std::string ret;
+
+  headers.iterateReverse([&key, &ret, &cookie](const HeaderEntry& header) -> HeaderMap::Iterate {
+    // Find the cookie headers in the request (typically, there's only one).
+    if (header.key() == cookie) {
+
+      // Split the cookie header into individual cookies.
+      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
+        // Find the key part of the cookie (i.e. the name of the cookie).
+        size_t first_non_space = s.find_first_not_of(' ');
+        size_t equals_index = s.find('=');
+        if (equals_index == absl::string_view::npos) {
+          // The cookie is malformed if it does not have an `=`. Continue
+          // checking other cookies in this header.
+          continue;
+        }
+        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+        // If the key matches, parse the value from the rest of the cookie string.
+        if (k == key) {
+          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
+
+          // Cookie values may be wrapped in double quotes.
+          // https://tools.ietf.org/html/rfc6265#section-4.1.1
+          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+            v = v.substr(1, v.size() - 2);
+          }
+          ret = std::string{v};
+          return HeaderMap::Iterate::Break;
+        }
+      }
+    }
+    return HeaderMap::Iterate::Continue;
+  });
+
+  return ret;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -380,42 +422,11 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
+  return parseCookie(headers, key, Http::Headers::get().Cookie.get());
+}
 
-  std::string ret;
-
-  headers.iterateReverse([&key, &ret](const HeaderEntry& header) -> HeaderMap::Iterate {
-    // Find the cookie headers in the request (typically, there's only one).
-    if (header.key() == Http::Headers::get().Cookie.get()) {
-
-      // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-        // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(" ");
-        size_t equals_index = s.find('=');
-        if (equals_index == absl::string_view::npos) {
-          // The cookie is malformed if it does not have an `=`. Continue
-          // checking other cookies in this header.
-          continue;
-        }
-        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-        // If the key matches, parse the value from the rest of the cookie string.
-        if (k == key) {
-          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
-
-          // Cookie values may be wrapped in double quotes.
-          // https://tools.ietf.org/html/rfc6265#section-4.1.1
-          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-            v = v.substr(1, v.size() - 2);
-          }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
-        }
-      }
-    }
-    return HeaderMap::Iterate::Continue;
-  });
-
-  return ret;
+std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
+  return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
@@ -439,10 +450,18 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
+  auto status = Utility::getResponseStatusNoThrow(headers);
+  if (!status.has_value()) {
+    throw CodecClientException(":status must be specified and a valid unsigned long");
+  }
+  return status.value();
+}
+
+absl::optional<uint64_t> Utility::getResponseStatusNoThrow(const ResponseHeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
   if (!header || !absl::SimpleAtoi(headers.getStatusValue(), &response_code)) {
-    throw CodecClientException(":status must be specified and a valid unsigned long");
+    return absl::nullopt;
   }
   return response_code;
 }
@@ -465,43 +484,6 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config) {
-  Http1Settings ret;
-  ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
-  ret.accept_http_10_ = config.accept_http_10();
-  ret.default_host_for_http_10_ = config.default_host_for_http_10();
-  ret.enable_trailers_ = config.enable_trailers();
-  ret.allow_chunked_length_ = config.allow_chunked_length();
-
-  if (config.header_key_format().has_proper_case_words()) {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;
-  } else {
-    ret.header_key_format_ = Http1Settings::HeaderKeyFormat::Default;
-  }
-
-  return ret;
-}
-
-Http1Settings
-Utility::parseHttp1Settings(const envoy::config::core::v3::Http1ProtocolOptions& config,
-                            const Protobuf::BoolValue& hcm_stream_error, bool validate_scheme) {
-  Http1Settings ret = parseHttp1Settings(config);
-  ret.validate_scheme_ = validate_scheme;
-
-  if (config.has_override_stream_error_on_invalid_http_message()) {
-    // override_stream_error_on_invalid_http_message, if set, takes precedence over any HCM
-    // stream_error_on_invalid_http_message
-    ret.stream_error_on_invalid_http_message_ =
-        config.override_stream_error_on_invalid_http_message().value();
-  } else {
-    // fallback to HCM value
-    ret.stream_error_on_invalid_http_message_ = hcm_stream_error.value();
-  }
-
-  return ret;
 }
 
 void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
@@ -627,17 +609,16 @@ Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
   xff_string = StringUtil::ltrim(xff_string);
   xff_string = StringUtil::rtrim(xff_string);
 
-  try {
-    // This technically requires a copy because inet_pton takes a null terminated string. In
-    // practice, we are working with a view at the end of the owning string, and could pass the
-    // raw pointer.
-    // TODO(mattklein123) PERF: Avoid the copy here.
-    return {
-        Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
-        last_comma == std::string::npos && num_to_skip == 0};
-  } catch (const EnvoyException&) {
-    return {nullptr, false};
+  // This technically requires a copy because inet_pton takes a null terminated string. In
+  // practice, we are working with a view at the end of the owning string, and could pass the
+  // raw pointer.
+  // TODO(mattklein123) PERF: Avoid the copy here.
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressNoThrow(std::string(xff_string));
+  if (address != nullptr) {
+    return {address, last_comma == std::string::npos && num_to_skip == 0};
   }
+  return {nullptr, false};
 }
 
 bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
@@ -797,7 +778,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   // Start position of the host
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
   // Start position of the path
-  const auto path_pos = uri.find("/", host_pos);
+  const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
     host = uri.substr(host_pos);
@@ -905,18 +886,6 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
-}
-
-const Router::RouteSpecificFilterConfig*
-Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
-                                                   const Router::RouteConstSharedPtr& route) {
-
-  const Router::RouteSpecificFilterConfig* maybe_filter_config{};
-  traversePerFilterConfigGeneric(
-      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
-        maybe_filter_config = &cfg;
-      });
-  return maybe_filter_config;
 }
 
 void Utility::traversePerFilterConfigGeneric(

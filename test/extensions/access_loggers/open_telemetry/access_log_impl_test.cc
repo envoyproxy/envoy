@@ -5,12 +5,11 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/string_accessor_impl.h"
-
-#include "extensions/access_loggers/open_telemetry/access_log_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -53,7 +52,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+               envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
+               Stats::Scope& scope));
 };
 
 class AccessLogTest : public testing::Test {
@@ -81,11 +81,14 @@ values:
                               *config_.mutable_attributes());
 
     config_.mutable_common_config()->set_log_name("test_log");
-    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _))
+    config_.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
+    EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _, _, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                        config,
-                   Common::GrpcAccessLoggerType logger_type, Stats::Scope&) {
+                   envoy::config::core::v3::ApiVersion, Common::GrpcAccessLoggerType logger_type,
+                   Stats::Scope&) {
               EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
               EXPECT_EQ(Common::GrpcAccessLoggerType::HTTP, logger_type);
               return logger_;

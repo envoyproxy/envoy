@@ -45,8 +45,8 @@ jobs:
        sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
        mkdir -p bin/clang11
        cd bin/clang11
-       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz                                                                        
-       tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz --strip-components 1  
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+       tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz --strip-components 1
        export PATH=bin/clang11/bin:$PATH
 
 
@@ -60,7 +60,7 @@ jobs:
     - name: Clean Artifacts
       run: |
         git clean -xdf
-       
+
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
       uses: github/codeql-action/analyze@v1

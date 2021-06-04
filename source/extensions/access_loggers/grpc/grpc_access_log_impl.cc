@@ -1,12 +1,12 @@
-#include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/config/utility.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/typed_async_client.h"
 
 const char GRPC_LOG_STATS_PREFIX[] = "access_logs.grpc_access_log.";
 
@@ -55,11 +55,12 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    Grpc::RawAsyncClientPtr&& client, std::chrono::milliseconds buffer_flush_interval_msec,
-    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher, Stats::Scope& scope) {
-  return std::make_shared<GrpcAccessLoggerImpl>(
-      std::move(client), config.log_name(), buffer_flush_interval_msec, max_buffer_size_bytes,
-      dispatcher, local_info_, scope, Config::Utility::getAndCheckTransportVersion(config));
+    envoy::config::core::v3::ApiVersion transport_version, Grpc::RawAsyncClientPtr&& client,
+    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+    Event::Dispatcher& dispatcher, Stats::Scope& scope) {
+  return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config.log_name(),
+                                                buffer_flush_interval_msec, max_buffer_size_bytes,
+                                                dispatcher, local_info_, scope, transport_version);
 }
 
 } // namespace GrpcCommon

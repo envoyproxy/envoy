@@ -11,10 +11,10 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/http/conn_pool_base.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -155,8 +155,8 @@ public:
         uint64_t old_limit = connecting_client->effectiveConcurrentStreamLimit();
         connecting_client->remaining_streams_ = 1;
         if (connecting_client->effectiveConcurrentStreamLimit() < old_limit) {
-          decrConnectingStreamCapacity(old_limit -
-                                       connecting_client->effectiveConcurrentStreamLimit());
+          decrConnectingAndConnectedStreamCapacity(
+              old_limit - connecting_client->effectiveConcurrentStreamLimit());
         }
       }
     }

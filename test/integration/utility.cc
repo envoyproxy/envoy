@@ -9,18 +9,21 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/http/http3/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/client_connection_factory_impl.h"
+#endif
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/ssl_utility.h"
@@ -121,10 +124,13 @@ private:
 };
 
 Network::TransportSocketFactoryPtr
-IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api,
+IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                                          Ssl::ContextManager& context_manager,
                                                           const std::string& san_to_match) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context, api()).WillByDefault(testing::ReturnRef(api));
+  ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(store));
+  ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
   auto* tls_context = quic_transport_socket_config.mutable_upstream_tls_context();
@@ -173,7 +179,7 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    const std::string& host, const std::string& content_type) {
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   NiceMock<Random::MockRandomGenerator> random;
@@ -185,11 +191,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   TestConnectionCallbacks connection_callbacks(*dispatcher);
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster,
-      fmt::format("{}://127.0.0.1:80", (type == Http::CodecClient::Type::HTTP3 ? "udp" : "tcp")),
+      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
       time_system)};
 
-  if (type <= Http::CodecClient::Type::HTTP2) {
+  if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(
         type,
         dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
@@ -199,14 +204,14 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                          client);
   }
 
+#ifdef ENVOY_ENABLE_QUIC
+  Extensions::TransportSockets::Tls::ContextManagerImpl manager(time_system);
   Network::TransportSocketFactoryPtr transport_socket_factory =
-      createQuicUpstreamTransportSocketFactory(api, "spiffe://lyft.com/backend-team");
+      createQuicUpstreamTransportSocketFactory(api, mock_stats_store, manager,
+                                               "spiffe://lyft.com/backend-team");
   std::unique_ptr<Http::PersistentQuicInfo> persistent_info;
-  Http::QuicClientConnectionFactory& connection_factory =
-      Config::Utility::getAndCheckFactoryByName<Http::QuicClientConnectionFactory>(
-          Http::QuicCodecNames::get().Quiche);
-  persistent_info = connection_factory.createNetworkConnectionInfo(
-      *dispatcher, *transport_socket_factory, mock_stats_store, time_system, addr);
+  persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      *dispatcher, *transport_socket_factory, time_system, addr, 0);
 
   Network::Address::InstanceConstSharedPtr local_address;
   if (addr->ip()->version() == Network::Address::IpVersion::v4) {
@@ -215,18 +220,22 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     // Docker only works with loopback v6 address.
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
-  Network::ClientConnectionPtr connection = connection_factory.createQuicNetworkConnection(
-      *persistent_info, *dispatcher, addr, local_address);
+  Network::ClientConnectionPtr connection =
+      Quic::createQuicNetworkConnection(*persistent_info, *dispatcher, addr, local_address);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
+#else
+  ASSERT(false, "running a QUIC integration test without compiling QUIC");
+  return nullptr;
+#endif
 }
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    Network::Address::IpVersion ip_version, const std::string& host,
                                    const std::string& content_type) {
   auto addr = Network::Utility::resolveUrl(

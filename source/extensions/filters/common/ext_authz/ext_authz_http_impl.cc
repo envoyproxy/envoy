@@ -1,16 +1,16 @@
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/matchers.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 

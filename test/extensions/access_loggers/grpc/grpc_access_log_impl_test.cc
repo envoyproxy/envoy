@@ -5,9 +5,8 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -156,8 +155,8 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
+  GrpcAccessLoggerSharedPtr logger = logger_cache_.getOrCreateLogger(
+      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope_);
   // Note that the local info node() method is mocked, so the node is not really configurable.
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   identifier:

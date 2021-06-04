@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/config.h"
+#include "source/extensions/upstreams/http/config.h"
 
 #include <chrono>
 #include <memory>
@@ -9,9 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,6 +48,9 @@ getHttp3Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
       options.use_downstream_protocol_config().has_http3_protocol_options()) {
     return options.use_downstream_protocol_config().http3_protocol_options();
   }
+  if (options.has_auto_config()) {
+    return options.auto_config().http3_protocol_options();
+  }
   return options.explicit_http_config().http3_protocol_options();
 }
 
@@ -75,8 +79,10 @@ uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
-    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options)
-    : http1_settings_(Envoy::Http::Utility::parseHttp1Settings(getHttpOptions(options))),
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
+    : http1_settings_(
+          Envoy::Http::Http1::parseHttp1Settings(getHttpOptions(options), validation_visitor)),
       http2_options_(Http2::Utility::initializeAndValidateOptions(getHttp2Options(options))),
       http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
@@ -104,6 +110,10 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   if (options.has_auto_config()) {
     use_http2_ = true;
     use_alpn_ = true;
+    use_http3_ = options.auto_config().has_http3_protocol_options();
+    if (options.auto_config().has_alternate_protocols_cache_options()) {
+      alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
+    }
   }
 }
 
@@ -112,8 +122,9 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
     const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
-    bool use_downstream_protocol, bool use_http2)
-    : http1_settings_(Envoy::Http::Utility::parseHttp1Settings(http1_settings)),
+    bool use_downstream_protocol, bool use_http2,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
+    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(http1_settings, validation_visitor)),
       http2_options_(Http2::Utility::initializeAndValidateOptions(http2_options)),
       common_http_protocol_options_(common_options),
       upstream_http_protocol_options_(upstream_options),

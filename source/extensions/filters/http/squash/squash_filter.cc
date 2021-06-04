@@ -1,19 +1,19 @@
-#include "extensions/filters/http/squash/squash_filter.h"
+#include "source/extensions/filters/http/squash/squash_filter.h"
 
 #include <memory>
 
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/codes.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
 

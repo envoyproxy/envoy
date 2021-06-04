@@ -1,4 +1,4 @@
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 #include <climits>
 #include <cstdint>
@@ -9,19 +9,20 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stream_info/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
@@ -149,13 +150,20 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
 }
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values,
+                                 const std::vector<CommandParserPtr>& commands)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      struct_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
+
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
                                  bool omit_empty_values)
     : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
       empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
-      struct_output_format_(toFormatMapValue(format_mapping)) {}
+      struct_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
 
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
@@ -177,10 +185,10 @@ StructFormatter::toFormatMapValue(const ProtobufWkt::Struct& struct_format) cons
     }
   }
   return {std::move(output)};
-};
+}
 
-StructFormatter::StructFormatListWrapper
-StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_format) const {
+StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toFormatListValue(
+    const ProtobufWkt::ListValue& list_value_format) const {
   auto output = std::make_unique<StructFormatList>();
   for (const auto& value : list_value_format.values()) {
     switch (value.kind_case()) {
@@ -204,9 +212,10 @@ StructFormatter::toFormatListValue(const ProtobufWkt::ListValue& list_value_form
 }
 
 std::vector<FormatterProviderPtr>
-StructFormatter::toFormatStringValue(const std::string& string_format) const {
-  return SubstitutionFormatParser::parse(string_format);
-};
+StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
+  std::vector<CommandParserPtr> commands;
+  return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
+}
 
 ProtobufWkt::Value StructFormatter::providersCallback(
     const std::vector<FormatterProviderPtr>& providers,
@@ -293,19 +302,17 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
                                                   std::string& main_header,
                                                   std::string& alternative_header,
                                                   absl::optional<size_t>& max_length) {
+  // subs is used only to check if there are more than 2 tokens separated by '?'.
   std::vector<std::string> subs;
-  parseCommand(token, start, "?", main_header, subs, max_length);
-  if (subs.size() > 1) {
+  alternative_header = "";
+  parseCommand(token, start, '?', max_length, main_header, alternative_header, subs);
+  if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
         // docs/root/configuration/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
-  if (subs.size() == 1) {
-    alternative_header = subs.front();
-  } else {
-    alternative_header = "";
-  }
+
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(main_header, getNewlinePattern()) ||
       std::regex_search(alternative_header, getNewlinePattern())) {
@@ -313,25 +320,24 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   }
 }
 
-void SubstitutionFormatParser::parseCommand(const std::string& token, const size_t start,
-                                            const std::string& separator, std::string& main,
-                                            std::vector<std::string>& sub_items,
-                                            absl::optional<size_t>& max_length) {
-  // TODO(dnoe): Convert this to use string_view throughout.
-  const size_t end_request = token.find(')', start);
-  sub_items.clear();
-  if (end_request != token.length() - 1) {
+void SubstitutionFormatParser::tokenizeCommand(const std::string& command, const size_t start,
+                                               const char separator,
+                                               std::vector<absl::string_view>& tokens,
+                                               absl::optional<size_t>& max_length) {
+  const size_t end_request = command.find(')', start);
+  tokens.clear();
+  if (end_request != command.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
-      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", token));
+      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", command));
     }
 
     // Closing bracket should be either last one or followed by ':' to denote limitation.
-    if (token[end_request + 1] != ':') {
-      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", token));
+    if (command[end_request + 1] != ':') {
+      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", command));
     }
 
-    const auto length_str = absl::string_view(token).substr(end_request + 2);
+    const auto length_str = absl::string_view(command).substr(end_request + 2);
     uint64_t length_value;
 
     if (!absl::SimpleAtoi(length_str, &length_value)) {
@@ -341,20 +347,10 @@ void SubstitutionFormatParser::parseCommand(const std::string& token, const size
     max_length = length_value;
   }
 
-  const std::string name_data = token.substr(start, end_request - start);
-  if (!separator.empty()) {
-    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-    if (!keys.empty()) {
-      // The main value is the first key
-      main = keys.at(0);
-      if (keys.size() > 1) {
-        // Sub items contain additional keys
-        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
-      }
-    }
-  } else {
-    main = name_data;
-  }
+  absl::string_view name_data(command);
+  name_data.remove_prefix(start);
+  name_data.remove_suffix(command.length() - end_request);
+  tokens = absl::StrSplit(name_data, separator);
 }
 
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
@@ -397,7 +393,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     std::vector<std::string> path;
     const size_t start = DYNAMIC_META_TOKEN.size();
 
-    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
     return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
     std::string filter_namespace;
@@ -405,22 +401,22 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     std::vector<std::string> path;
     const size_t start = CLUSTER_META_TOKEN.size();
 
-    parseCommand(token, start, ":", filter_namespace, path, max_length);
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
     return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
   } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
-    std::string key;
+    std::string key, serialize_type;
     absl::optional<size_t> max_length;
-    std::vector<std::string> path;
+    std::string path;
     const size_t start = FILTER_STATE_TOKEN.size();
 
-    parseCommand(token, start, ":", key, path, max_length);
+    parseCommand(token, start, ':', max_length, key, serialize_type);
     if (key.empty()) {
       throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
     }
 
-    const absl::string_view serialize_type =
-        !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
-
+    if (serialize_type.empty()) {
+      serialize_type = std::string(TYPED_SERIALIZATION);
+    }
     if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
       throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
     }
@@ -693,6 +689,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.lastDownstreamRxByteReceived();
+        });
+  } else if (field_name == "REQUEST_TX_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.lastUpstreamTxByteSent();
         });
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
@@ -1294,9 +1295,11 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  try {
-    MessageUtil::jsonConvertValue(*proto, val);
-  } catch (EnvoyException& ex) {
+  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
+  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
+  // when converting that to a structure.
+  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
+  catch (EnvoyException& ex) {
     return unspecifiedValue();
   }
   return val;

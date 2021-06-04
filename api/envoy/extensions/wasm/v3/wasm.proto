@@ -46,7 +46,7 @@ message VmConfig {
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
   // *vm_id* and code will use the same VM. May be left blank. Sharing a VM between plugins can
   // reduce memory utilization and make sharing of data easier which may have security implications.
-  // See ref: "TODO: add ref" for details.
+  // [#comment: TODO: add ref for details.]
   string vm_id = 1;
 
   // The Wasm runtime type.
@@ -61,6 +61,11 @@ message VmConfig {
   // .. _extension_envoy.wasm.runtime.v8:
   //
   // **envoy.wasm.runtime.v8**: `V8 <https://v8.dev/>`_-based WebAssembly runtime.
+  //
+  // .. _extension_envoy.wasm.runtime.wamr:
+  //
+  // **envoy.wasm.runtime.wamr**: `WAMR <https://github.com/bytecodealliance/wasm-micro-runtime/>`_-based WebAssembly runtime.
+  // This runtime is not enabled in the official build.
   //
   // .. _extension_envoy.wasm.runtime.wavm:
   //

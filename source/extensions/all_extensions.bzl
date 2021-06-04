@@ -5,11 +5,9 @@ load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 # The map may be overridden by extensions specified in envoy_build_config.
 _required_extensions = {
     "envoy.common.crypto.utility_lib": "//source/extensions/common/crypto:utility_lib",
+    "envoy.http.original_ip_detection.xff": "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
-    #TODO(#12829) remove these.
-    "envoy.listener.quic": "//source/extensions/quic_listeners/quiche:quic_factory_lib",
-    "envoy.transport_sockets.quic": "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
 }
 
 # Return the extension cc_library target after select
@@ -26,7 +24,7 @@ def envoy_all_extensions(denylist = []):
 # Core extensions needed to run Envoy's integration tests.
 _core_extensions = [
     "envoy.access_loggers.file",
-    "envoy.access_loggers.stdoutput",
+    "envoy.access_loggers.stream",
     "envoy.filters.http.router",
     "envoy.filters.http.health_check",
     "envoy.filters.network.http_connection_manager",

@@ -139,7 +139,7 @@ function run_testsuite() {
   echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
   echo "Now checking that the above version is what we expected."
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
- 
+
   start_test "Checking for match of --hot-restart-version and admin /hot_restart_version"
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   echo "fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ..."

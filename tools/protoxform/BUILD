@@ -57,10 +57,12 @@ py_binary(
     ],
     data = [
         "//:.clang-format",
+        "//:API_VERSION",
         "//tools/type_whisperer:api_type_db.pb_text",
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//tools/api_versioning:utils",
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",

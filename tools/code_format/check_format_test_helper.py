@@ -224,6 +224,10 @@ def run_checks():
         "grpc_shutdown.cc",
         "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. "
         + "See #8282")
+    errors += check_unfixable_error(
+        "source/raw_try.cc",
+        "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
+    )
     errors += check_unfixable_error("clang_format_double_off.cc", "clang-format nested off")
     errors += check_unfixable_error("clang_format_trailing_off.cc", "clang-format remains off")
     errors += check_unfixable_error("clang_format_double_on.cc", "clang-format nested on")
@@ -261,7 +265,8 @@ def run_checks():
     errors += check_unfixable_error(
         "std_optional.cc", "Don't use std::optional; use absl::optional instead")
     errors += check_unfixable_error(
-        "std_string_view.cc", "Don't use std::string_view; use absl::string_view instead")
+        "std_string_view.cc",
+        "Don't use std::string_view or toStdStringView; use absl::string_view instead")
     errors += check_unfixable_error(
         "std_variant.cc", "Don't use std::variant; use absl::variant instead")
     errors += check_unfixable_error("std_visit.cc", "Don't use std::visit; use absl::visit instead")

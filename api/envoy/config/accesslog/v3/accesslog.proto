@@ -169,8 +169,8 @@ message RuntimeFilter {
   // randomly sample based on the runtime key value alone.
   // *use_independent_randomness* can be used for logging kill switches within
   // complex nested :ref:`AndFilter
-  // <envoy_api_msg_config.accesslog.v3.AndFilter>` and :ref:`OrFilter
-  // <envoy_api_msg_config.accesslog.v3.OrFilter>` blocks that are easier to
+  // <envoy_v3_api_msg_config.accesslog.v3.AndFilter>` and :ref:`OrFilter
+  // <envoy_v3_api_msg_config.accesslog.v3.OrFilter>` blocks that are easier to
   // reason about from a probability perspective (i.e., setting to true will
   // cause the filter to behave like an independent random variable when
   // composed within logical operator filters).

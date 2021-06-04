@@ -1,12 +1,12 @@
 #include <memory>
 #include <vector>
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
-#include "common/tcp/conn_pool.h"
-#include "common/tcp/original_conn_pool.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/tcp/conn_pool.h"
+#include "source/common/tcp/original_conn_pool.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -80,8 +80,8 @@ public:
 
   ~TestActiveTcpClient() override { parent().onConnDestroyed(); }
   void clearCallbacks() override {
-    if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
-        state_ == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
+    if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY ||
+        state() == Envoy::ConnectionPool::ActiveClient::State::DRAINING) {
       parent().onConnReleased(*this);
     }
     ActiveTcpClient::clearCallbacks();

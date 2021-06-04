@@ -1,9 +1,8 @@
 #pragma once
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,6 +46,7 @@ public:
   void setCmd(Cmd cmd);
   void setData(const std::string& data);
   void setDb(const std::string& db);
+  void setIsQuery(bool is_query) { is_query_ = is_query; }
   bool isQuery() { return is_query_; }
 
 private:

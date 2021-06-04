@@ -6,7 +6,7 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 
@@ -149,7 +149,7 @@ public:
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
-                                                     MetadataMap& metadata_map,
+                                                     const MetadataMap& metadata_map,
                                                      MetadataFlags flags);
 
   static Http2Frame makeMalformedRequest(uint32_t stream_index);
