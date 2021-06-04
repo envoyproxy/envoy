@@ -32,6 +32,8 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
+const ::test::common::secret::TestPrivateKeyMethodConfig _mock_test_private_key_method_config_dummy;
+
 class SecretManagerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::secret> {
 protected:
   SecretManagerImplTest()
