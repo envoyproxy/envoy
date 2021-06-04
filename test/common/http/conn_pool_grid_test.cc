@@ -1,7 +1,7 @@
 #include "envoy/http/alternate_protocols_cache.h"
 
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_grid.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_grid.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -597,7 +597,7 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 } // namespace
 } // namespace Http
 } // namespace Envoy
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+#include "source/extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
 namespace {

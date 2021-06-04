@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include <memory>
 
@@ -6,11 +6,10 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/utility.h"
-#include "common/router/metadatamatchcriteria_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"
 

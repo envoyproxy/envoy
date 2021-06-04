@@ -1,8 +1,7 @@
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 #include "test/test_common/utility.h"
 

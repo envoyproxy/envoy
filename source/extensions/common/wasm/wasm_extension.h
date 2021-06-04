@@ -7,11 +7,10 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/plugin.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 namespace Envoy {
 namespace Extensions {

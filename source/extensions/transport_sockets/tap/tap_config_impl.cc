@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/tap/tap_config_impl.h"
+#include "source/extensions/transport_sockets/tap/tap_config_impl.h"
 
 #include "envoy/data/tap/v3/transport.pb.h"
 
-#include "common/common/assert.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {

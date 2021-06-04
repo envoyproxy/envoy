@@ -13,12 +13,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-
-#include "server/watchdog_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/server/watchdog_impl.h"
 
 #include "absl/types/optional.h"
 

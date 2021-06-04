@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 #include "test/extensions/filters/network/postgres_proxy/postgres_test_utils.h"
 

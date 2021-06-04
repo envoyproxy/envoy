@@ -15,8 +15,8 @@ envoy_cc_extension(
     srcs = ["simple_http_cache.cc"],
     hdrs = ["simple_http_cache.h"],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/registry",
+        "//envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",

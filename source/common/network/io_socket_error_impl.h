@@ -2,7 +2,7 @@
 
 #include "envoy/api/io_error.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {

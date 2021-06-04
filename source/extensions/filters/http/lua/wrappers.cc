@@ -1,9 +1,8 @@
-#include "extensions/filters/http/lua/wrappers.h"
+#include "source/extensions/filters/http/lua/wrappers.h"
 
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
 namespace Extensions {

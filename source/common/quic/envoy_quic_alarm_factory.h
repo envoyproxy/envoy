@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/common/non_copyable.h"
-#include "common/quic/envoy_quic_alarm.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/quic/envoy_quic_alarm.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push

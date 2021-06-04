@@ -40,7 +40,7 @@ envoy_extension_cc_test(
     srcs = ["tsi_handshaker_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/extensions/transport_sockets/alts:tsi_handshaker",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",
@@ -52,7 +52,7 @@ envoy_extension_cc_test(
     srcs = ["tsi_socket_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/extensions/transport_sockets/alts:tsi_socket",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/event:event_mocks",

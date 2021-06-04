@@ -18,8 +18,8 @@ envoy_cc_extension(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/http:request_id_extension_interface",
-        "//include/envoy/server:request_id_extension_config_interface",
+        "//envoy/http:request_id_extension_interface",
+        "//envoy/server:request_id_extension_config_interface",
         "//source/common/common:random_generator_lib",
         "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
     ],

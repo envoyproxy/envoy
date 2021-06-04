@@ -1,10 +1,10 @@
-#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

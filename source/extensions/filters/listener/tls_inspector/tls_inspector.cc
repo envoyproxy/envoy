@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <cstdint>
 #include <string>
@@ -10,8 +10,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/ssl.h"

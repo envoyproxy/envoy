@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
 #include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
