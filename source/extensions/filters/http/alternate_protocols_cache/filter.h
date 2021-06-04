@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/alternate_protocols_cache_manager_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

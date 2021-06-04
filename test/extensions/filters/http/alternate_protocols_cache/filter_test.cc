@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 
-#include "extensions/filters/http/alternate_protocols_cache/filter.h"
+#include "source/extensions/filters/http/alternate_protocols_cache/filter.h"
 
 #include "test/mocks/http/alternate_protocols_cache.h"
 #include "test/mocks/http/mocks.h"

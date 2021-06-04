@@ -1,11 +1,10 @@
-#include "extensions/filters/http/alternate_protocols_cache/config.h"
+#include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.validate.h"
 
-#include "common/http/alternate_protocols_cache_manager_impl.h"
-
-#include "extensions/filters/http/alternate_protocols_cache/filter.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/extensions/filters/http/alternate_protocols_cache/filter.h"
 
 namespace Envoy {
 namespace Extensions {
