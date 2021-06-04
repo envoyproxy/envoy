@@ -209,7 +209,7 @@ public:
                        "documentation in case error string changed.");
     } else {
       // Extract portion after ": " to get error string.
-      error_ = error.substr(end + 2);
+      error_ = std::string(error.substr(end + 2));
       // Extract position information if present.
       auto start = error.find("at ");
       if (start != std::string::npos && (start + 3) < end) {
