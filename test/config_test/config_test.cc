@@ -213,7 +213,7 @@ uint32_t run(const std::string& directory) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
                      [filename](const absl::string_view& s) {
-                       return filename.find(s) != std::string::npos;
+                       return filename.find(std::string(s)) != std::string::npos;
                      }) == unsuported_win32_configs.end()) {
       OptionsImpl options(
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
