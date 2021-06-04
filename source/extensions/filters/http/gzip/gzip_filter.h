@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/filters/http/common/compressor/compressor.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "source/extensions/filters/http/common/compressor/compressor.h"
 
 namespace Envoy {
 namespace Extensions {

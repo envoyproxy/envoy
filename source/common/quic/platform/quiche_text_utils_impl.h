@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/common/base64.h"
-#include "common/quic/platform/string_utils.h"
+#include "source/common/common/base64.h"
+#include "source/common/quic/platform/string_utils.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"

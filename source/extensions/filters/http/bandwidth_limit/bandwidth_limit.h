@@ -12,13 +12,12 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/assert.h"
-#include "common/common/shared_token_bucket_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/router/header_parser.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/http/common/stream_rate_limiter.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/shared_token_bucket_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 #include "absl/synchronization/mutex.h"
 

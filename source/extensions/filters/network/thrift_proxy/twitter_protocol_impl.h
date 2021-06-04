@@ -5,9 +5,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 
 #include "absl/types/optional.h"
 

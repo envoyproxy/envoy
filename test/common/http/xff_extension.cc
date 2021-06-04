@@ -1,6 +1,6 @@
 #include "test/common/http/xff_extension.h"
 
-#include "extensions/http/original_ip_detection/xff/xff.h"
+#include "source/extensions/http/original_ip_detection/xff/xff.h"
 
 namespace Envoy {
 

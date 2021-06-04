@@ -1,4 +1,4 @@
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"

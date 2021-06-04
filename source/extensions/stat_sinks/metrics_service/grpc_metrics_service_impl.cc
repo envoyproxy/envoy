@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include <chrono>
 
@@ -9,9 +9,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {

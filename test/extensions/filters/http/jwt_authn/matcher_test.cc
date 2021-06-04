@@ -1,8 +1,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/jwt_authn/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/jwt_authn/matcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"

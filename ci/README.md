@@ -172,20 +172,10 @@ From an interactive session, you can invoke `bazel` manually or use the `./ci/wi
 
 # Testing changes to the build image as a developer
 
-While all changes to the build image should eventually be upstreamed, it can be useful to
-test those changes locally before sending out a pull request. To experiment
-with a local clone of the upstream build image you can make changes to files such as
-build_container.sh locally and then run:
-
-```bash
-DISTRO=ubuntu
-cd ci/build_container
-LINUX_DISTRO="${DISTRO}" CIRCLE_SHA1=my_tag ./docker_build.sh  # Wait patiently for quite some time
-cd ../..
-IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.whatever'
-```
-
-This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
+The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
+repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
+the [build_container](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/README.md) folder.
+See the Dockerfiles and build scripts there for building a new image.
 
 # macOS Build Flow
 

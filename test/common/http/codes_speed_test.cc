@@ -8,9 +8,9 @@
 
 #include "envoy/stats/stats.h"
 
-#include "common/http/codes.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "benchmark/benchmark.h"
 

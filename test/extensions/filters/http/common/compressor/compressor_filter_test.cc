@@ -2,9 +2,8 @@
 
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/common/compressor/compressor.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/compression/compressor/mocks.h"
 #include "test/mocks/http/mocks.h"

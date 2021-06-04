@@ -1,6 +1,6 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/stats/histogram_impl.h"
+#include "source/common/stats/histogram_impl.h"
 
 #include "test/test_common/utility.h"
 
