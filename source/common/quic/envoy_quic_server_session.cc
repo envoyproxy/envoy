@@ -14,12 +14,13 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     std::unique_ptr<EnvoyQuicServerConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit)
+    uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
-      quic_connection_(std::move(connection)) {}
+      quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
+      listener_scope_(listener_scope) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -141,6 +142,20 @@ size_t EnvoyQuicServerSession::WriteHeadersOnHeadersStream(
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
   return quic::QuicServerSessionBase::WriteHeadersOnHeadersStream(id, std::move(headers), fin,
                                                                   precedence, ack_listener);
+}
+
+void EnvoyQuicServerSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
+                                                     quic::QuicRstStreamErrorCode error,
+                                                     quic::QuicStreamOffset bytes_written) {
+  QuicServerSessionBase::MaybeSendRstStreamFrame(id, error, bytes_written);
+  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, error, /*from_self*/ true,
+                                                   /*is_upstream*/ false);
+}
+
+void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
+  QuicServerSessionBase::OnRstStream(frame);
+  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error_code,
+                                                   /*from_self*/ false, /*is_upstream*/ false);
 }
 
 } // namespace Quic

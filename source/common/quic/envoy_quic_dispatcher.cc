@@ -66,7 +66,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes());
+      listener_config_.perConnectionBufferLimitBytes(), quic_stat_names_,
+      listener_config_.listenerScope());
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(
