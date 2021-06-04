@@ -151,7 +151,7 @@ public:
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
   MOCK_METHOD(void, post, (std::function<void()> callback));
   MOCK_METHOD(void, deleteInDispatcherThread, (DispatcherThreadDeletableConstPtr deletable));
-  MOCK_METHOD(void, run, (RunType type));
+  MOCK_METHOD(void, run, (RunType type, const OptDispatcherStartCb& cb));
   MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
   MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
   MOCK_METHOD(bool, trackedObjectStackIsEmpty, (), (const));

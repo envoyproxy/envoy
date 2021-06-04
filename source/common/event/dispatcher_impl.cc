@@ -290,8 +290,14 @@ void DispatcherImpl::deleteInDispatcherThread(DispatcherThreadDeletableConstPtr 
   }
 }
 
-void DispatcherImpl::run(RunType type) {
+void DispatcherImpl::run(RunType type, const OptDispatcherStartCb& cb) {
   run_tid_ = api_.threadFactory().currentThreadId();
+
+  // Run the dispatcher start callback if provided.
+  if (cb.has_value()) {
+    cb.value()();
+  }
+
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
   // not guarantee that events are run in any particular order. So even if we post() and call

@@ -42,6 +42,13 @@ MockWorker::MockWorker() {
         EXPECT_EQ(nullptr, remove_filter_chains_completion_);
         remove_filter_chains_completion_ = completion;
       }));
+
+  ON_CALL(*this, start(_, _))
+      .WillByDefault(Invoke([](GuardDog&, const Event::OptDispatcherStartCb& cb) -> void {
+        if (cb.has_value()) {
+          cb.value()();
+        }
+      }));
 }
 
 MockWorker::~MockWorker() = default;
