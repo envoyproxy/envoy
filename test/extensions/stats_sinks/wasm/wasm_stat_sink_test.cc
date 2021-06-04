@@ -22,9 +22,9 @@ public:
   using ::Envoy::Extensions::Common::Wasm::Context::Context;
   ~TestContext() override = default;
   using ::Envoy::Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {
-    std::cerr << std::string(message) << "\n";
-    log_(static_cast<spdlog::level::level_enum>(level), message);
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {
+    std::cerr << message << "\n";
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));
     Extensions::Common::Wasm::Context::log(static_cast<spdlog::level::level_enum>(level), message);
     return proxy_wasm::WasmResult::Ok;
   }
