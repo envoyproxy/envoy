@@ -2,7 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

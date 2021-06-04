@@ -4,7 +4,7 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 

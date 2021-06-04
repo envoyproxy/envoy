@@ -5,10 +5,9 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

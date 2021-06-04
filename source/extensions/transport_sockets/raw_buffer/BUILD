@@ -17,9 +17,9 @@ envoy_cc_extension(
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:transport_socket_config_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
+        "//envoy/server:transport_socket_config_interface",
         "//source/common/network:raw_buffer_socket_lib",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
     ],

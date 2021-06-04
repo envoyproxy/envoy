@@ -13,9 +13,9 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {

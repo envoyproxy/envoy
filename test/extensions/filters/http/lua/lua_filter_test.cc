@@ -3,11 +3,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/message_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/http/lua/lua_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/http/lua/lua_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"

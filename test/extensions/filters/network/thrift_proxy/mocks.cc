@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "gtest/gtest.h"
 

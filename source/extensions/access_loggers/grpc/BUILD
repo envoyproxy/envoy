@@ -18,9 +18,9 @@ envoy_cc_library(
     hdrs = ["config_utils.h"],
     deps = [
         ":grpc_access_log_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/singleton:instance_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/singleton:instance_interface",
     ],
 )
 
@@ -29,10 +29,10 @@ envoy_cc_library(
     srcs = ["grpc_access_log_impl.cc"],
     hdrs = ["grpc_access_log_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/access_loggers/common:grpc_access_logger",
@@ -47,7 +47,7 @@ envoy_cc_library(
     srcs = ["grpc_access_log_utils.cc"],
     hdrs = ["grpc_access_log_utils.h"],
     deps = [
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
@@ -104,7 +104,7 @@ envoy_cc_extension(
     ],
     deps = [
         ":config_utils",
-        "//include/envoy/server:access_log_config_interface",
+        "//envoy/server:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
@@ -125,7 +125,7 @@ envoy_cc_extension(
     ],
     deps = [
         ":config_utils",
-        "//include/envoy/server:access_log_config_interface",
+        "//envoy/server:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",

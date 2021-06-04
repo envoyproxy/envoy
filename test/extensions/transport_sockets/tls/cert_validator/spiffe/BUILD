@@ -42,6 +42,8 @@ envoy_extension_cc_test(
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     extension_name = "envoy.tls.cert_validator.spiffe",
+    # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/integration:http_integration_lib",

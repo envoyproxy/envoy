@@ -516,7 +516,11 @@ def _com_google_googletest():
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
 def _com_google_absl():
-    external_http_archive("com_google_absl")
+    external_http_archive(
+        name = "com_google_absl",
+        patches = ["@envoy//bazel:abseil.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "abseil_any",
         actual = "@com_google_absl//absl/types:any",

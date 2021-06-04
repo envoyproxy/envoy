@@ -1,10 +1,10 @@
-#include "extensions/filters/network/thrift_proxy/router/config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/config.h"
 
 #include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 namespace Envoy {
 namespace Extensions {

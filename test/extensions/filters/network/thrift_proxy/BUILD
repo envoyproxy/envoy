@@ -286,7 +286,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
-        "//include/envoy/common:base_includes",
+        "//envoy/common:base_includes",
         "//source/common/network:address_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",

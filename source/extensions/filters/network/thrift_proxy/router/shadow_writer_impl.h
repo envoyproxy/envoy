@@ -9,12 +9,11 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {

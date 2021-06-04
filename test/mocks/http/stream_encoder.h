@@ -2,7 +2,7 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/status.h"
+#include "source/common/http/status.h"
 
 #include "test/mocks/http/stream.h"
 

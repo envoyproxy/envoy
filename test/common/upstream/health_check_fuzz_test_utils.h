@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_checker_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"

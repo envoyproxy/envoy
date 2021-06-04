@@ -1,6 +1,6 @@
-#include "extensions/http/original_ip_detection/xff/xff.h"
+#include "source/extensions/http/original_ip_detection/xff/xff.h"
 
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {

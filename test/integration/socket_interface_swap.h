@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/network/socket_interface.h"
+#include "source/common/network/socket_interface.h"
 
 #include "test/integration/filters/test_socket_interface.h"
 

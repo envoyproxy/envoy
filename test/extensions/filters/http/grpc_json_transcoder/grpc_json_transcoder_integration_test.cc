@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"

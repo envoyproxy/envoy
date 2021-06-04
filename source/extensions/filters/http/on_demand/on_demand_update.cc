@@ -1,9 +1,9 @@
-#include "extensions/filters/http/on_demand/on_demand_update.h"
+#include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/http/codes.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codes.h"
 
 namespace Envoy {
 namespace Extensions {

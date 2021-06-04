@@ -6,13 +6,12 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/stats.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
