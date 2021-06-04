@@ -4,6 +4,7 @@
 
 #include "common/common/lock_guard.h"
 
+#include "library/common/config_internal.h"
 #include "library/common/data/utility.h"
 #include "library/common/stats/utility.h"
 
@@ -32,23 +33,23 @@ envoy_status_t Engine::run(const std::string config, const std::string log_level
 envoy_status_t Engine::main(const std::string config, const std::string log_level) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
+  const std::string name = "envoy";
+  const std::string config_flag = "--config-yaml";
+  const std::string composed_config = absl::StrCat(config_header, config);
+  const std::string log_flag = "-l";
+  const std::string concurrency_option = "--concurrency";
+  const std::string concurrency_arg = "0";
+  std::vector<const char*> envoy_argv = {name.c_str(),
+                                         config_flag.c_str(),
+                                         composed_config.c_str(),
+                                         concurrency_option.c_str(),
+                                         concurrency_arg.c_str(),
+                                         log_flag.c_str(),
+                                         log_level.c_str(),
+                                         nullptr};
   {
     Thread::LockGuard lock(mutex_);
     try {
-      const std::string name = "envoy";
-      const std::string config_flag = "--config-yaml";
-      const std::string log_flag = "-l";
-      const std::string concurrency_option = "--concurrency";
-      const std::string concurrency_arg = "0";
-      std::vector<const char*> envoy_argv = {name.c_str(),
-                                             config_flag.c_str(),
-                                             config.c_str(),
-                                             concurrency_option.c_str(),
-                                             concurrency_arg.c_str(),
-                                             log_flag.c_str(),
-                                             log_level.c_str(),
-                                             nullptr};
-
       main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
