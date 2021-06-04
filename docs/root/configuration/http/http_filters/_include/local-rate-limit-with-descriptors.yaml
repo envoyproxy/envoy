@@ -76,7 +76,6 @@ static_resources:
                       route: { cluster: default_service }
   clusters:
     - name: default_service
-      connect_timeout: 1s
       load_assignment:
         cluster_name: default_service
         endpoints:
@@ -87,7 +86,6 @@ static_resources:
                       address: 127.0.0.1
                       port_value: 8080
     - name: service_protected_by_rate_limit
-      connect_timeout: 1s
       load_assignment:
         cluster_name: service_protected_by_rate_limit
         endpoints:
