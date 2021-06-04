@@ -74,7 +74,7 @@ template <class T> std::atomic<T*> InjectableSingleton<T>::loader_ = nullptr;
 
 template <class T> class ScopedInjectableLoader {
 public:
-  ScopedInjectableLoader(std::unique_ptr<T>&& instance) {
+  explicit ScopedInjectableLoader(std::unique_ptr<T>&& instance) {
     instance_ = std::move(instance);
     InjectableSingleton<T>::initialize(instance_.get());
   }
@@ -82,6 +82,26 @@ public:
 
 private:
   std::unique_ptr<T> instance_;
+};
+
+// This class saves the singleton object and restore the original singleton at destroy. This class
+// is not thread safe. It can be used in single thread test.
+template <class T>
+class StackedScopedInjectableLoader :
+    // To access the protected loader_.
+    protected InjectableSingleton<T> {
+public:
+  explicit StackedScopedInjectableLoader(std::unique_ptr<T>&& instance) {
+    original_loader_ = InjectableSingleton<T>::getExisting();
+    InjectableSingleton<T>::clear();
+    instance_ = std::move(instance);
+    InjectableSingleton<T>::initialize(instance_.get());
+  }
+  ~StackedScopedInjectableLoader() { InjectableSingleton<T>::loader_ = original_loader_; }
+
+private:
+  std::unique_ptr<T> instance_;
+  T* original_loader_;
 };
 
 } // namespace Envoy

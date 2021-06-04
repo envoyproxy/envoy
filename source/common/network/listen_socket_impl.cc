@@ -48,19 +48,15 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
   }
 }
 
+// UDP listen socket desires io handle regardless bind_to_port is true or false.
 template <>
-void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::setPrebindSocketOptions() {
-// On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as on
-// Linux and later BSD socket stacks
-#ifndef WIN32
-  int on = 1;
-  auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
-#endif
+NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
+    const Address::InstanceConstSharedPtr& address,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
+    : ListenSocketImpl(Network::ioHandleForAddr(Socket::Type::Datagram, address), address) {
+  setPrebindSocketOptions();
+  setupSocket(options, bind_to_port);
 }
-
-template <>
-void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address), address) {
