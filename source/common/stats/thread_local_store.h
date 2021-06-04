@@ -187,11 +187,11 @@ public:
   }
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override {
-    return default_scope_->counterGroupFromStatNameWithTags(name, tags, max_entries);
+                                                 CounterGroupDescriptorSharedPtr descriptor) override {
+    return default_scope_->counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
-    return default_scope_->counterGroupFromString(name, max_entries);
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
+    return default_scope_->counterGroupFromString(name, descriptor);
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
@@ -362,7 +362,7 @@ private:
                                                  StatNameTagVectorOptConstRef tags) override;
     CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                    StatNameTagVectorOptConstRef tags,
-                                                   size_t max_entries) override;
+                                                   CounterGroupDescriptorSharedPtr descriptor) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
@@ -390,9 +390,9 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }
-    CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
+    CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
       StatNameManagedStorage storage(name, symbolTable());
-      return counterGroupFromStatName(storage.statName(), max_entries);
+      return counterGroupFromStatName(storage.statName(), descriptor);
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }

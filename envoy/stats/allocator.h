@@ -60,12 +60,12 @@ public:
    * @param name the full name of the group.
    * @param tag_extracted_name the name of the stat with tag-values stripped out.
    * @param tags the tag values.
-   * @param max_entries the maximum number of entries in the group.
+   * @param descriptor the maximum number of entries in the group.
    * @return CounterSharedPtr a counter.
    */
   virtual CounterGroupSharedPtr makeCounterGroup(StatName name, StatName tag_extracted_name,
                                                  const StatNameTagVector& stat_name_tags,
-                                                 size_t max_entries) PURE;
+                                                 CounterGroupDescriptorSharedPtr descriptor) PURE;
 
   virtual const SymbolTable& constSymbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;

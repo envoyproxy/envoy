@@ -132,8 +132,8 @@ public:
     return histogramFromString(name, unit);
   }
   TextReadout& textReadout(const std::string& name) { return textReadoutFromString(name); }
-  CounterGroup& counterGroup(const std::string& name, size_t max_entries) {
-    return counterGroupFromString(name, max_entries);
+  CounterGroup& counterGroup(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) {
+    return counterGroupFromString(name, descriptor);
   }
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
@@ -145,7 +145,7 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override;
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override;
   Counter& counterFromStatNameWithTags(const StatName& name,
                                        StatNameTagVectorOptConstRef tags) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
@@ -154,7 +154,7 @@ public:
                                            Histogram::Unit unit) override;
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override;
+                                                 CounterGroupDescriptorSharedPtr descriptor) override;
 
   // New APIs available for tests.
   CounterOptConstRef findCounterByString(const std::string& name) const;

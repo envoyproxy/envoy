@@ -126,16 +126,16 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
   return scope.textReadoutFromStatNameWithTags(StatName(joined.get()), tags);
 }
 
-CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, size_t max_entries,
+CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, CounterGroupDescriptorSharedPtr descriptor,
                                        StatNameTagVectorOptConstRef tags) {
   ElementVisitor visitor(scope.symbolTable(), elements);
-  return scope.counterGroupFromStatNameWithTags(visitor.statName(), tags, max_entries);
+  return scope.counterGroupFromStatNameWithTags(visitor.statName(), tags, descriptor);
 }
 
 CounterGroup& counterGroupFromStatNames(Scope& scope, const StatNameVec& elements,
-                                        size_t max_entries, StatNameTagVectorOptConstRef tags) {
+                                        CounterGroupDescriptorSharedPtr descriptor, StatNameTagVectorOptConstRef tags) {
   SymbolTable::StoragePtr joined = scope.symbolTable().join(elements);
-  return scope.counterGroupFromStatNameWithTags(StatName(joined.get()), tags, max_entries);
+  return scope.counterGroupFromStatNameWithTags(StatName(joined.get()), tags, descriptor);
 }
 
 } // namespace Utility

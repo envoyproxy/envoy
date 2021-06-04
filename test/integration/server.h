@@ -114,9 +114,9 @@ public:
 
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override {
+                                                 CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterGroupFromStatNameWithTags(name, tags, max_entries);
+    return wrapped_scope_->counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
 
   NullGaugeImpl& nullGauge(const std::string& str) override {
@@ -139,9 +139,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterGroupFromStatName(storage.statName(), max_entries);
+    return counterGroupFromStatName(storage.statName(), descriptor);
   }
 
   CounterOptConstRef findCounter(StatName name) const override {
@@ -343,13 +343,13 @@ public:
   }
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override {
+                                                 CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterGroupFromStatNameWithTags(name, tags, max_entries);
+    return store_.counterGroupFromStatNameWithTags(name, tags, descriptor);
   }
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterGroupFromString(name, max_entries);
+    return store_.counterGroupFromString(name, descriptor);
   }
   CounterOptConstRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);

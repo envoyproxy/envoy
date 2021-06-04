@@ -30,7 +30,7 @@ public:
   using GaugeAllocator = std::function<RefcountPtr<Base>(StatName, Gauge::ImportMode)>;
   using HistogramAllocator = std::function<RefcountPtr<Base>(StatName, Histogram::Unit)>;
   using TextReadoutAllocator = std::function<RefcountPtr<Base>(StatName name, TextReadout::Type)>;
-  using CounterGroupAllocator = std::function<RefcountPtr<Base>(StatName name, size_t max_entries)>;
+  using CounterGroupAllocator = std::function<RefcountPtr<Base>(StatName name, CounterGroupDescriptorSharedPtr descriptor)>;
   using BaseOptConstRef = absl::optional<std::reference_wrapper<const Base>>;
 
   IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
@@ -79,6 +79,17 @@ public:
     }
 
     RefcountPtr<Base> new_stat = text_readout_alloc_(name, type);
+    stats_.emplace(new_stat->statName(), new_stat);
+    return *new_stat;
+  }
+
+  Base& get(StatName name, CounterGroupDescriptorSharedPtr descriptor) {
+    auto stat = stats_.find(name);
+    if (stat != stats_.end()) {
+      return *stat->second;
+    }
+
+    RefcountPtr<Base> new_stat = counter_group_alloc_(name, descriptor);
     stats_.emplace(new_stat->statName(), new_stat);
     return *new_stat;
   }
@@ -171,9 +182,9 @@ public:
   }
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override {
+                                                 CounterGroupDescriptorSharedPtr descriptor) override {
     TagUtility::TagStatNameJoiner joiner(name, tags, symbolTable());
-    CounterGroup& counter_group = counter_groups_.get(joiner.nameWithTags(), max_entries);
+    CounterGroup& counter_group = counter_groups_.get(joiner.nameWithTags(), descriptor);
     return counter_group;
   }
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
@@ -234,9 +245,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
   }
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return counterGroupFromStatName(storage.statName(), max_entries);
+    return counterGroupFromStatName(storage.statName(), descriptor);
   }
 
 private:

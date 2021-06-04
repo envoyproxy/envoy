@@ -182,11 +182,11 @@ public:
   /**
    * Creates a CounterGroup from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
-   * @param max_entries The size of the group.
+   * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
-  CounterGroup& counterGroupFromStatName(const StatName& name, size_t max_entries) {
-    return counterGroupFromStatNameWithTags(name, absl::nullopt, max_entries);
+  CounterGroup& counterGroupFromStatName(const StatName& name, CounterGroupDescriptorSharedPtr descriptor) {
+    return counterGroupFromStatNameWithTags(name, absl::nullopt, descriptor);
   }
 
   /**
@@ -194,20 +194,20 @@ public:
    * will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @param tags optionally specified tags.
-   * @param max_entries The size of the group.
+   * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
   virtual CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                          StatNameTagVectorOptConstRef tags,
-                                                         size_t max_entries) PURE;
+                                                         CounterGroupDescriptorSharedPtr descriptor) PURE;
 
   /**
    * TODO(#6667): this variant is deprecated: use counterGroupFromStatName.
    * @param name The name, expressed as a string.
-   * @param max_entries The size of the group.
+   * @param descriptor The size of the group.
    * @return a counter group within the scope's namespace with a particular value type.
    */
-  virtual CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) PURE;
+  virtual CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.

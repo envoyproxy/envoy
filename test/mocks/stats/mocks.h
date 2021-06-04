@@ -251,6 +251,14 @@ public:
   std::string value_;
 };
 
+class MockCounterGroupDescriptor : public Envoy::Stats::CounterGroupDescriptor {
+ public:
+  MockCounterGroupDescriptor() = default;
+  ~MockCounterGroupDescriptor() override = default;
+  MOCK_METHOD(absl::string_view, nameSuffix, (size_t index));
+  MOCK_METHOD(size_t, size, ());
+};
+
 class MockCounterGroup : public MockStatWithRefcount<CounterGroup> {
 public:
   MockCounterGroup();

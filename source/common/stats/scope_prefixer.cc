@@ -58,11 +58,11 @@ TextReadout& ScopePrefixer::textReadoutFromStatNameWithTags(const StatName& name
 
 CounterGroup& ScopePrefixer::counterGroupFromStatNameWithTags(const StatName& name,
                                                               StatNameTagVectorOptConstRef tags,
-                                                              size_t max_entries) {
+                                                              CounterGroupDescriptorSharedPtr descriptor) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_.symbolTable().join({prefix_.statName(), name});
   return scope_.counterGroupFromStatNameWithTags(StatName(stat_name_storage.get()), tags,
-                                                 max_entries);
+                                                 descriptor);
 }
 
 CounterOptConstRef ScopePrefixer::findCounter(StatName name) const {

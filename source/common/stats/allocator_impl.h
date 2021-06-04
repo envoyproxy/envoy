@@ -32,7 +32,7 @@ public:
                                        const StatNameTagVector& stat_name_tags) override;
   CounterGroupSharedPtr makeCounterGroup(StatName name, StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         size_t max_entries) override;
+                                         CounterGroupDescriptorSharedPtr descriptor) override;
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 

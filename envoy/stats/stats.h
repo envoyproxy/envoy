@@ -190,6 +190,23 @@ public:
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
+class CounterGroupDescriptor {
+ public:
+  virtual ~CounterGroupDescriptor() = default;
+
+  /**
+   * Returns the suffix for the name of the counter at the specific index.
+   */
+  virtual absl::string_view nameSuffix(size_t index) PURE;
+
+  /**
+   * Returns the number of counters in the group.
+   */
+  virtual size_t size() PURE;
+};
+
+using CounterGroupDescriptorSharedPtr = std::shared_ptr<CounterGroupDescriptor>;
+
 /**
  * An group of always incrementing counters with latching capability. Each increment is added
  * both to a global counter as well as periodic counter. Calling latch() returns the periodic

@@ -104,18 +104,17 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
-  std::map<std::string, std::vector<uint64_t>> all_counter_groups;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
+      all_stats.emplace(counter->name() + counter->nameSuffix(), counter->value());
     }
   }
 
   if (const auto format_value = Utility::formatParam(params)) {
     if (format_value.value() == "json") {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-      response.add(statsAsJson(all_stats, all_counter_groups, text_readouts,
-                               server_.stats().histograms(), used_only, regex));
+      response.add(
+          statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -183,36 +182,26 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 
 std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::vector<uint64_t>>& all_counter_groups,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                           const bool used_only, const absl::optional<std::regex> regex,
                           const bool pretty_print) {
 
   ProtobufWkt::Struct document;
-  std::vector<ProtobufWkt::Value> stats_group;
+  std::vector<ProtobufWkt::Value> stats_array;
   for (const auto& text_readout : text_readouts) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
     (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
-    stats_group.push_back(ValueUtil::structValue(stat_obj));
-  }
-  for (const auto& group : all_counter_groups) {
-    for (size_t i = 0; i < group.second.size(); ++i) {
-      ProtobufWkt::Struct stat_obj;
-      auto* stat_obj_fields = stat_obj.mutable_fields();
-      (*stat_obj_fields)["name"] = ValueUtil::stringValue(group.first);
-      (*stat_obj_fields)["value"] = ValueUtil::numberValue(group.second[i]);
-      stats_group.push_back(ValueUtil::structValue(stat_obj));
-    }
+    stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
   for (const auto& stat : all_stats) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
     (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
-    stats_group.push_back(ValueUtil::structValue(stat_obj));
+    stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
 
   ProtobufWkt::Struct histograms_obj;
@@ -220,7 +209,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
 
   ProtobufWkt::Struct histograms_obj_container;
   auto* histograms_obj_container_fields = histograms_obj_container.mutable_fields();
-  std::vector<ProtobufWkt::Value> computed_quantile_group;
+  std::vector<ProtobufWkt::Value> computed_quantile_array;
 
   bool found_used_histogram = false;
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
@@ -229,12 +218,12 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
         Stats::HistogramStatisticsImpl empty_statistics;
-        std::vector<ProtobufWkt::Value> supported_quantile_group;
+        std::vector<ProtobufWkt::Value> supported_quantile_array;
         for (double quantile : empty_statistics.supportedQuantiles()) {
-          supported_quantile_group.push_back(ValueUtil::numberValue(quantile * 100));
+          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
         }
         (*histograms_obj_fields)["supported_quantiles"] =
-            ValueUtil::listValue(supported_quantile_group);
+            ValueUtil::listValue(supported_quantile_array);
         found_used_histogram = true;
       }
 
@@ -242,7 +231,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       auto* computed_quantile_fields = computed_quantile.mutable_fields();
       (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
 
-      std::vector<ProtobufWkt::Value> computed_quantile_value_group;
+      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
       for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
         ProtobufWkt::Struct computed_quantile_value;
         auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
@@ -253,21 +242,21 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
         (*computed_quantile_value_fields)["cumulative"] =
             std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
 
-        computed_quantile_value_group.push_back(ValueUtil::structValue(computed_quantile_value));
+        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
       }
-      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_group);
-      computed_quantile_group.push_back(ValueUtil::structValue(computed_quantile));
+      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+      computed_quantile_array.push_back(ValueUtil::structValue(computed_quantile));
     }
   }
 
   if (found_used_histogram) {
-    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_group);
+    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
     (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
-    stats_group.push_back(ValueUtil::structValue(histograms_obj_container));
+    stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
   }
 
   auto* document_fields = document.mutable_fields();
-  (*document_fields)["stats"] = ValueUtil::listValue(stats_group);
+  (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
 
   return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }

@@ -246,7 +246,7 @@ TextReadout& textReadoutFromStatNames(Scope& scope, const StatNameVec& elements,
  * @param tags optionally specified tags.
  * @return A counter group named using the joined elements.
  */
-CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, size_t max_entries,
+CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements, CounterGroupDescriptorSharedPtr descriptor,
                                        StatNameTagVectorOptConstRef tags = absl::nullopt);
 
 /**
@@ -263,7 +263,7 @@ CounterGroup& counterGroupFromElements(Scope& scope, const ElementVec& elements,
  * @return A counter group named using the joined elements.
  */
 CounterGroup& counterGroupFromStatNames(Scope& scope, const StatNameVec& elements,
-                                        size_t max_entries,
+                                        CounterGroupDescriptorSharedPtr descriptor,
                                         StatNameTagVectorOptConstRef tags = absl::nullopt);
 
 } // namespace Utility

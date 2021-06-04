@@ -28,7 +28,7 @@ public:
                                                StatNameTagVectorOptConstRef tags) override;
   CounterGroup& counterGroupFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags,
-                                                 size_t max_entries) override;
+                                                 CounterGroupDescriptorSharedPtr descriptor) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counterFromString(const std::string& name) override {
@@ -47,9 +47,9 @@ public:
     StatNameManagedStorage storage(name, symbolTable());
     return Scope::textReadoutFromStatName(storage.statName());
   }
-  CounterGroup& counterGroupFromString(const std::string& name, size_t max_entries) override {
+  CounterGroup& counterGroupFromString(const std::string& name, CounterGroupDescriptorSharedPtr descriptor) override {
     StatNameManagedStorage storage(name, symbolTable());
-    return Scope::counterGroupFromStatName(storage.statName(), max_entries);
+    return Scope::counterGroupFromStatName(storage.statName(), descriptor);
   }
 
   CounterOptConstRef findCounter(StatName name) const override;

@@ -6,6 +6,8 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 
+#include "test/mocks/stats/mocks.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -161,8 +163,10 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, b1.tags().size());
   EXPECT_EQ(0, b2.tags().size());
 
-  CounterGroup& a1 = store_->counterGroupFromStatName(makeStatName("a1"), 1);
-  CounterGroup& a2 = scope1->counterGroupFromStatName(makeStatName("a2"), 1);
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(testing::Return(1));
+  CounterGroup& a1 = store_->counterGroupFromStatName(makeStatName("a1"), d);
+  CounterGroup& a2 = scope1->counterGroupFromStatName(makeStatName("a2"), d);
   EXPECT_NE(&a1, &a2);
   EXPECT_EQ("a1", a1.name());
   EXPECT_EQ("scope1.a2", a2.name());
@@ -214,6 +218,7 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
 }
 
+std::shared_ptr<MockCounterGroupDescriptor> descriptor;
 /**
  * Test stats macros. @see stats_macros.h
  */
@@ -222,7 +227,7 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   GAUGE(test_gauge, Accumulate)                                                                    \
   HISTOGRAM(test_histogram, Microseconds)                                                          \
   TEXT_READOUT(test_text_readout)                                                                  \
-  COUNTER_GROUP(test_counter_group, 1)                                                             \
+  COUNTER_GROUP(test_counter_group, descriptor)                                                    \
   STATNAME(prefix)
 
 struct TestStats {
@@ -232,6 +237,9 @@ struct TestStats {
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
+  descriptor = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*descriptor, size()).WillRepeatedly(testing::Return(1));
+
   TestStats test_stats{ALL_TEST_STATS(
       POOL_COUNTER_PREFIX(*store_, "test."), POOL_GAUGE_PREFIX(*store_, "test."),
       POOL_HISTOGRAM_PREFIX(*store_, "test."), POOL_TEXT_READOUT_PREFIX(*store_, "test."),
@@ -253,6 +261,7 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
   CounterGroup& counterGroup = test_stats.test_counter_group_;
   EXPECT_EQ("test.test_counter_group", counterGroup.name());
   EXPECT_EQ(1, counterGroup.maxEntries());
+  descriptor = nullptr;
 }
 
 TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
@@ -265,6 +274,9 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
+  descriptor = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*descriptor, size()).WillRepeatedly(testing::Return(1));
+
   MAKE_STAT_NAMES_STRUCT(StatNames, ALL_TEST_STATS);
   StatNames stat_names(store_->symbolTable());
   EXPECT_EQ("prefix", store_->symbolTable().toString(stat_names.prefix_));
@@ -281,6 +293,7 @@ TEST_F(StatsIsolatedStoreImplTest, StatNamesStruct) {
   EXPECT_EQ("scope2.prefix.test_gauge", stats2.test_gauge_.name());
   EXPECT_EQ("scope2.prefix.test_histogram", stats2.test_histogram_.name());
   EXPECT_EQ("scope2.prefix.test_text_readout", stats2.test_text_readout_.name());
+  descriptor = nullptr;
 }
 
 } // namespace Stats

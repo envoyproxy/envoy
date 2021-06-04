@@ -256,8 +256,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   TextReadout& t1 = store_->textReadoutFromString("t1");
   EXPECT_EQ(&t1, &store_->textReadoutFromString("t1"));
 
-  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
-  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", 2));
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", d);
+  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", d));
   StatNameManagedStorage cg1_name("cg1", symbol_table_);
   auto found_counter_group = store_->findCounterGroup(cg1_name.statName());
   ASSERT_TRUE(found_counter_group.has_value());
@@ -320,8 +322,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   TextReadout& t1 = store_->textReadoutFromString("t1");
   EXPECT_EQ(&t1, &store_->textReadoutFromString("t1"));
 
-  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
-  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", 2));
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", d);
+  EXPECT_EQ(&cg1, &store_->counterGroupFromString("cg1", d));
   StatNameManagedStorage cg1_name("cg1", symbol_table_);
   auto found_counter_group = store_->findCounterGroup(cg1_name.statName());
   ASSERT_TRUE(found_counter_group.has_value());
@@ -412,8 +416,10 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   EXPECT_EQ("t1", t1.name());
   EXPECT_EQ("scope1.t2", t2.name());
 
-  CounterGroup& cg1 = store_->counterGroupFromString("cg1", 2);
-  CounterGroup& cg2 = scope1->counterGroupFromString("cg2", 2);
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& cg1 = store_->counterGroupFromString("cg1", d);
+  CounterGroup& cg2 = scope1->counterGroupFromString("cg2", d);
   EXPECT_EQ("cg1", cg1.name());
   EXPECT_EQ("scope1.cg2", cg2.name());
 
@@ -476,8 +482,10 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_EQ(&text_readout, &scope2->textReadoutFromString("tr"));
   Histogram& histogram = scope1->histogramFromString("histogram", Histogram::Unit::Unspecified);
   EXPECT_EQ(&histogram, &scope2->histogramFromString("histogram", Histogram::Unit::Unspecified));
-  CounterGroup& counter_group = scope1->counterGroupFromString("cg", 2);
-  EXPECT_EQ(&counter_group, &scope2->counterGroupFromString("cg", 2));
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& counter_group = scope1->counterGroupFromString("cg", d);
+  EXPECT_EQ(&counter_group, &scope2->counterGroupFromString("cg", d));
 
   // The histogram was created in scope1, which can now be destroyed. But the
   // histogram is kept alive by scope2.
@@ -579,7 +587,9 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   TextReadout& t1 = scope2->textReadoutFromString("some_string");
   EXPECT_EQ("scope1.foo.some_string", t1.name());
 
-  CounterGroup& cg1 = scope2->counterGroupFromString("some_counter_group", 2);
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& cg1 = scope2->counterGroupFromString("some_counter_group", d);
   EXPECT_EQ("scope1.foo.some_counter_group", cg1.name());
 
   tls_.shutdownGlobalThreading();
@@ -636,8 +646,10 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->textReadouts().size());
 
   // Counter groups work just like gauges.
-  CounterGroup& cg1 = scope1->counterGroupFromString("cg", 2);
-  CounterGroup& cg2 = scope2->counterGroupFromString("cg", 2);
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& cg1 = scope1->counterGroupFromString("cg", d);
+  CounterGroup& cg2 = scope2->counterGroupFromString("cg", d);
   EXPECT_EQ(&t1, &t2);
 
   cg1.inc(0);
@@ -717,7 +729,9 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
 TEST_F(StatsThreadLocalStoreTest, CounterGroup) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  CounterGroup& g = store_->counterGroupFromString("g", 2);
+  auto d = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d, size()).WillRepeatedly(Return(2));
+  CounterGroup& g = store_->counterGroupFromString("g", d);
   EXPECT_EQ(0, g.value(0));
   EXPECT_EQ(0, g.value(1));
 
@@ -737,6 +751,7 @@ TEST_F(StatsThreadLocalStoreTest, CounterGroup) {
   EXPECT_EQ(0, g.latch(0));
   EXPECT_EQ(4, g.value(0));
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -883,13 +898,17 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(&noop_string, &noop_string_2);
 
   // CounterGroup
-  CounterGroup& noop_group = store_->counterGroupFromString("noop_counter_group", 2);
+  auto d2 = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d2, size()).WillRepeatedly(Return(2));
+  CounterGroup& noop_group = store_->counterGroupFromString("noop_counter_group", d2);
   EXPECT_EQ(noop_group.name(), "");
   EXPECT_EQ(0, noop_group.maxEntries());
   EXPECT_EQ(0, noop_group.value(0));
   noop_group.inc(0);
   EXPECT_EQ(0, noop_group.value(0));
-  CounterGroup& noop_group_2 = store_->counterGroupFromString("noop_counter_group_2", 3);
+  auto d3 = std::make_shared<MockCounterGroupDescriptor>();
+  EXPECT_CALL(*d3, size()).WillRepeatedly(Return(3));
+  CounterGroup& noop_group_2 = store_->counterGroupFromString("noop_counter_group_2", d3);
   EXPECT_EQ(&noop_group, &noop_group_2);
 
   // Histogram
