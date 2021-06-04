@@ -168,8 +168,7 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               bool respect_expected_rq_timeout,
-               bool suppress_grpc_request_failure_code_stats,
+               bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -177,11 +176,10 @@ public:
         stats_(router_context.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
-        respect_expected_rq_timeout_(respect_expected_rq_timeout), 
+        respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
-        http_context_(http_context),
-        zone_name_(local_info_.zoneStatName()), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {
+        http_context_(http_context), zone_name_(local_info_.zoneStatName()),
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -193,13 +191,13 @@ public:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(), config.suppress_grpc_request_failure_code_stats(),
-                     config.strict_check_headers(), context.api().timeSource(), context.httpContext(), 
-                     context.routerContext()) {
+      : FilterConfig(
+            stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+            context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+            config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+            config.suppress_grpc_request_failure_code_stats(), config.strict_check_headers(),
+            context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }

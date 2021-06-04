@@ -306,7 +306,8 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
 class RouterTestChildSpan : public RouterTestBase {
 public:
-  RouterTestChildSpan() : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+  RouterTestChildSpan()
+      : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -556,7 +557,8 @@ Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::s
 class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
-  RouterTestStrictCheckOneHeader() : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
+  RouterTestStrictCheckOneHeader()
+      : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -605,7 +607,8 @@ class RouterTestStrictCheckSomeHeaders
     : public RouterTestBase,
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
-  RouterTestStrictCheckSomeHeaders() : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
+  RouterTestStrictCheckSomeHeaders()
+      : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -709,7 +712,8 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
 
 class RouterTestSupressGRPCStatsEnabled : public RouterTestBase {
 public:
-  RouterTestSupressGRPCStatsEnabled() : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+  RouterTestSupressGRPCStatsEnabled()
+      : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
@@ -731,9 +735,8 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
 
   expectResponseTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
-                                        {"content-type", "application/grpc"},
-                                        {"grpc-timeout", "20S"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-internal", "true"}, {"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data;
@@ -760,19 +763,20 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1U,
-          callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
-  
-  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-              .counter("upstream_rq_504")
-              .value());
-  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-              .counter("upstream_rq_5xx")
-              .value());
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_5xx").value());
 }
 
 class RouterTestSupressGRPCStatsDisabled : public RouterTestBase {
 public:
-  RouterTestSupressGRPCStatsDisabled() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+  RouterTestSupressGRPCStatsDisabled()
+      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
@@ -794,9 +798,8 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
 
   expectResponseTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
-                                        {"content-type", "application/grpc"},
-                                        {"grpc-timeout", "20S"}};
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-internal", "true"}, {"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data;
@@ -823,14 +826,14 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_EQ(1U,
-          callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
-  
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-              .counter("upstream_rq_504")
-              .value());
-  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
-              .counter("upstream_rq_5xx")
-              .value());
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_5xx").value());
 }
 
 } // namespace Router

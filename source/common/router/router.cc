@@ -299,7 +299,8 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
                            (upstream_host ? upstream_host->canary() : false);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
-    const bool exclude_http_code_stats = grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
+    const bool exclude_http_code_stats =
+        grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
