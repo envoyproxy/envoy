@@ -7,8 +7,8 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 

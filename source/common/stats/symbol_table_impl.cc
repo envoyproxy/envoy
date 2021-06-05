@@ -1,13 +1,13 @@
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 

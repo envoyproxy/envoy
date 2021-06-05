@@ -9,6 +9,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/event_service_config.proto";
 import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/listener.proto";
 import "envoy/config/metrics/v3/stats.proto";
@@ -39,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -250,7 +251,16 @@ message Bootstrap {
   // Setting this value causes failure if the
   // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
   // server startup. Apple' API only uses UDP for DNS resolution.
-  bool use_tcp_for_dns_lookups = 20;
+  // This field is deprecated in favor of *dns_resolution_config*
+  // which aggregates all of the DNS resolver configuration in a single message.
+  bool use_tcp_for_dns_lookups = 20
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // This may be overridden on a per-cluster basis in cds_config, when
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // is specified.
+  core.v3.DnsResolutionConfig dns_resolution_config = 30;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.

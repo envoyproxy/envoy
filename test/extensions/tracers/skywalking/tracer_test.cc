@@ -1,6 +1,5 @@
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/skywalking/tracer.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/tracer.h"
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"

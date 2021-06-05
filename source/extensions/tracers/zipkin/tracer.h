@@ -5,10 +5,10 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/extensions/tracers/zipkin/span_context.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
 namespace Extensions {

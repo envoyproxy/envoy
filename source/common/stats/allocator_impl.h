@@ -6,8 +6,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/thread_synchronizer.h"
-#include "common/stats/metric_impl.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/stats/metric_impl.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 namespace Envoy {
 namespace Extensions {

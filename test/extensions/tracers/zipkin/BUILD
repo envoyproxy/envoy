@@ -23,8 +23,8 @@ envoy_extension_cc_test(
     extension_name = "envoy.tracers.zipkin",
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/common:time_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",

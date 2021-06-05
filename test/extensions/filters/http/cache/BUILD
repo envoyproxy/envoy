@@ -24,7 +24,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.cache",
     deps = [
         ":common",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//test/test_common:simulated_time_system_lib",
