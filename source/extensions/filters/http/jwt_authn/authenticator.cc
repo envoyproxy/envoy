@@ -255,7 +255,7 @@ void AuthenticatorImpl::verifyKey() {
   const auto& provider = jwks_data_->getJwtProvider();
 
   if (!provider.forward_payload_header().empty()) {
-    if (provider.complete_padding_in_forward_payload()) {
+    if (provider.add_padding_in_forward_payload_header()) {
       std::string payload_with_padding = jwt_->payload_str_base64url_;
       Base64::completePadding(payload_with_padding);
       headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
