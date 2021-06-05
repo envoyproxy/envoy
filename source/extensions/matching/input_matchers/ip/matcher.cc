@@ -9,6 +9,10 @@ namespace InputMatchers {
 namespace IP {
 
 Matcher::Matcher(std::vector<Network::Address::CidrRange>&& ranges)
+    // We could put "false" instead of "true". What matters is that the IP
+    // belongs to the trie. We could further optimize the storage of LcTrie in
+    // this case by implementing an LcTrie<void> specialization that doesn't
+    // store any associated data.
     : trie_({{true, std::move(ranges)}}) {}
 
 bool Matcher::match(absl::optional<absl::string_view> input) {

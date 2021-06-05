@@ -19,7 +19,7 @@ public:
   bool match(absl::optional<absl::string_view> input) override;
 
 private:
-  Network::LcTrie::LcTrie<bool> trie_;
+  const Network::LcTrie::LcTrie<bool> trie_;
 };
 
 } // namespace IP

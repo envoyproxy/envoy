@@ -15,7 +15,7 @@ namespace Matching {
 namespace InputMatchers {
 namespace IP {
 
-class IPConfig : public Envoy::Matcher::InputMatcherFactory {
+class Config : public Envoy::Matcher::InputMatcherFactory {
 public:
   Envoy::Matcher::InputMatcherPtr
   createInputMatcher(const Protobuf::Message& config,

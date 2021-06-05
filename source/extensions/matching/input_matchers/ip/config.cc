@@ -7,8 +7,8 @@ namespace InputMatchers {
 namespace IP {
 
 Envoy::Matcher::InputMatcherPtr
-IPConfig::createInputMatcher(const Protobuf::Message& config,
-                             Server::Configuration::FactoryContext& factory_context) {
+Config::createInputMatcher(const Protobuf::Message& config,
+                           Server::Configuration::FactoryContext& factory_context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
       config, factory_context.messageValidationVisitor());
@@ -31,7 +31,7 @@ IPConfig::createInputMatcher(const Protobuf::Message& config,
 /**
  * Static registration for the consistent hashing matcher. @see RegisterFactory.
  */
-REGISTER_FACTORY(IPConfig, Envoy::Matcher::InputMatcherFactory);
+REGISTER_FACTORY(Config, Envoy::Matcher::InputMatcherFactory);
 
 } // namespace IP
 } // namespace InputMatchers

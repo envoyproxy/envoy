@@ -20,7 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // of these CIDR ranges. Internally, it uses a Level-Compressed trie, as
 // described in the paper `IP-address lookup using LC-tries
 // <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
-// by S. Nilsson and G. Karlsson.
+// by S. Nilsson and G. Karlsson. For "big" lists of IPs, this matcher is more
+// efficient than multiple single IP matcher, that would have a linear cost.
 message Ip {
   // Match if the IP belongs to any of these CIDR ranges.
   repeated config.core.v3.CidrRange cidr_ranges = 1 [(validate.rules).repeated = {min_items: 1}];

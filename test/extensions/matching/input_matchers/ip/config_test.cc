@@ -25,8 +25,8 @@ TEST(ConfigTest, TestConfig) {
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
-  IPConfig factory;
-  auto message = Config::Utility::translateAnyToFactoryConfig(
+  Config factory;
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto matcher = factory.createInputMatcher(*message, context);
   EXPECT_NE(nullptr, matcher);
@@ -47,8 +47,8 @@ TEST(ConfigTest, InvalidConfig) {
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
-  IPConfig factory;
-  auto message = Config::Utility::translateAnyToFactoryConfig(
+  Config factory;
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   EXPECT_THROW_WITH_MESSAGE(factory.createInputMatcher(*message, context), EnvoyException,
                             "malformed IP address: foo");
