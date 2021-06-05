@@ -8,10 +8,10 @@ namespace IP {
 
 Envoy::Matcher::InputMatcherPtr
 Config::createInputMatcher(const Protobuf::Message& config,
-                           Server::Configuration::FactoryContext& factory_context) {
+                           Server::Configuration::FactoryContext& context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
-      config, factory_context.messageValidationVisitor());
+      config, context.messageValidationVisitor());
 
   const auto& cidr_ranges = ip_config.cidr_ranges();
   std::vector<Network::Address::CidrRange> ranges;
@@ -26,7 +26,8 @@ Config::createInputMatcher(const Protobuf::Message& config,
     ranges.emplace_back(std::move(range));
   }
 
-  return std::make_unique<Matcher>(std::move(ranges));
+  const auto stat_prefix = ip_config.stat_prefix();
+  return std::make_unique<Matcher>(std::move(ranges), stat_prefix, context.scope());
 }
 /**
  * Static registration for the consistent hashing matcher. @see RegisterFactory.
