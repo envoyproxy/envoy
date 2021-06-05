@@ -9,7 +9,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/grpc/typed_async_client.h"
+#include "source/common/grpc/typed_async_client.h"
 
 #include "test/test_common/utility.h"
 

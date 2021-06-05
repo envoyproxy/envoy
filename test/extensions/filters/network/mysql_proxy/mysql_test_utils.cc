@@ -1,13 +1,12 @@
 #include "mysql_test_utils.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,6 +45,7 @@ std::string MySQLTestUtils::encodeClientLogin(uint16_t client_cap, std::string u
 }
 
 std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, uint8_t seq_force) {
+
   ClientLoginResponse* mysql_login_resp_encode = nullptr;
   auto encodeToString = [it, seq_force, &mysql_login_resp_encode]() {
     ASSERT(mysql_login_resp_encode != nullptr);
@@ -102,8 +102,7 @@ std::string MySQLTestUtils::encodeClientLoginResp(uint8_t srv_resp, uint8_t it, 
 
 std::string MySQLTestUtils::encodeAuthSwitchResp() {
   ClientSwitchResponse mysql_switch_resp_encode{};
-  std::string resp_opaque_data("mysql_opaque");
-  mysql_switch_resp_encode.setAuthPluginResp(resp_opaque_data);
+  mysql_switch_resp_encode.setAuthPluginResp(getAuthPluginData20());
   Buffer::OwnedImpl buffer;
   mysql_switch_resp_encode.encode(buffer);
   BufferHelper::encodeHdr(buffer, AUTH_SWITH_RESP_SEQ);

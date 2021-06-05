@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/common/base64.h"
-#include "common/quic/platform/quiche_string_piece_impl.h"
-#include "common/quic/platform/string_utils.h"
+#include "source/common/common/base64.h"
+#include "source/common/quic/platform/string_utils.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
@@ -59,11 +58,6 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   static bool IsAllDigits(absl::string_view data) {
     return std::all_of(data.begin(), data.end(), absl::ascii_isdigit);
-  }
-
-  // NOLINTNEXTLINE(readability-identifier-naming)
-  static std::vector<absl::string_view> Split(absl::string_view data, char delim) {
-    return absl::StrSplit(data, delim);
   }
 };
 

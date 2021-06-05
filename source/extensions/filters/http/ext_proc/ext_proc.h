@@ -12,11 +12,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/ext_proc/client.h"
-#include "extensions/filters/http/ext_proc/processor_state.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,7 +90,8 @@ class Filter : public Logger::Loggable<Logger::Id::filter>,
 public:
   Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        processing_mode_(config->processingMode()) {}
+        decoding_state_(*this, config->processingMode()),
+        encoding_state_(*this, config->processingMode()) {}
 
   void onDestroy() override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
@@ -100,10 +100,12 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
   // ExternalProcessorCallbacks
 
@@ -114,21 +116,26 @@ public:
 
   void onGrpcClose() override;
 
+  void onMessageTimeout();
+
+  void sendBufferedData(ProcessorState& state, bool end_stream) {
+    sendBodyChunk(state, *state.bufferedData(), end_stream);
+  }
+
+  void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
+
 private:
   StreamOpenState openStream();
-  void onMessageTimeout();
+
   void cleanUpTimers();
   void clearAsyncState();
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
-  Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
-                                      bool end_stream);
-  Http::FilterDataStatus onData(
-      ProcessorState& state,
-      envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode::BodySendMode body_mode,
-      Buffer::Instance& data, bool end_stream);
-
-  void sendBodyChunk(const ProcessorState& state, const Buffer::Instance& data, bool end_stream);
+  Http::FilterHeadersStatus onHeaders(ProcessorState& state,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
+  Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
+  Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 
   const FilterConfigSharedPtr config_;
   const ExternalProcessorClientPtr client_;
@@ -150,10 +157,6 @@ private:
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
-
-  // The processing mode. May be locally overridden by any response,
-  // So every instance of the filter has a copy.
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
 };
 
 } // namespace ExternalProcessing

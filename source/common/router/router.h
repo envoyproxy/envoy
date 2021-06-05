@@ -19,21 +19,21 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/cleanup.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/http/utility.h"
-#include "common/router/config_impl.h"
-#include "common/router/context_impl.h"
-#include "common/router/upstream_request.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_request.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -283,7 +283,8 @@ public:
       : config_(config), final_upstream_request_(nullptr),
         downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false),
+        request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -495,7 +496,8 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                const Http::HeaderEntry& internal_redirect);
+                                                const Http::HeaderEntry& internal_redirect,
+                                                uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
@@ -539,6 +541,8 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool request_buffer_overflowed_ : 1;
+  bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 

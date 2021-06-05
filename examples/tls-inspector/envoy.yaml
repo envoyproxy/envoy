@@ -43,7 +43,6 @@ static_resources:
 
   clusters:
   - name: service-https-http2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -56,7 +55,6 @@ static_resources:
                 address: service-https-http2
                 port_value: 443
   - name: service-https-http1.1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -69,7 +67,6 @@ static_resources:
                 address: service-https-http1.1
                 port_value: 443
   - name: service-http
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

@@ -10,13 +10,13 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/http/codec_client.h"
-#include "common/router/header_parser.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/health_checker_base_impl.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 
@@ -159,7 +159,7 @@ private:
     return envoy::data::core::v3::HTTP;
   }
 
-  Http::CodecClient::Type codecClientType(const envoy::type::v3::CodecClientType& type);
+  Http::CodecType codecClientType(const envoy::type::v3::CodecClientType& type);
 
   const std::string path_;
   const std::string host_value_;
@@ -168,7 +168,7 @@ private:
   const HttpStatusChecker http_status_checker_;
 
 protected:
-  const Http::CodecClient::Type codec_client_type_;
+  const Http::CodecType codec_client_type_;
   Random::RandomGenerator& random_generator_;
 };
 

@@ -5,10 +5,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 namespace Envoy {
 namespace Extensions {

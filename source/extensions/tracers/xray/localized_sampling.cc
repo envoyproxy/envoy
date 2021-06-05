@@ -1,17 +1,20 @@
-#include "extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
 
-#include "common/http/exception.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/util.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/xray/util.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr double DefaultRate = 0.5;
+// Corresponds to 5% sampling rate when no custom rules are applied.
+constexpr double DefaultRate = 0.05;
+// Determines how many requests to sample per second before default
+// sampling rate kicks in when no custom rules are applied.
 constexpr int DefaultFixedTarget = 1;
+// The required 'version' of sampling manifest file when localized sampling is applied.
 constexpr int SamplingFileVersion = 2;
 constexpr auto VersionJsonKey = "version";
 constexpr auto DefaultRuleJsonKey = "default";

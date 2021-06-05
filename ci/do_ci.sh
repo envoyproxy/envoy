@@ -7,9 +7,9 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-        "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
-  build_setup_args="-nofetch"
+          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+    build_setup_args="-nofetch"
 fi
 
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
@@ -218,11 +218,20 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
+  # Temporariliy exclude some extensions from the envoy binary to address build failures
+  # due to long command line. Tests will still run.
+  BAZEL_BUILD_OPTIONS+=(
+    "--test_env=HEAPCHECK="
+    "--//source/extensions/filters/network/rocketmq_proxy:enabled=False"
+    "--//source/extensions/filters/http/admission_control:enabled=False"
+    "--//source/extensions/filters/http/dynamo:enabled=False"
+    "--//source/extensions/filters/http/header_to_metadata:enabled=False"
+    "--//source/extensions/filters/http/on_demand:enabled=False")
   setup_gcc_toolchain
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
+  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
@@ -325,6 +334,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
 
   # Building all the dependencies from scratch to link them against libc++.
+  echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
   echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
@@ -407,7 +419,6 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh fix
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
@@ -418,7 +429,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  "${ENVOY_SRCDIR}"/tools/code_format/format_python_tools.sh check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
 elif [[ "$CI_TARGET" == "check_repositories" ]]; then
@@ -468,8 +478,12 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
+elif [[ "$CI_TARGET" == "tooling" ]]; then
+  echo "Run pytest tooling tests..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
+  exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" wasm-cc
+  run_ci_verify "*" "wasm-cc|win32-front-proxy"
   exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc

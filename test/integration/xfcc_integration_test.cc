@@ -8,13 +8,12 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -118,7 +117,7 @@ Network::ClientConnectionPtr XfccIntegrationTest::makeMtlsClientConnection() {
 }
 
 void XfccIntegrationTest::createUpstreams() {
-  addFakeUpstream(createUpstreamSslContext(), FakeHttpConnection::Type::HTTP1);
+  addFakeUpstream(createUpstreamSslContext(), Http::CodecType::HTTP1);
 }
 
 void XfccIntegrationTest::initialize() {
@@ -180,7 +179,7 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
     EXPECT_EQ(expected_xfcc, upstream_request_->headers().getForwardedClientCertValue());
   }
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
 }

@@ -18,9 +18,19 @@ wasm_rust_binary(
     ],
 )
 
+wasm_rust_binary(
+    name = "panic_rust.wasm",
+    srcs = ["panic_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
 envoy_cc_library(
     name = "test_cpp_plugin",
     srcs = [
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
         "test_cpp_null_plugin.cc",
         "test_resume_call_cpp.cc",
@@ -32,14 +42,15 @@ envoy_cc_library(
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
-        "//source/extensions/common/wasm:well_known_names",
     ],
 )
 
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = [
+        "test_close_stream_cpp.cc",
         "test_cpp.cc",
+        "test_panic_cpp.cc",
         "test_resume_call_cpp.cc",
     ],
     deps = [

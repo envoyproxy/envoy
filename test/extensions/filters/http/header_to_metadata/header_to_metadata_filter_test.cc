@@ -2,12 +2,11 @@
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
-#include "common/common/base64.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/base64.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

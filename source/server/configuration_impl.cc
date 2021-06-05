@@ -1,4 +1,4 @@
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 #include <chrono>
 #include <list>
@@ -16,15 +16,14 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/runtime_utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/runtime_utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -233,8 +232,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     if (layered_runtime_.layers().empty()) {
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
-  } else {
-    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
   }
   if (enable_deprecated_v2_api_) {
     auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();

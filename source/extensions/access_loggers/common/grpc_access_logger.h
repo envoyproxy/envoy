@@ -9,9 +9,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"

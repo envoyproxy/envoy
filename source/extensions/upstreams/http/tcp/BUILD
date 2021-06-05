@@ -17,8 +17,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    category = "envoy.upstreams",
-    security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
         ":upstream_request_lib",
@@ -36,9 +34,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",

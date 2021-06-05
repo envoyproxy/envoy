@@ -8,8 +8,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-// TODO(lambdai): remove connection_handler_impl after ActiveListenerImplBase is extracted from it.
-#include "server/connection_handler_impl.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_listener_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -23,7 +23,7 @@ struct UdpListenerStats {
   ALL_UDP_LISTENER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class ActiveUdpListenerBase : public ConnectionHandlerImpl::ActiveListenerImplBase,
+class ActiveUdpListenerBase : public ActiveListenerImplBase,
                               public Network::ConnectionHandler::ActiveUdpListener {
 public:
   ActiveUdpListenerBase(uint32_t worker_index, uint32_t concurrency,
@@ -83,6 +83,10 @@ public:
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  size_t numPacketsExpectedPerEventLoop() const final {
+    // TODO(mattklein123) change this to a reasonable number if needed.
+    return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+  }
 
   // Network::UdpWorker
   void onDataWorker(Network::UdpRecvData&& data) override;

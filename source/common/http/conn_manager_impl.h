@@ -35,18 +35,19 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
-#include "common/grpc/common.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/filter_manager.h"
-#include "common/http/user_agent.h"
-#include "common/http/utility.h"
-#include "common/local_reply/local_reply.h"
-#include "common/router/scoped_rds.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/user_agent.h"
+#include "source/common/http/utility.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -156,7 +157,8 @@ private:
                               public Tracing::Config,
                               public ScopeTrackedObject,
                               public FilterManagerCallbacks {
-    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit);
+    ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
+                 Buffer::BufferMemoryAccountSharedPtr account);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -187,12 +189,11 @@ private:
     const StreamInfo::StreamInfo& streamInfo() const override {
       return filter_manager_.streamInfo();
     }
-    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+    void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
-      return filter_manager_.sendLocalReply(is_grpc_request, code, body, modify_headers,
-                                            grpc_status, details);
+      return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
 
     // Tracing::TracingConfig
@@ -270,6 +271,7 @@ private:
     const Router::RouteEntry::UpgradeMap* upgradeMap() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+    void setRoute(Router::RouteConstSharedPtr route) override;
     void clearRouteCache() override;
     absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
     Tracing::Span& activeSpan() override;
@@ -279,6 +281,10 @@ private:
     void onLocalReply(Code code) override;
     Tracing::Config& tracingConfig() override;
     const ScopeTrackedObject& scope() override;
+
+    bool enableInternalRedirectsWithBody() const override {
+      return connection_manager_.enable_internal_redirects_with_body_;
+    }
 
     void traceRequest();
 
@@ -445,6 +451,7 @@ private:
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
   bool remote_close_{};
+  bool enable_internal_redirects_with_body_{};
 };
 
 } // namespace Http

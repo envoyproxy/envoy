@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -12,7 +14,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_stream.h"
+#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -46,6 +48,10 @@ public:
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for QUIC.
+  }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
@@ -59,7 +65,7 @@ public:
 
 protected:
   // EnvoyQuicStream
-  void switchStreamBlockState(bool should_block) override;
+  void switchStreamBlockState() override;
   uint32_t streamId() override;
   Network::Connection* connection() override;
 
@@ -78,7 +84,8 @@ private:
 
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection);
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst_code);
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 

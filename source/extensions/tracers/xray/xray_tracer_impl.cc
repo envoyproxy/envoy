@@ -1,11 +1,10 @@
-#include "extensions/tracers/xray/xray_tracer_impl.h"
+#include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-
-#include "extensions/tracers/xray/localized_sampling.h"
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 namespace Envoy {
 namespace Extensions {

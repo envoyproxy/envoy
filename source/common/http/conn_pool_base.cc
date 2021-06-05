@@ -1,11 +1,11 @@
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/conn_pool_base.h"
 
-#include "common/common/assert.h"
-#include "common/http/utility.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -96,7 +96,7 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state_ != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::DRAINING) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {

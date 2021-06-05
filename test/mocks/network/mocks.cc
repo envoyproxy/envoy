@@ -5,10 +5,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/listener_manager.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/printers.h"
 
@@ -171,7 +171,17 @@ MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 
-MockConnectionHandler::MockConnectionHandler() = default;
+MockConnectionHandler::MockConnectionHandler() {
+  ON_CALL(*this, incNumConnections()).WillByDefault(Invoke([this]() {
+    ++num_handler_connections_;
+  }));
+  ON_CALL(*this, decNumConnections()).WillByDefault(Invoke([this]() {
+    --num_handler_connections_;
+  }));
+  ON_CALL(*this, numConnections()).WillByDefault(Invoke([this]() {
+    return num_handler_connections_;
+  }));
+}
 MockConnectionHandler::~MockConnectionHandler() = default;
 
 MockIp::MockIp() = default;

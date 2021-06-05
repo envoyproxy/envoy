@@ -6,12 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
@@ -43,15 +42,15 @@ struct VariableBinding {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const Protobuf::Field*> request_body_field_path;
-  std::vector<const Protobuf::Field*> response_body_field_path;
+  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  std::vector<const ProtobufWkt::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
 void createHttpBodyEnvelope(Buffer::Instance& output,
-                            const std::vector<const Protobuf::Field*>& request_body_field_path,
+                            const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
                             std::string content_type, uint64_t content_length);
 
 /**
@@ -123,7 +122,7 @@ private:
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
   ProtobufUtil::Status resolveField(const Protobuf::Descriptor* descriptor,
                                     const std::string& field_path_str,
-                                    std::vector<const Protobuf::Field*>* field_path,
+                                    std::vector<const ProtobufWkt::Field*>* field_path,
                                     bool* is_http_body);
   ProtobufUtil::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                         const google::api::HttpRule& http_rule,

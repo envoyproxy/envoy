@@ -12,16 +12,16 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/assert.h"
-#include "common/common/statusor.h"
-#include "common/http/codec_helper.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/parser.h"
-#include "common/http/status.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/statusor.h"
+#include "source/common/http/codec_helper.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/parser.h"
+#include "source/common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -67,6 +67,10 @@ public:
     // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
     // connection, invoking any watermarks as necessary. There is no internal buffering that would
     // require a flush timeout not already covered by other timeouts.
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for H1.
   }
 
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
@@ -229,7 +233,7 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+  bool sendStrict1xxAnd204Headers() { return send_strict_1xx_and_204_headers_; }
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -280,7 +284,8 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool strict_1xx_and_204_headers_ : 1;
+  const bool require_strict_1xx_and_204_headers_ : 1;
+  const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
 

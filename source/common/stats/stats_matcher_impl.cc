@@ -1,11 +1,11 @@
-#include "common/stats/stats_matcher_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 
 #include <regex>
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Stats {

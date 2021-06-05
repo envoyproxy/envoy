@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
 #include <memory>
@@ -12,19 +12,18 @@
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stats/utility.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "extensions/transport_sockets/tls/stats.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -176,9 +175,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (ctx.cert_chain_ == nullptr ||
           !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
         while (uint64_t err = ERR_get_error()) {
-          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err, ERR_lib_error_string(err),
-                         ERR_func_error_string(err), ERR_GET_REASON(err),
-                         ERR_reason_error_string(err));
+          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                         absl::NullSafeStringView(ERR_lib_error_string(err)),
+                         absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
+                         absl::NullSafeStringView(ERR_reason_error_string(err)));
         }
         throw EnvoyException(
             absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));

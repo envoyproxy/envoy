@@ -1,16 +1,14 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
@@ -40,8 +38,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   const Network::ConnectionSocket& socket = cb.socket();
 
   const absl::string_view transport_protocol = socket.detectedTransportProtocol();
-  if (!transport_protocol.empty() &&
-      transport_protocol != TransportSockets::TransportProtocolNames::get().RawBuffer) {
+  if (!transport_protocol.empty() && transport_protocol != "raw_buffer") {
     ENVOY_LOG(trace, "http inspector: cannot inspect http protocol with transport socket {}",
               transport_protocol);
     return Network::FilterStatus::Continue;

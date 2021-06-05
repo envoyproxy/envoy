@@ -37,6 +37,11 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
+        name = "docs_pip3",
+        requirements = "@envoy//tools/docs:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "deps_pip3",
         requirements = "@envoy//tools/dependency:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -86,6 +91,11 @@ def _python_deps():
     pip_install(
         name = "pylint_pip3",
         requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(

@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.validate.h"
 
-#include "extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"

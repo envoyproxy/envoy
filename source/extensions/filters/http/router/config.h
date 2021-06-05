@@ -4,10 +4,9 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,9 +21,11 @@ class RouterFilterConfig
 public:
   RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
-  bool isTerminalFilter() override { return true; }
-
 private:
+  bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::router::v3::Router&,
+                                    Server::Configuration::FactoryContext&) override {
+    return true;
+  }
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::router::v3::Router& proto_config,
       const std::string& stat_prefix, Server::Configuration::FactoryContext& context) override;

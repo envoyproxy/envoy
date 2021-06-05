@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
-#include "common/api/api_impl.h"
-#include "common/grpc/async_client_manager_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/grpc/async_client_manager_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -105,7 +105,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 #endif
 }
 
-TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalChars) {
+TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
@@ -117,7 +117,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalChars) {
 #ifdef ENVOY_GOOGLE_GRPC
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
-      "Illegal characters in gRPC initial metadata.");
+      "Illegal characters in gRPC initial metadata header key: illegalcharacter;.");
 #else
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
@@ -136,6 +136,26 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
 
 #ifdef ENVOY_GOOGLE_GRPC
   EXPECT_NE(nullptr, async_client_manager_.factoryForGrpcService(grpc_service, scope_, false));
+#else
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Google C++ gRPC client is not linked");
+#endif
+}
+
+TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  envoy::config::core::v3::GrpcService grpc_service;
+  grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
+
+  auto& metadata = *grpc_service.mutable_initial_metadata()->Add();
+  metadata.set_key("legal-key");
+  metadata.set_value("NonAsciValue.भारत");
+
+#ifdef ENVOY_GOOGLE_GRPC
+  EXPECT_THROW_WITH_MESSAGE(
+      async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,
+      "Illegal ASCII value for gRPC initial metadata header key: legal-key.");
 #else
   EXPECT_THROW_WITH_MESSAGE(
       async_client_manager_.factoryForGrpcService(grpc_service, scope_, false), EnvoyException,

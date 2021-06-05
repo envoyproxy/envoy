@@ -6,9 +6,9 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
-#include "common/matcher/list_matcher.h"
-#include "common/matcher/matcher.h"
-#include "common/protobuf/utility.h"
+#include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
@@ -64,7 +64,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -104,7 +104,7 @@ matcher_list:
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
 
   TestUtility::validate(matcher);
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto common_input_factory = TestCommonProtocolInputFactory("generic", "foo");
   auto match_tree = factory.create(matcher);
@@ -141,7 +141,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
   NeverMatchFactory match_factory;
@@ -198,7 +198,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -257,7 +257,7 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
@@ -271,6 +271,46 @@ matcher_tree:
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(MatcherTest, TestNotMatcher) {
+  const std::string yaml = R"EOF(
+matcher_list:
+  matchers:
+  - on_match:
+      action:
+        name: test_action
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+          value: match!!
+    predicate:
+      not_matcher:
+        single_predicate:
+          input:
+            name: inner_input
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+          value_match:
+            exact: foo
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
+  auto inner_factory = TestDataInputFactory("inner_input", "foo");
+  NeverMatchFactory match_factory;
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  auto match_tree = factory.create(matcher);
+
+  const auto result = match_tree->match(TestData());
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_FALSE(result.on_match_.has_value());
 }
 
 TEST_F(MatcherTest, TestRecursiveMatcher) {
@@ -310,7 +350,7 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  MatchTreeFactory<TestData> factory(factory_context_, validation_visitor_);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");

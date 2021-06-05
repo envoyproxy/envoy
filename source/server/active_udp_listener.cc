@@ -1,10 +1,10 @@
-#include "server/active_udp_listener.h"
+#include "source/server/active_udp_listener.h"
 
 #include "envoy/network/exception.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include "spdlog/spdlog.h"
 
@@ -15,7 +15,7 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
                                              Network::Socket& listen_socket,
                                              Network::UdpListenerPtr&& listener,
                                              Network::ListenerConfig* config)
-    : ConnectionHandlerImpl::ActiveListenerImplBase(parent, config), worker_index_(worker_index),
+    : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)),
       udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}) {

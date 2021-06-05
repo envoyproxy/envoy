@@ -8,11 +8,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/macros.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/thrift.h"
-#include "extensions/filters/network/thrift_proxy/tracing.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/tracing.h"
 
 #include "absl/types/optional.h"
 

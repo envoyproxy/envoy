@@ -4,8 +4,7 @@
 
 #include "envoy/runtime/runtime.h"
 
-#include "common/singleton/const_singleton.h"
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/flat_hash_set.h"
 

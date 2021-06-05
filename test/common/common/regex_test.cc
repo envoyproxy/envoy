@@ -1,7 +1,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -58,6 +58,18 @@ TEST(Utility, ParseRegex) {
     const auto compiled_matcher = Utility::parseRegex(matcher);
     const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
     EXPECT_TRUE(compiled_matcher->match(long_string));
+  }
+
+  // Regression test for https://github.com/envoyproxy/envoy/issues/15826
+  {
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.mutable_google_re2();
+    matcher.set_regex("/status/200(/.*)?$");
+    const auto compiled_matcher = Utility::parseRegex(matcher);
+    EXPECT_TRUE(compiled_matcher->match("/status/200"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/foo"));
+    EXPECT_FALSE(compiled_matcher->match("/status/200foo"));
   }
 
   // Positive case to ensure no max program size is enforced.

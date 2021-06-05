@@ -6,22 +6,15 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/string_utils.h"
+#include "source/common/quic/platform/string_utils.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "fmt/printf.h"
-#include "quiche/common/platform/api/quiche_string_piece.h"
 
 namespace spdy {
-
-template <typename... Args>
-// NOLINTNEXTLINE(readability-identifier-naming)
-inline void SpdyStrAppendImpl(std::string* output, const Args&... args) {
-  absl::StrAppend(output, std::forward<const Args&>(args)...);
-}
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline char SpdyHexDigitToIntImpl(char c) { return quiche::HexDigitToInt(c); }
@@ -42,24 +35,6 @@ inline std::string SpdyHexEncodeImpl(const void* bytes, size_t size) {
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-inline std::string SpdyHexEncodeUInt32AndTrimImpl(uint32_t data) {
-  return absl::StrCat(absl::Hex(data));
-}
-
-// NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string SpdyHexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
-
-struct SpdyStringPieceCaseHashImpl {
-  size_t operator()(absl::string_view data) const {
-    std::string lower = absl::AsciiStrToLower(data);
-    return absl::Hash<std::string>()(lower);
-  }
-};
-
-struct SpdyStringPieceCaseEqImpl {
-  bool operator()(absl::string_view piece1, absl::string_view piece2) const {
-    return absl::EqualsIgnoreCase(piece1, piece2);
-  }
-};
 
 } // namespace spdy

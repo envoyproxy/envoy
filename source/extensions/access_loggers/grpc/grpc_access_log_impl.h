@@ -10,7 +10,7 @@
 #include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 namespace Envoy {
 namespace Extensions {

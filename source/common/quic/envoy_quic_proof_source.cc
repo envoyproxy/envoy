@@ -1,13 +1,11 @@
-#include "common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
 
 #include <openssl/bio.h>
 
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_io_handle_wrapper.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
@@ -24,7 +22,6 @@ EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address
   absl::optional<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> cert_config_ref =
       res.cert_config_;
   if (!cert_config_ref.has_value()) {
-    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return nullptr;
   }
   auto& cert_config = cert_config_ref.value().get();
@@ -83,29 +80,24 @@ EnvoyQuicProofSource::getTlsCertConfigAndFilterChain(const quic::QuicSocketAddre
                                                      const quic::QuicSocketAddress& client_address,
                                                      const std::string& hostname) {
   ENVOY_LOG(trace, "Getting cert chain for {}", hostname);
-  Network::ConnectionSocketImpl connection_socket(
-      std::make_unique<QuicIoHandleWrapper>(listen_socket_.ioHandle()),
-      quicAddressToEnvoyAddressInstance(server_address),
-      quicAddressToEnvoyAddressInstance(client_address));
-  connection_socket.setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
-  connection_socket.setRequestedServerName(hostname);
-  connection_socket.setRequestedApplicationProtocols({"h2"});
+  // TODO(danzh) modify QUICHE to make quic session or ALPN accessible to avoid hard-coded ALPN.
+  Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
+      listen_socket_.ioHandle(), server_address, client_address, hostname, "h3-29");
   const Network::FilterChain* filter_chain =
-      filter_chain_manager_.findFilterChain(connection_socket);
+      filter_chain_manager_.findFilterChain(*connection_socket);
+
   if (filter_chain == nullptr) {
     listener_stats_.no_filter_chain_match_.inc();
+    ENVOY_LOG(warn, "No matching filter chain found for handshake.");
     return {absl::nullopt, absl::nullopt};
   }
-  const Network::TransportSocketFactory& transport_socket_factory =
-      filter_chain->transportSocketFactory();
+  auto& transport_socket_factory =
+      dynamic_cast<const QuicServerTransportSocketFactory&>(filter_chain->transportSocketFactory());
 
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs =
-      dynamic_cast<const QuicServerTransportSocketFactory&>(transport_socket_factory)
-          .serverContextConfig()
-          .tlsCertificates();
-
+      transport_socket_factory.getTlsCertificates();
   if (tls_cert_configs.empty()) {
+    ENVOY_LOG(warn, "No certificate is configured in transport socket config.");
     return {absl::nullopt, absl::nullopt};
   }
   // Only return the first TLS cert config.

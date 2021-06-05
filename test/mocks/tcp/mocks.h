@@ -15,6 +15,13 @@ namespace Envoy {
 namespace Tcp {
 namespace ConnectionPool {
 
+class MockCallbacks : public Callbacks {
+  MOCK_METHOD(void, onPoolFailure,
+              (PoolFailureReason reason, Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (ConnectionDataPtr && conn, Upstream::HostDescriptionConstSharedPtr host));
+};
+
 class MockUpstreamCallbacks : public UpstreamCallbacks {
 public:
   MockUpstreamCallbacks();
