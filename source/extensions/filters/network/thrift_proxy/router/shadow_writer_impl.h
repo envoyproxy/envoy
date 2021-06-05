@@ -63,7 +63,7 @@ struct ShadowRequest : public ShadowRequestHandle,
                        public LinkedObject<ShadowRequest>,
                        Logger::Loggable<Logger::Id::thrift> {
 public:
-  ShadowRequest(ShadowWriterImpl& parent_, Upstream::ClusterInfoConstSharedPtr&& cluster_info,
+  ShadowRequest(ShadowWriterImpl& parent, Upstream::ClusterInfoConstSharedPtr&& cluster_info,
                 Upstream::TcpPoolData& pool, MessageMetadataSharedPtr& metadata,
                 TransportType transport_type, ProtocolType protocol_type);
   ~ShadowRequest() override;
@@ -138,7 +138,7 @@ public:
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")) {}
 
-  ~ShadowWriterImpl() {
+  ~ShadowWriterImpl() override {
     while (!active_requests_.empty()) {
       active_requests_.front()->resetStream();
       active_requests_.front()->cleanup();
