@@ -33,10 +33,8 @@ class StreamingTest : public HttpIntegrationTest,
                       public testing::TestWithParam<Grpc::ClientType> {
 
 protected:
-  StreamingTest() : HttpIntegrationTest(downstreamProtocol(), ipVersion()) {}
+  StreamingTest() : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 
-  Http::CodecType downstreamProtocol() const { return Http::CodecType::HTTP2; }
-  Http::CodecType upstreamProtocol() const { return Http::CodecType::HTTP2; }
   Network::Address::IpVersion ipVersion() const override { return Network::Address::IpVersion::v4; }
   Grpc::ClientType clientType() const override { return GetParam(); }
 
@@ -84,8 +82,8 @@ protected:
     // Make sure that we have control over when buffers will fill up
     config_helper_.setBufferLimits(BufferSize, BufferSize);
 
-    setUpstreamProtocol(upstreamProtocol());
-    setDownstreamProtocol(downstreamProtocol());
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
   Http::RequestEncoder&
