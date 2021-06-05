@@ -49,3 +49,15 @@ genrule(
     ),
     tools = [":generate_external_deps_rst"],
 )
+
+genrule(
+    name = "empty_protos_rst",
+    srcs = [
+        "//docs:empty_extensions.json",
+    ],
+    outs = ["empty_protos_rst.tar"],
+    cmd = (
+        "$(location //tools/protodoc:generate_empty) $(location //docs:empty_extensions.json) $@"
+    ),
+    tools = ["//tools/protodoc:generate_empty"],
+)

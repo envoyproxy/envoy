@@ -92,8 +92,7 @@ function generate_api_rst() {
   # Fill in boiler plate for extensions that have google.protobuf.Empty as their
   # config. We only have v2 support here for version history anchors, which don't point at any empty
   # configs.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-        "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:empty_protos_rst
 
   # We do ** matching below to deal with Bazel cache blah (source proto artifacts
   # are nested inside source package targets).
@@ -148,6 +147,7 @@ rsync -av \
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
 tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/tools/docs/empty_protos_rst.tar -C "${GENERATED_RST_DIR}"
 
 # Merge generated redirects
 jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/")) | with_entries(.value |= sub("^envoy/";"api-v2/")) | to_entries[] | "\(.value)\t\t\(.key)"' docs/v2_mapping.json >> "${GENERATED_RST_DIR}"/redirects.txt
