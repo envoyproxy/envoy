@@ -56,7 +56,7 @@ envoy_extension_cc_test(
     srcs = ["redis_cluster_lb_test.cc"],
     extension_name = "envoy.clusters.redis",
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -107,7 +107,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster",

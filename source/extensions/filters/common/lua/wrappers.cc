@@ -1,11 +1,11 @@
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include <lua.h>
 
 #include <cstdint>
 
-#include "common/common/assert.h"
-#include "common/common/hex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
 
 #include "absl/time/time.h"
 

@@ -1,12 +1,11 @@
 #include "envoy/extensions/access_loggers/wasm/v3/wasm.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/wasm/config.h"
-#include "extensions/access_loggers/wasm/wasm_access_log_impl.h"
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/wasm/config.h"
+#include "source/extensions/access_loggers/wasm/wasm_access_log_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"

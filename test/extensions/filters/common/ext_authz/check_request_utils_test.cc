@@ -1,10 +1,9 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/ext_authz/check_request_utils.h"
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["utility.h"],
     deps = [
         ":engine_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -25,8 +25,8 @@ envoy_cc_library(
     hdrs = ["matchers.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/network:connection_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
@@ -43,9 +43,9 @@ envoy_cc_library(
     name = "engine_interface",
     hdrs = ["engine.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/network:connection_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/network:connection_interface",
     ],
 )
 

@@ -3,7 +3,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Extensions {

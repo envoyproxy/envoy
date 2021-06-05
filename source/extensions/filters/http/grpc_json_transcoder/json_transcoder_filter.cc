@@ -1,4 +1,4 @@
-#include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
 #include <memory>
 #include <unordered_set>
@@ -7,18 +7,17 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"

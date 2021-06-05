@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["bandwidth_limit.cc"],
     hdrs = ["bandwidth_limit.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/http:codes_interface",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/common:shared_token_bucket_impl_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:header_utility_lib",
@@ -38,7 +38,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":bandwidth_limit_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",

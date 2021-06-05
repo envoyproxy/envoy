@@ -1,13 +1,12 @@
-#include "extensions/tracers/lightstep/config.h"
+#include "source/extensions/tracers/lightstep/config.h"
 
 #include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/config/trace/v3/lightstep.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/utility.h"
-#include "common/config/datasource.h"
-
-#include "extensions/tracers/lightstep/lightstep_tracer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/tracers/lightstep/lightstep_tracer_impl.h"
 
 #include "lightstep/tracer.h"
 

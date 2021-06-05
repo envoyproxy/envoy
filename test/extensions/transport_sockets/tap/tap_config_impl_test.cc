@@ -1,6 +1,5 @@
-#include "common/network/address_impl.h"
-
-#include "extensions/transport_sockets/tap/tap_config_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/transport_sockets/tap/tap_config_impl.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/mocks/network/mocks.h"
