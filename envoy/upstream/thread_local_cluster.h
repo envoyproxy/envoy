@@ -26,6 +26,8 @@ public:
 
   Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
 
+  Http::ConnectionPool::Instance* pool() const { return pool_; }
+
 private:
   friend class HttpPoolDataPeer;
 
