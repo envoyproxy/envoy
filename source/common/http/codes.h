@@ -48,7 +48,7 @@ public:
   void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                Code response_code) const override;
   void chargeResponseStat(const ResponseStatInfo& info,
-                          bool exclude_http_code_stats = false) const override;
+                          bool exclude_http_code_stats) const override;
   void chargeResponseTiming(const ResponseTimingInfo& info) const override;
 
 private:

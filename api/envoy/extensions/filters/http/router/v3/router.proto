@@ -82,5 +82,10 @@ message Router {
   // If set, Envoy will avoid incrementing HTTP failure code stats
   // on gRPC requests. This includes the individual status code value
   // (e.g. upstream_rq_504) and group stats (e.g. upstream_rq_5xx).
+  // This field is useful if interested in relying only on the gRPC
+  // stats filter to define success and failure metrics for gRPC requests
+  // as not all failed gRPC requests charge HTTP status code metrics. See
+  // :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
+  // for more details.
   bool suppress_grpc_request_failure_code_stats = 7;
 }
