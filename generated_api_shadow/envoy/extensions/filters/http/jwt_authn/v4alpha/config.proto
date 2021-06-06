@@ -212,7 +212,7 @@ message JwtProvider {
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
-  // This field only applies to :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>.
+  // This field only applies to :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`.
   //
   // When it is specified, the base64 encoded payload will be added to the
   // header. Normally JWT based64 encode doesn't add padding. If this field is
