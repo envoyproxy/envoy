@@ -8,6 +8,7 @@ licenses(["notice"])  # Apache 2
 exports_files([
     "protodoc_manifest.yaml",
     "v2_mapping.json",
+    "redirects.txt",
 ])
 
 envoy_package()
@@ -43,4 +44,21 @@ filegroup(
             "root/**/*.pb",
         ],
     ),
+)
+
+genrule(
+    name = "v2_redirects",
+    outs = ["v2_redirects.txt"],
+    cmd = "jq -r 'with_entries(.key |= sub(\"^envoy/\";\"api-v3/\")) | with_entries(.value |= sub(\"^envoy/\";\"api-v2/\")) | to_entries[] | \"\\(.value)\t\t\\(.key)\"' docs/v2_mapping.json > $@",
+    tools = ["//docs:v2_mapping.json"],
+)
+
+genrule(
+    name = "redirects",
+    outs = ["envoy-redirects.txt"],
+    cmd = "cat $(location //docs:redirects.txt) > $@ && cat $(location :v2_redirects) >> $@",
+    tools = [
+        ":redirects.txt",
+        ":v2_redirects",
+    ],
 )
