@@ -17,8 +17,8 @@ emits the message counts for both uni-directional and bi-directional calls.
 
 See more info on the wire format in `gRPC over HTTP/2 <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_.
 
-Note by default, the router filter will emit translated HTTP status code stats (from the cluster namespace) for some types 
-of gRPC requests. If only setting gRPC specific metrics is preferred, this behavior can be avoided by setting the field 
+Note by default, the router filter will emit translated HTTP status code stats (from the cluster namespace) for some types
+of gRPC requests. If only setting gRPC specific metrics is preferred, this behavior can be avoided by setting the field
 :ref:`suppress_grpc_request_failure_code_stats <envoy_v3_api_field_extensions.filters.http.router.v3.Router.suppress_grpc_request_failure_code_stats>`
 within the router filter itself.
 
