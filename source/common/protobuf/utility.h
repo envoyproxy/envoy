@@ -8,12 +8,12 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/hash.h"
-#include "common/common/stl_helpers.h"
-#include "common/common/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/stl_helpers.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/str_join.h"
 
@@ -663,6 +663,25 @@ public:
    */
   static void systemClockToTimestamp(const SystemTime system_clock_time,
                                      ProtobufWkt::Timestamp& timestamp);
+};
+
+class StructUtil {
+public:
+  /**
+   * Recursively updates in-place a protobuf structure with keys from another
+   * object.
+   *
+   * The merging strategy is the following. If a key from \p other does not
+   * exists, it's just copied into \p obj. If the key exists but has a
+   * different type, it is replaced by the new value. Otherwise:
+   * - for scalar values (null, string, number, boolean) are replaced with the new value
+   * - for lists: new values are added to the current list
+   * - for structures: recursively apply this scheme
+   *
+   * @param obj the object to update in-place
+   * @param with the object to update \p obj with
+   */
+  static void update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with);
 };
 
 } // namespace Envoy

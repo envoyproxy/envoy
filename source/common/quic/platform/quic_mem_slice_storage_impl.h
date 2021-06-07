@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_iovec.h"

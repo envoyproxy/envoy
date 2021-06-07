@@ -26,15 +26,15 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/subscription_factory_impl.h"
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/alternate_protocols_cache_manager_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/upstream/load_stats_reporter.h"
-#include "common/upstream/priority_conn_pool_map.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/priority_conn_pool_map.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -413,11 +413,11 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      Http::ConnectionPool::Instance*
-      httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-                   LoadBalancerContext* context) override;
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context) override;
+      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
+                                                absl::optional<Http::Protocol> downstream_protocol,
+                                                LoadBalancerContext* context) override;
+      absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
+                                              LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
 

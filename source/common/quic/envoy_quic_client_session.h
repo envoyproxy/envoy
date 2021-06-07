@@ -13,9 +13,9 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -33,7 +33,7 @@ public:
                          const quic::ParsedQuicVersionVector& supported_versions,
                          std::unique_ptr<EnvoyQuicClientConnection> connection,
                          const quic::QuicServerId& server_id,
-                         quic::QuicCryptoClientConfig* crypto_config,
+                         std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
 
@@ -46,6 +46,9 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
+  void dumpState(std::ostream&, int) const override {
+    // TODO(kbaichoo): Implement dumpState for H3.
+  }
 
   // Network::ClientConnection
   // Set up socket and start handshake.
@@ -86,6 +89,7 @@ private:
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   const absl::string_view host_name_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
 };
 
 } // namespace Quic

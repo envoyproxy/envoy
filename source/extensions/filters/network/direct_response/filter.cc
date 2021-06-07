@@ -1,7 +1,7 @@
-#include "extensions/filters/network/direct_response/filter.h"
+#include "source/extensions/filters/network/direct_response/filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

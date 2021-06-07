@@ -1,14 +1,17 @@
-#include "common/http/filter_manager.h"
+#include "source/common/http/filter_manager.h"
+
+#include <functional>
 
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracked_object_stack.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,6 +54,14 @@ void ActiveStreamFilterBase::commonContinue() {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
     return;
+  }
+
+  // Set ScopeTrackerScopeState if there's no existing crash context.
+  ScopeTrackedObjectStack encapsulated_object;
+  absl::optional<ScopeTrackerScopeState> state;
+  if (parent_.dispatcher_.trackedObjectStackIsEmpty()) {
+    restoreContextOnContinue(encapsulated_object);
+    state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
@@ -228,6 +239,11 @@ Tracing::Span& ActiveStreamFilterBase::activeSpan() {
 
 const ScopeTrackedObject& ActiveStreamFilterBase::scope() {
   return parent_.filter_manager_callbacks_.scope();
+}
+
+void ActiveStreamFilterBase::restoreContextOnContinue(
+    ScopeTrackedObjectStack& tracked_object_stack) {
+  parent_.contextOnContinue(tracked_object_stack);
 }
 
 Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
@@ -529,6 +545,12 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       (*entry)->handle_->decodeComplete();
     }
 
+    // Skip processing metadata after sending local reply
+    if (state_.local_complete_ && std::next(entry) != decoder_filters_.end()) {
+      maybeContinueDecoding(continue_data_entry);
+      return;
+    }
+
     const bool new_metadata_added = processNewlyAddedMetadata();
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
@@ -542,8 +564,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       addDecodedData(*((*entry).get()), empty_data, true);
     }
 
-    if ((!continue_iteration || state_.local_complete_) &&
-        std::next(entry) != decoder_filters_.end()) {
+    if (!continue_iteration && std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
       // processing since we need to handle the case where a terminal filter wants to buffer, but
       // a previous filter has added body.
@@ -1063,6 +1084,21 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
+  // Check if the filter chain above did not remove critical headers or set malformed header values.
+  // We could do this at the codec in order to prevent other places than the filter chain from
+  // removing critical headers, but it will come with the implementation complexity.
+  // See the previous attempt (#15658) for detail, and for now we choose to protect only against
+  // filter chains.
+  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+  if (!status.ok()) {
+    // If the check failed, then we reply with BadGateway, and stop the further processing.
+    sendLocalReply(
+        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                     "{", status.message(), "}"));
+    return;
+  }
+
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
@@ -1298,6 +1334,11 @@ void FilterManager::setBufferLimit(uint32_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
+}
+
+void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
+  tracked_object_stack.add(connection_);
+  tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
 bool FilterManager::createFilterChain() {
@@ -1551,6 +1592,10 @@ void ActiveStreamEncoderFilter::responseDataDrained() {
 void ActiveStreamFilterBase::resetStream() { parent_.filter_manager_callbacks_.resetStream(); }
 
 uint64_t ActiveStreamFilterBase::streamId() const { return parent_.streamId(); }
+
+Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const {
+  return parent_.account();
+}
 
 } // namespace Http
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include <limits>
 #include <numeric>
@@ -7,16 +7,16 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/documentation_url.h"
-#include "common/common/fmt.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
@@ -108,7 +108,9 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
   case YAML::NodeType::Map: {
     auto& struct_fields = *value.mutable_struct_value()->mutable_fields();
     for (const auto& it : node) {
-      struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      if (it.first.Tag() != "!ignore") {
+        struct_fields[it.first.as<std::string>()] = parseYamlNode(it.second);
+      }
     }
     break;
   }
@@ -1054,6 +1056,45 @@ absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_u
 
 std::string TypeUtil::descriptorFullNameToTypeUrl(absl::string_view type) {
   return "type.googleapis.com/" + std::string(type);
+}
+
+void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with) {
+  auto& obj_fields = *obj.mutable_fields();
+
+  for (const auto& [key, val] : with.fields()) {
+    auto& obj_key = obj_fields[key];
+
+    // If the types are different, the last one wins.
+    const auto val_kind = val.kind_case();
+    if (val_kind != obj_key.kind_case()) {
+      obj_key = val;
+      continue;
+    }
+
+    // Otherwise, the strategy depends on the value kind.
+    switch (val.kind_case()) {
+    // For scalars, the last one wins.
+    case ProtobufWkt::Value::kNullValue:
+    case ProtobufWkt::Value::kNumberValue:
+    case ProtobufWkt::Value::kStringValue:
+    case ProtobufWkt::Value::kBoolValue:
+      obj_key = val;
+      break;
+    // If we got a structure, recursively update.
+    case ProtobufWkt::Value::kStructValue:
+      update(*obj_key.mutable_struct_value(), val.struct_value());
+      break;
+    // For lists, append the new values.
+    case ProtobufWkt::Value::kListValue: {
+      auto& obj_key_vec = *obj_key.mutable_list_value()->mutable_values();
+      const auto& vals = val.list_value().values();
+      obj_key_vec.MergeFrom(vals);
+      break;
+    }
+    case ProtobufWkt::Value::KIND_NOT_SET:
+      break;
+    }
+  }
 }
 
 } // namespace Envoy

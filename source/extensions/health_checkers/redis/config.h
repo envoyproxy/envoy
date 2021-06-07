@@ -7,8 +7,7 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
-#include "extensions/health_checkers/redis/redis.h"
-#include "extensions/health_checkers/well_known_names.h"
+#include "source/extensions/health_checkers/redis/redis.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +23,7 @@ public:
   createCustomHealthChecker(const envoy::config::core::v3::HealthCheck& config,
                             Server::Configuration::HealthCheckerFactoryContext& context) override;
 
-  std::string name() const override { return HealthCheckerNames::get().RedisHealthChecker; }
+  std::string name() const override { return "envoy.health_checkers.redis"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new envoy::extensions::health_checkers::redis::v3::Redis()};
   }

@@ -26,7 +26,6 @@ static_resources:
           max_rx_datagram_size: 9000
   clusters:
   - name: service_udp
-    connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
     load_assignment:

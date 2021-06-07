@@ -1,13 +1,12 @@
-#include "extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/cache_filter.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/cache/cache_custom_headers.h"
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"

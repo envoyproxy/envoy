@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -24,7 +24,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {
@@ -63,6 +63,7 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
 class MockEnvoyQuicSession : public quic::QuicSpdySession, public QuicFilterManagerConnectionImpl {
@@ -100,6 +101,7 @@ public:
                quic::QuicStreamOffset bytes_written));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
               (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -154,6 +156,7 @@ public:
                quic::StreamSendingState state, quic::TransmissionType type,
                absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};

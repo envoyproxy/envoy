@@ -1,4 +1,4 @@
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include <http_parser.h>
 
@@ -10,20 +10,20 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/status.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -778,7 +778,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   // Start position of the host
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
   // Start position of the path
-  const auto path_pos = uri.find("/", host_pos);
+  const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
     host = uri.substr(host_pos);
@@ -886,18 +886,6 @@ void Utility::transformUpgradeResponseFromH2toH1(ResponseHeaderMap& headers,
     headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
     headers.setStatus(101);
   }
-}
-
-const Router::RouteSpecificFilterConfig*
-Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
-                                                   const Router::RouteConstSharedPtr& route) {
-
-  const Router::RouteSpecificFilterConfig* maybe_filter_config{};
-  traversePerFilterConfigGeneric(
-      filter_name, route, [&maybe_filter_config](const Router::RouteSpecificFilterConfig& cfg) {
-        maybe_filter_config = &cfg;
-      });
-  return maybe_filter_config;
 }
 
 void Utility::traversePerFilterConfigGeneric(

@@ -3,10 +3,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/non_copyable.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/context_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/context_impl.h"
 
 namespace Envoy {
 namespace Extensions {

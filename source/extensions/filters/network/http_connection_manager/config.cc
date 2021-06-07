@@ -1,4 +1,4 @@
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
 #include <memory>
@@ -17,31 +17,31 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/request_id_extension_impl.h"
-#include "common/http/utility.h"
-#include "common/local_reply/local_reply.h"
-#include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/default_server_string.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/request_id_extension_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -307,7 +307,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
-      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)) {
+      path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -608,16 +609,22 @@ void HttpConnectionManagerConfig::processFilter(
   }
 
   // Now see if there is a factory that will accept the config.
-  auto& factory =
+  auto* factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config);
+          proto_config, proto_config.is_optional());
+  // null pointer returned only when the filter is optional, then skip all the processes.
+  if (factory == nullptr) {
+    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
+              proto_config.name());
+    return;
+  }
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), factory);
+      proto_config, context_.messageValidationVisitor(), *factory);
   Http::FilterFactoryCb callback =
-      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  dependency_manager.registerFilter(factory.name(), *factory.dependencies());
-  bool is_terminal = factory.isTerminalFilterByProto(*message, context_);
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory.name(), filter_chain_type,
+      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  dependency_manager.registerFilter(factory->name(), *factory->dependencies());
+  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
+  Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
                                            is_terminal, last_filter_in_current_config);
   auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
       callback, proto_config.name());

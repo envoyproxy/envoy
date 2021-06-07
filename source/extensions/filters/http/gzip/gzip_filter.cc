@@ -1,10 +1,10 @@
-#include "extensions/filters/http/gzip/gzip_filter.h"
+#include "source/extensions/filters/http/gzip/gzip_filter.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/http/headers.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {

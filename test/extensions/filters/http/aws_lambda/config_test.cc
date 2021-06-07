@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
-#include "extensions/filters/http/aws_lambda/config.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/aws_lambda/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"

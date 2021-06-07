@@ -2,8 +2,8 @@
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/router/config_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
@@ -56,8 +56,8 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
-  ConfigImpl config(proto_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                    true);
+  ConfigImpl config(proto_config, OptionalHttpFilters(), factory_context,
+                    ProtobufMessage::getNullValidationVisitor(), true);
 
   const auto stream_info = NiceMock<Envoy::StreamInfo::MockStreamInfo>();
   auto req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.lyft.com"},

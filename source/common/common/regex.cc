@@ -1,13 +1,13 @@
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "re2/re2.h"
 
