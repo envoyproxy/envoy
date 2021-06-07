@@ -1,4 +1,4 @@
-#include "common/http/http1/codec_impl.h"
+#include "source/common/http/http1/codec_impl.h"
 
 #include <memory>
 #include <string>
@@ -9,20 +9,20 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/statusor.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/legacy_parser_impl.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
@@ -195,9 +195,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else if (status && (*status < 200 || *status == 204) &&
-               connection_.strict1xxAnd204Headers()) {
-      // TODO(zuercher): when the "envoy.reloadable_features.strict_1xx_and_204_response_headers"
-      // feature flag is removed, this block can be coalesced with the 100 Continue logic above.
+               connection_.sendStrict1xxAnd204Headers()) {
+      // TODO(zuercher): when the
+      // "envoy.reloadable_features.send_strict_1xx_and_204_response_headers" feature flag is
+      // removed, this block can be coalesced with the 100 Continue logic above.
 
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
@@ -401,7 +402,7 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -458,8 +459,10 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false),
-      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
+      require_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.require_strict_1xx_and_204_response_headers")),
+      send_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
       dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
                                [&]() -> void { this->onBelowLowWatermark(); },
                                [&]() -> void { this->onAboveHighWatermark(); },
@@ -853,7 +856,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
+     << DUMP_MEMBER(require_strict_1xx_and_204_headers_)
+     << DUMP_MEMBER(send_strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
      << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
@@ -1172,17 +1176,8 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_.value().response_encoder_.setDetails(details);
   if (!active_request_.value().response_encoder_.startedResponse()) {
-    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
-    // If headers have not been fully parsed they may not be inferred correctly.
-    bool is_grpc_request = false;
-    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
-        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
-      is_grpc_request =
-          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    }
-    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
-                                                      CodeUtility::toString(error_code_), nullptr,
-                                                      absl::nullopt, details);
+    active_request_->request_decoder_->sendLocalReply(
+        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
   return okStatus();
 }
@@ -1279,7 +1274,7 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       handling_upgrade_ = true;
     }
 
-    if (strict_1xx_and_204_headers_ &&
+    if (require_strict_1xx_and_204_headers_ &&
         (parser_->statusCode() < 200 || parser_->statusCode() == 204)) {
       if (headers->TransferEncoding()) {
         RETURN_IF_ERROR(

@@ -7,26 +7,26 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/context_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/context_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 #endif
 
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/network/connection_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/router/context_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -246,7 +246,7 @@ public:
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
       FakeUpstreamConfig config(test_time_.timeSystem());
-      config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+      config.upstream_protocol_ = Http::CodecType::HTTP2;
       fake_upstream_ = std::make_unique<FakeUpstream>(0, ipVersion(), config);
     }
     switch (clientType()) {
@@ -305,7 +305,7 @@ public:
                                                     Upstream::ResourcePriority::Default, nullptr,
                                                     nullptr, state_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-        .WillRepeatedly(Return(http_conn_pool_.get()));
+        .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cm_.thread_local_cluster_.cluster_.info_, *stats_store_, *dispatcher_, local_info_, cm_,
         runtime_, random_, std::move(shadow_writer_ptr_), http_context_, router_context_);
@@ -524,7 +524,7 @@ public:
     async_client_transport_socket_ =
         mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     FakeUpstreamConfig config(test_time_.timeSystem());
-    config.upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+    config.upstream_protocol_ = Http::CodecType::HTTP2;
     fake_upstream_ =
         std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0, ipVersion(), config);
 

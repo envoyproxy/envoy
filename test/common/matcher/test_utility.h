@@ -3,7 +3,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -107,7 +107,7 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 // Factory for StringAction.
 class StringActionFactory : public ActionFactory {
 public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, const std::string&,
                                         Server::Configuration::FactoryContext&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
     return [string]() { return std::make_unique<StringAction>(string.value()); };

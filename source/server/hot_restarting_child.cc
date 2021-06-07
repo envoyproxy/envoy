@@ -1,6 +1,6 @@
-#include "server/hot_restarting_child.h"
+#include "source/server/hot_restarting_child.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Server {

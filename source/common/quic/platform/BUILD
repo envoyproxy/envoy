@@ -43,6 +43,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quic_core_flags_list_lib",
         "@com_googlesource_quiche//:quic_core_protocol_flags_list_lib",
     ],
@@ -136,7 +137,7 @@ envoy_cc_library(
     deps = [
         ":quiche_flags_impl_lib",
         ":string_utils_lib",
-        "//include/envoy/api:io_error_interface",
+        "//envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
@@ -188,7 +189,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_base",
     ],
@@ -232,7 +233,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
@@ -263,7 +264,6 @@ envoy_cc_library(
         "spdy_containers_impl.h",
         "spdy_logging_impl.h",
         "spdy_string_utils_impl.h",
-        "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
     ],
     external_deps = [

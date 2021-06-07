@@ -3,17 +3,18 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/http/date_provider.h"
-#include "common/http/path_utility.h"
-#include "common/local_reply/local_reply.h"
-#include "common/network/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/date_provider.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -50,12 +51,15 @@ namespace Http {
   COUNTER(downstream_rq_4xx)                                                                       \
   COUNTER(downstream_rq_5xx)                                                                       \
   COUNTER(downstream_rq_completed)                                                                 \
+  COUNTER(downstream_rq_failed_path_normalization)                                                 \
   COUNTER(downstream_rq_http1_total)                                                               \
   COUNTER(downstream_rq_http2_total)                                                               \
   COUNTER(downstream_rq_http3_total)                                                               \
   COUNTER(downstream_rq_idle_timeout)                                                              \
   COUNTER(downstream_rq_non_relative_path)                                                         \
   COUNTER(downstream_rq_overload_close)                                                            \
+  COUNTER(downstream_rq_redirected_with_normalized_path)                                           \
+  COUNTER(downstream_rq_rejected_via_ip_detection)                                                 \
   COUNTER(downstream_rq_response_before_rq_complete)                                               \
   COUNTER(downstream_rq_rx_reset)                                                                  \
   COUNTER(downstream_rq_timeout)                                                                   \
@@ -441,17 +445,6 @@ public:
   virtual const Http::Http1Settings& http1Settings() const PURE;
 
   /**
-   * @return if the HttpConnectionManager should normalize url following RFC3986
-   */
-  virtual bool shouldNormalizePath() const PURE;
-
-  /**
-   * @return if the HttpConnectionManager should merge two or more adjacent slashes in the path into
-   * one.
-   */
-  virtual bool shouldMergeSlashes() const PURE;
-
-  /**
    * @return port strip type from host/authority header.
    */
   virtual StripPortType stripPortType() const PURE;
@@ -471,6 +464,25 @@ public:
   virtual const PathTransformer& forwardingPathTransformer() const PURE;
 
   virtual const PathTransformer& filterPathTransformer() const PURE;
+  /**
+   * @return the action HttpConnectionManager should take when receiving client request
+   * with URI path containing %2F, %2f, %5c or %5C sequences.
+   */
+  virtual envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const PURE;
+
+  /**
+   * @return vector of OriginalIPDetectionSharedPtr original IP detection extensions.
+   */
+  virtual const std::vector<OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should remove trailing host dot from host/authority
+   * header.
+   */
+  virtual bool shouldStripTrailingHostDot() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

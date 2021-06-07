@@ -2,7 +2,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
 #include "test/server/listener_manager_impl_test.h"
@@ -125,7 +125,7 @@ udp_listener_config:
   auto& quic_socket_factory = dynamic_cast<const Quic::QuicServerTransportSocketFactory&>(
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
-  EXPECT_TRUE(quic_socket_factory.serverContextConfig().isReady());
+  EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
 }
 #endif
 

@@ -1,10 +1,11 @@
 #pragma once
 
+#include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
 
-#include "common/common/assert.h"
-
-#include "server/admin/config_tracker_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/server/admin/config_tracker_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -16,6 +17,12 @@ namespace Server {
  */
 class ValidationAdmin : public Admin {
 public:
+  // We want to implement the socket interface without implementing the http listener function.
+  // This is useful for TAP because it wants to emit warnings when the address type is UDS
+  explicit ValidationAdmin(Network::Address::InstanceConstSharedPtr address)
+      : socket_(address ? std::make_shared<Network::TcpListenSocket>(nullptr, std::move(address),
+                                                                     nullptr)
+                        : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
@@ -32,6 +39,7 @@ public:
 
 private:
   ConfigTrackerImpl config_tracker_;
+  Network::SocketSharedPtr socket_;
 };
 
 } // namespace Server

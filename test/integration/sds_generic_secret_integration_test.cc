@@ -6,8 +6,8 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/http_integration.h"
@@ -90,7 +90,7 @@ class SdsGenericSecretIntegrationTest : public Grpc::GrpcClientIntegrationParamT
                                         public HttpIntegrationTest {
 public:
   SdsGenericSecretIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()), registration_(factory_) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()), registration_(factory_) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

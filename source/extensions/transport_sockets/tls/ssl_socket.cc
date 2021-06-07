@@ -1,16 +1,15 @@
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/transport_sockets/tls/io_handle_bio.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/transport_sockets/tls/io_handle_bio.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -72,14 +71,8 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
-  BIO* bio;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_use_io_handle_bio")) {
-    // Use custom BIO that reads from/writes to IoHandle
-    bio = BIO_new_io_handle(&callbacks_->ioHandle());
-  } else {
-    // TODO(fcoras): remove once the io_handle_bio proves to be stable
-    bio = BIO_new_socket(callbacks_->ioHandle().fdDoNotUse(), 0);
-  }
+  // Use custom BIO that reads from/writes to IoHandle
+  BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
 }
 
@@ -210,9 +203,10 @@ void SslSocket::drainErrorQueue() {
     if (failure_reason_.empty()) {
       failure_reason_ = "TLS error:";
     }
-    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
-                                        ERR_func_error_string(err), ":",
-                                        ERR_reason_error_string(err)));
+    failure_reason_.append(absl::StrCat(" ", err, ":",
+                                        absl::NullSafeStringView(ERR_lib_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_func_error_string(err)), ":",
+                                        absl::NullSafeStringView(ERR_reason_error_string(err))));
   }
   if (!failure_reason_.empty()) {
     ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
@@ -400,6 +394,11 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
+
+Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
+  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  return ssl_ctx_;
 }
 
 Network::TransportSocketPtr

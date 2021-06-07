@@ -13,26 +13,27 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/http/filter_config_provider.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
-#include "common/common/logger.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/conn_manager_impl.h"
-#include "common/http/date_provider_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/http/path_utility.h"
-#include "common/json/json_loader.h"
-#include "common/local_reply/local_reply.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/date_provider_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -172,8 +173,9 @@ public:
     return stream_error_on_invalid_http_messaging_;
   }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  bool shouldNormalizePath() const override { return normalize_path_; }
-  bool shouldMergeSlashes() const override { return merge_slashes_; }
+  bool shouldNormalizePath() const { return normalize_path_; }
+  bool shouldMergeSlashes() const { return merge_slashes_; }
+  bool shouldStripTrailingHostDot() const override { return strip_trailing_host_dot_; }
   Http::StripPortType stripPortType() const override { return strip_port_type_; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {
@@ -187,18 +189,29 @@ public:
   const Http::PathTransformer& forwardingPathTransformer() const override {
     return forwarding_path_transformer_;
   }
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction
+      pathWithEscapedSlashesAction() const override {
+    return path_with_escaped_slashes_action_;
+  }
+  const std::vector<Http::OriginalIPDetectionSharedPtr>&
+  originalIpDetectionExtensions() const override {
+    return original_ip_detection_extensions_;
+  }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
   void
   processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                     proto_config,
-                int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
-                const char* filter_chain_type, bool last_filter_in_current_config);
+                int i, const std::string& prefix, const std::string& filter_chain_type,
+                bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
+                DependencyManager& dependency_manager);
   void
   processDynamicFilterConfig(const std::string& name,
                              const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-                             FilterFactoriesList& filter_factories, const char* filter_chain_type,
+                             FilterFactoriesList& filter_factories,
+                             const std::string& filter_chain_type,
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainFactoryCallbacks& callbacks,
                                      const FilterFactoriesList& filter_factories);
@@ -267,6 +280,7 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
+  std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -276,6 +290,9 @@ private:
   static const uint64_t RequestHeaderTimeoutMs = 0;
   Http::PathTransformer forwarding_path_transformer_;
   Http::PathTransformer filter_path_transformer_;
+  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
+  const bool strip_trailing_host_dot_;
 };
 
 /**

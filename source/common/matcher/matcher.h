@@ -8,13 +8,13 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/field_matcher.h"
-#include "common/matcher/list_matcher.h"
-#include "common/matcher/validation_visitor.h"
-#include "common/matcher/value_input_matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/validation_visitor.h"
+#include "source/common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -62,9 +62,11 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
  */
 template <class DataType> class MatchTreeFactory {
 public:
-  MatchTreeFactory(Server::Configuration::FactoryContext& factory_context,
+  MatchTreeFactory(const std::string& stats_prefix,
+                   Server::Configuration::FactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : factory_context_(factory_context), validation_visitor_(validation_visitor) {}
+      : stats_prefix_(stats_prefix), factory_context_(factory_context),
+        validation_visitor_(validation_visitor) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
     switch (config.matcher_type_case()) {
@@ -116,6 +118,10 @@ private:
 
       return std::make_unique<AllFieldMatcher<DataType>>(std::move(sub_matchers));
     }
+    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
+      return std::make_unique<NotFieldMatcher<DataType>>(
+          createFieldMatcher(field_predicate.not_matcher()));
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -151,7 +157,8 @@ private:
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           on_match.action().typed_config(), factory_context_.messageValidationVisitor(), factory);
-      return OnMatch<DataType>{factory.createActionFactoryCb(*message, factory_context_), {}};
+      return OnMatch<DataType>{
+          factory.createActionFactoryCb(*message, stats_prefix_, factory_context_), {}};
     }
 
     return absl::nullopt;
@@ -214,6 +221,7 @@ private:
     }
   }
 
+  const std::string stats_prefix_;
   Server::Configuration::FactoryContext& factory_context_;
   MatchTreeValidationVisitor<DataType>& validation_visitor_;
 };

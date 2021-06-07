@@ -281,13 +281,13 @@ modify different aspects of the server:
 
   .. note::
 
-    Generally only used during development. With `--enable-fine-grain-logging` being set, the logger is represented
-    by the path of the file it belongs to (to be specific, the path determined by `__FILE__`), so the logger list
+    Generally only used during development. With ``--enable-fine-grain-logging`` being set, the logger is represented
+    by the path of the file it belongs to (to be specific, the path determined by ``__FILE__``), so the logger list
     will show a list of file paths, and the specific path should be used as <logger_name> to change the log level.
 
 .. http:get:: /memory
 
-  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all ``/stats`` and filtering to get the memory-related statistics.
 
 .. http:post:: /quitquitquit
 
@@ -307,7 +307,7 @@ modify different aspects of the server:
 
    .. http:post:: /drain_listeners?inboundonly
 
-   :ref:`Drains <arch_overview_draining>` all inbound listeners. `traffic_direction` field in
+   :ref:`Drains <arch_overview_draining>` all inbound listeners. ``traffic_direction`` field in
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
    is inbound or outbound.
 
@@ -395,7 +395,7 @@ modify different aspects of the server:
 
     LIVE
 
-  See the `state` field of the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an
+  See the ``state`` field of the :ref:`ServerInfo proto <envoy_v3_api_msg_admin.v3.ServerInfo>` for an
   explanation of the output.
 
 .. _operations_admin_interface_stats:
@@ -420,10 +420,10 @@ modify different aspects of the server:
   .. http:get:: /stats?filter=regex
 
   Filters the returned stats to those with names matching the regular expression
-  `regex`. Compatible with `usedonly`. Performs partial matching by default, so
-  `/stats?filter=server` will return all stats containing the word `server`.
+  ``regex``. Compatible with ``usedonly``. Performs partial matching by default, so
+  ``/stats?filter=server`` will return all stats containing the word ``server``.
   Full-string matching can be specified with begin- and end-line anchors. (i.e.
-  `/stats?filter=^server.concurrency$`)
+  ``/stats?filter=^server.concurrency$``)
 
 .. http:get:: /stats?format=json
 
@@ -490,7 +490,7 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   v0.0.4 format. This can be used to integrate with a Prometheus server.
 
-  You can optionally pass the `usedonly` URL query argument to only get statistics that
+  You can optionally pass the ``usedonly`` URL query argument to only get statistics that
   Envoy has updated (counters incremented at least once, gauges changed at least once,
   and histograms added to at least once)
 
@@ -500,7 +500,7 @@ modify different aspects of the server:
   issues in the stats system. Initially, only the count of StatName
   lookups is acumulated, not the specific names that are being looked
   up. In order to see specific recent requests, you must enable the
-  feature by POSTing to `/stats/recentlookups/enable`. There may be
+  feature by POSTing to ``/stats/recentlookups/enable``. There may be
   approximately 40-100 nanoseconds of added overhead per lookup.
 
   When enabled, this endpoint emits a table of stat names that were
@@ -519,15 +519,15 @@ modify different aspects of the server:
   .. http:post:: /stats/recentlookups/enable
 
   Turns on collection of recent lookup of stat-names, thus enabling
-  `/stats/recentlookups`.
+  ``/stats/recentlookups``.
 
   See :repo:`source/docs/stats.md` for more details.
 
   .. http:post:: /stats/recentlookups/disable
 
   Turns off collection of recent lookup of stat-names, thus disabling
-  `/stats/recentlookups`. It also clears the list of lookups. However,
-  the total count, visible as stat `server.stats_recent_lookups`, is
+  ``/stats/recentlookups``. It also clears the list of lookups. However,
+  the total count, visible as stat ``server.stats_recent_lookups``, is
   not cleared, and continues to accumulate.
 
   See :repo:`source/docs/stats.md` for more details.

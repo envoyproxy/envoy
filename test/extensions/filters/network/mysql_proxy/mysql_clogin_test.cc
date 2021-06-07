@@ -1,7 +1,6 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
@@ -123,7 +122,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnIncompleteAuthLen) {
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -152,7 +151,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41SecureConnIncompleteAuthResp) {
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -180,7 +179,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthResp) {
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -463,7 +462,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthLen) {
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -492,7 +491,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPasswd) {
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -626,7 +625,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320IncompleteAuthResp) {
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*
@@ -649,7 +648,7 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin320WithDbIncompleteAuthResp) {
   EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
   EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
   EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), "");
+  EXPECT_EQ(mysql_clogin_decode.getAuthResp().size(), 0);
 }
 
 /*

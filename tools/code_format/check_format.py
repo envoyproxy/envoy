@@ -123,6 +123,25 @@ RAW_TRY_ALLOWLIST = (
     "./source/common/network/utility.cc",
 )
 
+# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+# now this is just WASM which makes use of std::string_view heavily so we need to convert to
+# absl::string_view internally. Everywhere else should be using absl::string_view for additional
+# safety.
+STD_STRING_VIEW_ALLOWLIST = (
+    "./source/extensions/common/wasm/context.h",
+    "./source/extensions/common/wasm/context.cc",
+    "./source/extensions/common/wasm/foreign.cc",
+    "./source/extensions/common/wasm/wasm.h",
+    "./source/extensions/common/wasm/wasm.cc",
+    "./source/extensions/common/wasm/wasm_vm.h",
+    "./source/extensions/common/wasm/wasm_vm.cc",
+    "./test/extensions/bootstrap/wasm/wasm_speed_test.cc",
+    "./test/extensions/bootstrap/wasm/wasm_test.cc",
+    "./test/extensions/common/wasm/wasm_test.cc",
+    "./test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc",
+    "./test/test_common/wasm_base.h",
+)
+
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config
 # processing.
@@ -143,7 +162,7 @@ BUILD_URLS_ALLOWLIST = (
     "./api/bazel/envoy_http_archive.bzl",
 )
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-10")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-11")
 BUILDIFIER_PATH = paths.get_buildifier()
 BUILDOZER_PATH = paths.get_buildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -164,7 +183,7 @@ DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
 VERSION_HISTORY_NEW_LINE_REGEX = re.compile("\* ([a-z \-_]+): ([a-z:`]+)")
 VERSION_HISTORY_SECTION_NAME = re.compile("^[A-Z][A-Za-z ]*$")
-RELOADABLE_FLAG_REGEX = re.compile(".*(..)(envoy.reloadable_features.[^ ]*)\s.*")
+RELOADABLE_FLAG_REGEX = re.compile(".*(...)(envoy.reloadable_features.[^ ]*)\s.*")
 INVALID_REFLINK = re.compile(".* ref:.*")
 OLD_MOCK_METHOD_REGEX = re.compile("MOCK_METHOD\d")
 # C++17 feature, lacks sufficient support across various libraries / compilers.
@@ -173,6 +192,7 @@ FOR_EACH_N_REGEX = re.compile("for_each_n\(")
 # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
 REF_WITH_PUNCTUATION_REGEX = re.compile(".*\. <[^<]*>`\s*")
 DOT_MULTI_SPACE_REGEX = re.compile("\\. +")
+FLAG_REGEX = re.compile("    \"(.*)\",")
 
 # yapf: disable
 PROTOBUF_TYPE_ERRORS = {
@@ -250,6 +270,15 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/common",
   "extensions/filters/network/common/redis",
 }
+
+UNSORTED_FLAGS = {
+  "envoy.reloadable_features.activate_timers_next_event_loop",
+  "envoy.reloadable_features.check_ocsp_policy",
+  "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
+  "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
+  "envoy.reloadable_features.upstream_http2_flood_checks",
+  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+}
 # yapf: enable
 
 
@@ -313,11 +342,15 @@ class FormatChecker:
     # look_path searches for the given executable in all directories in PATH
     # environment variable. If it cannot be found, empty string is returned.
     def look_path(self, executable):
+        if executable is None:
+            return ''
         return shutil.which(executable) or ''
 
     # path_exists checks whether the given path exists. This function assumes that
     # the path is absolute and evaluates environment variables.
     def path_exists(self, executable):
+        if executable is None:
+            return False
         return os.path.exists(os.path.expandvars(executable))
 
     # executable_by_others checks whether the given path has execute permission for
@@ -424,6 +457,9 @@ class FormatChecker:
     def allow_listed_for_serialize_as_string(self, file_path):
         return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
 
+    def allow_listed_for_std_string_view(self, file_path):
+        return file_path in STD_STRING_VIEW_ALLOWLIST
+
     def allow_listed_for_json_string_to_message(self, file_path):
         return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
 
@@ -494,6 +530,30 @@ class FormatChecker:
         subdir = path[0:slash]
         return subdir in SUBDIR_SET
 
+    # simple check that all flags between "Begin alphabetically sorted section."
+    # and the end of the struct are in order (except the ones that already aren't)
+    def check_runtime_flags(self, file_path, error_messages):
+        in_flag_block = False
+        previous_flag = ""
+        for line_number, line in enumerate(self.read_lines(file_path)):
+            if "Begin alphabetically" in line:
+                in_flag_block = True
+                continue
+            if not in_flag_block:
+                continue
+            if "}" in line:
+                break
+
+            match = FLAG_REGEX.match(line)
+            if not match:
+                error_messages.append("%s does not look like a reloadable flag" % line)
+                break
+
+            if previous_flag:
+                if line < previous_flag and match.groups()[0] not in UNSORTED_FLAGS:
+                    error_messages.append("%s and %s are out of order\n" % (line, previous_flag))
+            previous_flag = line
+
     def check_current_release_notes(self, file_path, error_messages):
         first_word_of_prior_line = ''
         next_word_to_check = ''  # first word after :
@@ -527,13 +587,12 @@ class FormatChecker:
             if invalid_reflink_match:
                 report_error("Found text \" ref:\". This should probably be \" :ref:\"\n%s" % line)
 
-            # make sure flags are surrounded by ``s
+            # make sure flags are surrounded by ``s (ie "inline literal")
             flag_match = RELOADABLE_FLAG_REGEX.match(line)
             if flag_match:
-                if not flag_match.groups()[0].startswith(' `'):
+                if not flag_match.groups()[0].startswith(' ``'):
                     report_error(
-                        "Flag `%s` should be enclosed in a single set of back ticks"
-                        % flag_match.groups()[1])
+                        "Flag %s should be enclosed in double back ticks" % flag_match.groups()[1])
 
             if line.startswith("* "):
                 if not ends_with_period(prior_line):
@@ -581,6 +640,9 @@ class FormatChecker:
             # This only validates entries for the current release as very old release
             # notes have a different format.
             self.check_current_release_notes(file_path, error_messages)
+        if file_path.endswith("source/common/runtime/runtime_features.cc"):
+            # Do runtime alphabetical order checks.
+            self.check_runtime_flags(file_path, error_messages)
 
         def check_format_errors(line, line_number):
 
@@ -784,8 +846,12 @@ class FormatChecker:
             report_error("Don't use std::monostate; use absl::monostate instead")
         if self.token_in_line("std::optional", line):
             report_error("Don't use std::optional; use absl::optional instead")
-        if self.token_in_line("std::string_view", line):
-            report_error("Don't use std::string_view; use absl::string_view instead")
+        if not self.allow_listed_for_std_string_view(
+                file_path) and not "NOLINT(std::string_view)" in line:
+            if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",
+                                                                                  line):
+                report_error(
+                    "Don't use std::string_view or toStdStringView; use absl::string_view instead")
         if self.token_in_line("std::variant", line):
             report_error("Don't use std::variant; use absl::variant instead")
         if self.token_in_line("std::visit", line):
@@ -795,12 +861,12 @@ class FormatChecker:
             report_error(
                 "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
             )
-        if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
+        if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
-                "in include/envoy/common/platform.h instead")
+                "in envoy/common/platform.h instead")
         if DESIGNATED_INITIALIZER_REGEX.search(line):
             # Designated initializers are not part of the C++14 standard and are not supported
             # by MSVC

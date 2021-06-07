@@ -7,18 +7,17 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/stats/timespan_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/protocol_converter.h"
-#include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
+#include "source/extensions/filters/network/thrift_proxy/stats.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/types/any.h"
 
@@ -127,6 +126,7 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
@@ -206,6 +206,9 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
+    Event::Dispatcher& dispatcher() override {
+      return parent_.read_callbacks_->connection().dispatcher();
+    }
     void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {

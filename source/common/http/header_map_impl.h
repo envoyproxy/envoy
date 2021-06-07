@@ -10,10 +10,10 @@
 #include "envoy/common/optref.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -498,8 +498,8 @@ private:
     INLINE_REQ_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
     INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
   };
-  void setForwardingPath(absl::string_view path) override { forwarding_path_ = path; }
-  void setFilterPath(absl::string_view path) override { filter_path_ = path; }
+  void setForwardingPath(absl::string_view path) override { forwarding_path_ = std::string(path); }
+  void setFilterPath(absl::string_view path) override { filter_path_ = std::string(path); }
   std::string forwarding_path_;
   std::string filter_path_;
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;

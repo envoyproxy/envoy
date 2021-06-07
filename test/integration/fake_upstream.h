@@ -15,31 +15,32 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/basic_resource_impl.h"
-#include "common/common/callback_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/config/utility.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/filter_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/filter_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "common/quic/active_quic_listener.h"
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/quic/quic_stat_names.h"
 #endif
 
-#include "server/active_raw_udp_listener_config.h"
+#include "source/server/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/test_time_system.h"
@@ -99,7 +100,7 @@ public:
     return encoder_.http1StreamEncoderOptions();
   }
   void
-  sendLocalReply(bool is_grpc_request, Http::Code code, absl::string_view body,
+  sendLocalReply(Http::Code code, absl::string_view body,
                  const std::function<void(Http::ResponseHeaderMap& headers)>& /*modify_headers*/,
                  const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view /*details*/) override {
@@ -119,7 +120,7 @@ public:
              [&](Buffer::Instance& data, bool end_stream) -> void {
                encoder_.encodeData(data, end_stream);
              }}),
-        Http::Utility::LocalReplyData({is_grpc_request, code, body, grpc_status, is_head_request}));
+        Http::Utility::LocalReplyData({false, code, body, grpc_status, is_head_request}));
   }
 
   ABSL_MUST_USE_RESULT
@@ -265,7 +266,8 @@ class SharedConnectionWrapper : public Network::ConnectionCallbacks,
 public:
   using DisconnectCallback = std::function<void()>;
 
-  SharedConnectionWrapper(Network::Connection& connection) : connection_(connection) {
+  SharedConnectionWrapper(Network::Connection& connection)
+      : connection_(connection), dispatcher_(connection_.dispatcher()) {
     connection_.addConnectionCallbacks(*this);
   }
 
@@ -284,6 +286,8 @@ public:
 
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   bool connected() {
     absl::MutexLock lock(&lock_);
@@ -355,6 +359,7 @@ public:
 
 private:
   Network::Connection& connection_;
+  Event::Dispatcher& dispatcher_;
   absl::Mutex lock_;
   bool parented_ ABSL_GUARDED_BY(lock_){};
   bool disconnected_ ABSL_GUARDED_BY(lock_){};
@@ -370,6 +375,7 @@ public:
   virtual ~FakeConnectionBase() {
     absl::MutexLock lock(&lock_);
     ASSERT(initialized_);
+    ASSERT(pending_cbs_ == 0);
   }
 
   ABSL_MUST_USE_RESULT
@@ -395,16 +401,20 @@ public:
   Network::Connection& connection() const { return shared_connection_.connection(); }
   bool connected() const { return shared_connection_.connected(); }
 
+  void postToConnectionThread(std::function<void()> cb);
+
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
       : shared_connection_(shared_connection), lock_(shared_connection.lock()),
-        time_system_(time_system) {}
+        dispatcher_(shared_connection_.dispatcher()), time_system_(time_system) {}
 
   SharedConnectionWrapper& shared_connection_;
   absl::Mutex& lock_; // TODO(mattklein123): Use the shared connection lock and figure out better
                       // guarded by annotations.
+  Event::Dispatcher& dispatcher_;
   bool initialized_ ABSL_GUARDED_BY(lock_){};
   bool half_closed_ ABSL_GUARDED_BY(lock_){};
+  std::atomic<uint64_t> pending_cbs_{};
   Event::TestTimeSystem& time_system_;
 };
 
@@ -413,11 +423,23 @@ protected:
  */
 class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeConnectionBase {
 public:
-  enum class Type { HTTP1, HTTP2, HTTP3 };
+  // This is a legacy alias.
+  using Type = Envoy::Http::CodecType;
+  static absl::string_view typeToString(Http::CodecType type) {
+    switch (type) {
+    case Http::CodecType::HTTP1:
+      return "http1";
+    case Http::CodecType::HTTP2:
+      return "http2";
+    case Http::CodecType::HTTP3:
+      return "http3";
+    }
+    return "invalid";
+  }
 
   FakeHttpConnection(FakeUpstream& fake_upstream, SharedConnectionWrapper& shared_connection,
-                     Type type, Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb,
-                     uint32_t max_request_headers_count,
+                     Http::CodecType type, Event::TestTimeSystem& time_system,
+                     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                          headers_with_underscores_action);
 
@@ -464,7 +486,7 @@ private:
     FakeHttpConnection& parent_;
   };
 
-  const Type type_;
+  const Http::CodecType type_;
   Http::ServerConnectionPtr codec_;
   std::list<FakeStreamPtr> new_streams_ ABSL_GUARDED_BY(lock_);
   testing::NiceMock<Random::MockRandomGenerator> random_;
@@ -548,7 +570,7 @@ struct FakeUpstreamConfig {
   }
 
   Event::TestTimeSystem& time_system_;
-  FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
+  Http::CodecType upstream_protocol_{Http::CodecType::HTTP1};
   bool enable_half_close_{};
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
@@ -574,10 +596,6 @@ public:
                const Network::Address::InstanceConstSharedPtr& address,
                const FakeUpstreamConfig& config);
 
-  // Creates a fake upstream bound to the specified |address|.
-  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-               const FakeUpstreamConfig& config);
-
   // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, Network::Address::IpVersion version,
                const FakeUpstreamConfig& config);
@@ -586,7 +604,7 @@ public:
                Network::Address::IpVersion version, const FakeUpstreamConfig& config);
   ~FakeUpstream() override;
 
-  FakeHttpConnection::Type httpType() { return http_type_; }
+  Http::CodecType httpType() { return http_type_; }
 
   // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
@@ -646,15 +664,15 @@ public:
   void cleanUp();
 
   Http::Http1::CodecStats& http1CodecStats() {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, stats_store_);
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
   }
 
   Http::Http2::CodecStats& http2CodecStats() {
-    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
   }
 
   Http::Http3::CodecStats& http3CodecStats() {
-    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, stats_store_);
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
   }
 
   // Write into the outbound buffer of the network connection at the specified index.
@@ -667,9 +685,11 @@ public:
   const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
   const envoy::config::core::v3::Http3ProtocolOptions& http3Options() { return http3_options_; }
 
+  Event::DispatcherPtr& dispatcher() { return dispatcher_; }
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
-  const FakeHttpConnection::Type http_type_;
+  const Http::CodecType http_type_;
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
@@ -732,7 +752,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1);
+            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -805,21 +825,25 @@ private:
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
-  std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
 
   // When a QueuedConnectionWrapper is popped from new_connections_, ownership is transferred to
   // consumed_connections_. This allows later the Connection destruction (when the FakeUpstream is
   // deleted) on the same thread that allocated the connection.
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
+  std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
   const FakeUpstreamConfig config_;
   bool read_disable_on_new_connection_;
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
+  Stats::ScopePtr stats_scope_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
+#endif
 };
 
 using FakeUpstreamPtr = std::unique_ptr<FakeUpstream>;

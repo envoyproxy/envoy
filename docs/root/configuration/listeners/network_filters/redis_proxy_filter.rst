@@ -94,7 +94,7 @@ is injected, then the total request latency is 500ms. Also, due to implementatio
 a delayed request will delay everything that comes in after it, due to the proxy's need to respect the
 order of commands it receives.
 
-Note that faults must have a `fault_enabled` field, and are not enabled by default (if no default value
+Note that faults must have a ``fault_enabled`` field, and are not enabled by default (if no default value
 or runtime key are set).
 
 Example configuration:

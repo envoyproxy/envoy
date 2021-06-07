@@ -15,17 +15,17 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/c_smart_ptr.h"
-#include "common/common/empty_string.h"
-#include "common/common/thread.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/config/version_converter.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -362,10 +362,16 @@ public:
    *
    * @param lhs JSON string on LHS.
    * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
    * @return bool indicating whether the JSON strings are equal.
    */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
-    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
   }
 
   /**
@@ -548,7 +554,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -637,6 +645,15 @@ public:
   static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
     return message;
   }
 
@@ -1043,8 +1060,8 @@ public:
   absl::string_view getFilterPath() override { return filter_path_; }
 
 private:
-  void setForwardingPath(absl::string_view path) override { forwarding_path_ = path; }
-  void setFilterPath(absl::string_view path) override { filter_path_ = path; }
+  void setForwardingPath(absl::string_view path) override { forwarding_path_ = std::string(path); }
+  void setFilterPath(absl::string_view path) override { filter_path_ = std::string(path); }
 
   std::string forwarding_path_;
   std::string filter_path_;
@@ -1094,6 +1111,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& rando
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Useful for testing ScopeTrackedObject order of deletion.
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);

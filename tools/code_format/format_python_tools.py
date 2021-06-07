@@ -23,7 +23,10 @@ def collect_files():
     for root, dirnames, filenames in os.walk(dirname):
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_LIST]
         for filename in fnmatch.filter(filenames, '*.py'):
-            if not filename.endswith('_pb2.py') and not filename.endswith('_pb2_grpc.py'):
+            ignore_file = (
+                "test" in root or filename.endswith('_pb2.py') or filename.endswith('_pb2_grpc.py')
+                or filename.endswith('intersphinx_custom.py'))
+            if not ignore_file:
                 matches.append(os.path.join(root, filename))
     return matches
 

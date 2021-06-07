@@ -33,6 +33,28 @@ stages:
             # not all have fixes so improve condition/handling
             condition: failed()
 
+      - job: tooling
+        dependsOn: []
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+          - script: ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
+            workingDirectory: $(Build.SourcesDirectory)
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+              BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+            displayName: "Run tooling checks"
+
+          - script: |
+              ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/tooling tooling'
+            displayName: "Upload tooling coverage to GCS"
+            env:
+              ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+              GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+              GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
+
       - job: format
         dependsOn: ["format_pre"]
         pool:

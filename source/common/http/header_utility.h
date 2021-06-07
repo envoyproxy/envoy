@@ -9,8 +9,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/http/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/http/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -66,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -154,13 +155,6 @@ public:
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
-   * Add headers from one HeaderMap to another
-   * @param headers target where headers will be added
-   * @param headers_to_add supplies the headers to be added
-   */
-  static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
-
-  /**
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
   static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
@@ -184,18 +178,40 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
+   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
+  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                    absl::optional<uint32_t> listener_port);
 
-  /* Does a common header check ensuring required headers are present.
+  /**
+   * @brief Return the index of the port, or npos if the host has no port
+   *
+   * Note this does not do validity checks on the port, it just finds the
+   * trailing : which is not a part of an IP address.
+   */
+  static absl::string_view::size_type getPortStart(absl::string_view host);
+
+  /* Does a common header check ensuring required request headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
    * host/authority for HTTP/1.1 or CONNECT requests.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
-  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+  static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /* Does a common header check ensuring required response headers are present.
+   * Current required response headers only includes :status.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional

@@ -26,7 +26,7 @@ Building Envoy has the following requirements:
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 
-Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with `--define tcmalloc=gperftools`
+Please note that for Clang/LLVM 8 and lower, Envoy may need to be built with ``--define tcmalloc=gperftools``
 as the new tcmalloc code is not guaranteed to compile with lower versions of Clang.
 
 

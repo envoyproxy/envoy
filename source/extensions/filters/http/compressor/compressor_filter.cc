@@ -1,4 +1,4 @@
-#include "extensions/filters/http/compressor/compressor_filter.h"
+#include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 namespace Envoy {
 namespace Extensions {

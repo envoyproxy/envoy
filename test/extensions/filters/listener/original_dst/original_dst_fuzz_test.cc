@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
