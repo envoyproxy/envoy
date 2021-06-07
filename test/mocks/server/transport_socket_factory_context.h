@@ -2,7 +2,7 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/secret/secret_manager_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/ssl/mocks.h"

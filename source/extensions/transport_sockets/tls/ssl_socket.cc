@@ -1,16 +1,15 @@
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/transport_sockets/tls/io_handle_bio.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/transport_sockets/tls/io_handle_bio.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -395,6 +394,11 @@ ServerSslSocketFactory::ServerSslSocketFactory(Envoy::Ssl::ServerContextConfigPt
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_, nullptr)) {
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
+}
+
+Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
+  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  return ssl_ctx_;
 }
 
 Network::TransportSocketPtr

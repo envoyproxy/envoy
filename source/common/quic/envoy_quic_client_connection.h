@@ -2,9 +2,9 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/network/utility.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_network_connection.h"
+#include "source/common/network/utility.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_network_connection.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -52,6 +52,9 @@ public:
   uint64_t maxDatagramSize() const override;
   void onDatagramsDropped(uint32_t) override {
     // TODO(mattklein123): Emit a stat for this.
+  }
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
 
   // Register file event and apply socket options.

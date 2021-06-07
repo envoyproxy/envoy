@@ -14,15 +14,15 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/event/libevent_scheduler.h"
-#include "common/http/headers.h"
-#include "server/active_listener_base.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/http/headers.h"
+#include "source/server/active_listener_base.h"
 
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_session.h"
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -725,6 +725,18 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
           }));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+}
+
+TEST_P(EnvoyQuicServerStreamTest, MetadataNotSupported) {
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  quic_stream_->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1,
+            TestUtility::findCounter(listener_config_.scope_, "http3.metadata_not_supported_error")
+                ->value());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 } // namespace Quic

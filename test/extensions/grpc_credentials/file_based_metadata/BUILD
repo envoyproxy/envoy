@@ -14,7 +14,6 @@ envoy_cc_test(
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
     deps = [
-        "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/file_based_metadata:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",
         "//test/integration:integration_lib",

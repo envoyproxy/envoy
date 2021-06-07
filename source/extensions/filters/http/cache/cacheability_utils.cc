@@ -1,11 +1,10 @@
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +31,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 }
 } // namespace
 
-bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers) {
+bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -52,7 +51,7 @@ bool CacheabilityUtils::isCacheableRequest(const Http::RequestHeaderMap& headers
   // Cache-related headers are checked in HttpCache::LookupRequest.
   return headers.Path() && headers.Host() &&
          !headers.getInline(CacheCustomHeaders::authorization()) &&
-         (method == header_values.MethodValues.Get) &&
+         (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
          (forwarded_proto == header_values.SchemeValues.Http ||
           forwarded_proto == header_values.SchemeValues.Https);
 }

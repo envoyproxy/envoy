@@ -13,12 +13,11 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/rocketmq_proxy/active_message.h"
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
-#include "extensions/filters/network/rocketmq_proxy/stats.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/stats.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"

@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.internal_redirect_predicates.previous_routes",
     deps = [
         "//source/common/stream_info:filter_state_lib",
-        "//source/extensions/internal_redirect:well_known_names",
         "//source/extensions/internal_redirect/previous_routes:config",
         "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
     ],

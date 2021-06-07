@@ -1,10 +1,9 @@
 #include <sstream>
 #include <vector>
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/common/redis/fault_impl.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
 
@@ -758,9 +757,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
   std::string request = makeBulkStringArray({"get", "foo"});
   initialize();
 
-  auto endpoint =
-      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version_), 0);
-  FakeUpstreamPtr target_server{createFakeUpstream(endpoint, upstreamProtocol())};
+  FakeUpstreamPtr target_server{std::make_unique<FakeUpstream>(0, version_, upstreamConfig())};
 
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";

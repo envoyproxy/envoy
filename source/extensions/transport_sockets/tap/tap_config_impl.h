@@ -4,8 +4,8 @@
 #include "envoy/data/tap/v3/transport.pb.h"
 #include "envoy/event/timer.h"
 
-#include "extensions/common/tap/tap_config_base.h"
-#include "extensions/transport_sockets/tap/tap_config.h"
+#include "source/extensions/common/tap/tap_config_base.h"
+#include "source/extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {

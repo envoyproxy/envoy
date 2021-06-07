@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -575,6 +575,16 @@ TEST_P(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingTrailer) {
         /*fin=*/!quic::VersionUsesHttp3(quic_version_.transport_version),
         trailers_.uncompressed_header_bytes(), trailers_);
   }
+}
+
+TEST_P(EnvoyQuicClientStreamTest, MetadataNotSupported) {
+  Http::MetadataMap metadata_map = {{"key", "value"}};
+  Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  quic_stream_->encodeMetadata(metadata_map_vector);
+  EXPECT_EQ(1, TestUtility::findCounter(scope_, "http3.metadata_not_supported_error")->value());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 // Tests that posted stream block callback won't cause use-after-free crash.

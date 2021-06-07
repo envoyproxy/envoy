@@ -7,8 +7,8 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/non_copyable.h"
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/synchronization/mutex.h"
 

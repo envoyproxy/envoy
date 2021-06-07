@@ -1,7 +1,7 @@
 #include <process.h>
 
-#include "common/common/assert.h"
-#include "common/common/thread_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread_impl.h"
 
 namespace Envoy {
 namespace Thread {

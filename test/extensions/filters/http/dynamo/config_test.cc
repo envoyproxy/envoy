@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
 #include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 
-#include "extensions/filters/http/dynamo/config.h"
+#include "source/extensions/filters/http/dynamo/config.h"
 
 #include "test/mocks/server/factory_context.h"
 

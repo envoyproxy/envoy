@@ -1,4 +1,4 @@
-#include "common/http/http1/codec_impl.h"
+#include "source/common/http/http1/codec_impl.h"
 
 #include <memory>
 #include <string>
@@ -9,20 +9,20 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/statusor.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/legacy_parser_impl.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
@@ -402,7 +402,7 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -1176,17 +1176,8 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_.value().response_encoder_.setDetails(details);
   if (!active_request_.value().response_encoder_.startedResponse()) {
-    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
-    // If headers have not been fully parsed they may not be inferred correctly.
-    bool is_grpc_request = false;
-    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
-        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
-      is_grpc_request =
-          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    }
-    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
-                                                      CodeUtility::toString(error_code_), nullptr,
-                                                      absl::nullopt, details);
+    active_request_->request_decoder_->sendLocalReply(
+        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
   return okStatus();
 }

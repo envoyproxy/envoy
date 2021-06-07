@@ -1,4 +1,4 @@
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -6,12 +6,12 @@
 #include <utility>
 #include <vector>
 
-#include "common/common/scalar_to_byte_vector.h"
-#include "common/common/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_subject_alt_names.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 
 namespace Envoy {
 namespace Network {

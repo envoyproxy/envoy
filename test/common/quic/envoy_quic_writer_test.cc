@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/quic/envoy_quic_packet_writer.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"

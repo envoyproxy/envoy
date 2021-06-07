@@ -1,8 +1,7 @@
 #include <regex>
 
-#include "common/stats/thread_local_store.h"
-
-#include "server/admin/stats_handler.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/server/admin/stats_handler.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -31,6 +30,12 @@ public:
                      const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
     return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
                                      true /*pretty_print*/);
+  }
+
+  void shutdownThreading() {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+    tls_.shutdownThread();
   }
 
   Stats::SymbolTableImpl symbol_table_;
@@ -189,7 +194,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
@@ -289,7 +294,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
@@ -391,7 +396,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
@@ -502,7 +507,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 })EOF";
 
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
-  store_->shutdownThreading();
+  shutdownThreading();
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,

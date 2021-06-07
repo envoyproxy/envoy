@@ -13,13 +13,12 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/http/header_utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/common/fault/fault_config.h"
-#include "extensions/filters/http/common/stream_rate_limiter.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/filters/common/fault/fault_config.h"
+#include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,6 +73,7 @@ public:
   const std::string& responseRateLimitPercentRuntime() const {
     return response_rate_limit_percent_runtime_;
   }
+  bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
 
 private:
   class RuntimeKeyValues {
@@ -96,6 +96,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
+
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
   const std::string delay_percent_runtime_;
   const std::string abort_percent_runtime_;
@@ -104,6 +105,7 @@ private:
   const std::string abort_grpc_status_runtime_;
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
+  const bool disable_downstream_cluster_stats_;
 };
 
 /**

@@ -9,9 +9,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "common/stats/histogram_impl.h"
-
-#include "server/admin/handler_ctx.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 

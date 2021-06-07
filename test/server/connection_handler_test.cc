@@ -4,18 +4,17 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/network/utility.h"
-
-#include "server/active_raw_udp_listener_config.h"
-#include "server/connection_handler_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_raw_udp_listener_config.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -31,6 +30,7 @@ using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -1046,7 +1046,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterReportError) {
   dispatcher_.clearDeferredDeleteList();
   // Make sure the error leads to no listener timer created.
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
-  // Make sure we never try to match the filer chain since listener filter doesn't complete.
+  // Make sure we never try to match the filter chain since listener filter doesn't complete.
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
 
   EXPECT_CALL(*listener, onDestroy());
@@ -1146,7 +1146,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
 
   const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
 
-  // The completion callback is scheduled
+  // The completion callback is scheduled.
   handler_->removeFilterChains(listener_tag, filter_chains,
                                []() { ENVOY_LOG(debug, "removed filter chains"); });
   // Trigger the deletion if any.
@@ -1160,6 +1160,104 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChain) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   EXPECT_CALL(*listener, onDestroy());
   handler_.reset();
+}
+
+// `removeListeners` and `removeFilterChains` are posted from main thread. The two post actions are
+// triggered by two timers. In some corner cases, the two timers have the same expiration time
+// point. Thus `removeListeners` may be executed prior to `removeFilterChains`. This test case
+// verifies that the work threads remove the listener and filter chains successfully under the above
+// sequence.
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
+  InSequence s;
+  uint64_t listener_tag = 1;
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(listener_tag, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+
+  EXPECT_EQ(1UL, handler_->numConnections());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
+  EXPECT_EQ(1UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->stopListeners(listener_tag);
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+
+  {
+    // Filter chain removal in the same poll cycle but earlier.
+    handler_->removeListeners(listener_tag);
+  }
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  MockFunction<void()> on_filter_chain_removed;
+  {
+    // Listener removal in the same poll cycle but later than filter chain removal.
+    handler_->removeFilterChains(listener_tag, filter_chains,
+                                 [&on_filter_chain_removed]() { on_filter_chain_removed.Call(); });
+  }
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  // on_filter_chain_removed must be deferred called.
+  EXPECT_CALL(on_filter_chain_removed, Call());
+  dispatcher_.clearDeferredDeleteList();
+
+  // Final counters.
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "downstream_cx_total")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "downstream_cx_active")->value());
+  EXPECT_EQ(1UL, TestUtility::findCounter(stats_store_, "test.downstream_cx_total")->value());
+  EXPECT_EQ(0UL, TestUtility::findGauge(stats_store_, "test.downstream_cx_active")->value());
+
+  // Verify that the callback is invoked already.
+  testing::Mock::VerifyAndClearExpectations(&on_filter_chain_removed);
+  handler_.reset();
+}
+
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveListener) {
+  InSequence s;
+
+  Network::TcpListenerCallbacks* listener_callbacks;
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* test_listener =
+      addListener(1, true, false, "test_listener", listener, &listener_callbacks);
+  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address_));
+  handler_->addListener(absl::nullopt, *test_listener);
+
+  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // Test stop/remove of not existent listener.
+  handler_->stopListeners(0);
+  handler_->removeListeners(0);
+
+  EXPECT_CALL(*listener, onDestroy());
+  handler_->stopListeners(1);
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  handler_->removeListeners(1);
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // Test stop/remove of not existent listener.
+  handler_->stopListeners(0);
+  handler_->removeListeners(0);
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {

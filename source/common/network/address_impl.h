@@ -10,9 +10,9 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/statusor.h"
-#include "common/common/thread.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Network {

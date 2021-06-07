@@ -5,13 +5,12 @@
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/type/v3/http.pb.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/health_discovery_service.h"
-#include "common/upstream/transport_socket_match_impl.h"
-
-#include "extensions/transport_sockets/raw_buffer/config.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"

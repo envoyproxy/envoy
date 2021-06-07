@@ -17,20 +17,22 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/network/connection_impl_base.h"
-#include "common/quic/quic_network_connection.h"
-#include "common/quic/envoy_quic_simulated_watermark_buffer.h"
-#include "common/quic/send_buffer_monitor.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 
 class TestPauseFilterForQuic;
 
 namespace Quic {
+
+class QuicNetworkConnectionTest;
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
@@ -77,7 +79,7 @@ public:
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
     // Unix domain socket is not supported.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
     // TODO(danzh): populate stats.
@@ -113,6 +115,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
+  // TODO(#2557) Implement this.
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
 
   // Network::FilterManagerConnection
@@ -142,6 +145,12 @@ public:
     codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
   }
 
+  uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
+
+  void setMaxIncomingHeadersCount(uint32_t max_headers_count) {
+    max_headers_count_ = max_headers_count;
+  }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -164,6 +173,7 @@ protected:
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
+  friend class Envoy::Quic::QuicNetworkConnectionTest;
 
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();
@@ -179,6 +189,7 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;
   uint32_t bytes_to_send_{0};
+  uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each
   // stream write. QUICHE doesn't buffer data in connection, all the data is buffered in stream's

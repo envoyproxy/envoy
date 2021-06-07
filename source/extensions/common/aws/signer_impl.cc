@@ -1,14 +1,13 @@
-#include "extensions/common/aws/signer_impl.h"
+#include "source/extensions/common/aws/signer_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-
-#include "extensions/common/aws/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -23,16 +22,16 @@ void SignerImpl::sign(Http::RequestMessage& message, bool sign_body) {
   sign(headers, content_hash);
 }
 
-void SignerImpl::sign(Http::RequestHeaderMap& headers) {
-  if (require_content_hash_) {
-    headers.setReference(SignatureHeaders::get().ContentSha256,
-                         SignatureConstants::get().UnsignedPayload);
-    sign(headers, SignatureConstants::get().UnsignedPayload);
-  } else {
-    headers.setReference(SignatureHeaders::get().ContentSha256,
-                         SignatureConstants::get().HashedEmptyString);
-    sign(headers, SignatureConstants::get().HashedEmptyString);
-  }
+void SignerImpl::signEmptyPayload(Http::RequestHeaderMap& headers) {
+  headers.setReference(SignatureHeaders::get().ContentSha256,
+                       SignatureConstants::get().HashedEmptyString);
+  sign(headers, SignatureConstants::get().HashedEmptyString);
+}
+
+void SignerImpl::signUnsignedPayload(Http::RequestHeaderMap& headers) {
+  headers.setReference(SignatureHeaders::get().ContentSha256,
+                       SignatureConstants::get().UnsignedPayload);
+  sign(headers, SignatureConstants::get().UnsignedPayload);
 }
 
 void SignerImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash) {

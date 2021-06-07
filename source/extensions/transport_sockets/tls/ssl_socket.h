@@ -13,11 +13,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
@@ -117,6 +116,8 @@ public:
   void onAddOrUpdateSecret() override;
 
   const Ssl::ClientContextConfig& config() const { return *config_; }
+
+  Envoy::Ssl::ClientContextSharedPtr sslCtx();
 
 private:
   Envoy::Ssl::ContextManager& manager_;

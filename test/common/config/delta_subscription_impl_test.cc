@@ -3,8 +3,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/config/api_version.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
 
