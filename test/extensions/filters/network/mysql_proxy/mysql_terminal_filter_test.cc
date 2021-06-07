@@ -6,18 +6,17 @@
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_config.h"
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_session.h"
-#include "extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "extensions/filters/network/mysql_proxy/route.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/extensions/filters/network/mysql_proxy/route.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -120,7 +119,9 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_,
                 tcpConnPool(Upstream::ResourcePriority::Default, nullptr))
         .WillOnce(Invoke([&](Upstream::ResourcePriority, Upstream::LoadBalancerContext*)
-                             -> Tcp::ConnectionPool::Instance* { return nullptr; }));
+                             -> absl::optional<Envoy::Upstream::TcpPoolData> {
+          return absl::optional<Envoy::Upstream::TcpPoolData>();
+        }));
 
     EXPECT_CALL(read_callbacks_, connection());
     EXPECT_CALL(read_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));

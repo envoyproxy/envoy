@@ -66,7 +66,7 @@ def add_reminders(assignees, maintainers_and_prs, message):
             maintainers_and_prs[
                 assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
         maintainers_and_prs[assignee] = maintainers_and_prs[assignee] + message
-        return has_maintainer_assignee
+    return has_maintainer_assignee
 
 
 def track_prs():
@@ -122,10 +122,7 @@ def post_to_maintainers(client, maintainers_and_messages):
         message = maintainers_and_messages[key]
 
         # Only send messages if we have the maintainer UID
-        # if key not in ['alyssawilk']:  # Use this line for debugging.
         if key not in MAINTAINERS:
-            # Right now we skip "unassigned" but eventually that should go to #maintainers
-            print("Skipping key %s " % key)
             continue
         uid = MAINTAINERS[key]
 
@@ -147,9 +144,8 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
             response = client.chat_postMessage(
                 channel='#envoy-maintainer-oncall',
                 text=("*'Unassigned' PRs* (PRs with no maintainer assigned)\n%s" % unassigned_prs))
-            # TODO(alyssawilk) once maintainers start /wait tagging, uncomment this
-            #response = client.chat_postMessage(
-            #    channel='#envoy-maintainer-oncall', text=("*Stalled PRs*\n\n%s" % out_slo_prs))
+            response = client.chat_postMessage(
+                channel='#envoy-maintainer-oncall', text=("*Stalled PRs*\n\n%s" % out_slo_prs))
         except SlackApiError as e:
             print("Unexpected error %s", e.response["error"])
 

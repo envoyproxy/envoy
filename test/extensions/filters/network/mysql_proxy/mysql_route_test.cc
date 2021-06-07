@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/network/mysql_proxy/v3/mysql_proxy.pb.h"
 
-#include "extensions/filters/network/mysql_proxy/route_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/route_impl.h"
 
 #include "test/mocks/upstream/mocks.h"
 

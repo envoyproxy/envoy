@@ -1,4 +1,4 @@
-#include "common/event/dispatcher_impl.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,30 +11,30 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/event/file_event_impl.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/event/signal_impl.h"
-#include "common/event/timer_impl.h"
-#include "common/filesystem/watcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/dns_impl.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/event/signal_impl.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/filesystem/watcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/dns_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
 #ifdef __APPLE__
-#include "common/network/apple_dns_impl.h"
+#include "source/common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {

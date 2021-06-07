@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
@@ -10,20 +10,19 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
-#include "extensions/filters/network/mysql_proxy/mysql_session.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -198,7 +197,7 @@ Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
 
   auto pool = cluster->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
 
-  if (pool == nullptr) {
+  if (!pool.has_value()) {
     ENVOY_LOG(info, "closed due to there is no host in cluster {}", cluster->info()->name());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;

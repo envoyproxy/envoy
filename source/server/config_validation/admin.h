@@ -3,10 +3,9 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/admin.h"
 
-#include "common/common/assert.h"
-#include "common/network/listen_socket_impl.h"
-
-#include "server/admin/config_tracker_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/server/admin/config_tracker_impl.h"
 
 namespace Envoy {
 namespace Server {

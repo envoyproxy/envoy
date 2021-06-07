@@ -5,9 +5,9 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"

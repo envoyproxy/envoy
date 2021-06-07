@@ -1,12 +1,11 @@
 #include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/stat_sinks/wasm/config.h"
-#include "extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/stat_sinks/wasm/config.h"
+#include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"

@@ -18,10 +18,14 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "server/filter_chain_factory_context_callback.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/lds_api.h"
-#include "server/listener_impl.h"
+#include "source/server/filter_chain_factory_context_callback.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/lds_api.h"
+#include "source/server/listener_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_stat_names.h"
+#endif
 
 namespace Envoy {
 namespace Server {
@@ -202,6 +206,10 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+#endif
+
   Instance& server_;
   ListenerComponentFactory& factory_;
 
@@ -316,6 +324,9 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(server_.stats().symbolTable());
+#endif
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

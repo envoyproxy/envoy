@@ -1,7 +1,7 @@
 #include "mock.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_session.h"
-#include "extensions/filters/network/mysql_proxy/route.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "source/extensions/filters/network/mysql_proxy/route.h"
 
 using testing::_;
 using testing::Return;

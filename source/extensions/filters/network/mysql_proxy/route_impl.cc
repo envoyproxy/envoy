@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/route_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/route_impl.h"
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
@@ -8,7 +8,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
-#include "extensions/filters/network/mysql_proxy/route.h"
+#include "source/extensions/filters/network/mysql_proxy/route.h"
 
 namespace Envoy {
 namespace Extensions {

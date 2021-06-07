@@ -18,8 +18,8 @@ envoy_cc_library(
         "stats.h",
     ],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -37,8 +37,8 @@ envoy_cc_library(
         ":decoder_lib",
         ":route_lib",
         ":stats_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -81,7 +81,7 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         ":util_lib",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/config:datasource_lib",
         "//source/extensions/common/sqlutils:sqlutils_lib",
@@ -118,7 +118,7 @@ envoy_cc_library(
     name = "route_interface",
     hdrs = ["route.h"],
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -133,7 +133,7 @@ envoy_cc_library(
     ],
     deps = [
         ":route_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
 )

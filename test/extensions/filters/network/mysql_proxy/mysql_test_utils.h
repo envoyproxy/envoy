@@ -1,10 +1,10 @@
 #pragma once
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_utils.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
 
 #include "fmt/format.h"
 

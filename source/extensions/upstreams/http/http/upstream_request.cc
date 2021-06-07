@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/http/upstream_request.h"
+#include "source/extensions/upstreams/http/http/upstream_request.h"
 
 #include <cstdint>
 #include <memory>
@@ -10,13 +10,13 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/router/router.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/router.h"
 
 using Envoy::Router::GenericConnectionPoolCallbacks;
 

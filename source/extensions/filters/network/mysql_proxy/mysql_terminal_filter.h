@@ -7,11 +7,10 @@
 #include "envoy/network/filter.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
 
 namespace Envoy {
 namespace Extensions {

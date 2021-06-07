@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "quiche/quic/core/quic_types.h"
 

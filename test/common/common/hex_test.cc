@@ -3,7 +3,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/hex.h"
+#include "source/common/common/hex.h"
 
 #include "gtest/gtest.h"
 

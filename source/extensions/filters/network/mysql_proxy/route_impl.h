@@ -7,7 +7,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "extensions/filters/network/mysql_proxy/route.h"
+#include "source/extensions/filters/network/mysql_proxy/route.h"
 
 namespace Envoy {
 namespace Extensions {

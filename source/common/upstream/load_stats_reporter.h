@@ -6,9 +6,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Upstream {

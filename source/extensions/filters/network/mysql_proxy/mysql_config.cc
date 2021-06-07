@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mysql_proxy/mysql_config.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
 
 #include <string>
 
@@ -8,15 +8,14 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
-
-#include "extensions/filters/network/mysql_proxy/mysql_decoder.h"
-#include "extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
-#include "extensions/filters/network/mysql_proxy/mysql_filter.h"
-#include "extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
-#include "extensions/filters/network/mysql_proxy/route.h"
-#include "extensions/filters/network/mysql_proxy/route_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/route.h"
+#include "source/extensions/filters/network/mysql_proxy/route_impl.h"
 
 namespace Envoy {
 namespace Extensions {

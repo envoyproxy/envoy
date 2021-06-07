@@ -1,12 +1,12 @@
-#include "extensions/filters/http/jwt_authn/matcher.h"
+#include "source/extensions/filters/http/jwt_authn/matcher.h"
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/common/regex.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
+#include "source/common/router/config_impl.h"
 
 #include "absl/strings/match.h"
 

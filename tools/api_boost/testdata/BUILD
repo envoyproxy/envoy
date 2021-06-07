@@ -59,7 +59,7 @@ envoy_cc_library(
     name = "validate",
     srcs = ["validate.cc"],
     deps = [
-        "//include/envoy/protobuf:message_validator_interface",
+        "//envoy/protobuf:message_validator_interface",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],

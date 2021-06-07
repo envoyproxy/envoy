@@ -4,12 +4,11 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 #include "envoy/grpc/status.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
-#include "extensions/filters/http/admission_control/thread_local_controller.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/admission_control/admission_control.h"
+#include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
+#include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
