@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-envoy
     ports:
-      - "80-81:80"
+    - "80-81:80"
 
   http_service:
     build:
@@ -18,6 +18,6 @@ services:
       context: .
       dockerfile: Dockerfile-lrs
     volumes:
-      - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
+    - /go/src/github.com/envoyproxy/envoy/examples/load-reporting-service
     ports:
-      - "18000:18000"
+    - "18000:18000"

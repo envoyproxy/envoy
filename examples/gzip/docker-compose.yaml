@@ -5,9 +5,9 @@ services:
       context: .
       dockerfile: Dockerfile-gzip
     ports:
-      - "9901:9901"
-      - "9902:9902"
-      - "10000:10000"
+    - "9901:9901"
+    - "9902:9902"
+    - "10000:10000"
 
   service:
     build:
