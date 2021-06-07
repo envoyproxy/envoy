@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
-#include "extensions/filters/http/admission_control/thread_local_controller.h"
+#include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"

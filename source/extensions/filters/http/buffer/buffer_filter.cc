@@ -1,18 +1,17 @@
-#include "extensions/filters/http/buffer/buffer_filter.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/http/codes.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,11 +1,10 @@
-#include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {

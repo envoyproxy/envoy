@@ -2,8 +2,8 @@
 
 #include "envoy/api/io_error.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"

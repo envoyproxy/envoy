@@ -1,5 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"

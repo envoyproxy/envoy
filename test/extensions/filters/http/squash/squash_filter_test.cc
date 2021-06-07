@@ -5,10 +5,9 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/squash/squash_filter.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/squash/squash_filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"

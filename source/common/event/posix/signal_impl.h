@@ -2,8 +2,8 @@
 
 #include "envoy/event/signal.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/event/event_impl_base.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/event_impl_base.h"
 
 namespace Envoy {
 namespace Event {

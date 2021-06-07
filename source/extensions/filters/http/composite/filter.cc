@@ -1,8 +1,8 @@
-#include "extensions/filters/http/composite/filter.h"
+#include "source/extensions/filters/http/composite/filter.h"
 
 #include "envoy/http/filter.h"
 
-#include "common/common/stl_helpers.h"
+#include "source/common/common/stl_helpers.h"
 
 namespace Envoy {
 namespace Extensions {

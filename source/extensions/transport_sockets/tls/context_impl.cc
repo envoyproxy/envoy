@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 
 #include <algorithm>
 #include <memory>
@@ -12,19 +12,18 @@
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stats/utility.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "extensions/transport_sockets/tls/stats.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"

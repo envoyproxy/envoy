@@ -1,8 +1,8 @@
 #include <string>
 
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/mongo_proxy/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/utility.h"
 
 #include "gtest/gtest.h"
 
