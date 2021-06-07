@@ -368,6 +368,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:shadow_writer_lib",
         "//test/mocks/network:network_mocks",

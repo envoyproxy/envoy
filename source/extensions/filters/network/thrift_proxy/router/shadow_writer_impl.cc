@@ -90,8 +90,7 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
     incClusterScopeCounter(*cluster_info, {upstream_rq_oneway_});
     break;
   default:
-    incClusterScopeCounter(*cluster_info, {upstream_rq_invalid_type_});
-    break;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (cluster_info->maintenanceMode()) {
@@ -206,7 +205,7 @@ void ShadowRequest::tryWriteRequest(const Buffer::OwnedImpl& buffer) {
   } else {
     // Make a copy and write when the connection becomes ready.
     // However, don't bother if it already failed.
-    if (reset_stream_) {
+    if (!reset_stream_) {
       request_buffer_.add(buffer);
     }
   }
@@ -247,8 +246,7 @@ void ShadowRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
           parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_exception_});
           break;
         default:
-          parent_.incClusterScopeCounter(*cluster_, {parent_.upstream_resp_invalid_type_});
-          break;
+          NOT_REACHED_GCOVR_EXCL_LINE;
         }
       }
 
@@ -314,21 +312,8 @@ void ShadowRequest::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ShadowRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
+void ShadowRequest::onResetStream(ConnectionPool::PoolFailureReason) {
   reset_stream_ = true;
-
-  switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
-    break;
-  case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    break;
-  case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-  case ConnectionPool::PoolFailureReason::Timeout:
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
   releaseConnection(false);
 }
 
