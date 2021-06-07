@@ -2,12 +2,11 @@
 #include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/macros.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/graphite_statsd/config.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/graphite_statsd/config.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"

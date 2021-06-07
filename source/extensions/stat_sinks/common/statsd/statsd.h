@@ -15,8 +15,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/network/io_socket_handle_impl.h"
-
-#include "extensions/stat_sinks/common/statsd/tag_formats.h"
+#include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 #include "absl/types/optional.h"
 

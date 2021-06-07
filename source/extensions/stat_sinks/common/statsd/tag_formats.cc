@@ -1,6 +1,6 @@
-#include "extensions/stat_sinks/common/statsd/tag_formats.h"
+#include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
