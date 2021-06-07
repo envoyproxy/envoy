@@ -1,9 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/listener/original_dst/v3/original_dst.pb.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"

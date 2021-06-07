@@ -1,6 +1,5 @@
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/wasm/wasm_filter.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"

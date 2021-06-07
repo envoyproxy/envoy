@@ -1,13 +1,12 @@
-#include "extensions/filters/network/rocketmq_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
 
-#include "common/common/enum_to_int.h"
-
-#include "extensions/filters/network/rocketmq_proxy/active_message.h"
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
-#include "extensions/filters/network/rocketmq_proxy/well_known_names.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

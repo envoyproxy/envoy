@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "test/integration/integration.h"
 

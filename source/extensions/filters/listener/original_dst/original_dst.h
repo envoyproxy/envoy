@@ -1,8 +1,9 @@
 #pragma once
 
-#include "common/common/logger.h"
+#include "envoy/network/filter.h"
 
-#include "extensions/filters/listener/original_dst/config.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/listener/original_dst/config.h"
 
 namespace Envoy {
 namespace Extensions {

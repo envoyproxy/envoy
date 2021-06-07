@@ -2,8 +2,8 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/listener/original_dst/config.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/extensions/filters/listener/original_dst/config.h"
+#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

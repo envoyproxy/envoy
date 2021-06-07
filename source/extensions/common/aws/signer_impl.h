@@ -1,11 +1,10 @@
 #pragma once
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/common/aws/credentials_provider.h"
-#include "extensions/common/aws/signer.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {
 namespace Extensions {

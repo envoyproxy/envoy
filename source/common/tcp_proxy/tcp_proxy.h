@@ -20,14 +20,14 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/logger.h"
-#include "common/network/cidr_range.h"
-#include "common/network/filter_impl.h"
-#include "common/network/hash_policy.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/upstream.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/filter_impl.h"
+#include "source/common/network/hash_policy.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tcp_proxy/upstream.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/node_hash_map.h"
 

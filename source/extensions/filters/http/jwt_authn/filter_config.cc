@@ -1,8 +1,8 @@
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include <algorithm> // std::sort
 
-#include "common/common/empty_string.h"
+#include "source/common/common/empty_string.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 

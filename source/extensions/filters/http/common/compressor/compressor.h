@@ -6,10 +6,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

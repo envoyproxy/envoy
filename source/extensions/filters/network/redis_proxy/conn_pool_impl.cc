@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -11,11 +11,10 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/stats/utility.h"
-
-#include "extensions/filters/network/redis_proxy/config.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {

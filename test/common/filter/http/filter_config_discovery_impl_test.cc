@@ -8,9 +8,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/json/json_loader.h"
+#include "source/common/config/utility.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"

@@ -10,11 +10,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/logical_dns_cluster.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

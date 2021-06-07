@@ -1,4 +1,4 @@
-#include "extensions/filters/http/compressor/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
 
 #include "test/extensions/filters/http/compressor/mock_compressor_library.pb.h"
 #include "test/mocks/server/factory_context.h"

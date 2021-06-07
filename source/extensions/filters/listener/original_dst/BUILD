@@ -16,7 +16,7 @@ envoy_cc_library(
     name = "config_lib",
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/network:filter_interface",
+        "//envoy/network:filter_interface",
         "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg_cc_proto",
     ],
 )
@@ -27,8 +27,8 @@ envoy_cc_library(
     hdrs = ["original_dst.h"],
     deps = [
         ":config_lib",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
@@ -51,8 +51,8 @@ envoy_cc_extension(
     deps = [
         ":config_lib",
         ":original_dst_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/listener:well_known_names",
     ],
 )

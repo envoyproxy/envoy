@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.http.original_ip_detection.xff",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/http/original_ip_detection/xff:config",
         "//source/extensions/http/original_ip_detection/xff:xff_lib",
         "//test/mocks/server:factory_context_mocks",

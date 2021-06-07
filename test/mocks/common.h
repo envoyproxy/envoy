@@ -7,7 +7,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "test/test_common/test_time.h"
 

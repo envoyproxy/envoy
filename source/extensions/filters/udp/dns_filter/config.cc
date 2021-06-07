@@ -1,4 +1,4 @@
-#include "extensions/filters/udp/dns_filter/config.h"
+#include "source/extensions/filters/udp/dns_filter/config.h"
 
 namespace Envoy {
 namespace Extensions {
