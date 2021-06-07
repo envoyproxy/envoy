@@ -1369,7 +1369,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   std::vector<std::shared_ptr<MockShadowRequest>> shadow_requests;
   for (int i = 0; i < 2; ++i) {
     shadow_requests.push_back(std::make_shared<MockShadowRequest>());
-    EXPECT_CALL(*shadow_requests.back(), tryWriteRequest(_));
+    EXPECT_CALL(*shadow_requests.back(), tryWriteRequest());
     EXPECT_CALL(*shadow_requests.back(), tryReleaseConnection());
   }
 

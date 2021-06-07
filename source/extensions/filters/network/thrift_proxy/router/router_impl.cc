@@ -350,24 +350,164 @@ FilterStatus Router::messageEnd() {
   request_size_ += transport_buffer.length();
   recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
 
-  Buffer::OwnedImpl shadow_buffer;
-  if (!shadow_requests_.empty()) {
-    shadow_buffer.add(transport_buffer);
-  }
-
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
 
   // Dispatch shadow requests, if any.
-  //
-  // Note: if connections aren't ready, the shadow request will copy the buffer
-  //       and write when appropriate.
+  // Note: if connections aren't ready, the write will happen when appropriate.
   for (auto& shadow_request : shadow_requests_) {
-    // TODO: set the right sequence id for shadow requests.
-    shadow_request.get().tryWriteRequest(shadow_buffer);
+    auto& request = shadow_request.get();
+    request.messageEnd();
+    request.tryWriteRequest();
   }
 
   return FilterStatus::Continue;
+}
+
+FilterStatus Router::passthroughData(Buffer::Instance& data) {
+  for (auto& shadow_request : shadow_requests_) {
+    Buffer::OwnedImpl shadow_data;
+    shadow_data.add(data);
+    shadow_request.get().passthroughData(shadow_data);
+  }
+
+  return ProtocolConverter::passthroughData(data);
+}
+
+FilterStatus Router::structBegin(absl::string_view name) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().structBegin(name);
+  }
+
+  return ProtocolConverter::structBegin(name);
+}
+
+FilterStatus Router::structEnd() {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().structEnd();
+  }
+
+  return ProtocolConverter::structEnd();
+}
+
+FilterStatus Router::fieldBegin(absl::string_view name, FieldType& field_type, int16_t& field_id) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().fieldBegin(name, field_type, field_id);
+  }
+
+  return ProtocolConverter::fieldBegin(name, field_type, field_id);
+}
+
+FilterStatus Router::fieldEnd() {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().fieldEnd();
+  }
+
+  return ProtocolConverter::fieldEnd();
+}
+
+FilterStatus Router::boolValue(bool& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().boolValue(value);
+  }
+
+  return ProtocolConverter::boolValue(value);
+}
+
+FilterStatus Router::byteValue(uint8_t& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().byteValue(value);
+  }
+
+  return ProtocolConverter::byteValue(value);
+}
+
+FilterStatus Router::int16Value(int16_t& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().int16Value(value);
+  }
+
+  return ProtocolConverter::int16Value(value);
+}
+
+FilterStatus Router::int32Value(int32_t& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().int32Value(value);
+  }
+
+  return ProtocolConverter::int32Value(value);
+}
+
+FilterStatus Router::int64Value(int64_t& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().int64Value(value);
+  }
+
+  return ProtocolConverter::int64Value(value);
+}
+
+FilterStatus Router::doubleValue(double& value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().doubleValue(value);
+  }
+
+  return ProtocolConverter::doubleValue(value);
+}
+
+FilterStatus Router::stringValue(absl::string_view value) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().stringValue(value);
+  }
+
+  return ProtocolConverter::stringValue(value);
+}
+
+FilterStatus Router::mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().mapBegin(key_type, value_type, size);
+  }
+
+  return ProtocolConverter::mapBegin(key_type, value_type, size);
+}
+
+FilterStatus Router::mapEnd() {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().mapEnd();
+  }
+
+  return ProtocolConverter::mapEnd();
+}
+
+FilterStatus Router::listBegin(FieldType& elem_type, uint32_t& size) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().listBegin(elem_type, size);
+  }
+
+  return ProtocolConverter::listBegin(elem_type, size);
+}
+
+FilterStatus Router::listEnd() {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().listEnd();
+  }
+
+  return ProtocolConverter::listEnd();
+}
+
+FilterStatus Router::setBegin(FieldType& elem_type, uint32_t& size) {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().setBegin(elem_type, size);
+  }
+
+  return ProtocolConverter::setBegin(elem_type, size);
+}
+
+FilterStatus Router::setEnd() {
+  for (auto& shadow_request : shadow_requests_) {
+    shadow_request.get().setEnd();
+  }
+
+  return ProtocolConverter::setEnd();
 }
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {

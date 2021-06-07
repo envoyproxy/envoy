@@ -127,12 +127,13 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
 
 ShadowRequest::ShadowRequest(ShadowWriterImpl& parent,
                              Upstream::ClusterInfoConstSharedPtr&& cluster_info,
-                             Upstream::TcpPoolData& pool, MessageMetadataSharedPtr&,
+                             Upstream::TcpPoolData& pool, MessageMetadataSharedPtr& metadata,
                              TransportType transport, ProtocolType protocol)
     : parent_(parent), conn_pool_data_(pool),
       transport_(NamedTransportConfigFactory::getFactory(transport).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol).createProtocol()),
-      cluster_(std::move(cluster_info)) {
+      cluster_(std::move(cluster_info)), metadata_(metadata) {
+  ProtocolConverter::initProtocolConverter(*protocol_, request_buffer_);
   response_decoder_ = std::make_unique<NullResponseDecoder>(*transport_, *protocol_);
 }
 
@@ -187,36 +188,57 @@ void ShadowRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_da
     conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
   }
 
-  // Is the request buffer ready to be dispatched?
-  if (request_buffer_.length() > 0) {
-    writeRequest(request_buffer_);
+  // Now that we have a connection, fetch the next available sequence id.
+  metadata_->setSequenceId(conn_state_->nextSequenceId());
+
+  if (request_ready_) {
+    writeRequest();
   }
 }
 
-void ShadowRequest::tryWriteRequest(const Buffer::OwnedImpl& buffer) {
+FilterStatus ShadowRequest::transportBegin(MessageMetadataSharedPtr) {
+  return FilterStatus::Continue;
+}
+
+FilterStatus ShadowRequest::transportEnd() { return FilterStatus::Continue; }
+
+void ShadowRequest::tryWriteRequest() {
   ENVOY_LOG(debug, "shadow request writing");
 
   if (conn_data_ != nullptr) {
-    // Make copy, write() drains.
-    Buffer::OwnedImpl shadow_buffer;
-    shadow_buffer.add(buffer);
-
-    writeRequest(shadow_buffer);
+    writeRequest();
   } else {
-    // Make a copy and write when the connection becomes ready.
+    // Wait until the connection becomes ready.
     // However, don't bother if it already failed.
     if (!reset_stream_) {
-      request_buffer_.add(buffer);
+      request_ready_ = true;
     }
   }
 }
 
 // TODO: set response timeout.
-void ShadowRequest::writeRequest(Buffer::OwnedImpl& buffer) {
+void ShadowRequest::writeRequest() {
+  // TODO(rgs1): is this even needed? The original upstream request does this...
+  metadata_->setProtocol(protocol_->type());
+
+  // Stitch everything together.
+  Buffer::OwnedImpl message_buffer;
+  protocol_->writeMessageBegin(message_buffer, *metadata_);
+  message_buffer.move(request_buffer_);
+
+  Buffer::OwnedImpl transport_buffer;
+  transport_->encodeFrame(transport_buffer, *metadata_, message_buffer);
+
   parent_.recordClusterScopeHistogram(*cluster_, {parent_.upstream_rq_size_},
-                                      Stats::Histogram::Unit::Bytes, buffer.length());
-  conn_data_->connection().write(buffer, false);
+                                      Stats::Histogram::Unit::Bytes, transport_buffer.length());
+  conn_data_->connection().write(transport_buffer, false);
   request_sent_ = true;
+
+  if (metadata_->messageType() == MessageType::Oneway) {
+    // No response expected
+    releaseConnection(false);
+    maybeCleanup();
+  }
 }
 
 void ShadowRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -273,7 +295,7 @@ bool ShadowRequest::requestInProgress() {
   }
 
   // Connection in progress and request buffered.
-  if (conn_pool_handle_ != nullptr && request_buffer_.length() > 0) {
+  if (conn_pool_handle_ != nullptr && request_ready_) {
     return true;
   }
 

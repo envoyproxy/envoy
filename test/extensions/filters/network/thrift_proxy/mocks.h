@@ -380,7 +380,7 @@ public:
   MockShadowRequest();
   ~MockShadowRequest() override;
 
-  MOCK_METHOD(void, tryWriteRequest, (const Buffer::OwnedImpl& buffer), ());
+  MOCK_METHOD(void, tryWriteRequest, (), ());
   MOCK_METHOD(void, tryReleaseConnection, (), ());
   MOCK_METHOD(bool, waitingForConnection, (), (const));
 };

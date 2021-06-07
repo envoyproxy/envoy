@@ -31,6 +31,7 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
     ],
 )
 

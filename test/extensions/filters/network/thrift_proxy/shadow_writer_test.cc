@@ -63,6 +63,14 @@ public:
     EXPECT_CALL(conn_pool_, newConnection(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
           auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
+          EXPECT_CALL(*data, connectionState())
+              .WillRepeatedly(Invoke(
+                  [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+          EXPECT_CALL(*data, setConnectionState_(_))
+              .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
+                conn_state_.swap(cs);
+              }));
+
           EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
           request_ptr->onPoolReady(std::move(data), host_);
           return nullptr;
@@ -74,7 +82,7 @@ public:
 
     Buffer::OwnedImpl buffer;
     buffer.add("hello");
-    request_ptr->tryWriteRequest(buffer);
+    request_ptr->tryWriteRequest();
 
     // Prepare response metadata & data processing.
     MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>();
@@ -138,6 +146,7 @@ public:
     }
   }
 
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -220,6 +229,13 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
   EXPECT_CALL(conn_pool_, newConnection(_))
       .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
+        EXPECT_CALL(*data, connectionState())
+            .WillRepeatedly(Invoke(
+                [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+        EXPECT_CALL(*data, setConnectionState_(_))
+            .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
+              conn_state_.swap(cs);
+            }));
         EXPECT_CALL(*data, connection()).WillOnce(ReturnRef(connection));
         request_ptr->onPoolReady(std::move(data), host_);
         return nullptr;
@@ -231,7 +247,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolReady) {
 
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
-  request_ptr->tryWriteRequest(buffer);
+  request_ptr->tryWriteRequest();
 }
 
 TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
@@ -254,9 +270,16 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   // Write before connection is ready.
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
-  request_ptr->tryWriteRequest(buffer);
+  request_ptr->tryWriteRequest();
 
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
+  EXPECT_CALL(*data, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+  EXPECT_CALL(*data, setConnectionState_(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
+
   NiceMock<Network::MockClientConnection> connection;
   EXPECT_CALL(*data, connection()).WillOnce(ReturnRef(connection));
   EXPECT_CALL(connection, write(_, false));
@@ -286,7 +309,7 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolFailure) {
 
   EXPECT_CALL(connection, write(_, false)).Times(0);
   Buffer::OwnedImpl buffer;
-  request_ptr->tryWriteRequest(buffer);
+  request_ptr->tryWriteRequest();
 }
 
 TEST_F(ShadowWriterTest, ShadowRequestCancelOnDestroy) {

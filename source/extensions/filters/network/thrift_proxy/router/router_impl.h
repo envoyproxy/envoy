@@ -242,6 +242,25 @@ public:
   FilterStatus transportEnd() override;
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus messageEnd() override;
+  FilterStatus passthroughData(Buffer::Instance& data) override;
+  FilterStatus structBegin(absl::string_view name) override;
+  FilterStatus structEnd() override;
+  FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                          int16_t& field_id) override;
+  FilterStatus fieldEnd() override;
+  FilterStatus boolValue(bool& value) override;
+  FilterStatus byteValue(uint8_t& value) override;
+  FilterStatus int16Value(int16_t& value) override;
+  FilterStatus int32Value(int32_t& value) override;
+  FilterStatus int64Value(int64_t& value) override;
+  FilterStatus doubleValue(double& value) override;
+  FilterStatus stringValue(absl::string_view value) override;
+  FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
+  FilterStatus mapEnd() override;
+  FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
+  FilterStatus listEnd() override;
+  FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
+  FilterStatus setEnd() override;
 
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;

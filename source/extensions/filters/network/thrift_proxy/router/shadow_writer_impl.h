@@ -77,7 +77,9 @@ public:
   }
 
   // Router::ShadowRequestHandle
-  void tryWriteRequest(const Buffer::OwnedImpl& buffer) override;
+  FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus transportEnd() override;
+  void tryWriteRequest() override;
   void tryReleaseConnection() override;
   bool waitingForConnection() const override;
 
@@ -94,14 +96,13 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
 private:
-  void writeRequest(Buffer::OwnedImpl& buffer);
+  void writeRequest();
   bool requestInProgress();
   void releaseConnection(bool close);
   void onResetStream(ConnectionPool::PoolFailureReason reason);
 
   ShadowWriterImpl& parent_;
   Upstream::TcpPoolData& conn_pool_data_;
-  MessageMetadataSharedPtr metadata_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
@@ -115,8 +116,10 @@ private:
   Buffer::OwnedImpl request_buffer_;
   NullResponseDecoderPtr response_decoder_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  MessageMetadataSharedPtr metadata_;
   uint64_t response_size_{};
   bool reset_stream_ : 1;
+  bool request_ready_ : 1;
 };
 
 class ShadowWriterImpl : public ShadowWriter,

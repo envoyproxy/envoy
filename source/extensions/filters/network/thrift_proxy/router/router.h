@@ -7,6 +7,7 @@
 #include "envoy/router/router.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
@@ -38,14 +39,14 @@ public:
 /**
  * ShadowRequestHandle is used to write a request or release a connection early if needed.
  */
-class ShadowRequestHandle {
+class ShadowRequestHandle : public ProtocolConverter {
 public:
   virtual ~ShadowRequestHandle() = default;
 
   /**
    * Submits a serialized request to be shadowed.
    */
-  virtual void tryWriteRequest(const Buffer::OwnedImpl& buffer) PURE;
+  virtual void tryWriteRequest() PURE;
 
   /**
    * Releases the upstream connection obtained for the shadow request if there's no request in
