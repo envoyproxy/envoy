@@ -41,7 +41,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
   for (const auto& a : cur_added) {
     // This adds a resource state that is waiting for the server for
     // more information.
-    resource_state_[resource_name] = ResourceState(ResourceType::ExplicitlyRequested);
+    resource_state_[a] = ResourceState(ResourceType::ExplicitlyRequested);
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -265,7 +265,8 @@ void DeltaSubscriptionState::addResourceStateFromServer(
   }
 }
 
-OptRef<ResourceState> DeltaSubscriptionState::getResourceState(const std::string& resource_name) {
+OptRef<DeltaSubscriptionState::ResourceState>
+DeltaSubscriptionState::getResourceState(const std::string& resource_name) {
   auto itr = resource_state_.find(resource_name);
   if (itr == resource_state_.end()) {
     return {};
