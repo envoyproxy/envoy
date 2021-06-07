@@ -15,9 +15,9 @@ static_resources:
           port_value: 10000
       filter_chains:
       - transport_socket:
-          name: envoy.transport_sockets.tls
+          name: envoy.transport_sockets.quic
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
             downstream_tls_context:
               common_tls_context:
                 tls_certificates:
