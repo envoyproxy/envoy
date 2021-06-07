@@ -1,6 +1,5 @@
 #include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
-#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/grpc/common.h"
@@ -281,7 +280,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponse) {
 // Regression test for https://github.com/envoyproxy/envoy/issues/14872 testing trailers-only
 // responses. Test verifies 499 HTTP status code when configuration is enabled.
 TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatusTrailersOnlyResponseHTTPStatusEnabled) {
-  config_.set_enable_http_status_codes(true);
+  config_.set_enable_http_status_codes_in_trailers_response(true);
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/grpc"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};

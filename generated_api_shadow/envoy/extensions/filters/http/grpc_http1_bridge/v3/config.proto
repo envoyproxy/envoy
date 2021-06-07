@@ -19,6 +19,7 @@ message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_http1_bridge.v2.Config";
 
-  // If true, the filter sets the request's HTTP status code alongside the existing gRPC status code.
-  bool enable_http_status_codes = 1;
+  // If true, the filter sets the request's HTTP status code alongside the existing gRPC status code when
+  // returning a trailers only response.
+  bool enable_http_status_codes_in_trailers_response = 1;
 }

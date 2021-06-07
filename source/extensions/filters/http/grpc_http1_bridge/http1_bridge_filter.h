@@ -66,7 +66,7 @@ private:
   void doResponseTrailers(const Http::ResponseHeaderOrTrailerMap& trailers);
   void updateGrpcStatusAndMessage(const Http::ResponseHeaderOrTrailerMap& trailers);
   void updateHttpStatusAndContentLength(const Http::ResponseHeaderOrTrailerMap& trailers,
-                                        bool enable_http_status_codes);
+                                        bool enable_http_status_codes_in_trailers_response);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

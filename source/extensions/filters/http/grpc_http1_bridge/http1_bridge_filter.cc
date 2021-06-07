@@ -54,8 +54,9 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
     // We may still need to set an http status and content length based on gRPC trailers
     // present in the response headers. This is known as a gRPC trailers-only response.
     // If the grpc status is non-zero, this will change the response code.
-    const bool enable_http_status_codes = proto_config_.enable_http_status_codes();
-    updateHttpStatusAndContentLength(headers, enable_http_status_codes);
+    const bool enable_http_status_codes_in_trailers_response =
+        proto_config_.enable_http_status_codes_in_trailers_response();
+    updateHttpStatusAndContentLength(headers, enable_http_status_codes_in_trailers_response);
     return Http::FilterHeadersStatus::Continue;
   } else {
     return Http::FilterHeadersStatus::StopIteration;
@@ -88,14 +89,15 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
 }
 
 void Http1BridgeFilter::updateHttpStatusAndContentLength(
-    const Http::ResponseHeaderOrTrailerMap& trailers, bool enable_http_status_codes) {
+    const Http::ResponseHeaderOrTrailerMap& trailers,
+    bool enable_http_status_codes_in_trailers_response) {
   // Here we check for grpc-status. If it's not zero, we change the response code. We assume
   // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
   // of exception/error that the response was not complete.
   const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
   if (grpc_status_header) {
     uint64_t grpc_status_code;
-    if (enable_http_status_codes &&
+    if (enable_http_status_codes_in_trailers_response &&
         (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
          grpc_status_code != 0)) {
       response_headers_->setStatus(Grpc::Utility::grpcToHttpStatus(grpc_status_code));
