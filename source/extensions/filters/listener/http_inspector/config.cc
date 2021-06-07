@@ -3,8 +3,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

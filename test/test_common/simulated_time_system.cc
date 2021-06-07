@@ -4,11 +4,11 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/event/real_time_system.h"
-#include "common/event/timer_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Event {

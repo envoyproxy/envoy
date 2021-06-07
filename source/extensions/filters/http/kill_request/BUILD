@@ -14,9 +14,9 @@ envoy_cc_library(
     srcs = ["kill_request_filter.cc"],
     hdrs = ["kill_request_filter.h"],
     deps = [
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
@@ -31,7 +31,7 @@ envoy_cc_extension(
     srcs = ["kill_request_config.cc"],
     hdrs = ["kill_request_config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/kill_request:kill_request_filter_lib",

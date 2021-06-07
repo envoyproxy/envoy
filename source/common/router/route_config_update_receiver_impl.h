@@ -9,9 +9,9 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {

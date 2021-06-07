@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["ip_tagging_filter.cc"],
     hdrs = ["ip_tagging_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -38,7 +38,7 @@ envoy_cc_extension(
         "//test/integration:__subpackages__",
     ],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",

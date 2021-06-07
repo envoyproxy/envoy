@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 
-#include "extensions/filters/http/health_check/config.h"
+#include "source/extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

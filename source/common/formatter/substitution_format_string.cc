@@ -1,10 +1,10 @@
-#include "common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_format_string.h"
 
 #include "envoy/api/api.h"
 
-#include "common/config/datasource.h"
-#include "common/config/utility.h"
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Formatter {

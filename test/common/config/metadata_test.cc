@@ -1,9 +1,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"

@@ -1,9 +1,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"

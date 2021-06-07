@@ -1,4 +1,4 @@
-#include "extensions/upstreams/http/config.h"
+#include "source/extensions/upstreams/http/config.h"
 
 #include "test/mocks/protobuf/mocks.h"
 

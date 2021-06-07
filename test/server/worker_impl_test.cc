@@ -1,9 +1,8 @@
 #include "envoy/network/exception.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-
-#include "server/worker_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/server/worker_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/guard_dog.h"

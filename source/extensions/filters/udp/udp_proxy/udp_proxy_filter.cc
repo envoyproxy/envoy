@@ -1,8 +1,8 @@
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "envoy/network/listener.h"
 
-#include "common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
 namespace Extensions {

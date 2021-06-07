@@ -290,6 +290,30 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
   EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
 }
 
+// When create new stream, the stream info will be populated from the connection.
+TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
+  setup(true, "", false);
+
+  absl::string_view server_name = "fake-server";
+  EXPECT_CALL(filter_callbacks_.connection_, id()).WillRepeatedly(Return(1234));
+  EXPECT_CALL(filter_callbacks_.connection_, requestedServerName())
+      .WillRepeatedly(Return(server_name));
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  decoder_ = &conn_manager_->newStream(response_encoder_);
+
+  EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
+  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamSslConnection());
+  EXPECT_EQ(1234, decoder_->streamInfo().connectionID());
+  EXPECT_EQ(server_name, decoder_->streamInfo().requestedServerName());
+
+  // Clean up.
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // By default, Envoy will set the server header to the server name, here "custom-value"
 TEST_F(HttpConnectionManagerImplTest, ServerHeaderOverwritten) {
   setup(false, "custom-value", false);

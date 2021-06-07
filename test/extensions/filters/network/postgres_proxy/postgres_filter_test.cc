@@ -3,8 +3,8 @@
 
 #include <tuple>
 
-#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_filter.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/network/postgres_proxy/postgres_test_utils.h"
 #include "test/mocks/network/mocks.h"

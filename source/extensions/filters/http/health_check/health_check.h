@@ -9,7 +9,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Extensions {

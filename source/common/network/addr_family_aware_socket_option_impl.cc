@@ -1,13 +1,13 @@
-#include "common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/addr_family_aware_socket_option_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 namespace Envoy {
 namespace Network {

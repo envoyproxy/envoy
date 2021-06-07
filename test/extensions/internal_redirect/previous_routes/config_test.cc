@@ -2,9 +2,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/internal_redirect.h"
 
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/internal_redirect/previous_routes/config.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/internal_redirect/previous_routes/config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

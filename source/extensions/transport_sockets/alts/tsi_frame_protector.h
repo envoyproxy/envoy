@@ -2,7 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "extensions/transport_sockets/alts/grpc_tsi.h"
+#include "source/extensions/transport_sockets/alts/grpc_tsi.h"
 
 #include "grpc/slice_buffer.h"
 
