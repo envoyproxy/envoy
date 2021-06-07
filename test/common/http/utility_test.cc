@@ -6,12 +6,12 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
-#include "common/common/fmt.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -1465,6 +1465,31 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+}
+
+TEST(CheckRequiredHeaders, Request) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(
+                                  TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}));
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{
+                                  {":method", "CONNECT"}, {":authority", "localhost:1234"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :method"),
+            HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :path"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :authority"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+}
+
+TEST(CheckRequiredHeaders, Response) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredResponseHeaders(
+                                  TestResponseHeaderMapImpl{{":status", "200"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
+            HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :status"),
+      HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
 } // namespace Http

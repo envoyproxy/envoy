@@ -1,6 +1,6 @@
-#include "common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/common/quic/envoy_quic_proof_verifier_base.h"
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "openssl/ssl.h"
 #include "quiche/quic/core/crypto/certificate_view.h"

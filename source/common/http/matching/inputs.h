@@ -6,7 +6,7 @@
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Http {

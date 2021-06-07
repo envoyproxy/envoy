@@ -4,10 +4,9 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

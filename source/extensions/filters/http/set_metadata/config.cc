@@ -1,4 +1,4 @@
-#include "extensions/filters/http/set_metadata/config.h"
+#include "source/extensions/filters/http/set_metadata/config.h"
 
 #include <string>
 
@@ -6,9 +6,8 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/set_metadata/set_metadata_filter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 namespace Envoy {
 namespace Extensions {

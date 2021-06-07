@@ -2,9 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "common/http/header_list_view.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
+#include "source/common/http/header_list_view.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"

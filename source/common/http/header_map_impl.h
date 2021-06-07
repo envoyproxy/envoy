@@ -10,10 +10,10 @@
 #include "envoy/common/optref.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {

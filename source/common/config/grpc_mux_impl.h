@@ -14,13 +14,13 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/ttl.h"
-#include "common/config/utility.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/ttl.h"
+#include "source/common/config/utility.h"
 
 #include "absl/container/node_hash_map.h"
 

@@ -8,9 +8,9 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"

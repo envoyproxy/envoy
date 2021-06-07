@@ -1,4 +1,4 @@
-#include "server/drain_manager_impl.h"
+#include "source/server/drain_manager_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,7 +7,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Server {

@@ -11,8 +11,8 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
-#include "common/common/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Matchers {

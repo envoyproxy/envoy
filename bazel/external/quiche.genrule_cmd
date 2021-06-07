@@ -47,10 +47,10 @@ cat <<EOF >sed_commands
 /^#include/ s!"epoll_server/!"quiche/epoll_server/!
 
 # The above global substitutions will prepend "quiche" to the platform code which we want to undo.
-/^#include/ s!"quiche/common/quic/platform/!"common/quic/platform/!
+/^#include/ s!"quiche/common/quic/platform/!"source/common/quic/platform/!
 
 # Use envoy specific implementations for below platform APIs.
-/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"common/quic/platform/quiche_logging_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"source/common/quic/platform/quiche_logging_impl.h!
 
 # The reset platform APIs use the QUICHE default implementations.
 /^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!

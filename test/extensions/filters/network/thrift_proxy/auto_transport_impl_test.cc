@@ -1,8 +1,7 @@
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

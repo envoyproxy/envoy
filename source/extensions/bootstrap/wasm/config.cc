@@ -1,13 +1,12 @@
-#include "extensions/bootstrap/wasm/config.h"
+#include "source/extensions/bootstrap/wasm/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {

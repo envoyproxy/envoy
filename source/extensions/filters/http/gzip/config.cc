@@ -1,6 +1,6 @@
-#include "extensions/filters/http/gzip/config.h"
+#include "source/extensions/filters/http/gzip/config.h"
 
-#include "extensions/filters/http/gzip/gzip_filter.h"
+#include "source/extensions/filters/http/gzip/gzip_filter.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include <cstdint>
 #include <list>
@@ -7,11 +7,11 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/empty_string.h"
-#include "common/runtime/runtime_features.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
 
