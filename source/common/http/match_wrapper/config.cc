@@ -1,11 +1,11 @@
-#include "common/http/match_wrapper/config.h"
+#include "source/common/http/match_wrapper/config.h"
 
 #include "envoy/http/filter.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-#include "common/matcher/matcher.h"
+#include "source/common/config/utility.h"
+#include "source/common/matcher/matcher.h"
 
 #include "absl/status/status.h"
 
@@ -86,6 +86,10 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
 Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
+
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
+    throw EnvoyException("Experimental matching API is not enabled");
+  }
 
   ASSERT(proto_config.has_extension_config());
   auto& factory =

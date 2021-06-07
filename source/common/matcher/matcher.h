@@ -9,13 +9,13 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/field_matcher.h"
-#include "common/matcher/list_matcher.h"
-#include "common/matcher/validation_visitor.h"
-#include "common/matcher/value_input_matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/validation_visitor.h"
+#include "source/common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -148,6 +148,10 @@ private:
     case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kAndMatcher):
       return createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>>(
           field_predicate.and_matcher().predicate());
+    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
+      return std::make_unique<NotFieldMatcher<DataType>>(
+          createFieldMatcher(field_predicate.not_matcher()));
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -210,7 +214,7 @@ private:
     explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
         : common_protocol_input_(std::move(common_protocol_input)) {}
 
-    DataInputGetResult get(const DataType&) override {
+    DataInputGetResult get(const DataType&) const override {
       return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
                                 common_protocol_input_->get()};
     }

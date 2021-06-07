@@ -1,6 +1,6 @@
-#include "common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -46,7 +46,9 @@ HttpTracerManagerImpl::getOrCreateHttpTracer(const envoy::config::trace::v3::Tra
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       *config, factory_context_->messageValidationVisitor(), factory);
 
-  HttpTracerSharedPtr http_tracer = factory.createHttpTracer(*message, *factory_context_);
+  HttpTracerSharedPtr http_tracer = std::make_shared<Tracing::HttpTracerImpl>(
+      factory.createTracerDriver(*message, *factory_context_),
+      factory_context_->serverFactoryContext().localInfo());
   http_tracers_.emplace(cache_key, http_tracer); // cache a weak reference
   return http_tracer;
 }

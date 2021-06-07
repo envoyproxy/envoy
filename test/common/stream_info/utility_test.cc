@@ -1,5 +1,5 @@
-#include "common/network/address_impl.h"
-#include "common/stream_info/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
 

@@ -1,6 +1,8 @@
 #pragma once
 
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -22,21 +24,63 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {
 namespace Quic {
 
+class MockEnvoyQuicServerConnection : public EnvoyQuicServerConnection {
+public:
+  MockEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter& writer,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Network::Socket& listen_socket)
+      : MockEnvoyQuicServerConnection(
+            helper, alarm_factory, writer,
+            quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
+            quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345), supported_versions,
+            listen_socket) {}
+
+  MockEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                quic::QuicPacketWriter& writer,
+                                quic::QuicSocketAddress self_address,
+                                quic::QuicSocketAddress peer_address,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Network::Socket& listen_socket)
+      : EnvoyQuicServerConnection(
+            quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
+            &writer, /*owns_writer=*/false, supported_versions,
+            createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
+                                         "example.com", "h3-29")) {}
+
+  Network::Connection::ConnectionStats& connectionStats() const {
+    return QuicNetworkConnection::connectionStats();
+  }
+
+  MOCK_METHOD(void, SendConnectionClosePacket,
+              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
+  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+};
+
 class MockEnvoyQuicSession : public quic::QuicSpdySession, public QuicFilterManagerConnectionImpl {
 public:
   MockEnvoyQuicSession(const quic::QuicConfig& config,
                        const quic::ParsedQuicVersionVector& supported_versions,
-                       EnvoyQuicConnection* connection, Event::Dispatcher& dispatcher,
+                       EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
-        QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit) {
+        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                        send_buffer_limit) {
     crypto_stream_ = std::make_unique<quic::test::MockQuicCryptoStream>(this);
+  }
+
+  void Initialize() override {
+    quic::QuicSpdySession::Initialize();
+    initialized_ = true;
   }
 
   // From QuicSession.
@@ -57,6 +101,7 @@ public:
                quic::QuicStreamOffset bytes_written));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
               (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -70,6 +115,10 @@ public:
 
 protected:
   bool hasDataToWrite() override { return HasDataToWrite(); }
+  const quic::QuicConnection* quicConnection() const override {
+    return initialized_ ? connection() : nullptr;
+  }
+  quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
 private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
@@ -80,13 +129,19 @@ class MockEnvoyQuicClientSession : public quic::QuicSpdyClientSession,
 public:
   MockEnvoyQuicClientSession(const quic::QuicConfig& config,
                              const quic::ParsedQuicVersionVector& supported_versions,
-                             EnvoyQuicConnection* connection, Event::Dispatcher& dispatcher,
+                             EnvoyQuicClientConnection* connection, Event::Dispatcher& dispatcher,
                              uint32_t send_buffer_limit)
       : quic::QuicSpdyClientSession(config, supported_versions, connection,
                                     quic::QuicServerId("example.com", 443, false), &crypto_config_,
                                     nullptr),
-        QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
+        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                        send_buffer_limit),
         crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()) {}
+
+  void Initialize() override {
+    quic::QuicSpdyClientSession::Initialize();
+    initialized_ = true;
+  }
 
   // From QuicSession.
   MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::QuicStreamId id));
@@ -101,15 +156,21 @@ public:
                quic::StreamSendingState state, quic::TransmissionType type,
                absl::optional<quic::EncryptionLevel> level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
   }
 
+  using quic::QuicSession::closed_streams;
   using quic::QuicSpdySession::ActivateStream;
 
 protected:
   bool hasDataToWrite() override { return HasDataToWrite(); }
+  const quic::QuicConnection* quicConnection() const override {
+    return initialized_ ? connection() : nullptr;
+  }
+  quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
 private:
   quic::QuicCryptoClientConfig crypto_config_;

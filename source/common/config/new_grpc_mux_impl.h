@@ -9,14 +9,14 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/delta_subscription_state.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/pausable_ack_queue.h"
-#include "common/config/watch_map.h"
-#include "common/grpc/common.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/pausable_ack_queue.h"
+#include "source/common/config/watch_map.h"
+#include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {
@@ -50,8 +50,6 @@ public:
   ScopedResume pause(const std::string& type_url) override;
   ScopedResume pause(const std::vector<std::string> type_urls) override;
 
-  void registerVersionedTypeUrl(const std::string& type_url);
-
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
       ControlPlaneStats& control_plane_stats) override;
@@ -75,9 +73,10 @@ public:
 
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
-                      const bool use_namespace_matching, Event::Dispatcher& dispatcher)
+                      const bool use_namespace_matching, Event::Dispatcher& dispatcher,
+                      const bool wildcard)
         : watch_map_(use_namespace_matching),
-          sub_state_(type_url, watch_map_, local_info, dispatcher) {}
+          sub_state_(type_url, watch_map_, local_info, dispatcher, wildcard) {}
 
     WatchMap watch_map_;
     DeltaSubscriptionState sub_state_;
@@ -129,7 +128,9 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
-  void addSubscription(const std::string& type_url, bool use_namespace_matching);
+  // Adds a subscription for the type_url to the subscriptions map and order list.
+  void addSubscription(const std::string& type_url, bool use_namespace_matching,
+                       const bool wildcard);
 
   void trySendDiscoveryRequests();
 
@@ -168,8 +169,6 @@ private:
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
-
-  const bool enable_type_url_downgrade_and_upgrade_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

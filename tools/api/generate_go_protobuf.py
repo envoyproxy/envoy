@@ -2,10 +2,12 @@
 
 from subprocess import check_output
 from subprocess import check_call
+import argparse
 import glob
 import os
 import shlex
 import shutil
+import sys
 import re
 
 # Needed for CI to pass down bazel options.
@@ -13,7 +15,6 @@ BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
-OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'main'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
@@ -121,9 +122,19 @@ def updated(repo):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Generate Go protobuf files and sync with go-control-plane')
+    parser.add_argument('--sync', action='store_true')
+    parser.add_argument('--output_base', default='build_go')
+    args = parser.parse_args()
+
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
-    output = os.path.join(workspace, OUTPUT_BASE)
+    output = os.path.join(workspace, args.output_base)
     generate_protobufs(output)
+    if not args.sync:
+        print('Skipping sync with go-control-plane')
+        sys.exit()
+
     repo = os.path.join(workspace, REPO_BASE)
     clone_go_protobufs(repo)
     sync_go_protobufs(output, repo)

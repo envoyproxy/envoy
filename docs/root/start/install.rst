@@ -57,38 +57,16 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
    To add the nightly repository instead, replace the word ``stable`` with ``nightly``,
    when adding the ``apt`` repository.
 
-Install Envoy on CentOS Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on RPM-based distros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/centos/>`_
+You can `install Envoy on Centos/Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
 
    $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/centos/tetrate-getenvoy.repo
-   $ sudo yum install getenvoy-envoy
-
-.. tip::
-
-   You can enable/disable ``nightly`` using ``yum-config-manager``:
-
-   .. code-block:: console
-
-      $ sudo yum-config-manager --enable tetrate-getenvoy-nightly
-      $ sudo yum-config-manager --disable tetrate-getenvoy-nightly
-
-Install Envoy on Redhat Enterprise Linux (RHEL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can
-`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rhel/>`_
-using `Get Envoy <https://www.getenvoy.io/>`__.
-
-.. code-block:: console
-
-   $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rhel/tetrate-getenvoy.repo
+   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rpm/tetrate-getenvoy.repo
    $ sudo yum install getenvoy-envoy
 
 .. tip::
@@ -159,6 +137,13 @@ The following commands will pull and show the Envoy version of current images.
          $ docker pull envoyproxy/|envoy_docker_image|
          $ docker run --rm envoyproxy/|envoy_docker_image| --version
 
+   .. tab:: Envoy (distroless)
+
+      .. substitution-code-block:: console
+
+         $ docker pull envoyproxy/|envoy_distroless_docker_image|
+         $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
+
    .. tab:: Get Envoy
 
       .. code-block:: console
@@ -201,6 +186,12 @@ The following table shows the available Docker images
      - |DOCKER_IMAGE_TAG_NAME|
      -
      -
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
    * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      - |DOCKER_IMAGE_TAG_NAME|
@@ -225,6 +216,12 @@ The following table shows the available Docker images
      -
      - latest
      - latest
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     -
+     -
+     - latest
+     -
    * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
      - Release binary with symbols stripped on top of a **glibc** alpine base.
      -

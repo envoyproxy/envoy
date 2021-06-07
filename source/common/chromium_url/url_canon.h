@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common/chromium_url/envoy_shim.h"
-#include "common/chromium_url/url_parse.h"
-#include "common/common/mem_block_builder.h"
+#include "source/common/chromium_url/envoy_shim.h"
+#include "source/common/chromium_url/url_parse.h"
+#include "source/common/common/mem_block_builder.h"
 
 namespace chromium_url {
 

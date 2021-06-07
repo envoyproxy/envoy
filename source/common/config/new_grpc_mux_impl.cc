@@ -1,17 +1,17 @@
-#include "common/config/new_grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_context_params.h"
-#include "common/config/xds_resource.h"
-#include "common/memory/utils.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_context_params.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/memory/utils.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -30,9 +30,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      transport_api_version_(transport_api_version), dispatcher_(dispatcher),
-      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")) {}
+      transport_api_version_(transport_api_version), dispatcher_(dispatcher) {}
 
 void NewGrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   auto sub = subscriptions_.find(resource_type_url);
@@ -62,35 +60,15 @@ ScopedResume NewGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
-void NewGrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
-  TypeUrlMap& type_url_map = typeUrlMap();
-  if (type_url_map.find(type_url) != type_url_map.end()) {
-    return;
-  }
-  // If type_url is v3, earlier_type_url will contain v2 type url.
-  absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
-  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
-  if (earlier_type_url.has_value()) {
-    type_url_map[earlier_type_url.value()] = type_url;
-    type_url_map[type_url] = earlier_type_url.value();
-  }
-}
-
 void NewGrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-    ControlPlaneStats&) {
+    ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
-  auto sub = subscriptions_.find(message->type_url());
-  // If this type url is not watched, try another version type url.
-  if (enable_type_url_downgrade_and_upgrade_ && sub == subscriptions_.end()) {
-    const std::string& type_url = message->type_url();
-    registerVersionedTypeUrl(type_url);
-    TypeUrlMap& type_url_map = typeUrlMap();
-    if (type_url_map.find(type_url) != type_url_map.end()) {
-      sub = subscriptions_.find(type_url_map[type_url]);
-    }
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
   }
+  auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
               "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
@@ -150,10 +128,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    if (enable_type_url_downgrade_and_upgrade_) {
-      registerVersionedTypeUrl(type_url);
-    }
-    addSubscription(type_url, options.use_namespace_matching_);
+    addSubscription(type_url, options.use_namespace_matching_, resources.empty());
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
@@ -225,10 +200,11 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
-                                     const bool use_namespace_matching) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
-                                       type_url, local_info_, use_namespace_matching, dispatcher_));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
+                                     const bool wildcard) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_,
+                                                                       use_namespace_matching,
+                                                                       dispatcher_, wildcard));
   subscription_ordering_.emplace_back(type_url);
 }
 

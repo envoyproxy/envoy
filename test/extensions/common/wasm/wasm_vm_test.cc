@@ -1,8 +1,7 @@
 #include "envoy/registry/registry.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -60,7 +59,6 @@ TEST_F(BaseVmTest, NullVmStartup) {
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
-  EXPECT_TRUE(wasm_vm->getCustomSection("user").empty());
   EXPECT_EQ(wasm_vm->runtime(), "null");
   std::function<void()> f;
   EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
@@ -148,12 +146,6 @@ TEST_P(WasmVmTest, V8Code) {
   auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_rust.wasm"));
   EXPECT_TRUE(wasm_vm->load(code, GetParam()));
-
-  // Sanity checks for the expected test file.
-  if (!wasm_vm->getPrecompiledSectionName().empty()) {
-    EXPECT_TRUE(!wasm_vm->getCustomSection(wasm_vm->getPrecompiledSectionName()).empty());
-  }
-  EXPECT_THAT(wasm_vm->getCustomSection("producers"), HasSubstr("rustc"));
 
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm->clone() != nullptr);

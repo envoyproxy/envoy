@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "extensions/filters/network/mongo_proxy/bson.h"
+#include "source/extensions/filters/network/mongo_proxy/bson.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,7 +1,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/grpc_stream.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"

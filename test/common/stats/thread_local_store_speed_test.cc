@@ -3,14 +3,14 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -29,17 +29,16 @@ public:
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
 
     Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
-      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
+      stat_names_.push_back(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table_));
     });
   }
 
   ~ThreadLocalStorePerf() {
-    for (auto& stat_name_storage : stat_names_) {
-      stat_name_storage->free(symbol_table_);
+    if (tls_) {
+      tls_->shutdownGlobalThreading();
     }
     store_.shutdownThreading();
     if (tls_) {
-      tls_->shutdownGlobalThreading();
       tls_->shutdownThread();
     }
     if (dispatcher_) {
@@ -72,7 +71,7 @@ private:
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
-  std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
+  std::vector<std::unique_ptr<Stats::StatNameManagedStorage>> stat_names_;
 };
 
 } // namespace Envoy

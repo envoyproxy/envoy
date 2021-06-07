@@ -1,7 +1,9 @@
-#include "extensions/filters/http/ext_proc/processor_state.h"
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
 
-#include "extensions/filters/http/ext_proc/ext_proc.h"
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,10 +11,11 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode;
 
 using envoy::service::ext_proc::v3alpha::BodyResponse;
+using envoy::service::ext_proc::v3alpha::CommonResponse;
 using envoy::service::ext_proc::v3alpha::HeadersResponse;
+using envoy::service::ext_proc::v3alpha::TrailersResponse;
 
 void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout) {
   if (!message_timer_) {
@@ -21,34 +24,68 @@ void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseco
   message_timer_->enableTimer(timeout);
 }
 
-bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
-                                           ProcessingMode_BodySendMode body_mode) {
-  if (callback_state_ == CallbackState::Headers) {
+bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
+  if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response");
+    const auto& common_response = response.response();
     MutationUtils::applyCommonHeaderResponse(response, *headers_);
+    if (response.response().clear_route_cache()) {
+      filter_callbacks_->clearRouteCache();
+    }
     callback_state_ = CallbackState::Idle;
     clearWatermark();
     message_timer_->disableTimer();
 
-    if (body_mode == ProcessingMode::BUFFERED) {
-      if (body_send_deferred_) {
-        // If we get here, then all the body data came in before the header message
-        // was complete, and the server wants the body. So, don't continue filter
-        // processing, but send the buffered request body now.
-        ENVOY_LOG(debug, "Sending buffered request body message");
-        callback_state_ = CallbackState::BufferedBody;
-        startMessageTimer(std::bind(&Filter::onMessageTimeout, &filter_),
-                          filter_.config().messageTimeout());
-        filter_.sendBufferedData(*this, true);
+    if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
+      ENVOY_LOG(debug, "Replacing complete message");
+      // Completely replace the body that may already exist.
+      if (common_response.has_body_mutation()) {
+        // Always remove the content-length header if changing the body.
+        // The proxy can restore it later if it needs to.
+        headers_->removeContentLength();
+        body_replaced_ = true;
+        if (bufferedData() == nullptr) {
+          Buffer::OwnedImpl new_body;
+          MutationUtils::applyBodyMutations(common_response.body_mutation(), new_body);
+          addBufferedData(new_body);
+        } else {
+          modifyBufferedData([&common_response](Buffer::Instance& buf) {
+            MutationUtils::applyBodyMutations(common_response.body_mutation(), buf);
+          });
+        }
       }
 
-      // Otherwise, we're not ready to continue processing because then
-      // we won't be able to modify the headers any more, so do nothing and
-      // let the doData callback handle body chunks until the end is reached.
-      return true;
+      // Once this message is received, we won't send anything more on this request
+      // or response to the processor. Clear flags to make sure.
+      body_mode_ = ProcessingMode::NONE;
+      send_trailers_ = false;
+
+    } else {
+      if (body_mode_ == ProcessingMode::BUFFERED) {
+        if (complete_body_available_) {
+          // If we get here, then all the body data came in before the header message
+          // was complete, and the server wants the body. So, don't continue filter
+          // processing, but send the buffered request body now.
+          ENVOY_LOG(debug, "Sending buffered request body message");
+          filter_.sendBufferedData(*this, true);
+        }
+
+        // Otherwise, we're not ready to continue processing because then
+        // we won't be able to modify the headers any more, so do nothing and
+        // let the doData callback handle body chunks until the end is reached.
+        return true;
+      }
+
+      if (send_trailers_ && trailers_available_) {
+        // Trailers came in while we were waiting for this response, and the server
+        // is not interested in the body, so send them now.
+        filter_.sendTrailers(*this, *trailers_);
+        return true;
+      }
     }
 
-    // If we got here, then the processor doesn't care about the body, so we can just continue.
+    // If we got here, then the processor doesn't care about the body or is not ready for
+    // trailers, so we can just continue.
     headers_ = nullptr;
     continueProcessing();
     return true;
@@ -57,12 +94,38 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response,
 }
 
 bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  if (callback_state_ == CallbackState::BufferedBody) {
+  if (callback_state_ == CallbackState::BufferedBodyCallback) {
     ENVOY_LOG(debug, "Applying body response to buffered data");
     modifyBufferedData([this, &response](Buffer::Instance& data) {
       MutationUtils::applyCommonBodyResponse(response, headers_, data);
     });
+    if (response.response().clear_route_cache()) {
+      filter_callbacks_->clearRouteCache();
+    }
     headers_ = nullptr;
+    callback_state_ = CallbackState::Idle;
+    message_timer_->disableTimer();
+
+    if (send_trailers_ && trailers_available_) {
+      // Trailers came in while we were waiting for this response, and the server
+      // asked to see them -- send them now.
+      filter_.sendTrailers(*this, *trailers_);
+      return true;
+    }
+
+    continueProcessing();
+    return true;
+  }
+  return false;
+}
+
+bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
+  if (callback_state_ == CallbackState::TrailersCallback) {
+    ENVOY_LOG(debug, "Applying response to buffered trailers");
+    if (response.has_header_mutation()) {
+      MutationUtils::applyHeaderMutations(response.header_mutation(), *trailers_, false);
+    }
+    trailers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
     continueProcessing();
@@ -74,8 +137,8 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
 void ProcessorState::clearAsyncState() {
   cleanUpTimer();
   if (callback_state_ != CallbackState::Idle) {
-    callback_state_ = CallbackState::Idle;
     continueProcessing();
+    callback_state_ = CallbackState::Idle;
   }
 }
 
@@ -83,6 +146,14 @@ void ProcessorState::cleanUpTimer() const {
   if (message_timer_ && message_timer_->enabled()) {
     message_timer_->disableTimer();
   }
+}
+
+void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.request_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.request_trailer_mode() == ProcessingMode::SEND;
+  body_mode_ = mode.request_body_mode();
 }
 
 void DecodingProcessorState::requestWatermark() {
@@ -99,6 +170,14 @@ void DecodingProcessorState::clearWatermark() {
     watermark_requested_ = false;
     decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   }
+}
+
+void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
+  // Account for the different default behaviors of headers and trailers --
+  // headers are sent by default and trailers are not.
+  send_headers_ = mode.response_header_mode() != ProcessingMode::SKIP;
+  send_trailers_ = mode.response_trailer_mode() == ProcessingMode::SEND;
+  body_mode_ = mode.response_body_mode();
 }
 
 void EncodingProcessorState::requestWatermark() {

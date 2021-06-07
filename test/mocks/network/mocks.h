@@ -17,9 +17,9 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/filter_manager_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/connection.h"
@@ -153,6 +153,7 @@ public:
   MOCK_METHOD(uint32_t, workerIndex, (), (const));
   MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
   MOCK_METHOD(void, post, (Network::UdpRecvData && data));
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -421,7 +422,7 @@ public:
   MOCK_METHOD(void, setRejectFraction, (UnitFloat));
 };
 
-class MockConnectionHandler : public ConnectionHandler {
+class MockConnectionHandler : public virtual ConnectionHandler {
 public:
   MockConnectionHandler();
   ~MockConnectionHandler() override;
@@ -441,6 +442,8 @@ public:
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
+
+  uint64_t num_handler_connections_{};
 };
 
 class MockIp : public Address::Ip {

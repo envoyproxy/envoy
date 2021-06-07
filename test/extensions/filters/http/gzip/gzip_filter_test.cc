@@ -2,13 +2,12 @@
 
 #include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
-#include "common/common/hex.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
-#include "extensions/filters/http/gzip/config.h"
-#include "extensions/filters/http/gzip/gzip_filter.h"
+#include "source/common/common/hex.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/extensions/filters/http/gzip/config.h"
+#include "source/extensions/filters/http/gzip/gzip_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

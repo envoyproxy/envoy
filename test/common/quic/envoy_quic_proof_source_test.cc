@@ -2,11 +2,10 @@
 #include <string>
 #include <vector>
 
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -73,8 +72,9 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
-    verifier_ =
-        std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
+    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
+        store_, client_context_config_, time_system_);
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
   // quic::ProofSource::Callback
@@ -153,9 +153,8 @@ public:
                     *connection_socket.addressProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                     *connection_socket.addressProvider().remoteAddress());
-          EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                    connection_socket.detectedTransportProtocol());
-          EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+          EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+          EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));
     EXPECT_CALL(filter_chain_, transportSocketFactory())
@@ -242,9 +241,8 @@ TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
                   *connection_socket.addressProvider().localAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
                   *connection_socket.addressProvider().remoteAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                  connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+        EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+        EXPECT_EQ("h3-29", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
       }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())

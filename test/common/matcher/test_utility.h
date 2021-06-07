@@ -3,7 +3,7 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -48,7 +48,7 @@ private:
 // A DataInput that returns the configured value every time.
 struct TestInput : public DataInput<TestData> {
   explicit TestInput(DataInputGetResult result) : result_(result) {}
-  DataInputGetResult get(const TestData&) override { return result_; }
+  DataInputGetResult get(const TestData&) const override { return result_; }
 
   DataInputGetResult result_;
 };

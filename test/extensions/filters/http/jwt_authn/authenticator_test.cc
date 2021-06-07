@@ -1,12 +1,11 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/common/jwks_fetcher.h"
-#include "extensions/filters/http/jwt_authn/authenticator.h"
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/extensions/filters/http/jwt_authn/mock.h"
@@ -108,6 +107,9 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
     // Verify the token is removed.
     EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
   }
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.
@@ -131,6 +133,9 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Payload not set by default
   EXPECT_EQ(out_name_, "");
+
+  EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // This test verifies the Jwt payload is set.
@@ -181,6 +186,9 @@ TEST_F(AuthenticatorTest, TestWrongIssuer) {
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(OtherGoodToken)}};
   expectVerifyStatus(Status::JwtUnknownIssuer, headers);
+
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_success_.value());
+  EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
 }
 
 // Jwt "iss" is "other.com", "issuer" in JwtProvider is not specified,

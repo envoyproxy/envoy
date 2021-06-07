@@ -1,7 +1,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
