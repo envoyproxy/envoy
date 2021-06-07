@@ -6,6 +6,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/timespan_impl.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
 #include "source/common/upstream/upstream_impl.h"
@@ -71,7 +72,7 @@ Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
-  return {ALL_DNS_CACHE_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+  return {ALL_DNS_CACHE_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
 DnsCacheImpl::LoadDnsCacheEntryResult
@@ -234,8 +235,11 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ENVOY_LOG(debug, "starting main thread resolve for host='{}' dns='{}' port='{}'", host,
             host_info.host_info_->resolvedHost(), host_info.port_);
   ASSERT(host_info.active_query_ == nullptr);
+  ASSERT(host_info.resolution_timespan_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
+  host_info.resolution_timespan_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      stats_.time_to_resolution_ms_, main_thread_dispatcher_.timeSource());
 
   host_info.active_query_ =
       resolver_->resolve(host_info.host_info_->resolvedHost(), dns_lookup_family_,
@@ -249,6 +253,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  Network::DnsResolver::ResolutionStatus status,
                                  std::list<Network::DnsResponse>&& response) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
+
   ENVOY_LOG(debug, "main thread resolve complete for host '{}'. {} results", host, response.size());
 
   // Functions like this one that modify primary_hosts_ are only called in the main thread so we
@@ -259,6 +264,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     ASSERT(primary_host_it != primary_hosts_.end());
     return primary_host_it->second.get();
   }();
+
+  primary_host_info->resolution_timespan_->complete();
+  primary_host_info->resolution_timespan_.reset();
 
   const bool first_resolve = !primary_host_info->host_info_->firstResolveComplete();
   primary_host_info->active_query_ = nullptr;

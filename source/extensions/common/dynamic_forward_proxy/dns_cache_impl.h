@@ -4,6 +4,7 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/dns.h"
+#include "envoy/stats/timespan.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/cleanup.h"
@@ -20,7 +21,7 @@ namespace DynamicForwardProxy {
 /**
  * All DNS cache stats. @see stats_macros.h
  */
-#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE)                                                        \
+#define ALL_DNS_CACHE_STATS(COUNTER, GAUGE, HISTOGRAM)                                             \
   COUNTER(dns_query_attempt)                                                                       \
   COUNTER(dns_query_failure)                                                                       \
   COUNTER(dns_query_success)                                                                       \
@@ -29,13 +30,14 @@ namespace DynamicForwardProxy {
   COUNTER(host_overflow)                                                                           \
   COUNTER(host_removed)                                                                            \
   COUNTER(dns_rq_pending_overflow)                                                                 \
-  GAUGE(num_hosts, NeverImport)
+  GAUGE(num_hosts, NeverImport)                                                                    \
+  HISTOGRAM(time_to_resolution_ms, Milliseconds)
 
 /**
  * Struct definition for all DNS cache stats. @see stats_macros.h
  */
 struct DnsCacheStats {
-  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_DNS_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy> {
@@ -147,6 +149,7 @@ private:
     const Event::TimerPtr refresh_timer_;
     const DnsHostInfoImplSharedPtr host_info_;
     Network::ActiveDnsQuery* active_query_{};
+    Stats::TimespanPtr resolution_timespan_{};
   };
 
   // Hold PrimaryHostInfo by shared_ptr to avoid having to hold the map mutex while updating
