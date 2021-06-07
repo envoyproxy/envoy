@@ -23,6 +23,8 @@ constexpr size_t MIN_QUERY_NAME_LENGTH = 3;
 constexpr size_t MAX_LABEL_LENGTH = 63;
 constexpr size_t MAX_NAME_LENGTH = 255;
 
+constexpr size_t MAX_SUFFIX_LABEL_COUNT = 2;
+
 // Amazon Route53 will return up to 8 records in an answer
 // https://aws.amazon.com/route53/faqs/#associate_multiple_ip_with_single_record
 constexpr size_t MAX_RETURNED_RECORDS = 8;

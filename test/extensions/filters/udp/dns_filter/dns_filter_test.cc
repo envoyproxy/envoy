@@ -119,12 +119,6 @@ stat_prefix: "my_prefix"
 server_config:
   inline_dns_table:
     external_retry_count: 3
-    known_suffixes:
-    - suffix: foo1.com
-    - suffix: foo2.com
-    - suffix: foo3.com
-    - suffix: foo16.com
-    - suffix: thisismydomainforafivehundredandtwelvebytetest.com
     virtual_domains:
     - name: "www.foo1.com"
       endpoint:
@@ -197,9 +191,6 @@ client_config:
 server_config:
   inline_dns_table:
     external_retry_count: 0
-    known_suffixes:
-    - suffix: foo1.com
-    - suffix: foo2.com
     virtual_domains:
       - name: "www.foo1.com"
         endpoint:
@@ -277,7 +268,6 @@ server_config:
   const std::string external_dns_table_json = R"EOF(
 {
   "external_retry_count": 3,
-  "known_suffixes": [ { "suffix": "com" } ],
   "virtual_domains": [
     {
       "name": "www.external_foo1.com",
@@ -297,8 +287,6 @@ server_config:
 
   const std::string external_dns_table_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "com"
 virtual_domains:
   - name: "www.external_foo1.com"
     endpoint:
@@ -324,8 +312,6 @@ virtual_domains:
 
   const std::string max_records_table_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "ermac.com"
 virtual_domains:
   - name: "one.web.ermac.com"
     endpoint:
@@ -388,8 +374,6 @@ virtual_domains:
 
   const std::string external_dns_table_services_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "subzero.com"
 virtual_domains:
   - name: "primary.voip.subzero.com"
     endpoint:

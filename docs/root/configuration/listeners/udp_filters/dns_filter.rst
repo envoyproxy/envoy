@@ -53,12 +53,6 @@ Example Configuration
         max_pending_lookups: 256
       server_config:
         inline_dns_table:
-          known_suffixes:
-          - suffix: "domain1.com"
-          - suffix: "domain2.com"
-          - suffix: "domain3.com"
-          - suffix: "domain4.com"
-          - suffix: "domain5.com"
           virtual_domains:
             - name: "www.domain1.com"
               endpoint:
@@ -151,10 +145,6 @@ DnsTable JSON Configuration
 .. code-block:: json
 
   {
-    "known_suffixes": [
-      { "suffix": "suffix1.com" },
-      { "suffix": "suffix2.com" }
-    ],
     "virtual_domains": [
       {
         "name": "www.suffix1.com",
