@@ -590,10 +590,15 @@ TEST(PacketLoss, LossTest) {
   sockaddr_storage storage;
   auto& sin = reinterpret_cast<sockaddr_in&>(storage);
   sin.sin_family = kernel_version;
+  sin.sin_port = 0;
   EXPECT_EQ(1,
             inet_pton(kernel_version, Network::Test::getLoopbackAddressUrlString(version).c_str(),
                       &sin.sin_addr));
   ASSERT_EQ(0, bind(fd, reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
+
+  // Get the port.
+  socklen_t storage_len = sizeof(storage);
+  ASSERT_EQ(0, getsockname(fd, reinterpret_cast<sockaddr*>(&storage), &storage_len));
 
   // Set the buffer size artificially small.
   int receive_buffer_size = 1000;
