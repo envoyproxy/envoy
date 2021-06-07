@@ -112,8 +112,8 @@ INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingTest, GRPC_CLIENT_INTEGRAT
 // Send a body that's larger than the buffer limit, and have the processor return immediately
 // after the headers come in.
 TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
-  const int num_chunks = 150;
-  const int chunk_size = 1000;
+  uint32_t num_chunks = 150;
+  uint32_t chunk_size = 1000;
 
   // This starts the gRPC server in the background. It'll be shut down when we stop the tests.
   test_processor_.start(
@@ -134,11 +134,11 @@ TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
 
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto& encoder = sendClientRequestHeaders([](Http::HeaderMap& headers) {
+  auto& encoder = sendClientRequestHeaders([num_chunks, chunk_size](Http::HeaderMap& headers) {
     headers.addCopy(LowerCaseString("expect_request_size_bytes"), num_chunks * chunk_size);
   });
 
-  for (int i = 0; i < num_chunks; i++) {
+  for (uint32_t i = 0; i < num_chunks; i++) {
     Buffer::OwnedImpl chunk;
     TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
     codec_client_->sendData(encoder, chunk, false);
@@ -154,12 +154,12 @@ TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
 // Send a body that's smaller than the buffer limit, and have the processor
 // request to see it in buffered form before allowing it to continue.
 TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
-  const int num_chunks = 99;
-  const int chunk_size = 1000;
-  const int total_size = num_chunks * chunk_size;
+  const uint32_t num_chunks = 99;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
-      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -194,11 +194,11 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
 
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto& encoder = sendClientRequestHeaders([](Http::HeaderMap& headers) {
+  auto& encoder = sendClientRequestHeaders([total_size](Http::HeaderMap& headers) {
     headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
   });
 
-  for (int i = 0; i < num_chunks; i++) {
+  for (uint32_t i = 0; i < num_chunks; i++) {
     Buffer::OwnedImpl chunk;
     TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
     codec_client_->sendData(encoder, chunk, false);
@@ -214,10 +214,10 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
 TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
-  const int response_size = 90000;
+  uint32_t response_size = 90000;
 
   test_processor_.start(
-      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -265,9 +265,9 @@ TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
 TEST_P(StreamingTest, PostAndProcessBufferedRequestBodyTooBig) {
   // Send just one chunk beyond the buffer limit -- integration
   // test framework can't handle anything else.
-  const int num_chunks = 11;
-  const int chunk_size = 10000;
-  const int total_size = num_chunks * chunk_size;
+  const uint32_t num_chunks = 11;
+  const uint32_t chunk_size = 10000;
+  uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
       [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
@@ -296,11 +296,11 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBodyTooBig) {
 
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto& encoder = sendClientRequestHeaders([](Http::HeaderMap& headers) {
+  auto& encoder = sendClientRequestHeaders([total_size](Http::HeaderMap& headers) {
     headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
   });
 
-  for (int i = 0; i < num_chunks; i++) {
+  for (uint32_t i = 0; i < num_chunks; i++) {
     Buffer::OwnedImpl chunk;
     TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
     codec_client_->sendData(encoder, chunk, false);
