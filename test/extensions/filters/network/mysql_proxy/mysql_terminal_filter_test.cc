@@ -61,6 +61,11 @@ public:
 
   DecoderPtr create(DecoderCallbacks&) override { return DecoderPtr{decoder_}; }
 
+  bool isTraceLogLevel() {
+    return (Envoy::Logger::Registry::getLog(Envoy::Logger::Id::connection).level() ==
+            spdlog::level::level_enum::trace);
+  }
+
   void SetUp() override {
     {
       auto proto_config = parseProtoFromYaml(yaml_string);
@@ -458,7 +463,7 @@ void MySQLTerminalFitlerTest::clientSendQuery() {
     data.drain(data.length());
     exec(
         [&]() {
-          EXPECT_CALL(read_callbacks_, connection()).Times(1 + 1);
+          EXPECT_CALL(read_callbacks_, connection()).Times(1 + 1 + isTraceLogLevel());
           EXPECT_CALL(store_.counter_, inc());
           filter_->onCommand(command);
         },
@@ -477,7 +482,7 @@ void MySQLTerminalFitlerTest::clientSendInvalidQuery() {
     data.drain(data.length());
     exec(
         [&]() {
-          EXPECT_CALL(read_callbacks_, connection());
+          EXPECT_CALL(read_callbacks_, connection()).Times(1 + isTraceLogLevel());
           EXPECT_CALL(store_.counter_, inc());
           filter_->onCommand(command);
         },
