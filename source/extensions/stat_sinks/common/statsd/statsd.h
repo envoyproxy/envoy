@@ -45,12 +45,12 @@ public:
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
                 absl::optional<uint64_t> buffer_size = absl::nullopt,
-                const Statsd::TagFormat tag_format = DefaultTagFormat);
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
                 absl::optional<uint64_t> buffer_size = absl::nullopt,
-                const Statsd::TagFormat tag_format = DefaultTagFormat)
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
         buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {

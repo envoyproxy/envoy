@@ -9,6 +9,7 @@
 #include "common/network/utility.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "extensions/stat_sinks/common/statsd/tag_formats.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -458,7 +459,7 @@ TEST(UdpStatsdSinkWithTagsTest, GraphiteTagSyntax) {
   auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
   writer_ptr->delegateBufferFake();
   NiceMock<ThreadLocal::MockInstance> tls_;
-  UdpStatsdSink sink(tls_, writer_ptr, true, getDefaultPrefix(), 1024, GraphiteTagFormat);
+  UdpStatsdSink sink(tls_, writer_ptr, true, getDefaultPrefix(), 1024, getGraphiteTagFormat());
 
   std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
   NiceMock<Stats::MockCounter> counter;

@@ -34,7 +34,7 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
     }
     return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
                                                            true, statsd_sink.prefix(), max_bytes,
-                                                           Common::Statsd::GraphiteTagFormat);
+                                                           Common::Statsd::getGraphiteTagFormat());
   }
   default:
     // Verified by schema.
