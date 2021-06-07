@@ -14,15 +14,15 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/event/libevent_scheduler.h"
-#include "common/http/headers.h"
-#include "server/active_listener_base.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/http/headers.h"
+#include "source/server/active_listener_base.h"
 
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_session.h"
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"

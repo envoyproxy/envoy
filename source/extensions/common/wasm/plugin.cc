@@ -1,4 +1,4 @@
-#include "extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 #include "envoy/common/exception.h"
 

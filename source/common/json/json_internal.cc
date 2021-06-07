@@ -1,4 +1,4 @@
-#include "common/json/json_internal.h"
+#include "source/common/json/json_internal.h"
 
 #include <cstdint>
 #include <fstream>
@@ -9,11 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
 
 // Do not let nlohmann/json leak outside of this file.
 #include "include/nlohmann/json.hpp"
@@ -209,7 +209,7 @@ public:
                        "documentation in case error string changed.");
     } else {
       // Extract portion after ": " to get error string.
-      error_ = error.substr(end + 2);
+      error_ = std::string(error.substr(end + 2));
       // Extract position information if present.
       auto start = error.find("at ");
       if (start != std::string::npos && (start + 3) < end) {

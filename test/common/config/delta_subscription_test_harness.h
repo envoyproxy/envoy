@@ -7,10 +7,10 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/grpc_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/version_converter.h"
-#include "common/grpc/common.h"
+#include "source/common/config/grpc_subscription_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/common.h"

@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
 
-#include "extensions/filters/http/set_metadata/config.h"
-#include "extensions/filters/http/set_metadata/set_metadata_filter.h"
+#include "source/extensions/filters/http/set_metadata/config.h"
+#include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"

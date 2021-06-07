@@ -1,4 +1,4 @@
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include <chrono>
 #include <memory>
@@ -17,31 +17,31 @@
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/default_server_string.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/request_id_extension_impl.h"
-#include "common/http/utility.h"
-#include "common/local_reply/local_reply.h"
-#include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/default_server_string.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/request_id_extension_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 #endif
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

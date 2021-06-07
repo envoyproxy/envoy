@@ -7,12 +7,12 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/pausable_ack_queue.h"
-#include "common/config/ttl.h"
-#include "common/config/watch_map.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/pausable_ack_queue.h"
+#include "source/common/config/ttl.h"
+#include "source/common/config/watch_map.h"
 
 #include "absl/container/node_hash_map.h"
 

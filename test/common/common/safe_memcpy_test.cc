@@ -1,10 +1,10 @@
 #include <vector>
 
-#include "common/common/safe_memcpy.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/test_common/utility.h"
 

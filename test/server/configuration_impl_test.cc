@@ -7,15 +7,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/config/well_known_names.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/cluster_manager_impl.h"
-
-#include "server/configuration_impl.h"
-
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

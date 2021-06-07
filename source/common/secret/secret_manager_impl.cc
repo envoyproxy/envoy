@@ -1,4 +1,4 @@
-#include "common/secret/secret_manager_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -6,14 +6,14 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/sds_api.h"
-#include "common/secret/secret_provider_impl.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/secret/secret_provider_impl.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {

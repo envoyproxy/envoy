@@ -3,9 +3,9 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/config/config_provider_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/mocks/server/instance.h"

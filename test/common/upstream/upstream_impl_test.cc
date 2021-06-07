@@ -16,13 +16,12 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/static_cluster.h"
-#include "common/upstream/strict_dns_cluster.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/static_cluster.h"
+#include "source/common/upstream/strict_dns_cluster.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -2343,22 +2342,22 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 123);
+  EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
 // Eds service_name is populated.

@@ -6,7 +6,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Extensions {

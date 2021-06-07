@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 
-#include "extensions/filters/http/ratelimit/config.h"
+#include "source/extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
