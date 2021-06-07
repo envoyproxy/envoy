@@ -308,7 +308,7 @@ matcher_list:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_FALSE(result.on_match_.has_value());
 }

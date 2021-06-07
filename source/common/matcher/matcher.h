@@ -131,6 +131,7 @@ private:
       return std::make_unique<MatcherT>(std::move(matchers));
     };
   }
+
   FieldMatcherFactoryCb<DataType> createFieldMatcher(
       const envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate& field_predicate) {
     switch (field_predicate.match_type_case()) {
@@ -149,8 +150,11 @@ private:
       return createAggregateFieldMatcherFactoryCb<AllFieldMatcher<DataType>>(
           field_predicate.and_matcher().predicate());
     case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
-      return std::make_unique<NotFieldMatcher<DataType>>(
-          createFieldMatcher(field_predicate.not_matcher()));
+      auto matcher_factory = createFieldMatcher(field_predicate.not_matcher());
+
+      return [matcher_factory]() {
+        return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory());
+      };
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
