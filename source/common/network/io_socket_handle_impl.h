@@ -6,8 +6,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/common/logger.h"
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
 namespace Network {

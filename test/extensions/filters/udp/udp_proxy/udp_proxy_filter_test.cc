@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
-#include "common/common/hash.h"
-#include "common/network/socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/common/common/hash.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/socket.h"

@@ -1,10 +1,10 @@
-#include "common/router/shadow_writer_impl.h"
+#include "source/common/router/shadow_writer_impl.h"
 
 #include <chrono>
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/http/headers.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/headers.h"
 
 #include "absl/strings/str_join.h"
 

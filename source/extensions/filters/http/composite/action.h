@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
 
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {

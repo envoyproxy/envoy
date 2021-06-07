@@ -1,4 +1,4 @@
-#include "extensions/filters/http/admission_control/admission_control.h"
+#include "source/extensions/filters/http/admission_control/admission_control.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,15 +12,14 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/enum_to_int.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

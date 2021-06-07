@@ -1,7 +1,7 @@
-#include "common/buffer/watermark_buffer.h"
+#include "source/common/buffer/watermark_buffer.h"
 
-#include "common/common/assert.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Buffer {

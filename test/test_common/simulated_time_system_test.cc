@@ -1,7 +1,7 @@
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/event/timer_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/event/timer_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"

@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["buffer_filter_test.cc"],
     extension_name = "envoy.filters.http.buffer",
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/http:header_map_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/buffer:buffer_filter_lib",

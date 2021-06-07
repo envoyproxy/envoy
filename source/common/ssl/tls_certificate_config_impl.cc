@@ -1,12 +1,12 @@
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/config/datasource.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Ssl {

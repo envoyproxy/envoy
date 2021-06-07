@@ -1,4 +1,4 @@
-#include "common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 

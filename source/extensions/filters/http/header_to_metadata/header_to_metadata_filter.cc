@@ -1,15 +1,14 @@
-#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
-#include "common/common/base64.h"
-#include "common/common/regex.h"
-#include "common/config/well_known_names.h"
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/regex.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"

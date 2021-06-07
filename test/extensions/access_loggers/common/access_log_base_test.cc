@@ -1,4 +1,4 @@
-#include "extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/access_loggers/common/access_log_base.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

@@ -1,10 +1,8 @@
-#include "common/crypto/utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
 
 #include "test/integration/http_integration.h"
 

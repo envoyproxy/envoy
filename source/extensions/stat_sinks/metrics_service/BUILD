@@ -16,10 +16,10 @@ envoy_cc_library(
     srcs = ["grpc_metrics_service_impl.cc"],
     hdrs = ["grpc_metrics_service_impl.h"],
     deps = [
-        "//include/envoy/grpc:async_client_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/metrics/v3:pkg_cc_proto",
@@ -44,7 +44,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/stat_sinks:well_known_names",

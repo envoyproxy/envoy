@@ -8,17 +8,16 @@
 #include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/async_client_utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
-#include "common/upstream/cluster_update_tracker.h"
-
-#include "extensions/tracers/zipkin/span_buffer.h"
-#include "extensions/tracers/zipkin/tracer.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/async_client_utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/common/upstream/cluster_update_tracker.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {

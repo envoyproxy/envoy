@@ -14,9 +14,9 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_protos.h"
-#include "common/upstream/edf_scheduler.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/common/upstream/edf_scheduler.h"
 
 namespace Envoy {
 namespace Upstream {
