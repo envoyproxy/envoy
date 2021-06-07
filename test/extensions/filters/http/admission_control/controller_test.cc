@@ -102,6 +102,9 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
 
 // Test for function: averageRps.
 TEST_F(ThreadLocalControllerTest, AverageRps) {
+  // Validate historical_data_.empty()
+  EXPECT_EQ(0, tlc_.averageRps());
+
   // Validate global_data_.requests == 0
   tlc_.requestCounts();
   EXPECT_EQ(0, tlc_.averageRps());
