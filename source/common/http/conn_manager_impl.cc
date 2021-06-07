@@ -276,7 +276,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   accumulated_requests_++;
   if (config_.maxRequestsPerConnection() > 0 &&
       accumulated_requests_ >= config_.maxRequestsPerConnection()) {
-    read_callbacks_->connection().readDisable(true);
+    startDrainSequence();
     requests_overflow_ = true;
     stats_.named_.downstream_cx_max_requests_.inc();
   }
