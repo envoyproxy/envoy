@@ -123,6 +123,25 @@ RAW_TRY_ALLOWLIST = (
     "./source/common/network/utility.cc",
 )
 
+# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+# now this is just WASM which makes use of std::string_view heavily so we need to convert to
+# absl::string_view internally. Everywhere else should be using absl::string_view for additional
+# safety.
+STD_STRING_VIEW_ALLOWLIST = (
+    "./source/extensions/common/wasm/context.h",
+    "./source/extensions/common/wasm/context.cc",
+    "./source/extensions/common/wasm/foreign.cc",
+    "./source/extensions/common/wasm/wasm.h",
+    "./source/extensions/common/wasm/wasm.cc",
+    "./source/extensions/common/wasm/wasm_vm.h",
+    "./source/extensions/common/wasm/wasm_vm.cc",
+    "./test/extensions/bootstrap/wasm/wasm_speed_test.cc",
+    "./test/extensions/bootstrap/wasm/wasm_test.cc",
+    "./test/extensions/common/wasm/wasm_test.cc",
+    "./test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc",
+    "./test/test_common/wasm_base.h",
+)
+
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config
 # processing.
@@ -437,6 +456,9 @@ class FormatChecker:
 
     def allow_listed_for_serialize_as_string(self, file_path):
         return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
+
+    def allow_listed_for_std_string_view(self, file_path):
+        return file_path in STD_STRING_VIEW_ALLOWLIST
 
     def allow_listed_for_json_string_to_message(self, file_path):
         return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
@@ -824,8 +846,12 @@ class FormatChecker:
             report_error("Don't use std::monostate; use absl::monostate instead")
         if self.token_in_line("std::optional", line):
             report_error("Don't use std::optional; use absl::optional instead")
-        if self.token_in_line("std::string_view", line):
-            report_error("Don't use std::string_view; use absl::string_view instead")
+        if not self.allow_listed_for_std_string_view(
+                file_path) and not "NOLINT(std::string_view)" in line:
+            if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",
+                                                                                  line):
+                report_error(
+                    "Don't use std::string_view or toStdStringView; use absl::string_view instead")
         if self.token_in_line("std::variant", line):
             report_error("Don't use std::variant; use absl::variant instead")
         if self.token_in_line("std::visit", line):
