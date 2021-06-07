@@ -31,7 +31,7 @@ namespace DynamicForwardProxy {
   COUNTER(host_removed)                                                                            \
   COUNTER(dns_rq_pending_overflow)                                                                 \
   GAUGE(num_hosts, NeverImport)                                                                    \
-  HISTOGRAM(time_to_resolution_ms, Milliseconds)
+  HISTOGRAM(time_to_resolution, Milliseconds)
 
 /**
  * Struct definition for all DNS cache stats. @see stats_macros.h

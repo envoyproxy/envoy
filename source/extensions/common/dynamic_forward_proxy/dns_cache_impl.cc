@@ -239,7 +239,7 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
 
   stats_.dns_query_attempt_.inc();
   host_info.resolution_timespan_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      stats_.time_to_resolution_ms_, main_thread_dispatcher_.timeSource());
+      stats_.time_to_resolution_, main_thread_dispatcher_.timeSource());
 
   host_info.active_query_ =
       resolver_->resolve(host_info.host_info_->resolvedHost(), dns_lookup_family_,
