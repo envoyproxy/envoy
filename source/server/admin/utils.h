@@ -5,9 +5,9 @@
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/init/manager.h"
 
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Server {

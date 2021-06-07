@@ -4,7 +4,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {

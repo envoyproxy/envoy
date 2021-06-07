@@ -1,4 +1,4 @@
-#include "common/upstream/logical_host.h"
+#include "source/common/upstream/logical_host.h"
 
 namespace Envoy {
 namespace Upstream {

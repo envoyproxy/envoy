@@ -1,5 +1,5 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/well_known_names.h"
 
 #include "test/mocks/server/listener_factory_context.h"
 

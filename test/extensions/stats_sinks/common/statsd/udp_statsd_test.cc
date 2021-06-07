@@ -3,12 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"

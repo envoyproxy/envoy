@@ -4,7 +4,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/jwt_authn/jwt_cache.h"
+#include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/simulated_time_system.h"

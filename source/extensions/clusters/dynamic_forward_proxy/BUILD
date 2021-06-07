@@ -16,7 +16,6 @@ envoy_cc_extension(
         "//source/common/network:transport_socket_options_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:logical_host_lib",
-        "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

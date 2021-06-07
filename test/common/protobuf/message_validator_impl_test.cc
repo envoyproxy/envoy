@@ -1,7 +1,7 @@
 #include "envoy/common/exception.h"
 
-#include "common/protobuf/message_validator_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"

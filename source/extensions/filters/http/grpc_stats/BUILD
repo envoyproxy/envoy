@@ -15,9 +15,9 @@ envoy_cc_extension(
     srcs = ["grpc_stats_filter.cc"],
     hdrs = ["grpc_stats_filter.h"],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/stream_info:filter_state_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/grpc:context_lib",

@@ -1,12 +1,12 @@
-#include "common/version/version.h"
+#include "source/common/version/version.h"
 
 #include <map>
 #include <regex>
 #include <string>
 
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"

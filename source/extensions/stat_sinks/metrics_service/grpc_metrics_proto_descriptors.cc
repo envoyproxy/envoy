@@ -1,12 +1,12 @@
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 
 #include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {

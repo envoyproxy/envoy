@@ -1,4 +1,4 @@
-#include "extensions/filters/http/jwt_authn/jwt_cache.h"
+#include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 
 #include "common/common/assert.h"
 

@@ -17,9 +17,9 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 
-#include "common/common/logger.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Server {

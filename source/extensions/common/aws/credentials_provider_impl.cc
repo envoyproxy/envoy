@@ -1,10 +1,10 @@
-#include "extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/lock_guard.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 
 namespace Envoy {
 namespace Extensions {

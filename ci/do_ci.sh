@@ -483,7 +483,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" wasm-cc
+  run_ci_verify "*" "wasm-cc|win32-front-proxy"
   exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc

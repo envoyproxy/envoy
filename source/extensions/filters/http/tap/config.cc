@@ -1,12 +1,12 @@
-#include "extensions/filters/http/tap/config.h"
+#include "source/extensions/filters/http/tap/config.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/tap/tap_config_impl.h"
-#include "extensions/filters/http/tap/tap_filter.h"
+#include "source/extensions/filters/http/tap/tap_config_impl.h"
+#include "source/extensions/filters/http/tap/tap_filter.h"
 
 namespace Envoy {
 namespace Extensions {

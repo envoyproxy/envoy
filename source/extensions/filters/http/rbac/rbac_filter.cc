@@ -1,11 +1,10 @@
-#include "extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_join.h"
 
