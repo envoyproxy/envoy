@@ -10,7 +10,10 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "statsd_lib",
-    srcs = ["statsd.cc"],
+    srcs = [
+        "statsd.cc",
+        "tag_formats.cc",
+    ],
     hdrs = [
         "statsd.h",
         "tag_formats.h",
