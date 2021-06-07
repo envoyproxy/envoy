@@ -37,8 +37,8 @@ void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
   }
 
   const Stats::StatName connection_close = connectionCloseStatName(error_code);
-  incCounter(scope, {http3_prefix_, is_upstream ? upstream_ : downstream_,
-                     source == quic::ConnectionCloseSource::FROM_SELF ? from_self_ : from_peer_,
+  incCounter(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
+                     (source == quic::ConnectionCloseSource::FROM_SELF ? from_self_ : from_peer_),
                      connection_close});
 }
 
@@ -52,8 +52,8 @@ void QuicStatNames::chargeQuicResetStreamErrorStats(Stats::Scope& scope,
   }
 
   const Stats::StatName stream_error = resetStreamErrorStatName(error_code);
-  incCounter(scope, {http3_prefix_, is_upstream ? upstream_ : downstream_,
-                     from_self ? from_self_ : from_peer_, stream_error});
+  incCounter(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
+                     (from_self ? from_self_ : from_peer_), stream_error});
 }
 
 Stats::StatName QuicStatNames::connectionCloseStatName(quic::QuicErrorCode error_code) {
