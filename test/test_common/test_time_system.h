@@ -78,9 +78,9 @@ public:
    */
   template <class D, class DispatcherOrScheduler>
   void advanceTimeAndRun(const D& duration, DispatcherOrScheduler& dispatcher_or_scheduler,
-                         Dispatcher::RunType mode) {
+                         Dispatcher::RunType mode, Event::OptDispatcherStartCb cb = absl::nullopt) {
     advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
-    dispatcher_or_scheduler.run(mode);
+    dispatcher_or_scheduler.run(mode, cb);
   }
 
   /**
