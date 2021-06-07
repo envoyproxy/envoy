@@ -85,10 +85,10 @@ Now, use ``curl`` to make a request for the compressed statistics:
     content-encoding: gzip
 
 .. seealso::
-   :ref:`Gzip Api <envoy_v3_api_field_extensions.filters.http.gzip.v3.Gzip.compressor>`
+   :ref:`Gzip Api <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
       API and configuration reference for Envoy's gzip compression.
 
-   :ref:`Gzip configuration <config_http_filters_gzip>`.
+   :ref:`Gzip configuration <config_http_filters_compressor>`.
       Reference documentation for Envoy's gzip compression.
 
    :ref:`Envoy admin quick start guide <start_quick_start_admin>`
