@@ -22,21 +22,26 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
           [this](const auto& expired) {
             Protobuf::RepeatedPtrField<std::string> removed_resources;
             for (const auto& resource : expired) {
-              setResourceWaitingForServer(resource);
-              removed_resources.Add(std::string(resource));
+              if (auto maybe_resource = getResourceState(resource); maybe_resource.has_value()) {
+                maybe_resource->setAsWaitingForServer();
+                removed_resources.Add(std::string(resource));
+              }
             }
 
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), wildcard_(wildcard), watch_map_(watch_map),
+      type_url_(std::move(type_url)),
+      mode_(wildcard ? WildcardMode::Implicit : WildcardMode::Disabled), watch_map_(watch_map),
       local_info_(local_info), dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
     const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
-    setResourceWaitingForServer(a);
+    // This adds a resource state that is waiting for the server for
+    // more information.
+    resource_state_[resource_name] = ResourceState(ResourceType::ExplicitlyRequested);
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -52,6 +57,31 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // add-remove (because "remove-add" has to be treated as equivalent to just "add").
     names_added_.erase(r);
     names_removed_.insert(r);
+  }
+  switch (mode_) {
+  case WildcardMode::Implicit:
+    if (names_removed_.find("*") != names_removed_.end()) {
+      // we explicitly cancel the wildcard subscription
+      mode_ = WildcardMode::Disabled;
+    } else if (!names_added_.empty()) {
+      // switch to explicit mode if we requested some extra names
+      mode_ = WildcardMode::Explicit;
+    }
+    break;
+
+  case WildcardMode::Explicit:
+    if (names_removed_.find("*") != names_removed_.end()) {
+      // we explicitly cancel the wildcard subscription
+      mode_ = WildcardMode::Disabled;
+    }
+    break;
+
+  case WildcardMode::Disabled:
+    if (names_added_.find("*") != names_added_.end()) {
+      // we switch into an explicit wildcard subscription
+      mode_ = WildcardMode::Explicit;
+    }
+    break;
   }
 }
 
@@ -124,7 +154,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     for (const auto& resource : message.resources()) {
-      addResourceState(resource);
+      addResourceStateFromServer(resource);
     }
   }
 
@@ -140,8 +170,8 @@ void DeltaSubscriptionState::handleGoodResponse(
   // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
   // cancelling my subscription" when we lose interest.
   for (const auto& resource_name : message.removed_resources()) {
-    if (resource_names_.find(resource_name) != resource_names_.end()) {
-      setResourceWaitingForServer(resource_name);
+    if (auto maybe_resource = getResourceState(resource_name); maybe_resource.has_value()) {
+      maybe_resource->setAsWaitingForServer();
     }
   }
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
@@ -177,16 +207,20 @@ DeltaSubscriptionState::getNextRequestAckless() {
       if (!resource_state.waitingForServer()) {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
-      // As mentioned above, fill resource_names_subscribe with everything, including names we
-      // have yet to receive any resource for unless this is a wildcard subscription, for which
-      // the first request on a stream must be without any resource names.
-      if (!wildcard_) {
+      // Add resource names to resource_names_subscribe only if this is not a wildcard subscription
+      // request or if we requested this resource explicitly (so we are actually in explicit
+      // wildcard mode).
+      if (mode_ == WildcardMode::Disabled ||
+          resource_state.type() == ResourceType::ExplicitlyRequested) {
         names_added_.insert(resource_name);
       }
     }
-    // Wildcard subscription initial requests must have no resource_names_subscribe.
-    if (wildcard_) {
-      names_added_.clear();
+    // We are not clearing the names_added_ set. If we are in implicit wildcard subscription mode,
+    // then the set should already be empty. If we are in explicit wildcard mode then the set will
+    // contain the names we explicitly requested, but we need to add * to the list to make sure it's
+    // sent too.
+    if (mode_ == WildcardMode::Explicit) {
+      names_added_.insert("*");
     }
     names_removed_.clear();
   }
@@ -213,7 +247,7 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void DeltaSubscriptionState::addResourceState(
+void DeltaSubscriptionState::addResourceStateFromServer(
     const envoy::service::discovery::v3::Resource& resource) {
   if (resource.has_ttl()) {
     ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
@@ -222,18 +256,25 @@ void DeltaSubscriptionState::addResourceState(
     ttl_.clear(resource.name());
   }
 
-  resource_state_[resource.name()] = ResourceState(resource);
-  resource_names_.insert(resource.name());
+  if (auto it = resource_state_.find(resource.name()); it != resource_state_.end()) {
+    auto old_type = it->second.type();
+    it->second = ResourceState(resource, old_type);
+  } else {
+    resource_state_.insert(
+        {resource.name(), ResourceState(resource, ResourceType::ReceivedFromServer)});
+  }
 }
 
-void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& resource_name) {
-  resource_state_[resource_name] = ResourceState();
-  resource_names_.insert(resource_name);
+OptRef<ResourceState> DeltaSubscriptionState::getResourceState(const std::string& resource_name) {
+  auto itr = resource_state_.find(resource_name);
+  if (itr == resource_state_.end()) {
+    return {};
+  }
+  return {itr->second};
 }
 
 void DeltaSubscriptionState::removeResourceState(const std::string& resource_name) {
   resource_state_.erase(resource_name);
-  resource_names_.erase(resource_name);
 }
 
 } // namespace Config
