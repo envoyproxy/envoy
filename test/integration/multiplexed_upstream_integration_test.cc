@@ -327,7 +327,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
   if (upstreamProtocol() == Http::CodecType::HTTP3 &&
-      downstreamPRotocol() == Http::CodecType::HTTP2) {
+      downstreamProtocol() == Http::CodecType::HTTP2) {
     // This test depends on fragile preconditions.
     // With HTTP/2 downstream all the requests are processed before the
     // responses are sent, then the connection read-disable results in not
