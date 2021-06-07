@@ -36,7 +36,6 @@ envoy_cc_library(
     name = "trace_driver_interface",
     hdrs = ["trace_driver.h"],
     deps = [
-        ":trace_context_interface",
         ":trace_reason_interface",
         "//envoy/stream_info:stream_info_interface",
     ],
