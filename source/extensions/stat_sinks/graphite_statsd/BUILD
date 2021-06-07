@@ -20,6 +20,6 @@ envoy_cc_extension(
         "//source/common/network:resolver_lib",
         "//source/extensions/stat_sinks/common/statsd:statsd_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/stat_sinks/graphite_statsd/v3:pkg_cc_proto",
     ],
 )

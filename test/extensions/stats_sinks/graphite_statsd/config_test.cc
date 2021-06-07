@@ -1,5 +1,5 @@
 #include "envoy/config/core/v3/address.pb.h"
-#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/macros.h"
@@ -38,7 +38,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GraphiteStatsdConfigLoopbackTest,
 TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = getStatSinkName();
 
-  envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
+  envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
@@ -67,14 +67,14 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
 TEST(GraphiteStatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   EXPECT_THROW(GraphiteStatsdSinkFactory().createStatsSink(
-                   envoy::config::metrics::v3::GraphiteStatsdSink(), server),
+                   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink(), server),
                ProtoValidationException);
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
   const std::string name = getStatSinkName();
 
-  envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
+  envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   sink_config.mutable_max_bytes_per_datagram()->set_value(128);
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -102,7 +102,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
 TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
   const std::string name = getStatSinkName();
 
-  envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
+  envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
@@ -130,7 +130,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
 TEST_P(GraphiteStatsdConfigLoopbackTest, WithCustomPrefix) {
   const std::string name = getStatSinkName();
 
-  envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
+  envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
   socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);

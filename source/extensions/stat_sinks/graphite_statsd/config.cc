@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/metrics/v3/stats.pb.h"
-#include "envoy/config/metrics/v3/stats.pb.validate.h"
+#include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.h"
+#include "envoy/extensions/stat_sinks/graphite_statsd/v3/graphite_statsd.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/network/resolver_impl.h"
@@ -21,10 +21,10 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                            Server::Configuration::ServerFactoryContext& server) {
 
   const auto& statsd_sink =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::GraphiteStatsdSink&>(
+      MessageUtil::downcastAndValidate<const envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
   switch (statsd_sink.statsd_specifier_case()) {
-  case envoy::config::metrics::v3::GraphiteStatsdSink::StatsdSpecifierCase::kAddress: {
+  case envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink::StatsdSpecifierCase::kAddress: {
     Network::Address::InstanceConstSharedPtr address =
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
@@ -43,7 +43,7 @@ GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
 }
 
 ProtobufTypes::MessagePtr GraphiteStatsdSinkFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::metrics::v3::GraphiteStatsdSink>();
+  return std::make_unique<envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink>();
 }
 
 std::string GraphiteStatsdSinkFactory::name() const { return "envoy.stat_sinks.graphite_statsd"; }
