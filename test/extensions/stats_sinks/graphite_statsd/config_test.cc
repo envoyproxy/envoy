@@ -65,9 +65,10 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
 // Negative test for protoc-gen-validate constraints for graphite_statsd.
 TEST(GraphiteStatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  EXPECT_THROW(GraphiteStatsdSinkFactory().createStatsSink(
-                   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink(), server),
-               ProtoValidationException);
+  EXPECT_THROW(
+      GraphiteStatsdSinkFactory().createStatsSink(
+          envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink(), server),
+      ProtoValidationException);
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {

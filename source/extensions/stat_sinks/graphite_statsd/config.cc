@@ -19,11 +19,12 @@ Stats::SinkPtr
 GraphiteStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                            Server::Configuration::ServerFactoryContext& server) {
 
-  const auto& statsd_sink =
-      MessageUtil::downcastAndValidate<const envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink&>(
-          config, server.messageValidationContext().staticValidationVisitor());
+  const auto& statsd_sink = MessageUtil::downcastAndValidate<
+      const envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink&>(
+      config, server.messageValidationContext().staticValidationVisitor());
   switch (statsd_sink.statsd_specifier_case()) {
-  case envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink::StatsdSpecifierCase::kAddress: {
+  case envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink::StatsdSpecifierCase::
+      kAddress: {
     Network::Address::InstanceConstSharedPtr address =
         Network::Address::resolveProtoAddress(statsd_sink.address());
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
