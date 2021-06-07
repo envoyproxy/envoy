@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"

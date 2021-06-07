@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "simple_lru_cache/simple_lru_cache_inl.h"
 
