@@ -427,17 +427,14 @@ names becomes empty, that means that the client is no longer interested in any r
 specified type.
 
 For :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource
-types, there is also a "wildcard" mode, which comes in two equivalent flavors. First flavor,
-implicit, is triggered when the initial request on the stream for that resource type contains no
-resource names. Second flavor, explicit, is triggered when a request (not necessarily an initial one
-on the stream) for that resource type contains (among other names) a special name "*". Opting in
-into the wildcard subscription means adding the wildcard subscription into the subscription state.
-For wildcard requests, the server should use site-specific business logic to determine the full set
-of resources that the client is interested in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
-The client can opt out from the wildcard mode by unsubscribing from the "*" resource name. Note that
-subsequently opting back into the wildcard mode can only be done with a request that adds the "*"
-resource name to the subscription state. Additional resource names added to the subscription state
-while being opted-in into the wildcard mode should not be ignored by the server.
+types, there is also a "wildcard" mode, which is triggered by sending a request containing a special
+resource name "*" in a list of resource names to subscribe to. As a special case, sending an initial
+request with no resource names at all also triggers the wildcard mode. For wildcard requests,
+the server should use site-specific business logic to determine the full set of resources that
+the client is interested in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
+The client can opt out from the wildcard mode by unsubscribing from the "*" resource name.
+Additional resource names added to the subscription state while being opted-in into the wildcard
+mode should not be ignored by the server.
 
 Client Behavior
 """""""""""""""
