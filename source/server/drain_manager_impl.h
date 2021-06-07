@@ -46,6 +46,7 @@ public:
 
 private:
   Instance& server_;
+  Event::Dispatcher& dispatcher_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
 
   std::atomic<bool> draining_{false};

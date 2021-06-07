@@ -16,12 +16,13 @@ namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
-    : server_(server), drain_type_(drain_type), cbs_(server_.dispatcher()) {}
+    : server_(server), dispatcher_(server.dispatcher()), drain_type_(drain_type),
+      cbs_(server_.dispatcher()) {}
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type,
                                    Event::Dispatcher& dispatcher)
-    : server_(server), drain_type_(drain_type), cbs_(dispatcher) {}
+    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), cbs_(dispatcher) {}
 
 DrainManagerSharedPtr
 DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
@@ -68,7 +69,7 @@ bool DrainManagerImpl::drainClose() const {
 
   // P(return true) = elapsed time / drain timeout
   // If the drain deadline is exceeded, skip the probability calculation.
-  const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
+  const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
   if (current_time >= drain_deadline_) {
     return true;
   }
@@ -93,10 +94,10 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   draining_ = true;
 
   // Schedule callback to run at end of drain time
-  drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
+  drain_tick_timer_ = dispatcher_.createTimer(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
-  drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
+  drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
 
   if (cbs_.size() == 0) {
     return;
@@ -112,7 +113,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // Call registered on-drain callbacks - with gradual delays
   // Note: This will distribute drain events in the first 1/4th of the drain window
   //       to ensure that we initiate draining with enough time for graceful shutdowns.
-  const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
+  const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
   const auto remaining_time =
       std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
   ASSERT(server_.options().drainTime() >= remaining_time);
