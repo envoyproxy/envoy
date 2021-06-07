@@ -6,7 +6,6 @@ Other features
 
   local_rate_limiting
   global_rate_limiting
-  connection_limiting
   bandwidth_limiting
   scripting
   ip_transparency
