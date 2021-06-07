@@ -712,6 +712,57 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  options_.bootstrap_version_ = 3;
+
+  bool workers_started = false;
+  absl::Notification workers_started_fired;
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    auto hooks = CustomListenerHooks([&]() {
+      workers_started = true;
+      workers_started_fired.Notify();
+    });
+    initialize("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", false, hooks);
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  workers_started_fired.WaitForNotification();
+  EXPECT_TRUE(workers_started);
+
+  // Flush three times in a row. Two of these should get dropped.
+  server_->dispatcher().post([&] {
+    server_->flushStats();
+    server_->flushStats();
+    server_->flushStats();
+  });
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
+
+  // Trigger another flush after the first one finished. This should go through an no drops should
+  // be recorded.
+  server_->dispatcher().post([&] { server_->flushStats(); });
+
+  server_->dispatcher().post([&] { stats_store_.runMergeCallback(); });
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 2, time_system_));
+
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_store_, "server.dropped_stat_flushes", 2, time_system_));
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 // Default validation mode
 TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -813,6 +864,23 @@ TEST_P(ServerInstanceImplTest, ZoneStatNameFromOption) {
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone_override",
             stats_store_.symbolTable().toString(server_->localInfo().zoneStatName()));
+}
+
+// Validate user agent information from bootstrap Node.
+TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  EXPECT_EQ(9, server_->localInfo().node().user_agent_build_version().version().major_number());
+  EXPECT_EQ(8, server_->localInfo().node().user_agent_build_version().version().minor_number());
+  EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().version().patch());
+}
+
+// Validate deprecated user agent version field from bootstrap Node.
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(UserAgentBuildDeprecatedOverrideFromNode)) {
+  initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
+  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
+  EXPECT_EQ("test", server_->localInfo().node().hidden_envoy_deprecated_build_version());
 }
 
 // Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not

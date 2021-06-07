@@ -110,7 +110,7 @@ It's helpful to focus on one at a time, so this example covers the following:
   and upstream.
 * The :ref:`HTTP connection manager <arch_overview_http_conn_man>` as the only :ref:`network filter
   <arch_overview_network_filters>`.
-* A hypothetical CustomFilter and the `router <arch_overview_http_routing>` filter as the :ref:`HTTP
+* A hypothetical CustomFilter and the :ref:`router <arch_overview_http_routing>` filter as the :ref:`HTTP
   filter <arch_overview_http_filters>` chain.
 * :ref:`Filesystem access logging <arch_overview_access_logs_sinks>`.
 * :ref:`Statsd sink <envoy_v3_api_msg_config.metrics.v3.StatsSink>`.
@@ -143,7 +143,7 @@ downstream to upstream.
 
 We use the terms :ref:`listener subsystem <arch_overview_listeners>` and :ref:`cluster subsystem
 <arch_overview_cluster_manager>` above to refer to the group of modules and instance classes that
-are created by the top level `ListenerManager` and `ClusterManager` classes. There are many
+are created by the top level ``ListenerManager`` and ``ClusterManager`` classes. There are many
 components that we discuss below that are instantiated before and during the course of a request by
 these management systems, for example listeners, filter chains, codecs, connection pools and load
 balancing data structures.
@@ -190,7 +190,7 @@ A brief outline of the life cycle of a request and response using the example co
 6. For each HTTP stream, an :ref:`HTTP filter <arch_overview_http_filters>` chain is created and
    runs. The request first passes through CustomFilter which may read and modify the request. The
    most important HTTP filter is the router filter which sits at the end of the HTTP filter chain.
-   When `decodeHeaders` is invoked on the router filter, the route is selected and a cluster is
+   When ``decodeHeaders`` is invoked on the router filter, the route is selected and a cluster is
    picked. The request headers on the stream are forwarded to an upstream endpoint in that cluster.
    The :ref:`router <arch_overview_http_routing>` filter obtains an HTTP :ref:`connection pool
    <arch_overview_conn_pool>` from the cluster manager for the matched cluster to do this.
@@ -256,7 +256,7 @@ chain.
 
 The TLS inspector filter implements the :repo:`ListenerFilter <include/envoy/network/filter.h>`
 interface. All filter interfaces, whether listener or network/HTTP, require that filters implement
-callbacks for specific connection or stream events. In the case of `ListenerFilter`, this is:
+callbacks for specific connection or stream events. In the case of ``ListenerFilter``, this is:
 
 
 .. code-block:: cpp
@@ -311,7 +311,7 @@ handshake.
 4. Network filter chain processing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-As with the listener filter chain, Envoy, via `Network::FilterManagerImpl`, will instantiate a
+As with the listener filter chain, Envoy, via ``Network::FilterManagerImpl``, will instantiate a
 series of :ref:`network filters <arch_overview_network_filters>` from their filter factories. The
 instance is fresh for each new connection. Network filters, like transport sockets, follow TCP
 lifecycle events and are invoked as data becomes available from the transport socket.
@@ -390,8 +390,8 @@ There are three kinds of HTTP filter interfaces:
 
 * :repo:`StreamDecoderFilter <include/envoy/http/filter.h>` with callbacks for request processing.
 * :repo:`StreamEncoderFilter <include/envoy/http/filter.h>` with callbacks for response processing.
-* :repo:`StreamFilter <include/envoy/http/filter.h>` implementing both `StreamDecoderFilter` and
-  `StreamEncoderFilter`.
+* :repo:`StreamFilter <include/envoy/http/filter.h>` implementing both ``StreamDecoderFilter`` and
+  ``StreamEncoderFilter``.
 
 Looking at the decoder filter interface:
 
@@ -435,9 +435,9 @@ route selection is finalized and a cluster is picked. The HCM selects a route fr
 ``RouteConfiguration`` at the start of HTTP filter chain execution. This is referred to as the
 *cached route*. Filters may modify headers and cause a new route to be selected, by asking HCM to
 clear the route cache and requesting HCM to reevaluate the route selection. Filters may also
-directly set this cached route selection via a `setRoute` callback. When the router filter is
+directly set this cached route selection via a ``setRoute`` callback. When the router filter is
 invoked, the route is finalized. The selected route’s configuration will point at an upstream
-cluster name. The router filter then asks the `ClusterManager` for an HTTP :ref:`connection pool
+cluster name. The router filter then asks the ``ClusterManager`` for an HTTP :ref:`connection pool
 <arch_overview_conn_pool>` for the cluster. This involves load balancing and the connection pool,
 discussed in the next section.
 
@@ -445,7 +445,7 @@ discussed in the next section.
    :width: 70%
    :align: center
 
-The resulting HTTP connection pool is used to build an `UpstreamRequest` object in the router, which
+The resulting HTTP connection pool is used to build an ``UpstreamRequest`` object in the router, which
 encapsulates the HTTP encoding and decoding callback methods for the upstream HTTP request. Once a
 stream is allocated on a connection in the HTTP connection pool, the request headers are forwarded
 to the upstream endpoint by the invocation of ``UpstreamRequest::encoderHeaders()``.

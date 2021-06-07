@@ -1,3 +1,5 @@
+#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+
 #include "extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
@@ -24,6 +26,7 @@ namespace {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
 using envoy::service::ext_proc::v3alpha::BodyResponse;
+using envoy::service::ext_proc::v3alpha::CommonResponse;
 using envoy::service::ext_proc::v3alpha::HeadersResponse;
 using envoy::service::ext_proc::v3alpha::HttpBody;
 using envoy::service::ext_proc::v3alpha::HttpHeaders;
@@ -1273,6 +1276,150 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using the default configuration, verify that the "clear_route_cache_ flag makes the appropriate
+// callback on the filter.
+TEST_F(HttpFilterTest, ClearRouteCache) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("foo");
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data);
+
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+
+  EXPECT_CALL(encoder_callbacks_, clearRouteCache());
+  processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+    resp.mutable_response()->set_clear_route_cache(true);
+  });
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(3, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(3, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using the default configuration, turn a GET into a POST.
+TEST_F(HttpFilterTest, ReplaceRequest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  Buffer::OwnedImpl req_buffer;
+  setUpDecodingBuffering(req_buffer);
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
+        hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+        auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_header()->set_key(":method");
+        hdr->mutable_header()->set_value("POST");
+        hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
+      });
+
+  Http::TestRequestHeaderMapImpl expected_request{
+      {":scheme", "http"}, {":authority", "host"}, {":path", "/"}, {":method", "POST"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected_request));
+  EXPECT_EQ(req_buffer.toString(), "Hello, World!");
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data_1;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_1, 100);
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_1, true));
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with response mode set up for buffering, replace the complete response.
+// This should result in none of the actual response coming back and no callbacks being
+// fired.
+TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl resp_data_1;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_1, 100);
+  Buffer::OwnedImpl resp_data_2;
+  TestUtility::feedBufferWithRandomCharacters(resp_data_2, 100);
+  Buffer::OwnedImpl buffered_resp_data;
+  setUpEncodingBuffering(buffered_resp_data);
+
+  processResponseHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
+        hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
+        auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_header()->set_key("x-test-header");
+        hdr->mutable_header()->set_value("true");
+        hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
+      });
+
+  // Ensure buffered data was updated
+  EXPECT_EQ(buffered_resp_data.toString(), "Hello, World!");
+
+  // Since we did CONTINUE_AND_REPLACE, later data is cleared
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_1, false));
+  EXPECT_EQ(resp_data_1.length(), 0);
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, true));
+  EXPECT_EQ(resp_data_2.length(), 0);
+
+  // No additional messages should come in since we replaced, although they
+  // are configured.
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 

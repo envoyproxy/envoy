@@ -168,7 +168,7 @@ public:
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
-                    const std::string& url, const std::string& body, Http::CodecClient::Type type,
+                    const std::string& url, const std::string& body, Http::CodecType type,
                     const std::string& host = "host", const std::string& content_type = "");
 
   /**
@@ -184,21 +184,20 @@ public:
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote early disconnection.
    */
-  static BufferingStreamDecoderPtr
-  makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
-                    const std::string& body, Http::CodecClient::Type type,
-                    Network::Address::IpVersion ip_version, const std::string& host = "host",
-                    const std::string& content_type = "");
+  static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, const std::string& method,
+                                                     const std::string& url,
+                                                     const std::string& body, Http::CodecType type,
+                                                     Network::Address::IpVersion ip_version,
+                                                     const std::string& host = "host",
+                                                     const std::string& content_type = "");
 
   /**
    * Create transport socket factory for Quic upstream transport socket.
-   * @param context supplies the port to connect to on localhost.
-   * @param san_to_match configs |context| to match Subject Alternative Name during certificate
-   * verification.
    * @return TransportSocketFactoryPtr the client transport socket factory.
    */
   static Network::TransportSocketFactoryPtr
   createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                           Ssl::ContextManager& context_manager,
                                            const std::string& san_to_match);
 };
 

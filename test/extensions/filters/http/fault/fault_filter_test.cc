@@ -66,6 +66,15 @@ public:
     fixed_delay: 5s
   )EOF";
 
+  const std::string fixed_delay_only_disable_stats_yaml = R"EOF(
+  delay:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    fixed_delay: 5s
+  disable_downstream_cluster_stats: true
+  )EOF";
+
   const std::string abort_only_yaml = R"EOF(
   abort:
     percentage:
@@ -714,6 +723,55 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
   EXPECT_EQ(1UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
+  EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
+}
+
+TEST_F(FaultFilterTest, DelayForDownstreamClusterDisableTracing) {
+  setUpTest(fixed_delay_only_disable_stats_yaml);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+
+  request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
+
+  // Delay related calls.
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(125UL));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.delay.fixed_duration_ms", 125UL))
+      .WillOnce(Return(500UL));
+  expectDelayTimer(500UL);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::DelayInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Delay only case, no aborts.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.cluster.abort.http_status", _)).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
+      .Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(decoder_filter_callbacks_.dispatcher_, popTrackedObject(_));
+  timer_->invokeCallback();
+
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.delays_injected").value());
   EXPECT_EQ(0UL, stats_.counter("prefix.fault.cluster.aborts_injected").value());
 }
 

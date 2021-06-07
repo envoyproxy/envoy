@@ -26,7 +26,7 @@ public:
 TEST_F(TcpConnPoolTest, TestNoConnPool) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig config;
   config.set_hostname("host");
-  EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
   EXPECT_EQ(nullptr,
             factory_.createGenericConnPool(thread_local_cluster_, config, nullptr, callbacks_));
 }

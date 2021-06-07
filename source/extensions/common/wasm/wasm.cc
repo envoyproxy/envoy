@@ -106,7 +106,8 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
 Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
     : WasmBase(base_wasm_handle,
                [&base_wasm_handle]() {
-                 return createWasmVm(base_wasm_handle->wasm()->wasm_vm()->runtime());
+                 return createWasmVm(absl::StrCat("envoy.wasm.runtime.",
+                                                  base_wasm_handle->wasm()->wasm_vm()->runtime()));
                }),
       scope_(getWasm(base_wasm_handle)->scope_),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
@@ -186,7 +187,8 @@ Word resolve_dns(void* raw_context, Word dns_address_ptr, Word dns_address_size,
     root_context->onResolveDns(token, status, std::move(response));
   };
   if (!context->wasm()->dnsResolver()) {
-    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver({}, false);
+    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver(
+        {}, envoy::config::core::v3::DnsResolverOptions());
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);

@@ -1,17 +1,18 @@
 #include "common/quic/quic_filter_manager_connection_impl.h"
 
+#include <initializer_list>
 #include <memory>
 
 namespace Envoy {
 namespace Quic {
 
-QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection,
-                                                                 Event::Dispatcher& dispatcher,
-                                                                 uint32_t send_buffer_limit)
+QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
+    QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
+    Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
-    : Network::ConnectionImplBase(dispatcher, /*id=*/connection.connection_id().Hash()),
-      quic_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
+    : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
+      network_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
       stream_info_(dispatcher.timeSource(),
                    connection.connectionSocket()->addressProviderSharedPtr()),
       write_buffer_watermark_simulation_(
@@ -61,8 +62,13 @@ bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
 }
 
 void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
-  if (quic_connection_ == nullptr) {
+  if (network_connection_ == nullptr) {
     // Already detached from quic connection.
+    return;
+  }
+  if (!initialized_) {
+    // Delay close till the first OnCanWrite() call.
+    close_type_during_initialize_ = type;
     return;
   }
   const bool delayed_close_timeout_configured = delayed_close_timeout_.count() > 0;
@@ -105,7 +111,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
 
 const Network::ConnectionSocket::OptionsSharedPtr&
 QuicFilterManagerConnectionImpl::socketOptions() const {
-  return quic_connection_->connectionSocket()->options();
+  return network_connection_->connectionSocket()->options();
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
@@ -134,6 +140,10 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_by
 
 void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
+    if (close_type_during_initialize_.has_value()) {
+      close(close_type_during_initialize_.value());
+      close_type_during_initialize_ = absl::nullopt;
+    }
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
@@ -151,21 +161,21 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
                                            " with details: ", frame.error_details);
-  if (quic_connection_ != nullptr) {
+  if (network_connection_ != nullptr) {
     // Tell network callbacks about connection close if not detached yet.
     raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
                              ? Network::ConnectionEvent::RemoteClose
                              : Network::ConnectionEvent::LocalClose);
-    ASSERT(quic_connection_ != nullptr);
-    quic_connection_ = nullptr;
+    ASSERT(network_connection_ != nullptr);
+    network_connection_ = nullptr;
   }
 }
 
 void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
-  if (quic_connection_ == nullptr) {
+  if (quicConnection() == nullptr) {
     return;
   }
-  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+  quicConnection()->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
                                     quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
 }
 

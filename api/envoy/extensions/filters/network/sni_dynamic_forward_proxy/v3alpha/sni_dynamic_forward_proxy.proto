@@ -25,7 +25,7 @@ message FilterConfig {
   // The DNS cache configuration that the filter will attach to. Note this
   // configuration must match that of associated :ref:`dynamic forward proxy
   // cluster configuration
-  // <envoy_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+  // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
   common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1
       [(validate.rules).message = {required: true}];
 

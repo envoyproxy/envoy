@@ -43,6 +43,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:assert_lib",
         "@com_googlesource_quiche//:quic_core_flags_list_lib",
         "@com_googlesource_quiche//:quic_core_protocol_flags_list_lib",
     ],

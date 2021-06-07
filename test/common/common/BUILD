@@ -5,6 +5,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2
@@ -392,6 +393,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     external_deps = [
         "abseil_strings",
     ],
@@ -430,5 +432,14 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//test/mocks:common_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "scope_tracked_object_stack_test",
+    srcs = ["scope_tracked_object_stack_test.cc"],
+    deps = [
+        "//source/common/common:scope_tracked_object_stack",
+        "//source/common/common:utility_lib",
     ],
 )

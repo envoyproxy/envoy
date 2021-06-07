@@ -3,7 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/trace/v3/opencensus.pb.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "common/common/logger.h"
 

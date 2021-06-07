@@ -18,7 +18,10 @@ cc_library(
     copts = [
         "-Wno-range-loop-analysis",
     ],
-    defines = ["ENVOY_WASM_V8"],
+    defines = [
+        "ENVOY_WASM_V8",
+        "V8_ENABLE_WEBASSEMBLY",
+    ],
     includes = [
         "wee8",
         "wee8/include",

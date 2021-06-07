@@ -29,7 +29,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
 
   rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
   config_ = std::make_shared<ConfigImpl>(
-      *route_config_proto_, factory_context_,
+      *route_config_proto_, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
   onUpdateCommon(version_info);
@@ -54,7 +54,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
                      *route_config_after_this_update);
 
   auto new_config = std::make_shared<ConfigImpl>(
-      *route_config_after_this_update, factory_context_,
+      *route_config_after_this_update, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
   // No exception, route_config_after_this_update is valid, can update the state.

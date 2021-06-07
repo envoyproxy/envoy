@@ -60,17 +60,17 @@ message RouteMatch {
   }
 
   // Inverts whatever matching is done in the :ref:`method_name
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v4alpha.RouteMatch.method_name>` or
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>` or
   // :ref:`service_name
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v4alpha.RouteMatch.service_name>` fields.
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` fields.
   // Cannot be combined with wildcard matching as that would result in routes never being matched.
   //
   // .. note::
   //
   //   This does not invert matching done as part of the :ref:`headers field
-  //   <envoy_api_field_extensions.filters.network.thrift_proxy.v4alpha.RouteMatch.headers>` field. To
+  //   <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` field. To
   //   invert header matching, see :ref:`invert_match
-  //   <envoy_api_field_config.route.v4alpha.HeaderMatcher.invert_match>`.
+  //   <envoy_v3_api_field_config.route.v3.HeaderMatcher.invert_match>`.
   bool invert = 3;
 
   // Specifies a set of headers that the route should match on. The router will check the request’s
@@ -110,7 +110,7 @@ message RouteAction {
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
   // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v4alpha.WeightedCluster.ClusterWeight.metadata_match>`,
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
   config.core.v4alpha.Metadata metadata_match = 3;
@@ -147,7 +147,7 @@ message WeightedCluster {
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
     // provided in :ref:`RouteAction's metadata_match
-    // <envoy_api_field_extensions.filters.network.thrift_proxy.v4alpha.RouteAction.metadata_match>`,
+    // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.
     config.core.v4alpha.Metadata metadata_match = 3;

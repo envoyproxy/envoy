@@ -171,7 +171,17 @@ MockListener::MockListener() = default;
 
 MockListener::~MockListener() { onDestroy(); }
 
-MockConnectionHandler::MockConnectionHandler() = default;
+MockConnectionHandler::MockConnectionHandler() {
+  ON_CALL(*this, incNumConnections()).WillByDefault(Invoke([this]() {
+    ++num_handler_connections_;
+  }));
+  ON_CALL(*this, decNumConnections()).WillByDefault(Invoke([this]() {
+    --num_handler_connections_;
+  }));
+  ON_CALL(*this, numConnections()).WillByDefault(Invoke([this]() {
+    return num_handler_connections_;
+  }));
+}
 MockConnectionHandler::~MockConnectionHandler() = default;
 
 MockIp::MockIp() = default;
