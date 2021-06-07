@@ -2,12 +2,12 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/macros.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
 #include "extensions/stat_sinks/graphite_statsd/config.h"
-#include "extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -25,6 +25,10 @@ namespace StatSinks {
 namespace GraphiteStatsd {
 namespace {
 
+const std::string& getStatSinkName() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stat_sinks.graphite_statsd");
+}
+
 class GraphiteStatsdConfigLoopbackTest
     : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, GraphiteStatsdConfigLoopbackTest,
@@ -32,7 +36,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GraphiteStatsdConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
-  const std::string name = StatsSinkNames::get().GraphiteStatsd;
+  const std::string name = getStatSinkName();
 
   envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -68,7 +72,7 @@ TEST(GraphiteStatsdConfigTest, ValidateFail) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
-  const std::string name = StatsSinkNames::get().GraphiteStatsd;
+  const std::string name = getStatSinkName();
 
   envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
   sink_config.mutable_max_bytes_per_datagram()->set_value(128);
@@ -96,7 +100,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
-  const std::string name = StatsSinkNames::get().GraphiteStatsd;
+  const std::string name = getStatSinkName();
 
   envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -124,7 +128,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, WithCustomPrefix) {
-  const std::string name = StatsSinkNames::get().GraphiteStatsd;
+  const std::string name = getStatSinkName();
 
   envoy::config::metrics::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();

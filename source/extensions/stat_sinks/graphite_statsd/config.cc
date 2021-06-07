@@ -10,7 +10,6 @@
 
 #include "extensions/stat_sinks/common/statsd/statsd.h"
 #include "extensions/stat_sinks/common/statsd/tag_formats.h"
-#include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +46,7 @@ ProtobufTypes::MessagePtr GraphiteStatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::GraphiteStatsdSink>();
 }
 
-std::string GraphiteStatsdSinkFactory::name() const { return StatsSinkNames::get().GraphiteStatsd; }
+std::string GraphiteStatsdSinkFactory::name() const { return "envoy.stat_sinks.graphite_statsd"; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
