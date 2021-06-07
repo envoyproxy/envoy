@@ -206,7 +206,8 @@ public:
   // - LookupResult::response_ranges_ entries are satisfiable (as documented
   // there).
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
-                                ResponseMetadata&& metadata, uint64_t content_length) const;
+                                ResponseMetadata&& metadata, uint64_t content_length,
+                                bool has_trailers) const;
 
   // Warning: this should not be accessed out-of-thread!
   const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }

@@ -47,11 +47,14 @@ protected:
 
   // Inserts a value into the cache.
   void insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& response_headers,
-              const absl::string_view response_body) {
+              const absl::string_view response_body,
+              const Http::TestResponseTrailerMapImpl& response_trailers = {}) {
     InsertContextPtr inserter = cache_.makeInsertContext(move(lookup));
     const ResponseMetadata metadata = {current_time_};
     inserter->insertHeaders(response_headers, metadata, false);
-    inserter->insertBody(Buffer::OwnedImpl(response_body), nullptr, true);
+    inserter->insertBody(
+        Buffer::OwnedImpl(response_body),
+        [&](bool) { inserter->insertTrailers(response_trailers); }, response_trailers.empty());
   }
 
   void insert(absl::string_view request_path,
@@ -72,13 +75,22 @@ protected:
     return body;
   }
 
+  Http::TestResponseTrailerMapImpl getTrailers(LookupContext& context) {
+    Http::TestResponseTrailerMapImpl trailers;
+    context.getTrailers([&trailers](Http::ResponseTrailerMapPtr&& data) {
+      EXPECT_NE(data, nullptr);
+      trailers = *data;
+    });
+    return trailers;
+  }
+
   LookupRequest makeLookupRequest(absl::string_view request_path) {
     request_headers_.setPath(request_path);
     return LookupRequest(request_headers_, current_time_, vary_allow_list_);
   }
 
-  AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
-                                              absl::string_view body) {
+  AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context, absl::string_view body,
+                                              Http::TestResponseTrailerMapImpl trailers = {}) {
     if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
                                    "CacheEntryStatus::Ok\n  Actual: "
@@ -93,6 +105,13 @@ protected:
     const std::string actual_body = getBody(*lookup_context, 0, body.size());
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
+    }
+    if (!trailers.empty()) {
+      const Http::TestResponseTrailerMapImpl actual_trailers = getTrailers(*lookup_context);
+      if (trailers != actual_trailers) {
+        return AssertionFailure() << "Expected trailers == " << trailers
+                                  << "\n  Actual:  " << actual_trailers;
+      }
     }
     return AssertionSuccess();
   }
@@ -255,6 +274,28 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
 
   // Looks up first version again to be sure it wasn't replaced with the second one.
   EXPECT_TRUE(expectLookupSuccessWithBody(first_value_vary.get(), Body1));
+}
+
+TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
+  const std::string RequestPath1("Name");
+  LookupContextPtr name_lookup_context = lookup(RequestPath1);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
+                                                   {"cache-control", "public,max-age=3600"}};
+  const std::string Body1("Value");
+  Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
+  insert(move(name_lookup_context), response_headers, Body1, response_trailers);
+  name_lookup_context = lookup(RequestPath1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), Body1, response_trailers));
+
+  const std::string& RequestPath2("Another Name");
+  LookupContextPtr another_name_lookup_context = lookup(RequestPath2);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
+
+  const std::string NewBody1("NewValue");
+  insert(move(name_lookup_context), response_headers, NewBody1, response_trailers);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), NewBody1, response_trailers));
 }
 
 } // namespace
