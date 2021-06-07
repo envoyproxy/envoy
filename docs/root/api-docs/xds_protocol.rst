@@ -427,13 +427,17 @@ names becomes empty, that means that the client is no longer interested in any r
 specified type.
 
 For :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource
-types, there is also a "wildcard" mode, which is triggered when the initial request on the stream
-for that resource type contains no resource names. In this case, the server should use
-site-specific business logic to determine the full set of resources that the client is interested
-in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification. Note
-that once a stream has entered wildcard mode for a given resource type, there is no way to change
-the stream out of wildcard mode; resource names specified in any subsequent request on the stream
-will be ignored.
+types, there is also a "wildcard" mode, which comes in two equivalent flavors. First flavor,
+implicit, is triggered when the initial request on the stream for that resource type contains no
+resource names. Second flavor, explicit, is triggered when a request (not necessarily an initial one
+on the stream) for that resource type contains (among other names) a special name "*". Opting in
+into the wildcard subscription means adding the wildcard subscription into the subscription state.
+For wildcard requests, the server should use site-specific business logic to determine the full set
+of resources that the client is interested in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
+The client can opt out from the wildcard mode by unsubscribing from the "*" resource name. Note that
+subsequently opting back into the wildcard mode can only be done with a request that adds the "*"
+resource name to the subscription state. Additional resource names added to the subscription state
+while being opted-in into the wildcard mode should not be ignored by the server.
 
 Client Behavior
 """""""""""""""
@@ -535,6 +539,8 @@ being requested by the client, and if one of those resources springs into existe
 server must send an update to the client informing it of the new resource. Clients that initially
 see a resource that does not exist must be prepared for the resource to be created at any time.
 
+.. _xds_protocol_unsubscribing_from_resources:
+
 Unsubscribing From Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -553,7 +559,10 @@ Note that for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and
 resource types where the stream is in "wildcard" mode (see :ref:`How the client specifies what
 resources to return <xds_protocol_resource_hints>` for details), the set of resources being
 subscribed to is determined by the server instead of the client, so there is no mechanism
-for the client to unsubscribe from resources.
+for the client to unsubscribe from resources. The only resources that the client could unsubscribe
+from are the resources that the client explicitly expressed the interest in before. Note that
+the server may still send the resource to the client if the resource was also a part of the set
+of resources determined by the server from the wildcard subscription.
 
 Requesting Multiple Resources on a Single Stream
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -779,8 +788,8 @@ resources to avoid resending them over the network by sending them in
 :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`.
 Because no state is assumed to be preserved from the previous stream, the reconnecting
 client must provide the server with all resource names it is interested in. Note that for wildcard
-requests (CDS/LDS/SRDS), the request must have no resources in both
-:ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>` and
+requests (CDS/LDS/SRDS), the request must have only resources the client was explicitly interested in in
+:ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>` and no resources in
 :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_unsubscribe>`.
 
 .. figure:: diagrams/incremental-reconnect.svg
