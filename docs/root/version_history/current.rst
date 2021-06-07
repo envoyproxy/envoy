@@ -68,7 +68,6 @@ New Features
 ------------
 
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
-* connection_limit: added new :ref:`Network connection limit filter <config_network_filters_connection_limit>`.
 * bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query.
 * cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * connection_limit: added new :ref:`Network connection limit filter <config_network_filters_connection_limit>`.

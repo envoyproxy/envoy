@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.h"
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.validate.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/network/connection_limit/connection_limit.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/network/connection_limit/connection_limit.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"

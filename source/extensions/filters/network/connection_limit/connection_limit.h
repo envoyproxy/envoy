@@ -10,8 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/thread_synchronizer.h"
-#include "common/runtime/runtime_protos.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Extensions {

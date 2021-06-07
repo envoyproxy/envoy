@@ -1,8 +1,8 @@
-#include "extensions/filters/network/connection_limit/connection_limit.h"
+#include "source/extensions/filters/network/connection_limit/connection_limit.h"
 
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,9 +1,9 @@
-#include "extensions/filters/network/connection_limit/config.h"
+#include "source/extensions/filters/network/connection_limit/config.h"
 
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.h"
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.validate.h"
 
-#include "extensions/filters/network/connection_limit/connection_limit.h"
+#include "source/extensions/filters/network/connection_limit/connection_limit.h"
 
 namespace Envoy {
 namespace Extensions {
