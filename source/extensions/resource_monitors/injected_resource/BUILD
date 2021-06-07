@@ -14,9 +14,9 @@ envoy_cc_library(
     srcs = ["injected_resource_monitor.cc"],
     hdrs = ["injected_resource_monitor.h"],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/server:resource_monitor_config_interface",
+        "//envoy/api:api_interface",
+        "//envoy/filesystem:filesystem_interface",
+        "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/extensions/resource_monitors/injected_resource/v3:pkg_cc_proto",
     ],
@@ -28,7 +28,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":injected_resource_monitor",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "@envoy_api//envoy/extensions/resource_monitors/injected_resource/v3:pkg_cc_proto",

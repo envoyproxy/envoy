@@ -1,13 +1,12 @@
 #include <chrono>
 
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/libevent.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "server/config_validation/api.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/server/config_validation/api.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"

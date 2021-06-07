@@ -1,14 +1,14 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/config/utility.h"
-#include "common/http/utility.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {

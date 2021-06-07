@@ -1,4 +1,4 @@
-#include "extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
+#include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
 
 #include <memory>
 

@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/http:codes_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -42,8 +42,8 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":ext_authz",
-        "//include/envoy/registry",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/registry",
+        "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
         "//source/common/grpc:google_async_client_cache",
         "//source/common/protobuf:utility_lib",

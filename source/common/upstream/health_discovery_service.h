@@ -11,17 +11,16 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/config/utility.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/locality_endpoint.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/locality_endpoint.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 

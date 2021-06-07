@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["http1_bridge_filter.cc"],
     hdrs = ["http1_bridge_filter.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
@@ -40,8 +40,8 @@ envoy_cc_extension(
         "//test/server:__subpackages__",
     ],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_http1_bridge:http1_bridge_filter_lib",

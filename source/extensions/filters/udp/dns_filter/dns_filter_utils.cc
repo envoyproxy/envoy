@@ -1,12 +1,12 @@
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include <algorithm>
 
 #include "envoy/common/platform.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Extensions {

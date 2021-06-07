@@ -4,13 +4,12 @@
 
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/http/context_impl.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/ratelimit/ratelimit.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"

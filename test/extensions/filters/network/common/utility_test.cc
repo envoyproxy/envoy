@@ -1,5 +1,5 @@
-#include "extensions/filters/network/common/utility.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/common/utility.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"

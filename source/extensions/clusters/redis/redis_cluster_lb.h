@@ -7,15 +7,13 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/upstream_impl.h"
-
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/crc16.h"
-
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec.h"
-#include "extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/common/redis/client.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/synchronization/mutex.h"

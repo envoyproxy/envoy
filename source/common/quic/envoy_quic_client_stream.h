@@ -14,7 +14,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_stream.h"
+#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {

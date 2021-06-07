@@ -8,10 +8,9 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/protobuf/utility.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/network/common/redis/fault.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/network/common/redis/fault.h"
 
 namespace Envoy {
 namespace Extensions {

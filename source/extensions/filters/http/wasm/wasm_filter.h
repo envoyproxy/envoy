@@ -7,9 +7,9 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

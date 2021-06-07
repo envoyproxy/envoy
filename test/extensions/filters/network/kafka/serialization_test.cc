@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/tagged_fields.h"
+#include "source/extensions/filters/network/kafka/tagged_fields.h"
 
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 

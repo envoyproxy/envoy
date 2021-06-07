@@ -18,13 +18,13 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "server/filter_chain_factory_context_callback.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/lds_api.h"
-#include "server/listener_impl.h"
+#include "source/server/filter_chain_factory_context_callback.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/lds_api.h"
+#include "source/server/listener_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_stat_names.h"
 #endif
 
 namespace Envoy {

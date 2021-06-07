@@ -1,12 +1,12 @@
-#include "common/config/version_converter.h"
+#include "source/common/config/version_converter.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/config/api_type_oracle.h"
-#include "common/protobuf/visitor.h"
-#include "common/protobuf/well_known.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/protobuf/visitor.h"
+#include "source/common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
 

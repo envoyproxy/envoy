@@ -3,7 +3,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/mocks/common.h"

@@ -15,9 +15,9 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":upstream_proxy_protocol",
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:transport_socket_config_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
+        "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
     ],
@@ -28,8 +28,8 @@ envoy_cc_library(
     srcs = ["proxy_protocol.cc"],
     hdrs = ["proxy_protocol.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
