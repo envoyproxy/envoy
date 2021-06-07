@@ -1,8 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <variant>
-#include <functional>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"

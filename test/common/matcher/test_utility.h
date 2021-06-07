@@ -135,8 +135,9 @@ class NeverMatchFactory : public InputMatcherFactory {
 public:
   NeverMatchFactory() : inject_factory_(*this) {}
 
-  InputMatcherFactoryCb createInputMatcherFactoryCb(const Protobuf::Message&,
-                                     Server::Configuration::FactoryContext&) override {
+  InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message&,
+                              Server::Configuration::FactoryContext&) override {
     return []() { return std::make_unique<NeverMatch>(); };
   }
 
