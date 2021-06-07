@@ -8,9 +8,8 @@
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/grpc/typed_async_client.h"
-
-#include "extensions/filters/http/ext_proc/client.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/filters/http/ext_proc/client.h"
 
 using envoy::service::ext_proc::v3alpha::ProcessingRequest;
 using envoy::service::ext_proc::v3alpha::ProcessingResponse;

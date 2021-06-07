@@ -7,8 +7,8 @@
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 
-#include "common/common/thread_synchronizer.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +45,7 @@ private:
     }
   };
   struct LocalDescriptorHash {
-    using is_transparent = void; // NOLINT(readability-identifier-naming)t
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const RateLimit::LocalDescriptor& d) const {
       return absl::Hash<std::vector<RateLimit::DescriptorEntry>>()(d.entries_);
     }

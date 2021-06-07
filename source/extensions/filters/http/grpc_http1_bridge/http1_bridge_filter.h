@@ -5,8 +5,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/context_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {

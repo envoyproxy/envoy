@@ -1,4 +1,4 @@
-#include "extensions/internal_redirect/previous_routes/previous_routes.h"
+#include "source/extensions/internal_redirect/previous_routes/previous_routes.h"
 
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"

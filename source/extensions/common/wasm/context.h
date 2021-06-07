@@ -11,12 +11,11 @@
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/filters/common/expr/cel_state.h"
-#include "extensions/filters/common/expr/evaluator.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/filters/common/expr/cel_state.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "eval/public/activation.h"
 #include "include/proxy-wasm/wasm.h"
@@ -354,7 +353,9 @@ protected:
 
   struct GrpcStreamClientHandler : public Grpc::RawAsyncStreamCallbacks {
     // Grpc::AsyncStreamCallbacks
-    void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+    void onCreateInitialMetadata(Http::RequestHeaderMap& initial_metadata) override {
+      context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
+    }
     void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&& metadata) override {
       context_->onGrpcReceiveInitialMetadataWrapper(token_, std::move(metadata));
     }

@@ -1,14 +1,13 @@
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 
 #include <limits>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
 namespace Extensions {

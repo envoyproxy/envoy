@@ -1,8 +1,7 @@
-#include "server/config_validation/dispatcher.h"
+#include "source/server/config_validation/dispatcher.h"
 
-#include "common/common/assert.h"
-
-#include "server/config_validation/connection.h"
+#include "source/common/common/assert.h"
+#include "source/server/config_validation/connection.h"
 
 namespace Envoy {
 namespace Event {
@@ -17,7 +16,8 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&, const bool) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>&,
+    const envoy::config::core::v3::DnsResolverOptions&) {
   return dns_resolver_;
 }
 

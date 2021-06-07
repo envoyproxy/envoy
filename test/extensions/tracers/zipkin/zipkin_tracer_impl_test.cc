@@ -5,14 +5,13 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -29,7 +28,6 @@
 
 using testing::_;
 using testing::DoAll;
-using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;

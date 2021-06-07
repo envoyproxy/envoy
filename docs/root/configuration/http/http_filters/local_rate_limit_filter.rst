@@ -22,8 +22,9 @@ configured to be returned.
 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.request_headers_to_add_when_not_enforced>` can be
 configured to be added to forwarded requests to the upstream when the local rate limit filter is enabled but not enforced.
 
-.. note::
-  The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.
+Depending on the value of the config :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>`,
+the token bucket is either shared across all workers or on a per connection basis. This results in the local rate limits being applied either per Envoy process or per downstream connection.
+By default the rate limits are applied per Envoy process.
 
 Example configuration
 ---------------------
@@ -55,6 +56,7 @@ Example filter configuration for a globally set rate limiter (e.g.: all vhosts/r
         header:
           key: x-local-rate-limit
           value: 'true'
+    local_rate_limit_per_downstream_connection: false
 
 
 Example filter configuration for a globally disabled rate limiter but enabled for a specific route:

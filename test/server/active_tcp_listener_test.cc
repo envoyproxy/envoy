@@ -4,12 +4,11 @@
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
-
-#include "server/active_tcp_listener.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_tcp_listener.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"

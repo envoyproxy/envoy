@@ -3,9 +3,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/delta_subscription_state.h"
-#include "common/config/utility.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

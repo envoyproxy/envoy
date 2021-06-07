@@ -1,11 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/oauth.h"
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
