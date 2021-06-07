@@ -95,7 +95,7 @@ Example Configuration
                         port: 5060
 
 
-In this example, Envoy is configured to respond to client queries for four domains. For any
+In this example, Envoy is configured to respond to client queries for five domains. For any
 other query, it will forward upstream to external resolvers. The filter will return an address
 matching the input query type. If the query is for type A records and no A records are configured,
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
