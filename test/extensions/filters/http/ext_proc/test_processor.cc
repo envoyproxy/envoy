@@ -9,13 +9,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-testing::AssertionResult TestProcessor::start(ProcessingFunc cb) {
+void TestProcessor::start(ProcessingFunc cb) {
   wrapper_ = std::make_unique<ProcessorWrapper>(cb);
   grpc::ServerBuilder builder;
   builder.RegisterService(wrapper_.get());
   builder.AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &listening_port_);
   server_ = builder.BuildAndStart();
-  return testing::AssertionSuccess();
 }
 
 void TestProcessor::shutdown() {

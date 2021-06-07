@@ -28,15 +28,10 @@ static const uint32_t BufferSize = 100000;
 // for the external processor. This lets us more fully exercise all the things that happen
 // with larger, streamed payloads.
 
-class StreamingTest : public HttpIntegrationTest,
-                      public Grpc::BaseGrpcClientIntegrationParamTest,
-                      public testing::TestWithParam<Grpc::ClientType> {
+class StreamingTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 
 protected:
-  StreamingTest() : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
-
-  Network::Address::IpVersion ipVersion() const override { return Network::Address::IpVersion::v4; }
-  Grpc::ClientType clientType() const override { return GetParam(); }
+  StreamingTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();
@@ -62,24 +57,24 @@ protected:
       address->set_address("127.0.0.1");
       address->set_port_value(test_processor_.port());
 
-      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
+      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
       ConfigHelper::setHttp2(
           *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
       ConfigHelper::setHttp2(*processor_cluster);
 
-      // Make sure both flavors of gRPC client use the right address
+      // Make sure both flavors of gRPC client use the right address.
       const auto addr =
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", test_processor_.port());
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
 
-      // CMerge the filter
+      // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
 
-    // Make sure that we have control over when buffers will fill up
+    // Make sure that we have control over when buffers will fill up.
     config_helper_.setBufferLimits(BufferSize, BufferSize);
 
     setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -111,11 +106,8 @@ protected:
   IntegrationStreamDecoderPtr client_response_;
 };
 
-// Ensure that the test suite is run with all combinations of HTTP1 and HTTP2 as
-// well as all combinations of the Envoy and Google gRPC clients.
-INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingTest,
-                         testing::Values(Grpc::ClientType::EnvoyGrpc,
-                                         Grpc::ClientType::GoogleGrpc));
+// Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
+INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
 // after the headers come in.
@@ -125,8 +117,7 @@ TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
 
   // This starts the gRPC server in the background. It'll be shut down when we stop the tests.
   test_processor_.start(
-      [](grpc::ServerContext*,
-         grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -168,8 +159,7 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
   const int total_size = num_chunks * chunk_size;
 
   test_processor_.start(
-      [](grpc::ServerContext*,
-         grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -227,8 +217,7 @@ TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
   const int response_size = 90000;
 
   test_processor_.start(
-      [](grpc::ServerContext*,
-         grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -268,6 +257,7 @@ TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
   ASSERT_TRUE(client_response_->waitForEndStream());
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ(client_response_->body().size(), response_size);
 }
 
 // Send a body that's larger than the buffer limit and have the processor
@@ -280,8 +270,7 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBodyTooBig) {
   const int total_size = num_chunks * chunk_size;
 
   test_processor_.start(
-      [](grpc::ServerContext*,
-         grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");

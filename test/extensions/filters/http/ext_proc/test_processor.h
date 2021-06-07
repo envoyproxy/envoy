@@ -15,7 +15,6 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 using ProcessingFunc = std::function<grpc::Status(
-    grpc::ServerContext* context,
     grpc::ServerReaderWriter<envoy::service::ext_proc::v3alpha::ProcessingResponse,
                              envoy::service::ext_proc::v3alpha::ProcessingRequest>*)>;
 
@@ -24,11 +23,11 @@ public:
   ProcessorWrapper(ProcessingFunc& cb) : callback_(cb) {}
 
   grpc::Status
-  Process(grpc::ServerContext* context,
+  Process(grpc::ServerContext*,
           grpc::ServerReaderWriter<envoy::service::ext_proc::v3alpha::ProcessingResponse,
                                    envoy::service::ext_proc::v3alpha::ProcessingRequest>* stream)
       override {
-    return callback_(context, stream);
+    return callback_(stream);
   }
 
 private:
@@ -39,7 +38,7 @@ class TestProcessor {
 public:
   // Start the processor listening on an ephemeral port (port 0) on 127.0.0.1.
   // All new streams will be delegated to the specified function.
-  testing::AssertionResult start(ProcessingFunc cb);
+  void start(ProcessingFunc cb);
 
   // Stop the processor from listening once all streams are closed.
   void shutdown();
