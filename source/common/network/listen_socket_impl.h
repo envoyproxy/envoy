@@ -10,10 +10,10 @@
 #include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/network/socket_impl.h"
-#include "common/network/socket_interface.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {

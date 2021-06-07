@@ -19,9 +19,9 @@ envoy_extension_cc_test(
         "abseil_synchronization",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:guarddog_config_interface",
+        "//envoy/common:time_interface",
+        "//envoy/registry",
+        "//envoy/server:guarddog_config_interface",
         "//source/common/filesystem:directory_lib",
         "//source/common/profiler:profiler_lib",
         "//source/extensions/watchdog/profile_action:config",
@@ -41,8 +41,8 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.watchdog.profile_action",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:guarddog_config_interface",
+        "//envoy/registry",
+        "//envoy/server:guarddog_config_interface",
         "//source/extensions/watchdog/profile_action:config",
         "//source/extensions/watchdog/profile_action:profile_action_lib",
         "//test/common/stats:stat_test_utility_lib",

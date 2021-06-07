@@ -6,8 +6,8 @@
 
 #include "envoy/access_log/access_log.h"
 
-#include "common/common/logger.h"
-#include "common/common/macros.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 

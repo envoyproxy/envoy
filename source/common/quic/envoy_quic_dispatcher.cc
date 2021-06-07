@@ -1,10 +1,10 @@
-#include "common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
 
-#include "common/common/safe_memcpy.h"
-#include "common/http/utility.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_session.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/http/utility.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

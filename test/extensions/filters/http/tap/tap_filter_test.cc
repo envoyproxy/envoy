@@ -1,5 +1,5 @@
-#include "extensions/filters/http/tap/config.h"
-#include "extensions/filters/http/tap/tap_filter.h"
+#include "source/extensions/filters/http/tap/config.h"
+#include "source/extensions/filters/http/tap/tap_filter.h"
 
 #include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/http/mocks.h"

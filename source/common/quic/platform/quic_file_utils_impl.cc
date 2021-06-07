@@ -4,10 +4,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quic_file_utils_impl.h"
+#include "source/common/quic/platform/quic_file_utils_impl.h"
 
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/str_cat.h"
 

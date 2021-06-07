@@ -1,10 +1,10 @@
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 
 #include <memory>
 
-#include "common/common/assert.h"
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/common/assert.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {

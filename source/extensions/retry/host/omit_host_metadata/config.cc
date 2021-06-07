@@ -1,10 +1,10 @@
-#include "extensions/retry/host/omit_host_metadata/config.h"
+#include "source/extensions/retry/host/omit_host_metadata/config.h"
 
 #include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {

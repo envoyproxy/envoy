@@ -3,12 +3,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/common/sqlutils/sqlutils.h"
-#include "extensions/filters/network/postgres_proxy/postgres_message.h"
-#include "extensions/filters/network/postgres_proxy/postgres_session.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/sqlutils/sqlutils.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_message.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
 

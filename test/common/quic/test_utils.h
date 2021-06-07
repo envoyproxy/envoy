@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -24,7 +24,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {

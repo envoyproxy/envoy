@@ -7,11 +7,11 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/health_discovery_service.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"

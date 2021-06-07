@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
 
 #include <map>
 #include <string>
@@ -8,18 +8,17 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter_config.h"
-#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter_config.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/stats.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {

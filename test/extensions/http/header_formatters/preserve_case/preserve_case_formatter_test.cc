@@ -1,4 +1,4 @@
-#include "extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "gtest/gtest.h"
 

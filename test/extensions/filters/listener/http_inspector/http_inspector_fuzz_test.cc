@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"

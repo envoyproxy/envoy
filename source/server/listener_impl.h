@@ -13,17 +13,16 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/basic_resource_impl.h"
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/quic_stat_names.h"
+#include "source/common/quic/quic_stat_names.h"
 #endif
 
 namespace Envoy {

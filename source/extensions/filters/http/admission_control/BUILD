@@ -23,9 +23,9 @@ envoy_cc_library(
         "thread_local_controller.h",
     ],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_object",
         "//source/common/common:cleanup_lib",
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
@@ -41,7 +41,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/common:enum_to_int",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",

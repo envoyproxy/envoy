@@ -2,8 +2,8 @@
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/thread.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_types.h"
