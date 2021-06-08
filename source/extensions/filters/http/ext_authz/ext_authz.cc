@@ -7,7 +7,6 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,7 +39,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   auto&& maybe_merged_per_route_config =
       Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-          HttpFilterNames::get().ExtAuthorization, route,
+          "envoy.filters.http.ext_authz", route,
           [](FilterConfigPerRoute& cfg_base, const FilterConfigPerRoute& cfg) {
             cfg_base.merge(cfg);
           });
@@ -208,7 +207,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
-    decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().ExtAuthorization,
+    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
                                                         response->dynamic_metadata);
   }
 
@@ -381,7 +380,7 @@ Filter::PerRouteFlags Filter::getPerRouteFlags(const Router::RouteConstSharedPtr
 
   const auto* specific_per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-          HttpFilterNames::get().ExtAuthorization, route);
+          "envoy.filters.http.ext_authz", route);
   if (specific_per_route_config != nullptr) {
     return PerRouteFlags{specific_per_route_config->disabled(),
                          specific_per_route_config->disableRequestBodyBuffering()};

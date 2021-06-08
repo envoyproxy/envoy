@@ -15,7 +15,6 @@
 
 #include "source/common/common/utility.h"
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 #include "source/server/options_impl.h"
 
 #if defined(__linux__)
@@ -641,13 +640,13 @@ TEST(FactoryByTypeTest, EarlierVersionConfigType) {
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   ProtobufWkt::Any non_api_type;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
