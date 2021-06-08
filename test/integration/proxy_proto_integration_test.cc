@@ -56,7 +56,7 @@ TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   cleanupUpstreamAndDownstream();
   const std::string log_line = waitForAccessLog(listener_access_log_name_);
-  EXPECT_EQ(log_line, "\"foo.com\"");
+  EXPECT_EQ(log_line, "foo.com");
 }
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
