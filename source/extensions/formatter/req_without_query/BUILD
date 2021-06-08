@@ -27,7 +27,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/formatter/req_without_query:req_without_query_lib",
         "@envoy_api//envoy/extensions/formatter/req_without_query/v3:pkg_cc_proto",
     ],

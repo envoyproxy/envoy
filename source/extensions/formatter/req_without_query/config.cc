@@ -1,8 +1,8 @@
-#include "extensions/formatter/req_without_query/config.h"
+#include "source/extensions/formatter/req_without_query/config.h"
 
 #include "envoy/extensions/formatter/req_without_query/v3/req_without_query.pb.h"
 
-#include "extensions/formatter/req_without_query/req_without_query.h"
+#include "source/extensions/formatter/req_without_query/req_without_query.h"
 
 namespace Envoy {
 namespace Extensions {

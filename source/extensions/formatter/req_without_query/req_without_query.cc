@@ -1,9 +1,9 @@
-#include "extensions/formatter/req_without_query/req_without_query.h"
+#include "source/extensions/formatter/req_without_query/req_without_query.h"
 
 #include <string>
 
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,7 +1,7 @@
 #include "envoy/config/core/v3/substitution_format_string.pb.validate.h"
 
-#include "common/formatter/substitution_format_string.h"
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
