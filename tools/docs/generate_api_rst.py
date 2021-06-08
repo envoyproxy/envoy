@@ -15,7 +15,7 @@ def main():
         #
         #   @envoy_api_canonical//envoy/watchdog/v3alpha:abort_action.proto
         #
-        # this transforms them to a list into a "canonical" form of:
+        # this transforms them to a list with a "canonical" form of:
         #
         #   envoy/watchdog/v3alpha/abort_action.proto.rst
         #
