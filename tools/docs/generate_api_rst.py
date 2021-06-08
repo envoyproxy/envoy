@@ -11,7 +11,7 @@ def main():
 
     with open(proto_srcs) as f:
         # the contents of `proto_srcs` are the result of a bazel genquery,
-        # containg bazel target rules, eg:
+        # containing bazel target rules, eg:
         #
         #   @envoy_api_canonical//envoy/watchdog/v3alpha:abort_action.proto
         #
