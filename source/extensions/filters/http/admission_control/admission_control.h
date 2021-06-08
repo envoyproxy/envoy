@@ -14,16 +14,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/codes.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
-#include "extensions/filters/http/admission_control/thread_local_controller.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/codes.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
+#include "source/extensions/filters/http/admission_control/thread_local_controller.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

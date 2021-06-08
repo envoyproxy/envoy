@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/quic/envoy_quic_proof_verifier_base.h"
-
-#include "extensions/transport_sockets/tls/context_impl.h"
+#include "source/common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 
 namespace Envoy {
 namespace Quic {

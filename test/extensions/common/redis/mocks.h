@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/common/redis/cluster_refresh_manager.h"
+#include "source/extensions/common/redis/cluster_refresh_manager.h"
 
 #include "gmock/gmock.h"
 

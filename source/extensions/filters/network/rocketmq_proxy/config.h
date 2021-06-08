@@ -6,11 +6,11 @@
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
 #include "envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
-#include "extensions/filters/network/rocketmq_proxy/router/router_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

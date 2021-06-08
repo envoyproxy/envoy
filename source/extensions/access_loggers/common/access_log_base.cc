@@ -1,7 +1,7 @@
-#include "extensions/access_loggers/common/access_log_base.h"
+#include "source/extensions/access_loggers/common/access_log_base.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {

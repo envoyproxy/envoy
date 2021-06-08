@@ -3,9 +3,8 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/integration/integration.h"
 

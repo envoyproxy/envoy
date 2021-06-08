@@ -1,7 +1,7 @@
-#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
-#include "common/protobuf/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 

@@ -7,10 +7,10 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/grpc/async_client.h"
 
-#include "common/common/backoff_strategy.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/config/utility.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Config {

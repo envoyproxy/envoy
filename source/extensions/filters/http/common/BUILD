@@ -14,7 +14,7 @@ envoy_cc_library(
     # A thin shim used by test and prod filters.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
     ],
 )
 
@@ -23,7 +23,7 @@ envoy_cc_library(
     hdrs = ["factory_base.h"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
     ],
 )
 
@@ -35,7 +35,7 @@ envoy_cc_library(
         "jwt_verify_lib",
     ],
     deps = [
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -50,7 +50,7 @@ envoy_cc_library(
         "//test:__subpackages__",
     ],
     deps = [
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:macros",
         "//source/extensions/common:utility_lib",
         "//source/extensions/filters/http:well_known_names",
@@ -62,9 +62,9 @@ envoy_cc_library(
     srcs = ["stream_rate_limiter.cc"],
     hdrs = ["stream_rate_limiter.h"],
     deps = [
-        "//include/envoy/common:token_bucket_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
+        "//envoy/common:token_bucket_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

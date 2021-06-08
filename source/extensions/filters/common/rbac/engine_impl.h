@@ -2,8 +2,8 @@
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "extensions/filters/common/rbac/engine.h"
-#include "extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/engine.h"
+#include "source/extensions/filters/common/rbac/matchers.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,9 +2,9 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/logger.h"
 
 #include "test/test_common/environment.h"
 

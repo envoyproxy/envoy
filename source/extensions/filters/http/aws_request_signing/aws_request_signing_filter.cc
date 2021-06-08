@@ -1,9 +1,9 @@
-#include "extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
 
 namespace Envoy {
 namespace Extensions {

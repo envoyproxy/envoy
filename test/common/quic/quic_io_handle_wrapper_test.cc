@@ -3,8 +3,8 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/network/address_impl.h"
-#include "common/quic/quic_io_handle_wrapper.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/io_handle.h"

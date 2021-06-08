@@ -6,10 +6,10 @@
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/http/utility.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
 using testing::Invoke;

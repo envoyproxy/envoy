@@ -1,8 +1,8 @@
-#include "extensions/common/wasm/wasm_extension.h"
+#include "source/extensions/common/wasm/wasm_extension.h"
 
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 namespace Envoy {
 namespace Extensions {

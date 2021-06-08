@@ -8,14 +8,13 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/http/message_impl.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
