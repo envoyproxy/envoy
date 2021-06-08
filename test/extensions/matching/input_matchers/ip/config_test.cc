@@ -32,6 +32,29 @@ TEST(ConfigTest, TestConfig) {
   EXPECT_NE(nullptr, matcher);
 }
 
+TEST(ConfigTest, StatConfig) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  const std::string yaml_string = R"EOF(
+    name: ip
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.ip.v3.Ip
+        cidr_ranges:
+        - address_prefix: 192.0.2.0
+          prefix_len: 24
+        stat_prefix: "test.ips_matcher"
+)EOF";
+
+  envoy::config::core::v3::TypedExtensionConfig config;
+  TestUtility::loadFromYaml(yaml_string, config);
+
+  Config factory;
+  auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
+  auto matcher = factory.createInputMatcher(*message, context);
+  EXPECT_NE(nullptr, matcher);
+}
+
 TEST(ConfigTest, InvalidConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
