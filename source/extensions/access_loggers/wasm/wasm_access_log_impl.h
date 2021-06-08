@@ -31,10 +31,10 @@ public:
       }
     }
 
-    auto obj = tls_slot_->get();
-    if (obj.has_value()) {
-      obj->handle()->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
-                                               response_trailers, stream_info);
+    auto handle = tls_slot_->get()->handle();
+    if (handle->wasmHandle()) {
+      handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
+                                        response_trailers, stream_info);
     }
   }
 
