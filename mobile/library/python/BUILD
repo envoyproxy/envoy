@@ -31,6 +31,10 @@ pybind_extension(
     srcs = [
         "module_definition.cc",
     ],
+    linkopts = select({
+        "//bazel:darwin": ["-Wl,-exported_symbol,_PyInit_envoy_engine"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_lib",
