@@ -22,6 +22,8 @@ OriginalDstFilter::getOriginalDst(Network::Socket& socket) {
            socket.addressProvider().localAddress()->type() == Network::Address::Type::Ip);
     return socket.addressProvider().localAddress();
   }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
