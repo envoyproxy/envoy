@@ -114,7 +114,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // Note: This will distribute drain events in the first 1/4th of the drain window
   //       to ensure that we initiate draining with enough time for graceful shutdowns.
   const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
-  const std::chrono::seconds remaining_time{0};
+  std::chrono::seconds remaining_time{0};
   if (current_time < drain_deadline_) {
     remaining_time =
         std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
