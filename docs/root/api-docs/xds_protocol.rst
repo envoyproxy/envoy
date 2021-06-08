@@ -91,18 +91,18 @@ combinations of two dimensions.
 
 The first dimension is State of the World (SotW) vs. incremental. The SotW approach was the
 original mechanism used by xDS, in which the client must specify all resource names it is
-interested in with each request, and the server must return all resources the client has
-subscribed to in each request (in LDS/CDS). This means that if the client is already subscribing
-to 99 resources and wants to add an additional one, it must send a request with all 100 resource
-names, rather than just the one new one. And the server must then respond by sending all 100
-resources, even if the 99 that were already subscribed to have not changed (in LDS/CDS). This
-mechanism can be a scalability limitation, which is why the incremental protocol variant was
-introduced. The incremental approach allows both the client and server to indicate only deltas
-relative to their previous state -- i.e., the client can say that it wants to add or remove its
-subscription to a particular resource name without resending those that have not changed, and the
-server can send updates only for those resources that have changed. The incremental protocol also
-provides a mechanism for lazy loading of resources. For details on the incremental protocol, see
-:ref:`Incremental xDS <xds_protocol_delta>` below.
+interested in with each request, and for LDS and CDS resources, the server must return all
+resources that the client has subscribed to in each request. This means that if the client is
+already subscribing to 99 resources and wants to add an additional one, it must send a request
+with all 100 resource names, rather than just the one new one. And for LDS and CDS resources, the
+server must then respond by sending all 100 resources, even if the 99 that were already subscribed
+to have not changed. This mechanism can be a scalability limitation, which is why the incremental
+protocol variant was introduced. The incremental approach allows both the client and server to
+indicate only deltas relative to their previous state -- i.e., the client can say that it wants
+to add or remove its subscription to a particular resource name without resending those that have
+not changed, and the server can send updates only for those resources that have changed. The
+incremental protocol also provides a mechanism for lazy loading of resources. For details on the
+incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
 
 The second dimension is using a separate gRPC stream for each resource type vs. aggregating all
 resource types onto a single gRPC stream. The former approach was the original mechanism used by
