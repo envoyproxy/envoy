@@ -127,8 +127,6 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         auto virtual_domains = dns_lookup_trie_.find(suffix);
         if (virtual_domains != nullptr) {
           virtual_domains->emplace(full_service_name, std::move(endpoint_config));
-        } else {
-          addEndpointToSuffix(suffix, full_service_name, endpoint_config);
         }
       }
     }
@@ -144,14 +142,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       if (virtual_domains == nullptr) {
         addEndpointToSuffix(suffix, domain_name, endpoint_config);
       } else {
-        auto existing_endpoint_config = virtual_domains->find(domain_name);
-
-        // A domain can be redirected to one cluster. If it appears multiple times, the last
-        // entry remains
-        if (existing_endpoint_config != virtual_domains->end()) {
-          virtual_domains->erase(existing_endpoint_config);
+        // A domain can be redirected to one cluster. If it appears multiple times, the first
+        // entry is the only one used
+        if (virtual_domains->find(domain_name) == virtual_domains->end()) {
+          virtual_domains->emplace(domain_name, std::move(endpoint_config));
         }
-        virtual_domains->emplace(domain_name, std::move(endpoint_config));
       }
     }
 
