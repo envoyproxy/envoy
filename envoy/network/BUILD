@@ -68,7 +68,7 @@ envoy_cc_library(
     hdrs = ["drain_decision.h"],
     external_deps = ["abseil_base"],
     deps = [
-        "//include/envoy/common:callback",
+        "//envoy/common:callback",
     ],
 )
 
