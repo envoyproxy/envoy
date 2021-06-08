@@ -80,52 +80,14 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:extensions_security_rst
 # Generate RST for external dependency docs in intro/arch_overview/security.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:external_deps_rst
 
-function generate_api_rst() {
-  local proto_target
-  declare -r API_VERSION=$1
-  echo "Generating ${API_VERSION} API RST..."
+# Generate RST for api
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
 
-  # Generate the extensions docs
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" @envoy_api_canonical//:"${API_VERSION}"_protos --aspects \
-    tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst
-
-  # Fill in boiler plate for extensions that have google.protobuf.Empty as their
-  # config. We only have v2 support here for version history anchors, which don't point at any empty
-  # configs.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-        "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-${API_VERSION}"/config
-
-  # We do ** matching below to deal with Bazel cache blah (source proto artifacts
-  # are nested inside source package targets).
-  shopt -s globstar
-
-  # Find all source protos.
-  proto_target=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//:${API_VERSION}_protos))")
-  declare -r proto_target
-
-  # Only copy in the protos we care about and know how to deal with in protodoc.
-  for p in ${proto_target}
-  do
-    declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api_canonical//}"
-    declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
-    # We use ** glob matching here to deal with the fact that we have something
-    # like
-    # bazel-bin/external/envoy_api_canonical/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
-    # and we don't want to have to do a nested loop and slow bazel query to
-    # recover the canonical package part of the path.
-    declare SRCS=(bazel-bin/external/envoy_api_canonical/**/"${PROTO_FILE_CANONICAL}.rst")
-    # While we may have reformatted the file multiple times due to the transitive
-    # dependencies in the aspect above, they all look the same. So, just pick an
-    # arbitrary match and we're done.
-    declare SRC="${SRCS[0]}"
-    declare DST="${GENERATED_RST_DIR}/api-${API_VERSION}/${PROTO_FILE_CANONICAL#envoy/}".rst
-
-    mkdir -p "$(dirname "${DST}")"
-    cp -f "${SRC}" "$(dirname "${DST}")"
-  done
-}
-
-generate_api_rst v3
+# Fill in boiler plate for extensions that have google.protobuf.Empty as their
+# config. We only have v2 support here for version history anchors, which don't point at any empty
+# configs.
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
+      "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-v3"/config
 
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
@@ -150,6 +112,7 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:redirects
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
 tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/tools/docs/api_rst.tar -C "${GENERATED_RST_DIR}"
 cp -a bazel-bin/docs/envoy-redirects.txt "${GENERATED_RST_DIR}"
 
 # To speed up validate_fragment invocations in validating_code_block
