@@ -100,9 +100,9 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "streaming_test",
+    name = "streaming_integration_test",
     size = "medium",
-    srcs = ["streaming_test.cc"],
+    srcs = ["streaming_integration_test.cc"],
     extension_name = "envoy.filters.http.ext_proc",
     deps = [
         ":test_processor_lib",

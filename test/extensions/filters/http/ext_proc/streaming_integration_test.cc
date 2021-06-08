@@ -27,11 +27,11 @@ static const uint32_t BufferSize = 100000;
 // These tests exercise ext_proc using the integration test framework and a real gRPC server
 // for the external processor. This lets us more fully exercise all the things that happen
 // with larger, streamed payloads.
-
-class StreamingTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class StreamingIntegrationTest : public HttpIntegrationTest,
+                                 public Grpc::GrpcClientIntegrationParamTest {
 
 protected:
-  StreamingTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
+  StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
   void TearDown() override {
     cleanupUpstreamAndDownstream();
@@ -90,9 +90,9 @@ protected:
     if (cb) {
       (*cb)(headers);
     }
-    auto enc_dec = codec_client_->startRequest(headers);
-    client_response_ = std::move(enc_dec.second);
-    return enc_dec.first;
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    client_response_ = std::move(encoder_decoder.second);
+    return encoder_decoder.first;
   }
 
   void sendGetRequest(const Http::RequestHeaderMap& headers) {
@@ -107,11 +107,12 @@ protected:
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
-INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
 // after the headers come in.
-TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
+TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
   uint32_t num_chunks = 150;
   uint32_t chunk_size = 1000;
 
@@ -153,7 +154,7 @@ TEST_P(StreamingTest, PostAndProcessHeadersOnly) {
 
 // Send a body that's smaller than the buffer limit, and have the processor
 // request to see it in buffered form before allowing it to continue.
-TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
+TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
   const uint32_t num_chunks = 99;
   const uint32_t chunk_size = 1000;
   uint32_t total_size = num_chunks * chunk_size;
@@ -213,7 +214,7 @@ TEST_P(StreamingTest, PostAndProcessBufferedRequestBody) {
 
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
-TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
+TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
   uint32_t response_size = 90000;
 
   test_processor_.start(
@@ -262,7 +263,7 @@ TEST_P(StreamingTest, GetAndProcessBufferedResponseBody) {
 
 // Send a body that's larger than the buffer limit and have the processor
 // try to process it in buffered mode. The client should get an error.
-TEST_P(StreamingTest, PostAndProcessBufferedRequestBodyTooBig) {
+TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
   // Send just one chunk beyond the buffer limit -- integration
   // test framework can't handle anything else.
   const uint32_t num_chunks = 11;
