@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/jwt_authn/filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/test_common/utility.h"

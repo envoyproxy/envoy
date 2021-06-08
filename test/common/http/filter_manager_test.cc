@@ -4,12 +4,12 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/http/filter_manager.h"
-#include "common/http/matching/inputs.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/matcher.h"
-#include "common/stream_info/filter_state_impl.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/matching/inputs.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"

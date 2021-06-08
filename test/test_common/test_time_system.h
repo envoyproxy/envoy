@@ -4,8 +4,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/assert.h"
-#include "common/common/thread.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
 
 #include "test/test_common/global.h"
 #include "test/test_common/only_one_thread.h"

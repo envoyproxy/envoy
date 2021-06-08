@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/thrift_object_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object_impl.h"
 
 namespace Envoy {
 namespace Extensions {

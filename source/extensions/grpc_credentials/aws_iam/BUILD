@@ -16,8 +16,8 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     external_deps = ["grpc"],
     deps = [
-        "//include/envoy/grpc:google_grpc_creds_interface",
-        "//include/envoy/registry",
+        "//envoy/grpc:google_grpc_creds_interface",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:google_grpc_creds_lib",

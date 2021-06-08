@@ -2,10 +2,9 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/http/kill_request/kill_request_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/kill_request/kill_request_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"

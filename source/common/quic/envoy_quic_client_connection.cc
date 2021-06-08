@@ -1,14 +1,14 @@
-#include "common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
 
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

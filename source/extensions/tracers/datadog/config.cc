@@ -1,12 +1,11 @@
-#include "extensions/tracers/datadog/config.h"
+#include "source/extensions/tracers/datadog/config.h"
 
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/config/trace/v3/datadog.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/utility.h"
-
-#include "extensions/tracers/datadog/datadog_tracer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
 
 #include "datadog/opentracing.h"
 

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/http/date_provider_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/network/http_connection_manager/config.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/http/date_provider_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"

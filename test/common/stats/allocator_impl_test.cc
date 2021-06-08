@@ -1,6 +1,6 @@
 #include <string>
 
-#include "common/stats/allocator_impl.h"
+#include "source/common/stats/allocator_impl.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"

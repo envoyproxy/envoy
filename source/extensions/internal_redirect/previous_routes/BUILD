@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["previous_routes.cc"],
     hdrs = ["previous_routes.h"],
     deps = [
-        "//include/envoy/router:internal_redirect_interface",
-        "//include/envoy/stream_info:filter_state_interface",
+        "//envoy/router:internal_redirect_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 
@@ -29,8 +29,8 @@ envoy_cc_extension(
     ],
     deps = [
         ":previous_routes_lib",
-        "//include/envoy/registry",
-        "//include/envoy/router:internal_redirect_interface",
+        "//envoy/registry",
+        "//envoy/router:internal_redirect_interface",
         "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
     ],
 )
