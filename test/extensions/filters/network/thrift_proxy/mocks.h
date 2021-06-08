@@ -380,6 +380,29 @@ public:
   MockShadowRequest();
   ~MockShadowRequest() override;
 
+  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata), ());
+  MOCK_METHOD(FilterStatus, transportEnd, (), ());
+  MOCK_METHOD(FilterStatus, messageEnd, (), ());
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data), ());
+  MOCK_METHOD(FilterStatus, structBegin, (absl::string_view name), ());
+  MOCK_METHOD(FilterStatus, structEnd, (), ());
+  MOCK_METHOD(FilterStatus, fieldBegin,
+              (absl::string_view name, FieldType& field_type, int16_t& field_id), ());
+  MOCK_METHOD(FilterStatus, fieldEnd, (), ());
+  MOCK_METHOD(FilterStatus, boolValue, (bool& value), ());
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value), ());
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value), ());
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value), ());
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value), ());
+  MOCK_METHOD(FilterStatus, doubleValue, (double& value), ());
+  MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value), ());
+  MOCK_METHOD(FilterStatus, mapBegin, (FieldType & key_type, FieldType& value_type, uint32_t& size),
+              ());
+  MOCK_METHOD(FilterStatus, mapEnd, (), ());
+  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size), ());
+  MOCK_METHOD(FilterStatus, listEnd, (), ());
+  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size), ());
+  MOCK_METHOD(FilterStatus, setEnd, (), ());
   MOCK_METHOD(void, tryWriteRequest, (), ());
   MOCK_METHOD(void, tryReleaseConnection, (), ());
   MOCK_METHOD(bool, waitingForConnection, (), (const));

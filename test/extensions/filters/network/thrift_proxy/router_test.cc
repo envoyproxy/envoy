@@ -1368,7 +1368,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   // Set up shadow requests.
   std::vector<std::shared_ptr<MockShadowRequest>> shadow_requests;
   for (int i = 0; i < 2; ++i) {
-    shadow_requests.push_back(std::make_shared<MockShadowRequest>());
+    shadow_requests.push_back(std::make_shared<NiceMock<MockShadowRequest>>());
     EXPECT_CALL(*shadow_requests.back(), tryWriteRequest());
     EXPECT_CALL(*shadow_requests.back(), tryReleaseConnection());
   }
