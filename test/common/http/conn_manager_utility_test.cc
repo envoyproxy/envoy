@@ -1229,8 +1229,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
   EXPECT_EQ(Tracing::Reason::Sampling, request_id_extension_->getTraceReason(request_headers));
 }
 
-TEST_F(ConnectionManagerUtilityTest, DelegateSamplingLogicToTracingProvider) {
-  tracing_config_.delegate_sampling_ = true;
+TEST_F(ConnectionManagerUtilityTest, CheckSamplingDecisionWithBypassSamplingWithRequestId) {
+  tracing_config_.bypass_sampling_with_request_id_ = true;
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};

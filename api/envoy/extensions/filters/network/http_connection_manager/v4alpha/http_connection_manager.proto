@@ -192,9 +192,10 @@ message HttpConnectionManager {
     //   on OpenCensus side.
     config.trace.v4alpha.Tracing.Http provider = 9;
 
-    // Trace reason is decided by request_id by default. If true, these sampling strategy is delegated
-    // to the configured tracing provider.
-    bool delegate_sampling = 10;
+    // Trace reason is decided by request_id by default. If true, these sampling strategy decisions
+    // will be decided by only tracing provider and :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`
+    // never be modified.
+    bool bypass_sampling_with_request_id = 10;
   }
 
   message InternalAddressConfig {

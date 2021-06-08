@@ -36,7 +36,7 @@ Minor Behavior Changes
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
-* tracing: add :ref:`delegate_sampling <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.delegate_sampling>` to bypass current UUID based sampling decision behavior.
+* tracing: add :ref:`bypass_sampling_with_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.bypass_sampling_with_request_id>` to bypass current :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` based sampling decision behavior.
 
 Bug Fixes
 ---------

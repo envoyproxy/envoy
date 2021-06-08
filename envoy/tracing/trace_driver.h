@@ -81,7 +81,7 @@ public:
   /**
    * @return true if trace reason won't be decided by request_id value.
    */
-  virtual bool delegateSampling() const PURE;
+  virtual bool bypassSamplingWithRequestId() const PURE;
 };
 
 /**

@@ -16,7 +16,7 @@ MockConfig::MockConfig() {
   ON_CALL(*this, customTags()).WillByDefault(Return(&custom_tags_));
   ON_CALL(*this, verbose()).WillByDefault(Return(verbose_));
   ON_CALL(*this, maxPathTagLength()).WillByDefault(Return(uint32_t(256)));
-  ON_CALL(*this, delegateSampling()).WillByDefault(Return(false));
+  ON_CALL(*this, bypassSamplingWithRequestId()).WillByDefault(Return(false));
 }
 MockConfig::~MockConfig() = default;
 

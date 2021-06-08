@@ -201,7 +201,7 @@ private:
     const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
-    bool delegateSampling() const override;
+    bool bypassSamplingWithRequestId() const override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {

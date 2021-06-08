@@ -507,7 +507,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
-            tracing_config.verbose(), max_path_tag_length, tracing_config.delegate_sampling()});
+            tracing_config.verbose(), max_path_tag_length,
+            tracing_config.bypass_sampling_with_request_id()});
   }
 
   for (const auto& access_log : config.access_log()) {
