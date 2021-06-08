@@ -33,7 +33,7 @@ envoy_cc_library(
     ],
     deps = [
         ":action_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/matcher:matcher_lib",
@@ -45,11 +45,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "unknown",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/composite:filter_lib",

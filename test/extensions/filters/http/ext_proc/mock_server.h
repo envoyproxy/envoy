@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/client.h"
 
 #include "gmock/gmock.h"
 

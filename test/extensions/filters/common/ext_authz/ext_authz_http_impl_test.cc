@@ -1,13 +1,12 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"

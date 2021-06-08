@@ -15,9 +15,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -1381,6 +1381,27 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // upstream_response_timeout.
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+}
+
+envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    size_t http3_max_stream_receive_window) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  if (http2_options.has_initial_stream_window_size() &&
+      http2_options.initial_stream_window_size().value() < http3_max_stream_receive_window) {
+    // Set http3 stream flow control window only if the configured http2 stream flow control
+    // window is smaller than the upper limit of flow control window supported by QUICHE which is
+    // also the default for http3 streams.
+    http3_options.mutable_quic_protocol_options()->mutable_initial_stream_window_size()->set_value(
+        http2_options.initial_stream_window_size().value());
+  }
+  if (http2_options.has_override_stream_error_on_invalid_http_message()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        http2_options.override_stream_error_on_invalid_http_message().value());
+  } else if (http2_options.stream_error_on_invalid_http_messaging()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  }
+  return http3_options;
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

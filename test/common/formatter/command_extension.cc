@@ -1,6 +1,6 @@
 #include "test/common/formatter/command_extension.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Formatter {

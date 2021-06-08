@@ -1,16 +1,16 @@
-#include "common/http/http3/conn_pool.h"
+#include "source/common/http/http3/conn_pool.h"
 
 #include <cstdint>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/utility.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -44,8 +44,9 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
   Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
-  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(dispatcher, transport_socket_factory,
-                                                              time_source, source_address);
+  quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
+      dispatcher, transport_socket_factory, time_source, source_address,
+      host->cluster().perConnectionBufferLimitBytes());
   setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
 }
 
@@ -80,9 +81,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return std::make_unique<ActiveClient>(*pool, data);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(
-            CodecClient::Type::HTTP3, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),
+                                                 data.host_description_, pool->dispatcher(),
+                                                 pool->randomGenerator())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http3}, time_source);

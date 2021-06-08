@@ -1,17 +1,17 @@
-#include "common/local_reply/local_reply.h"
+#include "source/common/local_reply/local_reply.h"
 
 #include <string>
 #include <vector>
 
 #include "envoy/api/api.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/config/datasource.h"
-#include "common/formatter/substitution_format_string.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/router/header_parser.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/datasource.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace LocalReply {

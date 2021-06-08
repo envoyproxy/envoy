@@ -1,8 +1,8 @@
 #include <string>
 
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
-#include "extensions/tracers/xray/xray_tracer_impl.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
+#include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"

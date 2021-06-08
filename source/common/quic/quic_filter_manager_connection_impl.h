@@ -17,20 +17,22 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/network/connection_impl_base.h"
-#include "common/quic/quic_network_connection.h"
-#include "common/quic/envoy_quic_simulated_watermark_buffer.h"
-#include "common/quic/send_buffer_monitor.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 
 class TestPauseFilterForQuic;
 
 namespace Quic {
+
+class QuicNetworkConnectionTest;
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
@@ -171,6 +173,7 @@ protected:
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
+  friend class Envoy::Quic::QuicNetworkConnectionTest;
 
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.
   void onSendBufferHighWatermark();

@@ -1,12 +1,11 @@
-#include "extensions/tracers/dynamic_ot/config.h"
+#include "source/extensions/tracers/dynamic_ot/config.h"
 
 #include "envoy/config/trace/v3/dynamic_ot.pb.h"
 #include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/utility.h"
-
-#include "extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/dynamic_ot/dynamic_opentracing_driver_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -16,8 +16,7 @@ class ConnectTerminationIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  ConnectTerminationIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
+  ConnectTerminationIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
     enableHalfClose(true);
   }
 
@@ -226,7 +225,7 @@ TEST_P(ConnectTerminationIntegrationTest, BasicMaxStreamDuration) {
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     ASSERT_TRUE(response_->waitForReset());
@@ -274,7 +273,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
     EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
@@ -322,7 +321,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStrippingLegacy) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
   EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
     EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
@@ -376,7 +375,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
   EXPECT_EQ(upstream_request_->headers().getHostValue(), "host:80");
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
   } else {
     EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
@@ -421,7 +420,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
   } else {
     EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Protocol)[0]->value(),
@@ -442,26 +441,26 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectTerminationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-using Params = std::tuple<Network::Address::IpVersion, FakeHttpConnection::Type, bool>;
+using Params = std::tuple<Network::Address::IpVersion, Http::CodecType, bool>;
 
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public testing::TestWithParam<Params>,
                                     public HttpIntegrationTest {
 public:
   TcpTunnelingIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, std::get<0>(GetParam())) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())) {}
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
     return fmt::format(
         "{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-        std::get<1>(p.param) == FakeHttpConnection::Type::HTTP1 ? "HTTP1Upstream" : "HTTP2Upstream",
+        std::get<1>(p.param) == Http::CodecType::HTTP1 ? "HTTP1Upstream" : "HTTP2Upstream",
         std::get<2>(p.param) ? "WaitConnectResponse" : "DoNotWaitConnectResponse");
   }
 
   void SetUp() override {
     wait_for_connect_response_ = std::get<2>(GetParam());
     enableHalfClose(true);
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
     setUpstreamProtocol(std::get<1>(GetParam()));
 
     if (wait_for_connect_response_) {
@@ -519,7 +518,7 @@ TEST_P(TcpTunnelingIntegrationTest, Basic) {
   ASSERT_TRUE(tcp_client->write("hello", false));
   tcp_client->close();
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -574,7 +573,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   ASSERT_TRUE(tcp_client->write("hello", false));
   tcp_client->close();
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -596,7 +595,7 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   // upstream gets a stream reset.
   default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -625,13 +624,13 @@ TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
   // Send data from upstream to downstream with an end stream and make sure the data is received
   // before the connection is half-closed.
   upstream_request_->encodeData(12, true);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->close());
   }
   ASSERT_TRUE(tcp_client->waitForData(12));
   tcp_client->waitForHalfClose();
 
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     tcp_client->close();
   } else {
@@ -647,7 +646,7 @@ TEST_P(TcpTunnelingIntegrationTest, CloseUpstreamFirst) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, ResetStreamTest) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
   enableHalfClose(false);
@@ -696,7 +695,7 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   upstream_request_->encodeData(data, false);
 
   tcp_client->waitForDisconnect();
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
     tcp_client->close();
   } else {
@@ -719,7 +718,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
   tcp_client->readDisable(true);
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(tcp_client->write("hello", false));
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
@@ -739,7 +738,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyDownstreamFlush) {
   tcp_client->readDisable(false);
   tcp_client->waitForData(data);
   tcp_client->waitForHalfClose();
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     tcp_client->close();
   }
 }
@@ -765,7 +764,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   ASSERT_TRUE(tcp_client->waitForData(5));
 
   ASSERT_TRUE(tcp_client->write(data, true));
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     tcp_client->close();
 
     upstream_request_->readDisable(false);
@@ -785,7 +784,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
 
 // Test that h2 connection is reused.
 TEST_P(TcpTunnelingIntegrationTest, H2ConnectionReuse) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
   initialize();
@@ -831,7 +830,7 @@ TEST_P(TcpTunnelingIntegrationTest, H2ConnectionReuse) {
 
 // Test that with HTTP1 we have no connection reuse with downstream close.
 TEST_P(TcpTunnelingIntegrationTest, H1NoConnectionReuse) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   initialize();
@@ -872,7 +871,7 @@ TEST_P(TcpTunnelingIntegrationTest, H1NoConnectionReuse) {
 
 // Test that with HTTP1 we have no connection with upstream close.
 TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   initialize();
@@ -916,7 +915,7 @@ TEST_P(TcpTunnelingIntegrationTest, H1UpstreamCloseNoConnectionReuse) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   initialize();
@@ -946,7 +945,7 @@ TEST_P(TcpTunnelingIntegrationTest, 2xxStatusCodeValidHttp1) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   initialize();
@@ -975,7 +974,7 @@ TEST_P(TcpTunnelingIntegrationTest, ContentLengthHeaderIgnoredHttp1) {
 }
 
 TEST_P(TcpTunnelingIntegrationTest, TransferEncodingHeaderIgnoredHttp1) {
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     return;
   }
   initialize();
@@ -1029,7 +1028,7 @@ TEST_P(TcpTunnelingIntegrationTest, DeferTransmitDataUntilSuccessConnectResponse
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
 
   tcp_client->close();
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -1061,7 +1060,7 @@ TEST_P(TcpTunnelingIntegrationTest, NoDataTransmittedIfConnectFailureResponseIsR
   ASSERT_FALSE(upstream_request_->waitForData(*dispatcher_, 1, std::chrono::milliseconds(100)));
 
   tcp_client->close();
-  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
@@ -1086,8 +1085,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                       testing::Values(FakeHttpConnection::Type::HTTP1,
-                                       FakeHttpConnection::Type::HTTP2),
+                       testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2),
                        testing::Values(false, true)),
     TcpTunnelingIntegrationTest::paramsToString);
 

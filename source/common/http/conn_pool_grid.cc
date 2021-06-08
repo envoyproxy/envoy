@@ -1,7 +1,7 @@
-#include "common/http/conn_pool_grid.h"
+#include "source/common/http/conn_pool_grid.h"
 
-#include "common/http/http3/conn_pool.h"
-#include "common/http/mixed_conn_pool.h"
+#include "source/common/http/http3/conn_pool.h"
+#include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/quic_versions.h"
 

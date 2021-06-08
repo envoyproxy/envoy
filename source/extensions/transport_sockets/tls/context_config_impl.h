@@ -9,9 +9,9 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/empty_string.h"
-#include "common/json/json_loader.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

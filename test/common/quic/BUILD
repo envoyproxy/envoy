@@ -55,6 +55,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_stat_names_test",
+    srcs = ["quic_stat_names_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_stat_names_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_session_cache_test",
     srcs = ["envoy_quic_session_cache_test.cc"],
     external_deps = ["quiche_quic_platform"],
@@ -129,7 +141,7 @@ envoy_cc_test(
         ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:codec_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
@@ -157,7 +169,7 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:codec_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
@@ -202,7 +214,7 @@ envoy_cc_test(
         ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_dispatcher_lib",

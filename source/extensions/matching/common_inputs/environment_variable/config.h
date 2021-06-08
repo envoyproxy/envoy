@@ -5,9 +5,8 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/matching/common_inputs/environment_variable/input.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/matching/common_inputs/environment_variable/input.h"
 
 namespace Envoy {
 namespace Extensions {

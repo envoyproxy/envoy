@@ -31,7 +31,7 @@ static_resources:
                 server_uri:
                   uri: ext_authz
                   cluster: ext_authz-http-service
-                  timeout:  0.250s
+                  timeout: 0.250s
                 authorization_response:
                   allowed_upstream_headers:
                     patterns:
@@ -41,7 +41,6 @@ static_resources:
 
   clusters:
   - name: upstream-service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -55,7 +54,6 @@ static_resources:
                 port_value: 8080
 
   - name: ext_authz-http-service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

@@ -62,6 +62,11 @@ message VmConfig {
   //
   // **envoy.wasm.runtime.v8**: `V8 <https://v8.dev/>`_-based WebAssembly runtime.
   //
+  // .. _extension_envoy.wasm.runtime.wamr:
+  //
+  // **envoy.wasm.runtime.wamr**: `WAMR <https://github.com/bytecodealliance/wasm-micro-runtime/>`_-based WebAssembly runtime.
+  // This runtime is not enabled in the official build.
+  //
   // .. _extension_envoy.wasm.runtime.wavm:
   //
   // **envoy.wasm.runtime.wavm**: `WAVM <https://wavm.github.io/>`_-based WebAssembly runtime.
