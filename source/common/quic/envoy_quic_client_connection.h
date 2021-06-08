@@ -23,7 +23,7 @@ namespace Quic {
 
 class PacketsToReadDelegate {
 public:
-  virtual ~PacketsToReadDelegate() {}
+  virtual ~PacketsToReadDelegate() = default;
 
   virtual size_t numPacketsExpectedPerEventLoop() PURE;
 };
