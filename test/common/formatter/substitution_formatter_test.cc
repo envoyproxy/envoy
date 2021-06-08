@@ -1403,6 +1403,18 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
+                                      stream_info, body),
+                ProtoEq(ValueUtil::stringValue("test_value")));
+  }
+  // Disable string value unquoting and expect the same result as above but quoted.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.unquote_log_string_values", "false"}});
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
     EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
                                                  response_trailers, stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -1425,8 +1437,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "inner_key"},
                                        absl::optional<size_t>());
-    EXPECT_EQ("\"inner_value\"", formatter.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
+    EXPECT_EQ("inner_value", formatter.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                       stream_info, body),
                 ProtoEq(ValueUtil::stringValue("inner_value")));
@@ -1462,8 +1474,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   // size limit
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
-    EXPECT_EQ("\"test", formatter.format(request_headers, response_headers, response_trailers,
-                                         stream_info, body));
+    EXPECT_EQ("test_", formatter.format(request_headers, response_headers, response_trailers,
+                                        stream_info, body));
 
     // N.B. Does not truncate.
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -2135,9 +2147,9 @@ TEST(SubstitutionFormatterTest, StructFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""}};
+      {"test_obj.inner_key", "inner_value"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
@@ -2200,9 +2212,9 @@ TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataTest) {
   EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""},
+      {"test_obj.inner_key", "inner_value"},
       {"test_obj.non_existing_key", "-"},
   };
 
@@ -2648,7 +2660,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
-        "\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+        "test_value|{\"inner_key\":\"inner_value\"}|inner_value",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 
