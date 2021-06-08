@@ -1,4 +1,4 @@
-#include "extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/context.h"
 
 #include <algorithm>
 #include <cctype>

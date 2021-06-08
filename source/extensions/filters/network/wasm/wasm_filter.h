@@ -28,10 +28,9 @@ public:
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
-    PluginHandleSharedPtr handle = nullptr;
-    if (tls_slot_->get().has_value()) {
-      handle = tls_slot_->get()->handle();
-      wasm = handle->wasm().get();
+    PluginHandleSharedPtr handle = tls_slot_->get()->handle();
+    if (handle->wasmHandle()) {
+      wasm = handle->wasmHandle()->wasm().get();
     }
     if (!wasm || wasm->isFailed()) {
       if (plugin_->fail_open_) {
@@ -45,7 +44,7 @@ public:
     return std::make_shared<Context>(wasm, handle->rootContextId(), handle);
   }
 
-  Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasm().get(); }
+  Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasmHandle()->wasm().get(); }
 
 private:
   PluginSharedPtr plugin_;

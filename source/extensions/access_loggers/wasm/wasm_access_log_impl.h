@@ -33,8 +33,8 @@ public:
 
     auto obj = tls_slot_->get();
     if (obj.has_value()) {
-      obj->handle()->wasm()->log(plugin_, request_headers, response_headers, response_trailers,
-                                 stream_info);
+      obj->handle()->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
+                                               response_trailers, stream_info);
     }
   }
 
