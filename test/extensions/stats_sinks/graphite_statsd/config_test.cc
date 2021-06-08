@@ -35,7 +35,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GraphiteStatsdConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
-  const std::string name = getStatSinkName();
+  const std::string& name = getStatSinkName();
 
   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -72,7 +72,7 @@ TEST(GraphiteStatsdConfigTest, ValidateFail) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
-  const std::string name = getStatSinkName();
+  const std::string& name = getStatSinkName();
 
   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   sink_config.mutable_max_bytes_per_datagram()->set_value(128);
@@ -100,7 +100,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
-  const std::string name = getStatSinkName();
+  const std::string& name = getStatSinkName();
 
   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -128,7 +128,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
 }
 
 TEST_P(GraphiteStatsdConfigLoopbackTest, WithCustomPrefix) {
-  const std::string name = getStatSinkName();
+  const std::string& name = getStatSinkName();
 
   envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
