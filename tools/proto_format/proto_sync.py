@@ -427,8 +427,6 @@ def sync(api_root, mode, labels, shadow):
                     print(
                         'Proto formatting may overwrite or delete files in the above list with no git backup.'
                     )
-                    if input('Continue? [yN] ').strip().lower() != 'y':
-                        sys.exit(1)
                 src_files = set(
                     str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
                 dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
@@ -438,12 +436,9 @@ def sync(api_root, mode, labels, shadow):
                     print(
                         'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
                     )
-                    if input('Delete files? [yN] ').strip().lower() == 'y':
-                        subprocess.run(['patch', '-p1'],
-                                       input=diff,
-                                       cwd=str(api_root_path.resolve()))
-                    else:
-                        sys.exit(1)
+                    subprocess.run(['patch', '-p1'],
+                                   input=diff,
+                                   cwd=str(api_root_path.resolve()))
                 else:
                     subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
