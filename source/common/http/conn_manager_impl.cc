@@ -506,22 +506,22 @@ void ConnectionManagerImpl::doConnectionClose(
 }
 
 void ConnectionManagerImpl::createStartDrainTimer(std::chrono::milliseconds drain_delay) {
-  if (!codec_) {
-    stats_.named_.downstream_cx_drain_close_.inc();
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
-  } else if (read_callbacks_) {
-    start_drain_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
-      if (drain_state_ != DrainState::NotDraining) {
-        return;
-      }
+  start_drain_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+    if (drain_state_ != DrainState::NotDraining) {
+      return;
+    }
+    if (!codec_) {
+      stats_.named_.downstream_cx_drain_close_.inc();
+      doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
+    } else {
       startDrainSequence();
       stats_.named_.downstream_cx_drain_close_.inc();
       for (const auto& stream : streams_) {
         ENVOY_STREAM_LOG(debug, "drain closing connection", *stream);
       }
-    });
-    start_drain_timer_->enableTimer(drain_delay);
-  }
+    }
+  });
+  start_drain_timer_->enableTimer(drain_delay);
 }
 
 void ConnectionManagerImpl::onGoAway(GoAwayErrorCode) {
