@@ -9,7 +9,6 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
-#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
