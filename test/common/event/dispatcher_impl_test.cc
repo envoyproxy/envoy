@@ -319,22 +319,6 @@ TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
   dispatcher->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST(DispatcherTest, RunsStartCallbackFirstIfProvided) {
-  InSequence s;
-
-  Api::ApiPtr api = Api::createApiForTest();
-  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher post_watcher;
-  ReadyWatcher start_cb_watcher;
-
-  // Start Callback should always run before post callbacks.
-  EXPECT_CALL(start_cb_watcher, ready());
-  EXPECT_CALL(post_watcher, ready());
-
-  dispatcher->post([&]() { post_watcher.ready(); });
-  dispatcher->run(Dispatcher::RunType::NonBlock, [&]() -> void { start_cb_watcher.ready(); });
-}
-
 class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()

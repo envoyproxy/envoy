@@ -106,9 +106,7 @@ public:
     impl_.deleteInDispatcherThread(std::move(deletable));
   }
 
-  void run(RunType type, const OptDispatcherStartCb& cb = absl::nullopt) override {
-    impl_.run(type, cb);
-  }
+  void run(RunType type) override { impl_.run(type); }
 
   Buffer::WatermarkFactory& getWatermarkFactory() override { return impl_.getWatermarkFactory(); }
   void pushTrackedObject(const ScopeTrackedObject* object) override {

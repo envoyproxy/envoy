@@ -74,13 +74,13 @@ public:
    *
    * @param duration The amount of time to advance.
    * @param dispatcher_or_scheduler The event loop to run after advancing time forward.
-   * @param args args to pass to the dispatcher or scheduler's run method
+   * @param mode The mode to use when running the event loop.
    */
-  template <class D, class DispatcherOrScheduler, typename... Args>
+  template <class D, class DispatcherOrScheduler>
   void advanceTimeAndRun(const D& duration, DispatcherOrScheduler& dispatcher_or_scheduler,
-                         Args&&... args) {
+                         Dispatcher::RunType mode) {
     advanceTimeAsyncImpl(std::chrono::duration_cast<Duration>(duration));
-    dispatcher_or_scheduler.run(std::forward<Args>(args)...);
+    dispatcher_or_scheduler.run(mode);
   }
 
   /**

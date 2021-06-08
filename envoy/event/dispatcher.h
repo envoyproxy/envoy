@@ -29,8 +29,6 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Event {
 
@@ -56,11 +54,6 @@ using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
 using PostCb = std::function<void()>;
 
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
-
-/**
- * Callback invoked when the dispatcher begins running.
- */
-using OptDispatcherStartCb = absl::optional<std::function<void()>>;
 
 /**
  * Minimal interface to the dispatching loop used to create low-level primitives. See Dispatcher
@@ -289,7 +282,6 @@ public:
    * @param type specifies whether to run in blocking mode (run() will not return until exit() is
    *              called) or non-blocking mode where only active events will be executed and then
    *              run() will return.
-   * @param cb a callback that will run when the dispatcher begins running.
    */
   enum class RunType {
     Block,       // Runs the event-loop until there are no pending events.
@@ -299,7 +291,7 @@ public:
     RunUntilExit // Runs the event-loop until loopExit() is called, blocking
                  // until there are pending or active events.
   };
-  virtual void run(RunType type, const OptDispatcherStartCb& cb = absl::nullopt) PURE;
+  virtual void run(RunType type) PURE;
 
   /**
    * Returns a factory which connections may use for watermark buffer creation.

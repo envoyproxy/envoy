@@ -88,7 +88,7 @@ public:
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override;
   void post(std::function<void()> callback) override;
   void deleteInDispatcherThread(DispatcherThreadDeletableConstPtr deletable) override;
-  void run(RunType type, const OptDispatcherStartCb& cb = absl::nullopt) override;
+  void run(RunType type) override;
   Buffer::WatermarkFactory& getWatermarkFactory() override { return *buffer_factory_; }
   void pushTrackedObject(const ScopeTrackedObject* object) override;
   void popTrackedObject(const ScopeTrackedObject* expected_object) override;
