@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/wasm/config.h"
+#include "source/extensions/stat_sinks/wasm/config.h"
 
 #include <memory>
 
@@ -6,9 +6,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

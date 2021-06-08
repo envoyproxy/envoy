@@ -6,11 +6,10 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/network/rocketmq_proxy/metadata.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/network/rocketmq_proxy/metadata.h"
 
 #include "absl/strings/string_view.h"
 

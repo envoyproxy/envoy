@@ -1,10 +1,10 @@
-#include "common/api/api_impl.h"
+#include "source/common/api/api_impl.h"
 
 #include <chrono>
 #include <string>
 
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
 
 namespace Envoy {
 namespace Api {

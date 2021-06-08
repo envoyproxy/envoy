@@ -4,17 +4,17 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/request_id/uuid/config.h"
 
-#include "extensions/request_id/uuid/config.h"
-
-#include "test/common/http/ip_detection_extensions.h"
+#include "test/common/http/custom_header_extension.h"
+#include "test/common/http/xff_extension.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -1500,6 +1500,51 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   TestRequestHeaderMapImpl header_map_none(original_headers_none);
   ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
   EXPECT_EQ(header_map_none.getHostValue(), "host:9999");
+}
+
+// maybeNormalizeHost() removes trailing dot of host from host header.
+TEST_F(ConnectionManagerUtilityTest, RemoveTrailingDot) {
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers;
+  original_headers.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map(original_headers);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map, config_, 0);
+  EXPECT_EQ(header_map.getHostValue(), "host");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::None));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_with_port;
+  original_headers_with_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_with_port(original_headers_with_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_with_port, config_, 443);
+  EXPECT_EQ(header_map_with_port.getHostValue(), "host:443");
+
+  ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_strip_port;
+  original_headers_strip_port.setHost("host.:443");
+
+  TestRequestHeaderMapImpl header_map_strip_port(original_headers_strip_port);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_strip_port, config_, 443);
+  EXPECT_EQ(header_map_strip_port.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl original_headers_no_dot;
+  original_headers_no_dot.setHost("host");
+
+  TestRequestHeaderMapImpl header_map_no_dot(original_headers_no_dot);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_no_dot, config_, 0);
+  EXPECT_EQ(header_map_no_dot.getHostValue(), "host");
+
+  ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(false));
+  TestRequestHeaderMapImpl original_headers_none;
+  original_headers_none.setHost("host.");
+
+  TestRequestHeaderMapImpl header_map_none(original_headers_none);
+  ConnectionManagerUtility::maybeNormalizeHost(header_map_none, config_, 0);
+  EXPECT_EQ(header_map_none.getHostValue(), "host.");
 }
 
 // maybeNormalizePath() does not touch escaped slashes when configured to KEEP_UNCHANGED.

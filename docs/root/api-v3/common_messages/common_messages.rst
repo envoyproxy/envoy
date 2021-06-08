@@ -16,6 +16,7 @@ Common messages
   ../config/core/v3/grpc_service.proto
   ../config/core/v3/grpc_method_list.proto
   ../config/core/v3/http_uri.proto
+  ../config/core/v3/resolver.proto
   ../config/core/v3/socket_option.proto
   ../config/core/v3/udp_socket_config.proto
   ../config/core/v3/substitution_format_string.proto

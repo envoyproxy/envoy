@@ -11,10 +11,9 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/logical_dns_cluster.h"
-
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/logical_dns_cluster.h"
 #include "source/extensions/clusters/redis/redis_cluster.h"
 
 #include "test/common/upstream/utility.h"

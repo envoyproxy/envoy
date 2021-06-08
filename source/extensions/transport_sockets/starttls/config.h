@@ -4,7 +4,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {

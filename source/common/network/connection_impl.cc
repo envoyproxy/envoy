@@ -1,4 +1,4 @@
-#include "common/network/connection_impl.h"
+#include "source/common/network/connection_impl.h"
 
 #include <atomic>
 #include <cstdint>
@@ -12,15 +12,15 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {

@@ -6,9 +6,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/router/router.h"
 
-#include "common/network/utility.h"
-#include "common/upstream/ring_hash_lb.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"

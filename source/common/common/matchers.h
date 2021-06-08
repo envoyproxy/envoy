@@ -11,8 +11,8 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
-#include "common/common/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Matchers {
@@ -128,6 +128,8 @@ public:
 
   static PathMatcherConstSharedPtr createExact(const std::string& exact, bool ignore_case);
   static PathMatcherConstSharedPtr createPrefix(const std::string& prefix, bool ignore_case);
+  static PathMatcherConstSharedPtr
+  createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher);
 
   bool match(const absl::string_view path) const override;
 

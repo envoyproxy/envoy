@@ -37,7 +37,7 @@ jobs:
       uses: github/codeql-action/init@cb5810848de15b695cd9ef3b559dd178c43c7df3 # v1
       # Override language selection by uncommenting this and choosing your languages
       with:
-         languages: cpp
+        languages: cpp
 
     - name: Install deps
       shell: bash

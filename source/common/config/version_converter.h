@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 // Convenience macro for downgrading a message and obtaining a reference.
 #define API_DOWNGRADE(msg) (*Envoy::Config::VersionConverter::downgrade(msg)->msg_)

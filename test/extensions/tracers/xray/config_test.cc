@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/tracers/xray/config.h"
+#include "source/extensions/tracers/xray/config.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/tracer_factory.h"

@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     deps = [
-        "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/upstream:load_balancer_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:load_balancer_interface",
         "//source/common/upstream:load_balancer_lib",
     ],
 )
@@ -24,8 +24,8 @@ envoy_cc_library(
     hdrs = ["router_impl.h"],
     deps = [
         ":router_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:thread_local_cluster_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rocketmq_proxy:conn_manager_lib",
     ],
@@ -37,8 +37,8 @@ envoy_cc_library(
     hdrs = ["route_matcher.h"],
     deps = [
         ":router_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",

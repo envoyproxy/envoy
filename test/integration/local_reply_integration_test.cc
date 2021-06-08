@@ -66,7 +66,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -125,7 +125,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -177,7 +177,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -256,7 +256,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -330,7 +330,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -391,7 +391,7 @@ mappers:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -449,7 +449,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();
@@ -507,7 +507,7 @@ body_format:
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ASSERT_TRUE(response->waitForEndStream());
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   } else {
     codec_client_->close();

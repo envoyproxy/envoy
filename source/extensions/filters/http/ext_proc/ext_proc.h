@@ -12,11 +12,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/ext_proc/client.h"
-#include "extensions/filters/http/ext_proc/processor_state.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -133,8 +132,8 @@ private:
   void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);
 
-  Http::FilterHeadersStatus onHeaders(ProcessorState& state, Http::HeaderMap& headers,
-                                      bool end_stream);
+  Http::FilterHeadersStatus onHeaders(ProcessorState& state,
+                                      Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
 

@@ -12,9 +12,9 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/macros.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "absl/types/optional.h"
 
