@@ -218,20 +218,11 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  # Temporariliy exclude some extensions from the envoy binary to address build failures
-  # due to long command line. Tests will still run.
-  BAZEL_BUILD_OPTIONS+=(
-    "--test_env=HEAPCHECK="
-    "--//source/extensions/filters/network/rocketmq_proxy:enabled=False"
-    "--//source/extensions/filters/http/admission_control:enabled=False"
-    "--//source/extensions/filters/http/dynamo:enabled=False"
-    "--//source/extensions/filters/http/header_to_metadata:enabled=False"
-    "--//source/extensions/filters/http/on_demand:enabled=False")
+  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
   setup_gcc_toolchain
 
-  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
-  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
+  echo "Testing ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
