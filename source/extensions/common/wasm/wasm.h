@@ -14,16 +14,15 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/version/version.h"
-
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/common/wasm/wasm_extension.h"
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/version/version.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/wasm_extension.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -62,7 +61,7 @@ public:
   Network::DnsResolverSharedPtr& dnsResolver() { return dns_resolver_; }
 
   // WasmBase
-  void error(absl::string_view message) override;
+  void error(std::string_view message) override;
   proxy_wasm::CallOnThreadFunction callOnThreadFunction() override;
   ContextBase* createContext(const std::shared_ptr<PluginBase>& plugin) override;
   ContextBase* createRootContext(const std::shared_ptr<PluginBase>& plugin) override;

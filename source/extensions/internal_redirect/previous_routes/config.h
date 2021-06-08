@@ -4,7 +4,7 @@
 #include "envoy/extensions/internal_redirect/previous_routes/v3/previous_routes_config.pb.validate.h"
 #include "envoy/router/internal_redirect.h"
 
-#include "extensions/internal_redirect/previous_routes/previous_routes.h"
+#include "source/extensions/internal_redirect/previous_routes/previous_routes.h"
 
 namespace Envoy {
 namespace Extensions {

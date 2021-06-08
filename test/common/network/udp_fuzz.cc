@@ -2,13 +2,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/fuzz/fuzz_runner.h"

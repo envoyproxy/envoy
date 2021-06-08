@@ -1,15 +1,13 @@
-#include "extensions/access_loggers/wasm/config.h"
+#include "source/extensions/access_loggers/wasm/config.h"
 
 #include "envoy/extensions/access_loggers/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/wasm/wasm_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/wasm/wasm_access_log_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,7 +56,7 @@ ProtobufTypes::MessagePtr WasmAccessLogFactory::createEmptyConfigProto() {
       new envoy::extensions::access_loggers::wasm::v3::WasmAccessLog()};
 }
 
-std::string WasmAccessLogFactory::name() const { return AccessLogNames::get().Wasm; }
+std::string WasmAccessLogFactory::name() const { return "envoy.access_loggers.wasm"; }
 
 /**
  * Static registration for the wasm access log. @see RegisterFactory.

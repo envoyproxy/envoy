@@ -1,16 +1,15 @@
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/transport_sockets/tls/io_handle_bio.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/transport_sockets/tls/io_handle_bio.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"

@@ -1,12 +1,12 @@
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include <string>
 #include <vector>
 
 #include "envoy/http/codes.h"
 
-#include "common/http/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Extensions {

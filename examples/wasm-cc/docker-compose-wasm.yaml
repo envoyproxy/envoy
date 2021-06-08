@@ -8,8 +8,8 @@ services:
                 && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
     volumes:
-      - ../..:/source
-      - ./lib:/build
+    - ../..:/source
+    - ./lib:/build
 
   wasm_compile:
     image: envoyproxy/envoy-build-ubuntu:55d9e4719d2bd0accce8f829b44dab70cd42112a
@@ -18,5 +18,5 @@ services:
                 && cp -a bazel-bin/examples/wasm-cc/* /build"
     working_dir: /source
     volumes:
-      - ../..:/source
-      - ./lib:/build
+    - ../..:/source
+    - ./lib:/build

@@ -1,12 +1,12 @@
-#include "extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include <chrono>
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
 
 #include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"

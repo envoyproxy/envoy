@@ -1,4 +1,4 @@
-#include "extensions/matching/input_matchers/consistent_hashing/config.h"
+#include "source/extensions/matching/input_matchers/consistent_hashing/config.h"
 
 namespace Envoy {
 namespace Extensions {

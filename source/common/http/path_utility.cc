@@ -1,8 +1,8 @@
-#include "common/http/path_utility.h"
+#include "source/common/http/path_utility.h"
 
-#include "common/common/logger.h"
-#include "common/http/legacy_path_canonicalizer.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/legacy_path_canonicalizer.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"

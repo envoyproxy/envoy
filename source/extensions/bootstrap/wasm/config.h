@@ -7,9 +7,8 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 namespace Envoy {
 namespace Extensions {

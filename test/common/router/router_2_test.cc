@@ -1,4 +1,4 @@
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/common/router/router_test_base.h"
 

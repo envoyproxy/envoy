@@ -6,22 +6,22 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-      - "8000:8000"
+    - "8000:8000"
 
   service1:
     build:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./responses.yaml:/etc/responses.yaml
+    - ./responses.yaml:/etc/responses.yaml
     environment:
-      - SERVICE_NAME=1
+    - SERVICE_NAME=1
 
   service2:
     build:
       context: .
       dockerfile: Dockerfile-service
     volumes:
-      - ./responses.yaml:/etc/responses.yaml
+    - ./responses.yaml:/etc/responses.yaml
     environment:
-      - SERVICE_NAME=2
+    - SERVICE_NAME=2

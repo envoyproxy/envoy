@@ -1,4 +1,4 @@
-#include "extensions/common/sqlutils/sqlutils.h"
+#include "source/extensions/common/sqlutils/sqlutils.h"
 
 #include "gtest/gtest.h"
 

@@ -1,11 +1,11 @@
-#include "common/config/watch_map.h"
+#include "source/common/config/watch_map.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/xds_resource.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/xds_resource.h"
 
 namespace Envoy {
 namespace Config {
