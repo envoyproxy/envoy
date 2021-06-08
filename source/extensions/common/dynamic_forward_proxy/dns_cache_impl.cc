@@ -34,16 +34,22 @@ DnsCacheImpl::DnsCacheImpl(
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
-  uint pre_loaded_hostnames;
+  // Pre-Loaded hostnames are resolved without a read lock on primary hosts because it is done
+  // during object construction.
+  uint pre_loaded_hostnames{};
   for (auto it = config.pre_load_hostnames().begin();
        it != config.pre_load_hostnames().end() && pre_loaded_hostnames < max_hosts_;
        ++it, ++pre_loaded_hostnames) {
+    // No need to get a resolution handle on this resolution as the only outcome needed is for the
+    // cache to load an entry. Further if this particular resolution fails all the is lost is the
+    // potential optimization of having the entry be pre-loaded the first time a true consumer of
+    // this DNS cache asks for it.
     main_thread_dispatcher_.post([this, host = it->address(), default_port = it->port_value()]() {
       startCacheLoad(host, default_port);
     });
   }
 
-  if (config.pre_load_hostnames().size() > max_hosts_) {
+  if (static_cast<size_t>(config.pre_load_hostnames().size()) > max_hosts_) {
     stats_.host_overflow_.add(config.pre_load_hostnames().size() - max_hosts_);
   }
 }
