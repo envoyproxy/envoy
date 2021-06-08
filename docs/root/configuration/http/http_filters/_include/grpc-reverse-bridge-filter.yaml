@@ -59,12 +59,12 @@ static_resources:
     load_assignment:
       cluster_name: some_service
       endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: localhost
-                  port_value: 4630
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 4630
   - name: grpc
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
@@ -76,9 +76,9 @@ static_resources:
     load_assignment:
       cluster_name: grpc
       endpoints:
-        - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: localhost
-                    port_value: 10005
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: localhost
+                port_value: 10005

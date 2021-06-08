@@ -1,6 +1,6 @@
 on:
   schedule:
-    - cron: '0 12 * * 4'
+  - cron: '0 12 * * 4'
 
 jobs:
   CodeQL-Build:
@@ -29,7 +29,7 @@ jobs:
       uses: github/codeql-action/init@v1
       # Override language selection by uncommenting this and choosing your languages
       with:
-         languages: cpp
+        languages: cpp
 
     - name: Install deps
       shell: bash
