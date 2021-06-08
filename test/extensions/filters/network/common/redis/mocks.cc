@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

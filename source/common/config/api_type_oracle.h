@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

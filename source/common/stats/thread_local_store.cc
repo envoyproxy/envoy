@@ -1,4 +1,4 @@
-#include "common/stats/thread_local_store.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,11 +11,11 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/lock_guard.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/tag_utility.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/tag_utility.h"
 
 #include "absl/strings/str_join.h"
 

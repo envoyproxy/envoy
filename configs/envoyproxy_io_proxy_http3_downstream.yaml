@@ -1,4 +1,5 @@
 # An example config which accepts HTTP/3 and forwarads the requests upstream over TCP.
+# This includes a TCP listener which advertises that HTTP/3 is available via the alt-svc header
 admin:
   address:
     socket_address:
@@ -18,13 +19,12 @@ static_resources:
           name: envoy.transport_sockets.tls
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-            downstream_tls_context:
-              common_tls_context:
-                tls_certificates:
-                - certificate_chain:
-                    filename: certs/servercert.pem
-                  private_key:
-                    filename: certs/serverkey.pem
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: certs/servercert.pem
+                private_key:
+                  filename: certs/serverkey.pem
         filters:
         - name: envoy.filters.network.http_connection_manager
           typed_config:
@@ -49,8 +49,6 @@ static_resources:
             http3_protocol_options:
             http_filters:
             - name: envoy.filters.http.router
-
-  listeners:
     - name: listener_udp
       address:
         socket_address:

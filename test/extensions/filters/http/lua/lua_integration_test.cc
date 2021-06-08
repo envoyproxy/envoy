@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"

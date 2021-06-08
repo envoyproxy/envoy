@@ -4,15 +4,14 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "extensions/request_id/uuid/config.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/custom_header_extension.h"
 #include "test/common/http/xff_extension.h"

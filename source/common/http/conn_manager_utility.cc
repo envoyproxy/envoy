@@ -1,4 +1,4 @@
-#include "common/http/conn_manager_utility.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include <atomic>
 #include <cstdint>
@@ -6,18 +6,18 @@
 
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/utility.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/path_utility.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"

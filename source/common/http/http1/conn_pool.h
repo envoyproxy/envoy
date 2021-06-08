@@ -4,8 +4,8 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_wrappers.h"
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/codec_wrappers.h"
+#include "source/common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {

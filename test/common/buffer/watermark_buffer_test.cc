@@ -1,9 +1,9 @@
 #include <array>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/test_common/test_runtime.h"
