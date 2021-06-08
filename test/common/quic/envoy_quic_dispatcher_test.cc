@@ -33,7 +33,7 @@
 #include "test/common/quic/test_utils.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/extensions/quic/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

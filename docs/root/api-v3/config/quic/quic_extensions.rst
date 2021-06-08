@@ -5,4 +5,5 @@ Quic Extensions
   :glob:
   :maxdepth: 2
 
-  ../../extensions/quic/v3/*
+  ../../extensions/quic/crypto_stream/v3/*
+  ../../extensions/quic/proof_source/v3/*

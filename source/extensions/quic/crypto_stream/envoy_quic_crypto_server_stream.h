@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/quic/v3/crypto_stream.pb.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/quic/envoy_quic_crypto_stream_factory.h"
@@ -11,7 +11,7 @@ namespace Quic {
 class EnvoyQuicCryptoServerStreamFactoryImpl : public EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::quic::v3::CryptoServerStreamConfig>();
+    return std::make_unique<envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig>();
   }
   std::string name() const override { return "envoy.quic.server.crypto_stream.quiche"; }
   std::unique_ptr<quic::QuicCryptoServerStreamBase>

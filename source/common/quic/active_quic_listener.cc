@@ -20,8 +20,8 @@
 #include "source/common/config/utility.h"
 #include "source/common/quic/quic_network_connection.h"
 #include "source/common/runtime/runtime_features.h"
-#include "envoy/extensions/quic/v3/crypto_stream.pb.h"
-#include "envoy/extensions/quic/v3/proof_source.pb.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
+#include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 
 namespace Envoy {
 namespace Quic {
@@ -265,7 +265,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   if (!config.has_crypto_stream_config()) {
     // If not specified, use the quic crypto stream created by QUICHE.
     crypto_stream_config.set_name("envoy.quic.server.crypto_stream.quiche");
-    envoy::extensions::quic::v3::CryptoServerStreamConfig empty_crypto_stream_config;
+    envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
     crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
   } else {
     crypto_stream_config = config.crypto_stream_config();
@@ -278,7 +278,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   envoy::config::core::v3::TypedExtensionConfig proof_source_config;
   if (!config.has_proof_source_config()) {
     proof_source_config.set_name("envoy.quic.proof_source.filter_chain");
-    envoy::extensions::quic::v3::ProofSourceConfig empty_proof_source_config;
+    envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_source_config;
     proof_source_config.mutable_typed_config()->PackFrom(empty_proof_source_config);
   } else {
     proof_source_config = config.proof_source_config();

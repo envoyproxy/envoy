@@ -1,4 +1,4 @@
-#include "envoy/extensions/quic/v3/proof_source.pb.h"
+#include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/quic/envoy_quic_proof_source.h"
@@ -11,7 +11,7 @@ namespace Quic {
 class EnvoyQuicProofSourceFactoryImpl : public EnvoyQuicProofSourceFactoryInterface {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::quic::v3::ProofSourceConfig>();
+    return std::make_unique<envoy::extensions::quic::proof_source::v3::ProofSourceConfig>();
   }
 
   std::string name() const override { return "envoy.quic.proof_source.filter_chain"; }

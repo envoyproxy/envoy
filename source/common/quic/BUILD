@@ -178,7 +178,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/registry",
         "//source/common/http/http3:quic_client_connection_factory_lib",
-        "//source/extensions/quic:envoy_quic_crypto_client_stream_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
     ],
@@ -367,7 +367,8 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/server:connection_handler_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto",
     ],
 )
 
@@ -425,8 +426,8 @@ envoy_cc_library(
         "//conditions:default": [
             ":codec_lib",
             ":quic_transport_socket_factory_lib",
-            "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
-            "//source/extensions/quic:envoy_quic_proof_source_factory_impl_lib",
+            "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
+            "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         ],
     }),
 )

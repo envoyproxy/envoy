@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Extensions of various QUIC objects.
+# Extensions of QUIC crypto stream.
 
 envoy_extension_package()
 
@@ -22,7 +22,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
-        "@envoy_api//envoy/extensions/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
     ],
 )
 
@@ -56,38 +56,4 @@ envoy_cc_library(
     deps = [
         "//source/common/quic:envoy_quic_crypto_stream_factory_lib",
     ],
-)
-
-envoy_cc_library(
-    name = "envoy_quic_proof_source_factory_impl_lib",
-    srcs = ["envoy_quic_proof_source_factory_impl.cc"],
-    hdrs = ["envoy_quic_proof_source_factory_impl.h"],
-    tags = ["nofips"],
-    visibility = [
-        "//source/common/quic:__subpackages__",
-        "//test:__subpackages__",
-    ],
-    deps = [
-        "//source/common/quic:envoy_quic_proof_source_factory_interface",
-        "//source/common/quic:envoy_quic_proof_source_lib",
-        "@envoy_api//envoy/extensions/quic/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_extension(
-    name = "envoy_quic_default_proof_source",
-    extra_visibility = [
-        "//source/common/quic:__subpackages__",
-        "//test:__subpackages__",
-    ],
-    tags = ["nofips"],
-    deps = select(
-        {
-            "//bazel:boringssl_fips": [],
-            "//bazel:boringssl_disabled": [],
-            "//conditions:default": [
-                ":envoy_quic_proof_source_factory_impl_lib",
-            ],
-        },
-    ),
 )

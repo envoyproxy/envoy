@@ -43,8 +43,8 @@
 #include "source/common/quic/platform/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
-#include "source/extensions/quic/envoy_quic_crypto_server_stream.h"
-#include "source/extensions/quic/envoy_quic_proof_source_factory_impl.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -275,11 +275,11 @@ protected:
     crypto_stream_config:
       name: "envoy.quic.server.crypto_stream.quiche"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.quic.v3.CryptoServerStreamConfig
+        "@type": type.googleapis.com/envoy.extensions.quic.crypto_stream.v3.CryptoServerStreamConfig
     proof_source_config:
       name: "envoy.quic.proof_source.filter_chain"
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.quic.v3.ProofSourceConfig
+        "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
 )EOF",
                        connection_window_size_, stream_window_size_);
   }

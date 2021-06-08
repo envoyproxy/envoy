@@ -1715,7 +1715,6 @@ envoy_cc_test(
     ],
     deps = envoy_select_enable_http3([
         ":protocol_integration_test_lib",
-        "//source/extensions/quic:envoy_quic_crypto_server_stream_lib",
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:quic_factory_lib",
