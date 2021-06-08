@@ -242,6 +242,7 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  bool noChunkedEncodingHeaderFor304() { return no_chunked_encoding_header_for_304_; }
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
@@ -288,6 +289,7 @@ protected:
   const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
+  const bool no_chunked_encoding_header_for_304_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
