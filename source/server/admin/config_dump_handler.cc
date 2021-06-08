@@ -1,16 +1,23 @@
-#include "server/admin/config_dump_handler.h"
+#include "source/server/admin/config_dump_handler.h"
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/http/query_params.h"
 #include "envoy/matcher/dump_matcher.h"
 
+<<<<<<< HEAD
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/matcher/config_dump_matcher.h"
 #include "common/network/utility.h"
 
 #include "server/admin/utils.h"
+=======
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/server/admin/utils.h"
+>>>>>>> upstream/main
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"

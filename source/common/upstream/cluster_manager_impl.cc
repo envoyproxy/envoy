@@ -1,4 +1,4 @@
-#include "common/upstream/cluster_manager_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -18,38 +18,37 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_resource.h"
-#include "common/grpc/async_client_manager_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/http1/conn_pool.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/http/mixed_conn_pool.h"
-#include "common/matcher/config_dump_matcher.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/router/shadow_writer_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tcp/conn_pool.h"
-#include "common/tcp/original_conn_pool.h"
-#include "common/upstream/cds_api_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/maglev_lb.h"
-#include "common/upstream/original_dst_cluster.h"
-#include "common/upstream/priority_conn_pool_map_impl.h"
-#include "common/upstream/ring_hash_lb.h"
-#include "common/upstream/subset_lb.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/grpc/async_client_manager_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/http1/conn_pool.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/http/mixed_conn_pool.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/shadow_writer_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tcp/conn_pool.h"
+#include "source/common/tcp/original_conn_pool.h"
+#include "source/common/upstream/cds_api_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/maglev_lb.h"
+#include "source/common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/priority_conn_pool_map_impl.h"
+#include "source/common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/http/conn_pool_grid.h"
-#include "common/http/http3/conn_pool.h"
+#include "source/common/http/conn_pool_grid.h"
+#include "source/common/http/http3/conn_pool.h"
 #endif
 
 namespace Envoy {
@@ -910,41 +909,45 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-Http::ConnectionPool::Instance*
+absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = connPool(priority, protocol, context, false);
+  auto pool = connPool(priority, protocol, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // Now see if another host should be preconnected.
-  // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so preconnecting must be
-  // performed here in anticipation of the new stream.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
-    return connPool(priority, protocol, context, true);
-  });
-  return ret;
+  HttpPoolData data(
+      [this, priority, protocol, context]() -> void {
+        // Now that a new stream is being established, attempt to preconnect.
+        maybePreconnect(*this, parent_.cluster_manager_state_,
+                        [this, &priority, &protocol, &context]() {
+                          return connPool(priority, protocol, context, true);
+                        });
+      },
+      pool);
+  return data;
 }
 
-Tcp::ConnectionPool::Instance*
+absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = tcpConnPool(priority, context, false);
+  auto pool = tcpConnPool(priority, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
-  // be performed here in anticipation of the new connection.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  // Now see if another host should be preconnected.
-  maybePreconnect(*this, parent_.cluster_manager_state_,
-                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
-
-  return ret;
+  TcpPoolData data(
+      [this, priority, context]() -> void {
+        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
+          return tcpConnPool(priority, context, true);
+        });
+      },
+      pool);
+  return data;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,

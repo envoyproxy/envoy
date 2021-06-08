@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "exact_map_matcher_lib",
     hdrs = ["exact_map_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -31,7 +31,7 @@ envoy_cc_library(
     name = "value_input_matcher_lib",
     hdrs = ["value_input_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
         "//source/common/common:matchers_lib",
     ],
 )
@@ -40,7 +40,7 @@ envoy_cc_library(
     name = "validation_visitor_lib",
     hdrs = ["validation_visitor.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -49,7 +49,7 @@ envoy_cc_library(
     hdrs = ["list_matcher.h"],
     deps = [
         ":field_matcher_lib",
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -57,7 +57,7 @@ envoy_cc_library(
     name = "field_matcher_lib",
     hdrs = ["field_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -71,8 +71,8 @@ envoy_cc_library(
         ":list_matcher_lib",
         ":validation_visitor_lib",
         ":value_input_matcher_lib",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/matcher:matcher_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

@@ -12,7 +12,6 @@ load(
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
-    _envoy_include_prefix = "envoy_include_prefix",
     _envoy_proto_library = "envoy_proto_library",
 )
 load(
@@ -225,7 +224,6 @@ envoy_cc_linux_library = _envoy_cc_linux_library
 envoy_cc_posix_library = _envoy_cc_posix_library
 envoy_cc_posix_without_linux_library = _envoy_cc_posix_without_linux_library
 envoy_cc_win32_library = _envoy_cc_win32_library
-envoy_include_prefix = _envoy_include_prefix
 envoy_proto_library = _envoy_proto_library
 
 # Test wrappers (from envoy_test.bzl)

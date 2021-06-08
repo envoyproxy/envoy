@@ -9,15 +9,14 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/dubbo_proxy/active_message.h"
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
-#include "extensions/filters/network/dubbo_proxy/serializer.h"
-#include "extensions/filters/network/dubbo_proxy/stats.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/dubbo_proxy/active_message.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/serializer.h"
+#include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 namespace Envoy {
 namespace Extensions {

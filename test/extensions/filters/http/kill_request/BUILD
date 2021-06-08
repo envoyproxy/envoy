@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     srcs = ["kill_request_filter_test.cc"],
     extension_name = "envoy.filters.http.kill_request",
     deps = [
-        "//include/envoy/http:metadata_interface",
+        "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/kill_request:kill_request_filter_lib",

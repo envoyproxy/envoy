@@ -6,9 +6,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"

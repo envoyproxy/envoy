@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/typed_async_client.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/typed_async_client.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,6 +1,6 @@
-#include "common/tracing/http_tracer_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/tracer_factory.h"

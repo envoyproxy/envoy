@@ -1,11 +1,11 @@
-#include "server/hot_restarting_base.h"
+#include "source/server/hot_restarting_base.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/mem_block_builder.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/mem_block_builder.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Server {

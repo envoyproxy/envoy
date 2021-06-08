@@ -15,9 +15,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
-#include "common/config/subscription_base.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {

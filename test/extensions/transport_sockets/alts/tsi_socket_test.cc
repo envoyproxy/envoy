@@ -1,6 +1,6 @@
 
 
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #include "test/mocks/network/mocks.h"
 

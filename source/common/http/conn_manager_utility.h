@@ -7,9 +7,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/tracing/trace_reason.h"
 
-#include "common/http/conn_manager_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
 
 namespace Envoy {
 namespace Http {

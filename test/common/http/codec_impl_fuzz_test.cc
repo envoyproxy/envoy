@@ -9,13 +9,13 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/conn_manager_utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"

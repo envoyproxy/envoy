@@ -2,14 +2,13 @@
 
 #include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
 
-#include "common/common/base64.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/message_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/http/wasm/config.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/http/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"

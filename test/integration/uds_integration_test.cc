@@ -2,9 +2,9 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
 
