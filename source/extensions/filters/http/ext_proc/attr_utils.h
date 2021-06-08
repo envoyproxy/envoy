@@ -30,14 +30,14 @@ using google::protobuf::Any;
 
 class ExprValueUtil {
 public:
-  static absl::optional<Value> optionalStringValue(const absl::optional<std::string>& str);
+  static Value optionalStringValue(const absl::optional<std::string>& str);
   static Value stringValue(const std::string& str);
   static Value int64Value(int64_t n);
   static Value uint64Value(uint64_t n);
   static Value doubleValue(double n);
   static Value boolValue(bool b);
   static Value objectValue(Any o);
-  static Value mapValue(MapValue m);
+  static Value mapValue(MapValue* m);
   static const Value nullValue();
 };
 
@@ -55,7 +55,7 @@ public:
   void setResponseTrailers(Envoy::Http::ResponseTrailerMap* response_trailers);
 
 private:
-  Value findValue(absl::string_view root_tok, absl::string_view sub_tok);
+  absl::optional<Value> findValue(absl::string_view root_tok, absl::string_view sub_tok);
   absl::optional<Value> requestSet(absl::string_view name);
   absl::optional<Value> responseSet(absl::string_view path);
   absl::optional<Value> connectionSet(absl::string_view path);

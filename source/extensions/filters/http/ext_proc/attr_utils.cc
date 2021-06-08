@@ -33,6 +33,7 @@ namespace ExternalProcessing {
 using google::api::expr::v1alpha1::MapValue;
 using google::api::expr::v1alpha1::MapValue_Entry;
 using google::api::expr::v1alpha1::Value;
+using google::protobuf::NullValue;
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using AttrMap = ProtobufWkt::Map<std::string, ProtobufWkt::Value>;
 
@@ -160,7 +161,7 @@ const std::string CONNECTION_URI_SAN_LOCAL_CERTIFICATE_TOKEN = "uri_san_local_ce
 const std::string CONNECTION_URI_SAN_PEER_CERTIFICATE_TOKEN = "uri_san_peer_certificate";
 const std::string CONNECTION_TERMINATION_DETAILS_TOKEN = "termination_details";
 
-MapValue ExprValueUtil::mapValue(MapValue m) {
+Value ExprValueUtil::mapValue(MapValue* m) {
   Value val;
   val.set_allocated_map_value(m);
   return val;
@@ -180,8 +181,9 @@ Value ExprValueUtil::optionalStringValue(const absl::optional<std::string>& str)
 }
 
 const Value ExprValueUtil::nullValue() {
+  Value v1;
   Value v;
-  v.set_null_value();
+  v.set_null_value(v1.null_value());
   return v;
 }
 
@@ -340,7 +342,7 @@ absl::optional<Value> AttrUtils::responseSet(absl::string_view path) {
   auto part_token = response_tokens.find(path);
   if (part_token == response_tokens.end()) {
     ENVOY_LOG(debug, "Unable to find response attribute: '{}'", path);
-    return;
+    return absl::nullopt;
   }
 
   switch (part_token->second) {
@@ -368,6 +370,7 @@ absl::optional<Value> AttrUtils::responseSet(absl::string_view path) {
   case ResponseToken::TOTAL_SIZE:
     return ExprValueUtil::uint64Value(info_.bytesReceived());
   }
+  return absl::nullopt;
 }
 
 absl::optional<Value> AttrUtils::destinationSet(absl::string_view path) {
@@ -413,6 +416,7 @@ absl::optional<Value> AttrUtils::sourceSet(absl::string_view path) {
   } else {
     ENVOY_LOG(debug, "Unable to find ext_proc source attribute: '{}'", path);
   }
+  return absl::nullopt;
 }
 
 absl::optional<Value> AttrUtils::upstreamSet(absl::string_view path) {
@@ -421,7 +425,7 @@ absl::optional<Value> AttrUtils::upstreamSet(absl::string_view path) {
   auto part_token = upstream_tokens.find(path);
   if (part_token == upstream_tokens.end()) {
     ENVOY_LOG(debug, "Unable to find ext_proc upstream attribute: '{}'", path);
-    return;
+    return absl::nullopt;
   }
 
   auto upstreamHost = info_.upstreamHost();
@@ -482,6 +486,7 @@ absl::optional<Value> AttrUtils::upstreamSet(absl::string_view path) {
     return ExprValueUtil::stringValue(info_.upstreamTransportFailureReason());
     break;
   }
+  return absl::nullopt;
 }
 
 absl::optional<Value> AttrUtils::connectionSet(absl::string_view path) {
@@ -490,7 +495,7 @@ absl::optional<Value> AttrUtils::connectionSet(absl::string_view path) {
   auto part_token = connection_tokens.find(path);
   if (part_token == connection_tokens.end()) {
     ENVOY_LOG(debug, "Unable to find ext_proc connection attribute: '{}'", path);
-    return;
+    return absl::nullopt;
   }
 
   auto connId = info_.connectionID();
@@ -503,7 +508,7 @@ absl::optional<Value> AttrUtils::connectionSet(absl::string_view path) {
     }
     break;
   case ConnectionToken::MTLS:
-    return;
+    return absl::nullopt;
     if (downstreamSsl != nullptr) {
       return ExprValueUtil::boolValue(downstreamSsl->peerCertificatePresented());
     }
@@ -554,20 +559,27 @@ absl::optional<Value> AttrUtils::connectionSet(absl::string_view path) {
       return ExprValueUtil::optionalStringValue(info_.connectionTerminationDetails());
     }
   }
+  return absl::nullopt;
 }
 
 absl::optional<Value> AttrUtils::metadataSet() {
   if (attributes_.contains(METADATA_TOKEN)) {
     MapValue m;
-    for (auto const& [k, s] : info_.dynamicMetadata().filter_metadata()) {
+    for (auto const& [k, v] : info_.dynamicMetadata().filter_metadata()) {
       Value sk = ExprValueUtil::stringValue(k);
-      MapValue_Entry e;
-      e.set_allocated_key(sk);
-      e.set_allocated_value(v);
-      m.add_entries(e);
+      // todo: convert s to object value (any)
+      MapValue_Entry* e = m.add_entries();
+      e->set_allocated_key(&sk);
+      Value vv;
+      Value any_v;
+      Any* a = any_v.mutable_object_value();
+      a->PackFrom(v);
+      vv.set_allocated_object_value(a);
+      e->set_allocated_value(&vv);
     }
-    return absl::make_optional(ExprValueUtil::mapValue(m));
+    return absl::make_optional(ExprValueUtil::mapValue(&m));
   }
+  return absl::nullopt;
 }
 
 // todo(eas): there are two issues here
