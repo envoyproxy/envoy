@@ -1,7 +1,7 @@
-#include "common/stats/timespan_impl.h"
+#include "source/common/stats/timespan_impl.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 namespace Stats {

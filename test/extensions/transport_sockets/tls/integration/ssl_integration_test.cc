@@ -12,13 +12,12 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/integration/autonomous_upstream.h"

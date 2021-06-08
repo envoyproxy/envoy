@@ -1,11 +1,10 @@
-#include "extensions/filters/http/cache/cacheability_utils.h"
+#include "source/extensions/filters/http/cache/cacheability_utils.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/http/cache/cache_custom_headers.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
 namespace Extensions {

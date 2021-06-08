@@ -6,10 +6,10 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/metadata.h"
-#include "common/http/exception.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"

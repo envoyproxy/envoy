@@ -2,10 +2,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/socket_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"

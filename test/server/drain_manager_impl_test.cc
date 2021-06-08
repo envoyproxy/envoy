@@ -3,7 +3,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "server/drain_manager_impl.h"
+#include "source/server/drain_manager_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"

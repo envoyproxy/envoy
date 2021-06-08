@@ -7,11 +7,10 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "server/configuration_impl.h"
-#include "server/listener_manager_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"

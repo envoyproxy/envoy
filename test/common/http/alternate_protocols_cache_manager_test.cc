@@ -1,5 +1,5 @@
-#include "common/http/alternate_protocols_cache_manager_impl.h"
-#include "common/singleton/manager_impl.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"

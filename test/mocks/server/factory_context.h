@@ -3,9 +3,8 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/router/context_impl.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"

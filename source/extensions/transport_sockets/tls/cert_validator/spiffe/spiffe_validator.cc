@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -6,15 +6,14 @@
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/config/datasource.h"
-#include "common/config/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "extensions/transport_sockets/tls/cert_validator/utility.h"
-#include "extensions/transport_sockets/tls/stats.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"

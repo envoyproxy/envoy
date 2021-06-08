@@ -7,9 +7,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/network/socket_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"

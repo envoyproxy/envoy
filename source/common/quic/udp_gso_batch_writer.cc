@@ -1,7 +1,7 @@
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
 
-#include "common/network/io_socket_error_impl.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

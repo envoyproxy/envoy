@@ -4,9 +4,9 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
-#include "common/common/matchers.h"
-#include "common/config/metadata.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/metadata.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/utility.h"
 
