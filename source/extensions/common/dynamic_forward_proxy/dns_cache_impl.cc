@@ -33,11 +33,17 @@ DnsCacheImpl::DnsCacheImpl(
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
-  for (const auto& address : config.pre_load_hostnames()) {
-    main_thread_dispatcher_.post([this, host = address.socket_address().address(),
-                                  default_port = address.socket_address().port_value()]() {
+
+  uint pre_loaded_hostnames;
+  for(auto it = config.pre_load_hostnames().begin(); it != config.pre_load_hostnames().end() && pre_loaded_hostnames < max_hosts_ ; ++it,++pre_loaded_hostnames) {
+    main_thread_dispatcher_.post([this, host = it->address(),
+                                default_port = it->port_value()]() {
       startCacheLoad(host, default_port);
     });
+  }
+
+  if (config.pre_load_hostnames().size() > max_hosts_) {
+    stats_.host_overflow_.add(config.pre_load_hostnames().size() - max_hosts_);
   }
 }
 
