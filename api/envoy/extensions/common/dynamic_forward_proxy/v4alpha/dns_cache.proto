@@ -107,5 +107,6 @@ message DnsCacheConfig {
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   config.core.v4alpha.DnsResolutionConfig dns_resolution_config = 9;
 
-  repeated config.core.v4alpha.Address pre_load_hostnames = 10;
+  // Hostnames to pre-load into the cache upon cache creation.
+  repeated config.core.v4alpha.SocketAddress pre_load_hostnames = 10;
 }
