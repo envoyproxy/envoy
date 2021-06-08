@@ -1,15 +1,14 @@
-#include "extensions/common/tap/tap_config_base.h"
+#include "source/extensions/common/tap/tap_config_base.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/matcher/matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
 

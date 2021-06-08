@@ -1,4 +1,4 @@
-#include "common/upstream/logical_dns_cluster.h"
+#include "source/common/upstream/logical_dns_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -12,12 +12,12 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {

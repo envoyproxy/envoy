@@ -1,12 +1,12 @@
-#include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
+#include "source/extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 #include <grpcpp/grpcpp.h>
 
 #include "envoy/config/trace/v3/opencensus.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -25,7 +25,7 @@
 #include "opencensus/trace/trace_params.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_grpc_utils.h"
+#include "source/common/grpc/google_grpc_utils.h"
 #endif
 
 namespace Envoy {

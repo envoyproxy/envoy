@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/filters/http/common/compressor/compressor.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "source/extensions/filters/http/common/compressor/compressor.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

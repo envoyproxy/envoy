@@ -1,12 +1,12 @@
-#include "extensions/watchdog/profile_action/profile_action.h"
+#include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include <chrono>
 
 #include "envoy/thread/thread.h"
 
-#include "common/profiler/profiler.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/profiler/profiler.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_format.h"
 

@@ -11,11 +11,11 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/utility.h"
-#include "common/http/codec_client.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"

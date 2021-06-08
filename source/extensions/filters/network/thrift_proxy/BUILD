@@ -16,7 +16,7 @@ envoy_cc_library(
     deps = [
         ":protocol_interface",
         ":thrift_lib",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
     ],
 )
 
@@ -49,7 +49,7 @@ envoy_cc_extension(
         ":protocol_interface",
         ":twitter_protocol_lib",
         ":unframed_transport_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
@@ -72,12 +72,12 @@ envoy_cc_library(
         ":protocol_interface",
         ":stats_lib",
         ":transport_interface",
-        "//include/envoy/event:deferred_deletable",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:timespan_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:timespan_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
@@ -119,7 +119,7 @@ envoy_cc_library(
     deps = [
         ":thrift_lib",
         ":tracing_interface",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:macros",
         "//source/common/http:header_map_lib",
     ],
@@ -140,7 +140,7 @@ envoy_cc_library(
     deps = [
         ":decoder_events_lib",
         ":protocol_interface",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
     ],
 )
 
@@ -157,9 +157,9 @@ envoy_cc_library(
         ":thrift_lib",
         ":thrift_object_interface",
         ":transport_interface",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/registry",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
@@ -236,8 +236,8 @@ envoy_cc_library(
     name = "stats_lib",
     hdrs = ["stats.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
     ],
 )
 
@@ -249,9 +249,9 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":metadata_lib",
         ":thrift_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/registry",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
@@ -262,7 +262,7 @@ envoy_cc_library(
     name = "conn_state_lib",
     hdrs = ["conn_state.h"],
     deps = [
-        "//include/envoy/tcp:conn_pool_interface",
+        "//envoy/tcp:conn_pool_interface",
     ],
 )
 
@@ -280,7 +280,7 @@ envoy_cc_library(
     hdrs = ["thrift_object.h"],
     deps = [
         ":thrift_lib",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
     ],
 )
 

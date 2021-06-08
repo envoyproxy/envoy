@@ -4,11 +4,11 @@
 #include "envoy/config/listener/v3/quic_config.pb.h"
 #include "envoy/http/codec.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/quic/quic_io_handle_wrapper.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -27,7 +27,7 @@
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 #include "openssl/ssl.h"
 
@@ -167,6 +167,11 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
+
+// Modify new_connection_id according to given old_connection_id to make sure packets with the new
+// one can be routed to the same listener.
+void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id);
 
 } // namespace Quic
 } // namespace Envoy

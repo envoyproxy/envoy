@@ -1,9 +1,9 @@
 #include <cstdint>
 #include <fstream>
 
-#include "common/common/assert.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/filesystem/watcher_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/filesystem/watcher_impl.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

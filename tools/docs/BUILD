@@ -24,3 +24,54 @@ genrule(
     ),
     tools = [":generate_extensions_security_rst"],
 )
+
+py_binary(
+    name = "generate_external_deps_rst",
+    srcs = [
+        "generate_external_deps_rst.py",
+    ],
+    deps = [
+        "//tools/dependency:exports",
+        "//tools/dependency:utils",
+    ],
+)
+
+genrule(
+    name = "external_deps_rst",
+    srcs = [
+        "//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+    ],
+    outs = ["external_deps_rst.tar"],
+    cmd = (
+        "$(location generate_external_deps_rst) $@"
+    ),
+    tools = [":generate_external_deps_rst"],
+)
+
+py_binary(
+    name = "generate_api_rst",
+    srcs = [
+        "generate_api_rst.py",
+    ],
+)
+
+genquery(
+    name = "v3_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
+    scope = ["@envoy_api_canonical//:v3_protos"],
+)
+
+genrule(
+    name = "api_rst",
+    srcs = [
+        "//tools/protodoc:api_v3_protodoc",
+        ":v3_proto_srcs",
+    ],
+    outs = ["api_rst.tar"],
+    cmd = (
+        "$(location generate_api_rst) $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@"
+    ),
+    tools = [":generate_api_rst"],
+)

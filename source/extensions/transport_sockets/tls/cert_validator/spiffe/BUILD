@@ -23,8 +23,8 @@ envoy_cc_extension(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/ssl:context_config_interface",
-        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//envoy/ssl:context_config_interface",
+        "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:c_smart_ptr_lib",

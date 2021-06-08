@@ -5,12 +5,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/protobuf_link_hacks.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"

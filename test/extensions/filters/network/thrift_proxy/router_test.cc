@@ -4,12 +4,11 @@
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/config.h"
-#include "extensions/filters/network/thrift_proxy/router/config.h"
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -577,7 +576,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
