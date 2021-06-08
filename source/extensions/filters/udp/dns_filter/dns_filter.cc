@@ -317,7 +317,8 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
   for (const auto& query : context->queries_) {
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
-    if (isKnownDomain(query->name_) || !config_->forwardQueries()) {
+    const bool forward_queries = config_->forwardQueries();
+    if (isKnownDomain(query->name_) || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -329,10 +330,14 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
       }
     }
 
-    ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
-    resolver_->resolveExternalQuery(std::move(context), query.get());
+    // Forwarding queries is enabled if the configuration contains a client configuration
+    // for the dns_filter.
+    if (forward_queries) {
+      ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
+      resolver_->resolveExternalQuery(std::move(context), query.get());
 
-    return DnsLookupResponseCode::External;
+      return DnsLookupResponseCode::External;
+    }
   }
 
   if (context->answers_.empty()) {

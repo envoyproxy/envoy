@@ -573,6 +573,33 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
 }
 
+TEST_F(DnsFilterTest, NoHostForSingleTypeAQuery) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  const std::string domain("www.api.foo3.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(0, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
+  EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
+  EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
+}
+
 TEST_F(DnsFilterTest, RepeatedTypeAQuerySuccess) {
   InSequence s;
 
