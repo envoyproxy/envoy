@@ -35,9 +35,10 @@ DnsCacheImpl::DnsCacheImpl(
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
   uint pre_loaded_hostnames;
-  for(auto it = config.pre_load_hostnames().begin(); it != config.pre_load_hostnames().end() && pre_loaded_hostnames < max_hosts_ ; ++it,++pre_loaded_hostnames) {
-    main_thread_dispatcher_.post([this, host = it->address(),
-                                default_port = it->port_value()]() {
+  for (auto it = config.pre_load_hostnames().begin();
+       it != config.pre_load_hostnames().end() && pre_loaded_hostnames < max_hosts_;
+       ++it, ++pre_loaded_hostnames) {
+    main_thread_dispatcher_.post([this, host = it->address(), default_port = it->port_value()]() {
       startCacheLoad(host, default_port);
     });
   }
