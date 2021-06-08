@@ -96,6 +96,7 @@ New Features
 * tls: allow dual ECDSA/RSA certs via SDS. Previously, SDS only supported a single certificate per context, and dual cert was only supported via non-SDS.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
 * windows container image: added user, EnvoyUser which is part of the Network Configuration Operators group to the container image.
+
 Deprecated
 ----------
 
