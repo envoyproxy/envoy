@@ -1,6 +1,6 @@
 #include "envoy/event/timer.h"
 
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/simulated_time_system.h"
@@ -14,7 +14,7 @@ class CompressorIntegrationTest : public testing::TestWithParam<Network::Address
                                   public Event::SimulatedTimeSystem,
                                   public HttpIntegrationTest {
 public:
-  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

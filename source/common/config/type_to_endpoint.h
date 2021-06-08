@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 

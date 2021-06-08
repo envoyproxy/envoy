@@ -1,4 +1,4 @@
-#include "extensions/filters/http/aws_lambda/aws_lambda_filter.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 
 #include <string>
 #include <vector>
@@ -8,20 +8,18 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/base64.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/const_singleton.h"
-
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -120,12 +118,8 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
     : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  if (!decoder_callbacks_->route() || !decoder_callbacks_->route()->routeEntry()) {
-    return absl::nullopt;
-  }
-  const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-  const auto* settings = route_entry->mostSpecificPerFilterConfigTyped<FilterSettings>(
-      HttpFilterNames::get().AwsLambda);
+  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
+      HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
   if (!settings) {
     return absl::nullopt;
   }

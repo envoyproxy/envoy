@@ -14,11 +14,11 @@
 #include "envoy/network/connection_handler.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include "absl/container/inlined_vector.h"
 
@@ -66,9 +66,9 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const bool use_tcp_for_dns_lookups) override;
+  Network::DnsResolverSharedPtr createDnsResolver(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

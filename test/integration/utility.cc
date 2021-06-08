@@ -9,20 +9,20 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/api_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -179,7 +179,7 @@ sendRequestAndWaitForResponse(Event::Dispatcher& dispatcher, const std::string& 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    const std::string& host, const std::string& content_type) {
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   NiceMock<Random::MockRandomGenerator> random;
@@ -191,11 +191,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   TestConnectionCallbacks connection_callbacks(*dispatcher);
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster,
-      fmt::format("{}://127.0.0.1:80", (type == Http::CodecClient::Type::HTTP3 ? "udp" : "tcp")),
+      cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
       time_system)};
 
-  if (type <= Http::CodecClient::Type::HTTP2) {
+  if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(
         type,
         dispatcher->createClientConnection(addr, Network::Address::InstanceConstSharedPtr(),
@@ -236,7 +235,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
-                                   const std::string& body, Http::CodecClient::Type type,
+                                   const std::string& body, Http::CodecType type,
                                    Network::Address::IpVersion ip_version, const std::string& host,
                                    const std::string& content_type) {
   auto addr = Network::Utility::resolveUrl(

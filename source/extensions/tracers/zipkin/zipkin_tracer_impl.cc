@@ -1,19 +1,18 @@
-#include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/zipkin/span_context_extractor.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {

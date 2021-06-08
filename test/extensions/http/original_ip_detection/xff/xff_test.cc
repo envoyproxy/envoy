@@ -1,6 +1,6 @@
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 
-#include "extensions/http/original_ip_detection/xff/xff.h"
+#include "source/extensions/http/original_ip_detection/xff/xff.h"
 
 #include "test/test_common/utility.h"
 

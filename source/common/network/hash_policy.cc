@@ -1,9 +1,9 @@
-#include "common/network/hash_policy.h"
+#include "source/common/network/hash_policy.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {

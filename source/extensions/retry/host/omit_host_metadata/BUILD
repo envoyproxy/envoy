@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["omit_host_metadata.cc"],
     hdrs = ["omit_host_metadata.h"],
     deps = [
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/upstream:retry_interface",
         "//source/common/config:well_known_names",
     ],
 )
@@ -23,12 +23,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.retry_host_predicates",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":omit_host_metadata_predicate_lib",
-        "//include/envoy/registry",
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/registry",
+        "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/extensions/retry/host/omit_host_metadata/v3:pkg_cc_proto",
     ],

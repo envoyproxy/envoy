@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["set_metadata_filter.cc"],
     hdrs = ["set_metadata_filter.h"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
@@ -27,10 +27,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",

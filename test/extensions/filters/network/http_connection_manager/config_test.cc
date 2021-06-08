@@ -7,10 +7,9 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/http_connection_manager/config.h"
-#include "extensions/request_id/uuid/config.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"

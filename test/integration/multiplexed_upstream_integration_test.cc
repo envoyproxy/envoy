@@ -5,7 +5,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/test_common/printers.h"
@@ -17,16 +17,9 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-// TODO(alyssawilk) move #defines into getProtocolTestParams in a follow-up
-#ifdef ENVOY_ENABLE_QUIC
-INSTANTIATE_TEST_SUITE_P(ProtocolsWithQuic, Http2UpstreamIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-#endif
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
@@ -333,12 +326,20 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    // This test depends on fragile preconditions.
+    // With HTTP/2 downstream all the requests are processed before the
+    // responses are sent, then the connection read-disable results in not
+    // receiving flow control window updates.
+    return;
+  }
   config_helper_.addFilter(
       fmt::format(R"EOF(
   name: pause-filter{}
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty)EOF",
-                  downstreamProtocol() == Http::CodecClient::Type::HTTP3 ? "-for-quic" : ""));
+                  downstreamProtocol() == Http::CodecType::HTTP3 ? "-for-quic" : ""));
 
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
@@ -647,18 +648,18 @@ protected:
     Http2UpstreamIntegrationTest::initialize();
   }
   void createUpstreams() override {
-    ASSERT_EQ(upstreamProtocol(), FakeHttpConnection::Type::HTTP3);
+    ASSERT_EQ(upstreamProtocol(), Http::CodecType::HTTP3);
     ASSERT_EQ(fake_upstreams_count_, 1);
     ASSERT_FALSE(autonomous_upstream_);
 
     if (use_http2_) {
-      auto config = configWithType(FakeHttpConnection::Type::HTTP2);
+      auto config = configWithType(Http::CodecType::HTTP2);
       Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), FakeHttpConnection::Type::HTTP2);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
     } else {
-      auto config = configWithType(FakeHttpConnection::Type::HTTP3);
+      auto config = configWithType(Http::CodecType::HTTP3);
       Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), FakeHttpConnection::Type::HTTP3);
+      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
     }
   }
 
@@ -676,7 +677,7 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP3})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 #endif

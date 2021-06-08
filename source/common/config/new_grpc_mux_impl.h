@@ -9,14 +9,14 @@
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/api_version.h"
-#include "common/config/delta_subscription_state.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/pausable_ack_queue.h"
-#include "common/config/watch_map.h"
-#include "common/grpc/common.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/pausable_ack_queue.h"
+#include "source/common/config/watch_map.h"
+#include "source/common/grpc/common.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Config {

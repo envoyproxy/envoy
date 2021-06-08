@@ -7,11 +7,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/context_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"

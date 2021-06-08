@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["http1_bridge_filter.cc"],
     hdrs = ["http1_bridge_filter.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
@@ -33,17 +33,15 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.filters.http",
     # Legacy test use. TODO(#9953) clean up.
     extra_visibility = [
         "//source/exe:__pkg__",
         "//test/integration:__subpackages__",
         "//test/server:__subpackages__",
     ],
-    security_posture = "unknown",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_http1_bridge:http1_bridge_filter_lib",

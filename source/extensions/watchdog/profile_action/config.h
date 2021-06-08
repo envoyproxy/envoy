@@ -3,7 +3,7 @@
 #include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
 #include "envoy/server/guarddog_config.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
