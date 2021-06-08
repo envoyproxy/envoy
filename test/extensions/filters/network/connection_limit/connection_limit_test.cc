@@ -188,7 +188,9 @@ delay: 0s
 
   // Start a thread and see if we are under limit. This will wait pre-CAS.
   synchronizer().waitOn("increment_pre_cas");
-  std::thread t1([&] { EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter.filter_.onNewConnection()); });
+  std::thread t1([&] {
+    EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter.filter_.onNewConnection());
+  });
   // Wait until the thread is actually waiting.
   synchronizer().barrierOn("increment_pre_cas");
 

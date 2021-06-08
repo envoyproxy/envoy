@@ -24,8 +24,8 @@ message ConnectionLimit {
   // <config_network_filters_connection_limit_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The max connections configuration to use for new incoming connections that are processed by the
-  // filter's filter chain based on per worker. When max_connection is reached, the incoming connection
+  // The max connections configuration to use for new incoming connections that are processed
+  // by the filter's filter chain. When max_connection is reached, the incoming connection
   // will be closed after delay duration.
   google.protobuf.UInt64Value max_connections = 2 [(validate.rules).uint64 = {gte: 1}];
 
