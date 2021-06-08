@@ -102,24 +102,24 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
 
 // Test for function: averageRps.
 TEST_F(ThreadLocalControllerTest, AverageRps) {
-  // Validate historical_data_.empty()
+  // Validate that historical_data_ is empty.
   EXPECT_EQ(0, tlc_.averageRps());
 
-  // Validate global_data_.requests == 0
+  // Validate that global_data_.requests equals to zero.
   tlc_.requestCounts();
   EXPECT_EQ(0, tlc_.averageRps());
 
-  // Validate historical_data_.size() < 2
+  // Validate the value in one second.
   tlc_.recordSuccess();
   tlc_.recordFailure();
-  EXPECT_EQ(0, tlc_.averageRps());
-
-  // Validate that the sampling window is not full
-  time_system_.advanceTimeWait(std::chrono::seconds(1));
-  tlc_.requestCounts();
   EXPECT_EQ(2, tlc_.averageRps());
 
-  // Now clean up the sampling window to validate that the sampling window is full
+  // Validate that the sampling window is not full.
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  tlc_.recordSuccess();
+  EXPECT_EQ(3, tlc_.averageRps());
+
+  // Now clean up the sampling window to validate that the sampling window is full.
   time_system_.advanceTimeWait(std::chrono::seconds(10));
   for (int tick = 0; tick < window_.count(); ++tick) {
     // 1 + 3 + 5 + 7 + 9

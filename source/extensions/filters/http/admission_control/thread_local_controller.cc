@@ -21,10 +21,9 @@ uint32_t ThreadLocalControllerImpl::averageRps() const {
   if (historical_data_.empty() || global_data_.requests == 0) {
     return 0;
   }
-  using namespace std::chrono;
-  auto count_of_seconds = duration_cast<seconds>(ageOfOldestSample()).count();
-
-  return count_of_seconds == 0 ? 0 : global_data_.requests / count_of_seconds;
+  using std::chrono::seconds;
+  seconds secs = std::max(seconds(1), std::chrono::duration_cast<seconds>(ageOfOldestSample()));
+  return global_data_.requests / secs.count();
 }
 
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
