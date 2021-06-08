@@ -116,7 +116,7 @@ public:
   Context();                                          // Testing.
   Context(Wasm* wasm);                                // Vm Context.
   Context(Wasm* wasm, const PluginSharedPtr& plugin); // Root Context.
-  Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin,
+  Context(Wasm* wasm, uint32_t root_context_id,
           PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 

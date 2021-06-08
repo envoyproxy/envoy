@@ -39,10 +39,10 @@ public:
         return nullptr;
       } else {
         // Fail closed is handled by an empty Context.
-        return std::make_shared<Context>(nullptr, 0, plugin_, handle);
+        return std::make_shared<Context>(nullptr, 0, handle);
       }
     }
-    return std::make_shared<Context>(wasm, handle->rootContextId(), plugin_, handle);
+    return std::make_shared<Context>(wasm, handle->rootContextId(), handle);
   }
 
   Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasm().get(); }
