@@ -41,7 +41,7 @@ public:
  */
 class ShadowRequestHandle : public ProtocolConverter {
 public:
-  virtual ~ShadowRequestHandle() = default;
+  ~ShadowRequestHandle() override = default;
 
   /**
    * Submits a serialized request to be shadowed.
