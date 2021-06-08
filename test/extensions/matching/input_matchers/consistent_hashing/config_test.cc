@@ -28,7 +28,8 @@ TEST(ConfigTest, TestConfig) {
   auto message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto matcher = factory.createInputMatcherFactoryCb(*message, context);
-  EXPECT_NE(nullptr, matcher);
+  ASSERT_NE(nullptr, matcher);
+  matcher();
 }
 
 TEST(ConfigTest, InvalidConfig) {
