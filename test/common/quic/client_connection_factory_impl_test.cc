@@ -8,6 +8,8 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
 
 using testing::Return;
@@ -18,6 +20,10 @@ namespace Quic {
 class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   void initialize() {
+    test_address_ = Network::Utility::resolveUrl(absl::StrCat(
+        "tcp://",
+        Network::Test::getLoopbackAddressString(TestEnvironment::getIpVersionsForTest()[0]),
+        ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
         .WillOnce(Return(context));
@@ -36,8 +42,7 @@ protected:
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
-  Network::Address::InstanceConstSharedPtr test_address_ =
-      Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+  Network::Address::InstanceConstSharedPtr test_address_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
 };
