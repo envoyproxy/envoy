@@ -226,9 +226,8 @@ void GuardDogImpl::start(Api::Api& api) {
   thread_ = api.threadFactory().createThread(
       [this, &guarddog_thread_started]() -> void {
         loop_timer_->enableTimer(std::chrono::milliseconds(0));
-
-        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit,
-                         [&guarddog_thread_started]() { guarddog_thread_started.Notify(); });
+        dispatcher_->post([&guarddog_thread_started]() { guarddog_thread_started.Notify(); });
+        dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
       },
       options);
 
