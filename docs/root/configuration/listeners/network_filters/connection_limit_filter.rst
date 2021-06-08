@@ -11,9 +11,9 @@ Connection Limit Filter
 Overview
 --------
 
-The filter is based on per listener and per worker, it can protect for resources such as connections, CPU, memory, etc.
-by making sure every filter chain gets fair share of connection resources and prevent any single entity based on filter chain match
-or descriptors from consuming a large number of connections to ensure fair share of the connections.
+The filter can protect for resources such as connections, CPU, memory, etc. by making sure every filter chain
+gets fair share of connection resources and prevent any single entity based on filter chain match or descriptors
+from consuming a large number of connections.
 The connection limit filter applies a connection limit to incoming connections that are processed by the filter's filter chain.
 Each connection processed by the filter marked as an active connection, and if the number of active connections reaches the max connections limit,
 the connection will be closed without further filter iteration.
@@ -28,20 +28,6 @@ the connection will be closed without further filter iteration.
 
 .. note::
   In the current implementation each filter chain has an independent connection limit.
-
-Algorithm
----------
-
-The filter will use the reference counting algorithm to keep trace of active connection count.
-
-1. Active connection count < max connection limit:
-
-   -  Increment count for a new allowed connection.
-   -  Decrement count when a connection closes.
-
-2. Active connection count >= max connection limit:
-
-   -  Close the new connection request after configured delay time.
 
 .. _config_network_filters_connection_limit_stats:
 

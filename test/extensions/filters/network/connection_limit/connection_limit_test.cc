@@ -29,6 +29,9 @@ public:
     config_ = std::make_shared<Config>(proto_config, stats_store_, runtime_);
   }
 
+  Thread::ThreadSynchronizer& synchronizer() { return config_->synchronizer_; }
+  bool decrementConnection() { return config_->decrementConnection(); }
+
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
@@ -168,6 +171,57 @@ runtime_enabled:
   EXPECT_EQ(0, TestUtility::findCounter(
                    stats_store_, "connection_limit.connection_limit_stats.limited_connections")
                    ->value());
+}
+
+// Verify increment connection counter CAS edge cases.
+TEST_F(ConnectionLimitFilterTest, IncrementCasEdgeCases) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0s
+)EOF");
+
+  InSequence s;
+  ActiveFilter active_filter(config_);
+
+  synchronizer().enable();
+
+  // Start a thread and see if we are under limit. This will wait pre-CAS.
+  synchronizer().waitOn("increment_pre_cas");
+  std::thread t1([&] { EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter.filter_.onNewConnection()); });
+  // Wait until the thread is actually waiting.
+  synchronizer().barrierOn("increment_pre_cas");
+
+  // Increase connection counter to 1, which should cause the CAS to fail on the other thread.
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+  synchronizer().signal("increment_pre_cas");
+  t1.join();
+}
+
+// Verify decrement connection counter CAS edge cases.
+TEST_F(ConnectionLimitFilterTest, DecrementCasEdgeCases) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0s
+)EOF");
+
+  InSequence s;
+  ActiveFilter active_filter(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+
+  synchronizer().enable();
+
+  // Start a thread, this will wait pre-CAS.
+  synchronizer().waitOn("decrement_pre_cas");
+  std::thread t1([&] { EXPECT_FALSE(decrementConnection()); });
+  // Wait until the thread is actually waiting.
+  synchronizer().barrierOn("decrement_pre_cas");
+
+  // Decrease connection counter to 0, which should cause the CAS to fail on the other thread.
+  EXPECT_TRUE(decrementConnection());
+  synchronizer().signal("decrement_pre_cas");
+  t1.join();
 }
 
 } // namespace ConnectionLimitFilter

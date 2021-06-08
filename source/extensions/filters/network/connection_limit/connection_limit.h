@@ -55,6 +55,9 @@ private:
   const uint64_t max_connections_;
   std::atomic<uint64_t> connections_;
   absl::optional<std::chrono::milliseconds> delay_;
+  mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
+
+  friend class ConnectionLimitTestBase;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

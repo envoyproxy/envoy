@@ -26,6 +26,9 @@ ConnectionLimitStats Config::generateStats(const std::string& prefix, Stats::Sco
 bool Config::incrementConnectionWithinLimit() {
   auto conns = connections_.load(std::memory_order_relaxed);
   while (conns < max_connections_) {
+    // Testing hook.
+    synchronizer_.syncPoint("increment_pre_cas");
+
     if (connections_.compare_exchange_weak(conns, conns + 1, std::memory_order_release,
                                            std::memory_order_relaxed)) {
       return true;
@@ -37,8 +40,12 @@ bool Config::incrementConnectionWithinLimit() {
 void Config::incrementConnection() { connections_++; }
 
 bool Config::decrementConnection() {
+  ASSERT(connections_ > 0);
   auto conns = connections_.load(std::memory_order_relaxed);
   while (conns > 0) {
+    // Testing hook.
+    synchronizer_.syncPoint("decrement_pre_cas");
+
     if (connections_.compare_exchange_weak(conns, conns - 1, std::memory_order_release,
                                            std::memory_order_relaxed)) {
       return true;
