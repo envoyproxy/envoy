@@ -307,7 +307,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
 
   EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamSslConnection());
-  EXPECT_EQ(1234, decoder_->streamInfo().connectionID());
+  EXPECT_EQ(1234U, decoder_->streamInfo().connectionID());
   EXPECT_EQ(server_name, decoder_->streamInfo().requestedServerName());
 
   // Clean up.

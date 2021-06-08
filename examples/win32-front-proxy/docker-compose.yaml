@@ -6,29 +6,29 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "8080:8080"
-      - "8443:8443"
-      - "8003:8003"
+    - "8080:8080"
+    - "8443:8443"
+    - "8003:8003"
 
   service1:
     build:
       context: .
       dockerfile: Dockerfile-service
     networks:
-      - envoymesh
+    - envoymesh
     environment:
-      - SERVICE_NAME=1
+    - SERVICE_NAME=1
 
   service2:
     build:
       context: .
       dockerfile: Dockerfile-service
     networks:
-      - envoymesh
+    - envoymesh
     environment:
-      - SERVICE_NAME=2
+    - SERVICE_NAME=2
 
 networks:
   envoymesh: {}
