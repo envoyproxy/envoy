@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["previous_priorities.cc"],
     hdrs = ["previous_priorities.h"],
     deps = [
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/upstream:retry_interface",
         "//source/common/upstream:load_balancer_lib",
     ],
 )
@@ -25,8 +25,8 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":previous_priorities_lib",
-        "//include/envoy/registry",
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/registry",
+        "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/extensions/retry/priority/previous_priorities/v3:pkg_cc_proto",
     ],

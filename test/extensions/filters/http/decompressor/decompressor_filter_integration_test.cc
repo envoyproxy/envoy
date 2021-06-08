@@ -1,6 +1,6 @@
 #include "envoy/event/timer.h"
 
-#include "extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/factory_context.h"

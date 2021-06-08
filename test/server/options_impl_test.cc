@@ -13,16 +13,14 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/utility.h"
-
-#include "server/options_impl.h"
-
-#include "extensions/filters/http/buffer/buffer_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
+#include "source/server/options_impl.h"
 
 #if defined(__linux__)
 #include <sched.h>
-#include "server/options_impl_platform_linux.h"
+#include "source/server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"

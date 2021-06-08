@@ -1,7 +1,7 @@
 !ignore dynamic_sockets:
-  - &admin_address { address: 127.0.0.1, port_value: 9901 }
-  - &listener_address { address: 127.0.0.1, port_value: 10000 }
-  - &lb_address { address: 127.0.0.1, port_value: 1234 }
+- &admin_address {address: 127.0.0.1, port_value: 9901}
+- &listener_address {address: 127.0.0.1, port_value: 10000}
+- &lb_address {address: 127.0.0.1, port_value: 1234}
 
 admin:
   address:
@@ -25,8 +25,8 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/" }
-                route: { cluster: some_service }
+              - match: {prefix: "/"}
+                route: {cluster: some_service}
           http_filters:
           - name: envoy.filters.http.router
   clusters:

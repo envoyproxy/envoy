@@ -3,8 +3,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/instance.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
 
 #include "test/test_common/utility.h"
 

@@ -1,14 +1,13 @@
-#include "server/hot_restarting_parent.h"
+#include "source/server/hot_restarting_parent.h"
 
 #include "envoy/server/instance.h"
 
-#include "common/memory/stats.h"
-#include "common/network/utility.h"
-#include "common/stats/stat_merger.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
-
-#include "server/listener_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/stat_merger.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/utility.h"
+#include "source/server/listener_impl.h"
 
 namespace Envoy {
 namespace Server {

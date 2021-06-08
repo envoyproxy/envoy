@@ -1,4 +1,4 @@
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 #include <array>
 #include <cstdint>
@@ -7,11 +7,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/socket_interface.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {

@@ -1,4 +1,4 @@
-#include "extensions/filters/common/ext_authz/check_request_utils.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
 #include <chrono>
 #include <cstdint>
@@ -10,18 +10,17 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "absl/strings/str_cat.h"
 

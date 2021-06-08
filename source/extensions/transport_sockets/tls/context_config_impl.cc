@@ -1,18 +1,17 @@
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include <memory>
 #include <string>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"
 

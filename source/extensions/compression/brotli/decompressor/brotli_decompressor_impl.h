@@ -4,7 +4,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/compression/brotli/common/base.h"
+#include "source/extensions/compression/brotli/common/base.h"
 
 #include "brotli/decode.h"
 

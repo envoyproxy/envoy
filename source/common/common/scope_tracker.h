@@ -3,7 +3,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 

@@ -1,12 +1,12 @@
-#include "common/access_log/access_log_manager_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
 
 #include <string>
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/container/fixed_array.h"
 
