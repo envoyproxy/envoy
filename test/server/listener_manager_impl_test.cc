@@ -607,53 +607,6 @@ TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
             manager_->listeners().front().get().listenerFiltersTimeout());
 }
 
-TEST_F(ListenerManagerImplTest, AppliesDumpFilter) {
-  time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
-
-  const std::string foo_yaml = R"EOF(
-name: foo
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters: []
-  )EOF";
-
-  const std::string baz_yaml = R"EOF(
-name: baz
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 5678
-filter_chains:
-- filters: []
-  )EOF";
-
-  NameListenerDumpMatcherFactory factory;
-  Registry::InjectFactory<Matcher::ConfigDump::DumpMatcherFactory> injection(factory);
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true})).Times(2);
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(foo_yaml), "", false));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(baz_yaml), "", false));
-
-  checkConfigDump(R"EOF(
-static_listeners:
-  listener:
-    "@type": type.googleapis.com/envoy.config.listener.v3.Listener
-    name: "foo"
-    address:
-      socket_address:
-        address: "127.0.0.1"
-        port_value: 1234
-    filter_chains: {}
-  last_updated:
-    seconds: 1001001001
-    nanos: 1000000
-)EOF",
-                  {{"name", "foo"}});
-}
-
 TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   InSequence s;
 

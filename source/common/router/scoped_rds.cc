@@ -7,7 +7,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/matcher/dump_matcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
@@ -521,8 +520,7 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
 
-ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs(
-    const Matcher::ConfigDump::MatchingParameters& matching_params) const {
+ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
@@ -536,9 +534,6 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs(
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
-        if (!Matcher::ConfigDump::isMatch(it.second->configProto(), matching_params)) {
-          continue;
-        }
         dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
             API_RECOVER_ORIGINAL(it.second->configProto()));
       }
@@ -554,9 +549,6 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs(
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
-      if (!Matcher::ConfigDump::isMatch(*config_proto, matching_params)) {
-        continue;
-      }
       inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
           API_RECOVER_ORIGINAL(*config_proto));
     }

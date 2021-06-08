@@ -244,16 +244,12 @@ envoy_cc_library(
     name = "config_dump_handler_lib",
     srcs = ["config_dump_handler.cc"],
     hdrs = ["config_dump_handler.h"],
-    external_deps = [
-        "abseil_hash",
-    ],
     deps = [
         ":config_tracker_lib",
         ":handler_ctx_lib",
         ":utils_lib",
 <<<<<<< HEAD
         "//include/envoy/http:codes_interface",
-        "//include/envoy/matcher:dump_matcher_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:instance_interface",
 =======
@@ -262,10 +258,8 @@ envoy_cc_library(
         "//envoy/server:instance_interface",
 >>>>>>> upstream/main
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
-        "//source/common/matcher:config_dump_matcher",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

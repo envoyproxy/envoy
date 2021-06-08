@@ -7,13 +7,11 @@
 namespace Envoy {
 namespace Server {
 
-using ::Envoy::Matcher::ConfigDump::MatchingParameters;
-
 class ConfigTrackerImplTest : public testing::Test {
 public:
   ConfigTrackerImplTest() : cbs_map(tracker.getCallbacksMap()) {
     EXPECT_TRUE(cbs_map.empty());
-    test_cb = [this](const MatchingParameters&) {
+    test_cb = [this] {
       called = true;
       return test_msg();
     };
@@ -26,7 +24,6 @@ public:
   ConfigTrackerImpl tracker;
   const std::map<std::string, ConfigTracker::Cb>& cbs_map;
   ConfigTracker::Cb test_cb;
-  MatchingParameters empty_params;
   bool called{false};
   std::string test_string{"foo"};
 };
@@ -36,7 +33,7 @@ TEST_F(ConfigTrackerImplTest, Basic) {
   auto entry_owner = tracker.add("test_key", test_cb);
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_NE(nullptr, entry_owner);
-  EXPECT_NE(nullptr, cbs_map.begin()->second(empty_params));
+  EXPECT_NE(nullptr, cbs_map.begin()->second());
   EXPECT_TRUE(called);
 }
 
@@ -64,8 +61,8 @@ TEST_F(ConfigTrackerImplTest, AddDuplicate) {
 
 TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   ConfigTracker::EntryOwnerPtr owner1, owner2;
-  owner1 = tracker.add("test_key", [&](const MatchingParameters&) {
-    owner2 = tracker.add("test_key2", [&](const MatchingParameters&) {
+  owner1 = tracker.add("test_key", [&] {
+    owner2 = tracker.add("test_key2", [&] {
       owner1.reset();
       return test_msg();
     });
@@ -73,10 +70,10 @@ TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   });
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_NE(nullptr, owner1);
-  EXPECT_NE(nullptr, cbs_map.at("test_key")(empty_params));
+  EXPECT_NE(nullptr, cbs_map.at("test_key")());
   EXPECT_EQ(2, cbs_map.size());
   EXPECT_NE(nullptr, owner2);
-  EXPECT_NE(nullptr, cbs_map.at("test_key2")(empty_params));
+  EXPECT_NE(nullptr, cbs_map.at("test_key2")());
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_EQ(0, cbs_map.count("test_key"));
 }

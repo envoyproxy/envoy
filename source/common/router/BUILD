@@ -165,6 +165,7 @@ envoy_cc_library(
     hdrs = ["rds_impl.h"],
     deps = [
         ":config_lib",
+<<<<<<< HEAD
         "//envoy/config:subscription_interface",
         "//envoy/http:codes_interface",
         "//envoy/local_info:local_info_interface",
@@ -174,6 +175,17 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//envoy/singleton:instance_interface",
         "//envoy/thread_local:thread_local_interface",
+=======
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/http:codes_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/router:rds_interface",
+        "//include/envoy/router:route_config_provider_manager_interface",
+        "//include/envoy/router:route_config_update_info_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+>>>>>>> parent of 818ec8d41 (Add ability to filter ConfigDump.)
         "//source/common/common:assert_lib",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:cleanup_lib",
@@ -186,7 +198,6 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
-        "//source/common/matcher:config_dump_matcher",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
@@ -238,7 +249,6 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:watcher_lib",
-        "//source/common/matcher:config_dump_matcher",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

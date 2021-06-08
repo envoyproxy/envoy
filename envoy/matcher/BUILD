@@ -22,16 +22,3 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
-envoy_cc_library(
-    name = "dump_matcher_interface",
-    hdrs = ["dump_matcher.h"],
-    external_deps = [
-        "abseil_base",
-        "abseil_hash",
-    ],
-    deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//source/common/protobuf",
-    ],
-)

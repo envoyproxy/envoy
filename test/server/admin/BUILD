@@ -123,12 +123,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_dump_handler_test",
     srcs = ["config_dump_handler_test.cc"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":admin_instance_lib",
-        "//include/envoy/matcher:dump_matcher_interface",
     ],
 )
 

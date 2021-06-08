@@ -18,7 +18,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/matcher/dump_matcher.h"
 #include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
@@ -566,8 +565,7 @@ private:
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
-  ProtobufTypes::MessagePtr
-  dumpClusterConfigs(const Matcher::ConfigDump::MatchingParameters& matching_params);
+  ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
 
   /**

@@ -9,7 +9,6 @@
 #include "envoy/config/route/v3/scoped_route.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/matcher/dump_matcher.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
@@ -194,11 +193,10 @@ private:
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
 
-  // Detect scope name and scope key conflict between added scopes or between
-  // added scopes and old scopes. Some removed scopes may be in added resources
-  // list, instead of being removed, they should be updated, so only return
-  // scope names that will disappear after update. If conflict detected, fill
-  // exception_msg with information about scope conflict and return.
+  // Detect scope name and scope key conflict between added scopes or between added scopes and old
+  // scopes. Some removed scopes may be in added resources list, instead of being removed, they
+  // should be updated, so only return scope names that will disappear after update. If conflict
+  // detected, fill exception_msg with information about scope conflict and return.
   Protobuf::RepeatedPtrField<std::string> detectUpdateConflictAndCleanupRemoved(
       const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg);
@@ -276,8 +274,7 @@ public:
   ~ScopedRoutesConfigProviderManager() override = default;
 
   // Envoy::Config::ConfigProviderManagerImplBase
-  ProtobufTypes::MessagePtr
-  dumpConfigs(const Matcher::ConfigDump::MatchingParameters& matching_params) const override;
+  ProtobufTypes::MessagePtr dumpConfigs() const override;
 
   // Envoy::Config::ConfigProviderManager
   Envoy::Config::ConfigProviderPtr

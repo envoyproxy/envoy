@@ -17,17 +17,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "config_dump_matcher",
-    srcs = ["config_dump_matcher.cc"],
-    hdrs = ["config_dump_matcher.h"],
-    deps = [
-        "//include/envoy/matcher:dump_matcher_interface",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "value_input_matcher_lib",
     hdrs = ["value_input_matcher.h"],
     deps = [

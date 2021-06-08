@@ -39,7 +39,6 @@ envoy_cc_library(
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
         "//source/common/init:watcher_lib",
-        "//source/common/matcher:config_dump_matcher",
         "//source/common/protobuf",
     ],
 )
