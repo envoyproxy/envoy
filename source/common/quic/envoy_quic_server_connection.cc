@@ -35,5 +35,19 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   return true;
 }
 
+std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
+EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
+  return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
+      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this);
+}
+
+quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(
+    const quic::QuicConnectionId& old_connection_id) const {
+  quic::QuicConnectionId new_connection_id =
+      quic::QuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(old_connection_id);
+  adjustNewConnectionIdForRoutine(new_connection_id, old_connection_id);
+  return new_connection_id;
+}
+
 } // namespace Quic
 } // namespace Envoy
