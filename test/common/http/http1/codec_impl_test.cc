@@ -1450,9 +1450,10 @@ TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingNotAddedWhenCon
 }
 
 // Upstream response 304 without content-length header
-// 304 Response does not need to have Transfer-Encoding added even it's allowed by RFC 7230, Section 3.3.1
-// Both GET and HEAD response are the same and consistent
-TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingContentLengthNotAddedWhenContentLengthNotPresent) {
+// 304 Response does not need to have Transfer-Encoding added even it's allowed by RFC 7230,
+// Section 3.3.1. Both GET and HEAD response are the same and consistent
+TEST_F(Http1ServerConnectionImplTest,
+       304ResponseTransferEncodingContentLengthNotAddedWhenContentLengthNotPresent) {
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
@@ -1492,7 +1493,8 @@ TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingContentLengthNo
 // The legacy behavior returns different headers for GET and HEAD requests
 // For GET, it adds "content-length: 0"
 // For HEAD, it adds "transfer-encoding: chunked"
-TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingContentLengthNotAddedWhenContentLengthNotPresentLegacy) {
+TEST_F(Http1ServerConnectionImplTest,
+       304ResponseTransferEncodingContentLengthNotAddedWhenContentLengthNotPresentLegacy) {
   // Testing old behavior with no_chunked_encoding_header_for_304 turned off
   // GET and HEAD returns different headers
   TestScopedRuntime scoped_runtime;
@@ -2155,9 +2157,8 @@ TEST_F(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_TRUE(status.ok());
 
   // Check dump contents
-  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5"));
-  EXPECT_THAT(ostream.contents(), HasSubstr("header_parsing_state_: Done"));
-  EXPECT_THAT(ostream.contents(), HasSubstr("current_header_field_: , current_header_value_: "
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
+                                            "Done, current_header_field_: , current_header_value_: "
                                             "\n, active_request_.request_url_: null"));
   EXPECT_THAT(ostream.contents(),
               HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: \"POST / "
@@ -3334,8 +3335,8 @@ TEST_F(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   EXPECT_FALSE(status.ok());
 
   // Check for body data.
-  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5"));
-  EXPECT_THAT(ostream.contents(), HasSubstr("header_parsing_state_: Done"));
+  EXPECT_THAT(ostream.contents(), HasSubstr("buffered_body_.length(): 5, header_parsing_state_: "
+                                            "Done"));
   EXPECT_THAT(ostream.contents(),
               testing::HasSubstr("current_dispatching_buffer_ front_slice length: 43 contents: "
                                  "\"HTTP/1.1 200 OK\\r\\nContent-Length: 5\\r\\n\\r\\nHello\"\n"));
