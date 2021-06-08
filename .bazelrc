@@ -105,9 +105,12 @@ build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
+build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
+build:clang-msan --copt -fno-optimize-sibling-calls
 
 # Clang with libc++
 build:libc++ --config=clang
@@ -237,6 +240,10 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-tsan --config=remote
+build:remote-tsan --config=rbe-toolchain-clang-libc++
+build:remote-tsan --config=rbe-toolchain-tsan
+
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
@@ -264,6 +271,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-asan --config=docker-sandbox
+build:docker-asan --config=rbe-toolchain-clang-libc++
+build:docker-asan --config=rbe-toolchain-asan
 
 build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++

@@ -1,4 +1,4 @@
-#include "server/listener_manager_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include <algorithm>
 
@@ -13,29 +13,28 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/network/filter_matcher.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/network/filter_matcher.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
-#include "server/api_listener_impl.h"
-#include "server/configuration_impl.h"
-#include "server/drain_manager_impl.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/transport_socket_config_impl.h"
+#include "source/server/api_listener_impl.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
-#include "extensions/filters/listener/well_known_names.h"
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -944,12 +943,11 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
     if (filter_chain.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      transport_socket.set_name("envoy.transport_sockets.tls");
       transport_socket.mutable_typed_config()->PackFrom(
           filter_chain.hidden_envoy_deprecated_tls_context());
     } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
     }
   }
 

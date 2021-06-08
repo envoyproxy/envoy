@@ -1,10 +1,9 @@
-#include "extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/extensions/tracers/zipkin/span_context_extractor.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-
-#include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/zipkin/span_context.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {

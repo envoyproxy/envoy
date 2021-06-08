@@ -47,7 +47,6 @@ static_resources:
 
   clusters:
   - name: web_service
-    connect_timeout: 0.25s
     type: strict_dns
     lb_policy: round_robin
     load_assignment:

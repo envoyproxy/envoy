@@ -10,9 +10,8 @@
 #include "envoy/server/worker.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-
-#include "server/listener_hooks.h"
+#include "source/common/common/logger.h"
+#include "source/server/listener_hooks.h"
 
 namespace Envoy {
 namespace Server {

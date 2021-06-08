@@ -57,38 +57,16 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
    To add the nightly repository instead, replace the word ``stable`` with ``nightly``,
    when adding the ``apt`` repository.
 
-Install Envoy on CentOS Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on RPM-based distros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/centos/>`_
+You can `install Envoy on Centos/Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
 
    $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/centos/tetrate-getenvoy.repo
-   $ sudo yum install getenvoy-envoy
-
-.. tip::
-
-   You can enable/disable ``nightly`` using ``yum-config-manager``:
-
-   .. code-block:: console
-
-      $ sudo yum-config-manager --enable tetrate-getenvoy-nightly
-      $ sudo yum-config-manager --disable tetrate-getenvoy-nightly
-
-Install Envoy on Redhat Enterprise Linux (RHEL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can
-`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rhel/>`_
-using `Get Envoy <https://www.getenvoy.io/>`__.
-
-.. code-block:: console
-
-   $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rhel/tetrate-getenvoy.repo
+   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rpm/tetrate-getenvoy.repo
    $ sudo yum install getenvoy-envoy
 
 .. tip::

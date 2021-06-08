@@ -56,8 +56,7 @@ std::string terminalFilterConfig() { return "is_terminal_filter: true"; }
 class ExtensionDiscoveryIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                           public HttpIntegrationTest {
 public:
-  ExtensionDiscoveryIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ExtensionDiscoveryIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void addDynamicFilter(const std::string& name, bool apply_without_warming,
                         bool set_default_config = true, bool rate_limit = false,
@@ -129,6 +128,9 @@ public:
   void initialize() override {
     defer_listener_finalization_ = true;
     setUpstreamCount(1);
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api",
+                                      "true");
+
     // Add an xDS cluster for extension config discovery.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -192,9 +194,9 @@ public:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the extension config discovery upstream (fake_upstreams_[1]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the listener config discovery upstream (fake_upstreams_[2]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void waitXdsStream() {

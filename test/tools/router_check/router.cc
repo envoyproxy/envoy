@@ -8,12 +8,12 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/network/socket_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -113,7 +113,8 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
-      route_config, *factory_context, ProtobufMessage::getNullValidationVisitor(), false);
+      route_config, Router::OptionalHttpFilters(), *factory_context,
+      ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
     MessageUtil::checkForUnexpectedFields(route_config,
                                           ProtobufMessage::getStrictValidationVisitor(),

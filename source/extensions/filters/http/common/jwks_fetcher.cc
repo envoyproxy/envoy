@@ -1,10 +1,10 @@
-#include "extensions/filters/http/common/jwks_fetcher.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "jwt_verify_lib/status.h"
 

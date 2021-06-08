@@ -3,11 +3,11 @@
 #include <memory>
 
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "opentracing/ext/tags.h"
 #include "opentracing/tracer.h"

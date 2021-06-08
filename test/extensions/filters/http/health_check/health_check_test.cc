@@ -3,11 +3,10 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"

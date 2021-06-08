@@ -2,13 +2,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -44,6 +44,7 @@ public:
   void onDatagramsDropped(uint32_t dropped) override;
   uint32_t workerIndex() const override;
   Network::UdpPacketWriter& udpPacketWriter() override;
+  size_t numPacketsExpectedPerEventLoop() const override;
 
 private:
   UdpFuzz* my_upf_;
@@ -176,6 +177,10 @@ void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
     my_upf_->dispatcher_->exit();
   }
   UNREFERENCED_PARAMETER(dropped);
+}
+
+size_t FuzzUdpListenerCallbacks::numPacketsExpectedPerEventLoop() const {
+  return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }

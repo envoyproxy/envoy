@@ -17,10 +17,10 @@
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
-#include "common/config/api_version.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/server_stats.h"
 
@@ -243,7 +243,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool resuse_port);
+  void addQuicDownstreamTransportSocketConfig(bool reuse_port);
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -327,6 +327,11 @@ public:
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+
+  // Populate and return a Http3ProtocolOptions instance based on http2_options.
+  static envoy::config::core::v3::Http3ProtocolOptions
+  http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                              size_t http3_max_stream_receive_window);
 
 private:
   static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
