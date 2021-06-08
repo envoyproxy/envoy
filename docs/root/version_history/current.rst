@@ -14,6 +14,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
+* access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
 * aws_request_signing: requests are now buffered by default to compute signatures which include the
   payload hash, making the filter compatible with most AWS services. Previously, requests were
   never buffered, which only produced correct signatures for requests without a body, or for
