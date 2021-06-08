@@ -2114,6 +2114,39 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
 }
 
+TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DeprecatedKnownSuffixes)) {
+  InSequence s;
+
+  const std::string config_using_known_suffixes = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    known_suffixes:
+    - suffix: "foo1.com"
+    virtual_domains:
+      - name: "www.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(config_using_known_suffixes);
+
+  const std::string query =
+      Utils::buildQueryForDomain("www.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters

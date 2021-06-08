@@ -184,9 +184,9 @@ void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
   DnsVirtualDomainConfigSharedPtr virtual_domains = std::make_shared<DnsVirtualDomainConfig>();
   virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
 
-  if (!dns_lookup_trie_.add(suffix, std::move(virtual_domains), false)) {
-    ENVOY_LOG(error, "Unable to add trie entry for suffix [{}] and domain [{}]", suffix,
-              domain_name);
+  auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
+  if (!success) {
+    throw EnvoyException(fmt::format("domain suffix [{}] already exists", suffix));
   }
 }
 
