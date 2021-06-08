@@ -6,7 +6,7 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/network/lc_trie.h"
+#include "source/common/network/lc_trie.h"
 
 namespace Envoy {
 namespace Extensions {

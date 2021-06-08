@@ -1,9 +1,8 @@
 #include "envoy/network/address.h"
 
+#include "source/extensions/matching/input_matchers/ip/matcher.h"
+
 #include "test/common/stats/stat_test_utility.h"
-
-#include "extensions/matching/input_matchers/ip/matcher.h"
-
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

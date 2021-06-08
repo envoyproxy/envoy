@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
         "//source/common/network:lc_trie_lib",
     ],
 )
@@ -25,9 +25,9 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":ip_lib",
-        "//include/envoy/matcher:matcher_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:factory_context_interface",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/registry",
+        "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/matching/input_matchers/ip/v3:pkg_cc_proto",
     ],
 )
