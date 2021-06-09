@@ -55,6 +55,13 @@ private:
   mutable Common::ThreadSafeCallbackManager<std::chrono::milliseconds> cbs_;
   std::vector<Common::ThreadSafeCallbackHandlePtr> child_drain_cbs_;
 
+  // Callbacks called by startDrainSequence to cascade/proxy to children
+  Common::ThreadSafeCallbackManager<> children_;
+
+  // Callback handle parent will invoke to initiate drain-sequence. Created and set
+  // by the parent drain-manager.
+  Common::ThreadSafeCallbackHandlePtr parent_callback_handle_;
+
   Event::TimerPtr parent_shutdown_timer_;
 };
 

@@ -17,12 +17,13 @@ namespace Server {
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
     : server_(server), dispatcher_(server.dispatcher()), drain_type_(drain_type),
-      cbs_(server_.dispatcher()) {}
+      cbs_(server_.dispatcher()), children_(server.dispatcher()) {}
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type,
                                    Event::Dispatcher& dispatcher)
-    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), cbs_(dispatcher) {}
+    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), cbs_(dispatcher),
+      children_(dispatcher) {}
 
 DrainManagerSharedPtr
 DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
@@ -30,15 +31,8 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
   auto child = std::make_shared<DrainManagerImpl>(server_, drain_type, dispatcher);
 
   // Wire up the child so that when the parent starts draining, the child also sees the state-change
-  child_drain_cbs_.push_back(addOnDrainCloseCb(
-      dispatcher,
-      [child_ = std::weak_ptr<DrainManagerImpl>(child)](std::chrono::milliseconds) mutable {
-        // disregard the specified delay time and kick off the child drain immediately
-        auto child = child_.lock();
-        if (child && !child->draining_) {
-          child->startDrainSequence([] {});
-        }
-      }));
+  auto child_cb = children_.add(dispatcher, [child] { child->startDrainSequence([] {}); });
+  child->parent_callback_handle_ = child_cb;
   return child;
 }
 
@@ -92,6 +86,9 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
   draining_ = true;
+
+  // Signal to child drain-managers to start their drain sequence
+  children_.runCallbacksWith([] { return std::tuple<>(); });
 
   // Schedule callback to run at end of drain time
   drain_tick_timer_ = dispatcher_.createTimer(drain_complete_cb);
