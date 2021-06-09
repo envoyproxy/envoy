@@ -133,13 +133,14 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  addResponseHeadersSize(headers->byteSize());
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  response_headers_size_ = headers->byteSize();
+  addResponseHeadersSize(headers->byteSize());
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
   // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.

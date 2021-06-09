@@ -127,6 +127,9 @@ private:
     return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
            downstream_metadata_map_vector_.empty();
   }
+  void addResponseHeadersSize(uint64_t size) {
+    response_headers_size_ = response_headers_size_.value_or(0) + size;
+  }
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
