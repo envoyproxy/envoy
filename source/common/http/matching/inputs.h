@@ -22,32 +22,25 @@ public:
   virtual absl::optional<std::reference_wrapper<const HeaderType>>
   headerMap(const HttpMatchingData& data) const PURE;
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& data) override {
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
     const auto maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
 
-    auto header = maybe_headers->get().get(name_);
-    if (header.empty()) {
-      return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
-    }
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
 
-    if (header_as_string_result_) {
+    if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-              header_as_string_result_->result()};
+              std::string(header_string.result().value())};
     }
 
-    header_as_string_result_ = HeaderUtility::getAllOfHeaderAsString(header, ",");
-
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            header_as_string_result_->result()};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
 
 private:
   const LowerCaseString name_;
-  absl::optional<HeaderUtility::GetAllOfHeaderAsStringResult> header_as_string_result_;
 };
 
 /**
