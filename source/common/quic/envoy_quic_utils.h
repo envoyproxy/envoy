@@ -168,5 +168,10 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
 
+// Modify new_connection_id according to given old_connection_id to make sure packets with the new
+// one can be routed to the same listener.
+void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id);
+
 } // namespace Quic
 } // namespace Envoy

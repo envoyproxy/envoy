@@ -451,20 +451,20 @@ and security team to ensure they still qualify for inclusion on the list.
 
 | Organization  | End User | Last Review |
 |:-------------:|:--------:|:-----------:|
-| Aspen Mesh    | No       | 12/19       |
-| AWS           | No       | 12/19       |
-| Cilium        | No       | 12/19       |
-| Cloud Foundry | No       | 12/19       |
-| Datawire      | No       | 12/19       |
-| Google        | No       | 12/19       |
-| IBM           | No       | 12/19       |
-| Istio         | No       | 12/19       |
+| Aspen Mesh    | No       | 06/21       |
+| AWS           | No       | 06/21       |
+| Cilium        | No       | 06/21       |
+| Cloud Foundry | No       | 06/21       |
+| Datawire      | No       | 06/21       |
+| Google        | No       | 06/21       |
+| IBM           | No       | 06/21       |
+| Istio         | No       | 06/21       |
 | Microsoft     | No       | 2/21        |
-| Red Hat       | No       | 12/19       |
-| solo.io       | No       | 12/19       |
-| Tetrate       | No       | 12/19       |
-| VMware        | No       | 12/19       |
-| Pinterest     | Yes      | 12/19       |
+| Red Hat       | No       | 06/21       |
+| solo.io       | No       | 06/21       |
+| Tetrate       | No       | 06/21       |
+| VMware        | No       | 06/21       |
+| Pinterest     | Yes      | 06/21       |
 | Dropbox       | Yes      | 01/20       |
 | Stripe        | Yes      | 01/20       |
 | Square        | Yes      | 05/21       |

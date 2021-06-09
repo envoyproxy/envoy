@@ -49,10 +49,6 @@ struct MethodInfo {
 };
 using MethodInfoSharedPtr = std::shared_ptr<MethodInfo>;
 
-void createHttpBodyEnvelope(Buffer::Instance& output,
-                            const std::vector<const ProtobufWkt::Field*>& request_body_field_path,
-                            std::string content_type, uint64_t content_length);
-
 /**
  * Global configuration for the gRPC JSON transcoder filter. Factory for the Transcoder interface.
  */

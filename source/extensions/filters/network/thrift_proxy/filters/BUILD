@@ -39,16 +39,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:decoder_events_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_interface",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
     ],
 )
 
