@@ -55,7 +55,8 @@ public:
 
   // Take a string_view as argument and return an optional string.
   // The optional will be null if the transformation fail.
-  absl::optional<std::string> transform(const absl::string_view original_path) const;
+  absl::optional<std::string> transform(const absl::string_view original_path,
+                                        NormalizePathAction& normalize_path_action) const;
 
   static absl::optional<std::string> mergeSlashes(absl::string_view original_path);
 

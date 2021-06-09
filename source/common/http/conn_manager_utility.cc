@@ -486,14 +486,19 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
 
   const auto original_path = request_headers.getPathValue();
   absl::optional<std::string> forwarding_path =
-      config.forwardingPathTransformer().transform(original_path);
+      config.forwardingPathTransformer().transform(original_path, final_action);
+  if (final_action == NormalizePathAction::Reject) {
+    return final_action;
+  }
+
   absl::optional<std::string> filter_path;
   if (forwarding_path.has_value()) {
     request_headers.setForwardingPath(forwarding_path.value());
-    filter_path = config.filterPathTransformer().transform(forwarding_path.value());
+    filter_path = config.filterPathTransformer().transform(forwarding_path.value(), final_action);
   } else {
     return NormalizePathAction::Reject;
   }
+
   if (filter_path.has_value()) {
     request_headers.setPath(filter_path.value());
     request_headers.setFilterPath(filter_path.value());

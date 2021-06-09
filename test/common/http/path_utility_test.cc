@@ -239,49 +239,59 @@ public:
 
 TEST_F(PathTransformerTest, MergeSlashes) {
   setPathTransformer({"MergeSlashes"});
+  NormalizePathAction action;
   PathTransformer const& path_transformer = pathTransformer();
-  EXPECT_EQ("", path_transformer.transform("").value());                // empty
-  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c").value());     // relative
-  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/").value()); // ends with slash
-  EXPECT_EQ("a/b/c/", path_transformer.transform("a//b/c/").value());   // relative ends with slash
-  EXPECT_EQ("/a", path_transformer.transform("/a").value());            // no-op
-  EXPECT_EQ("/a/b/c", path_transformer.transform("//a/b/c").value());   // double / start
-  EXPECT_EQ("/a/b/c", path_transformer.transform("/a//b/c").value());   // double / in the middle
-  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a/b/c//").value()); // double / end
-  EXPECT_EQ("/a/b/c", path_transformer.transform("/a///b/c").value());  // triple / in the middle
+  EXPECT_EQ("", path_transformer.transform("", action).value());                // empty
+  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c", action).value());     // relative
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/", action).value()); // ends with slash
+  EXPECT_EQ("a/b/c/",
+            path_transformer.transform("a//b/c/", action).value());  // relative ends with slash
+  EXPECT_EQ("/a", path_transformer.transform("/a", action).value()); // no-op
+  EXPECT_EQ("/a/b/c", path_transformer.transform("//a/b/c", action).value()); // double / start
   EXPECT_EQ("/a/b/c",
-            path_transformer.transform("/a////b/c").value()); // quadruple / in the middle
-  EXPECT_EQ("/a/b?a=///c",
-            path_transformer.transform("/a//b?a=///c").value()); // slashes in the query are ignored
-  EXPECT_EQ("/a/b?", path_transformer.transform("/a//b?").value()); // empty query
-  EXPECT_EQ("/a/?b", path_transformer.transform("//a/?b").value()); // ends with slash + query
+            path_transformer.transform("/a//b/c", action).value()); // double / in the middle
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a/b/c//", action).value()); // double / end
+  EXPECT_EQ("/a/b/c",
+            path_transformer.transform("/a///b/c", action).value()); // triple / in the middle
+  EXPECT_EQ("/a/b/c",
+            path_transformer.transform("/a////b/c", action).value()); // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c", path_transformer.transform("/a//b?a=///c", action)
+                               .value()); // slashes in the query are ignored
+  EXPECT_EQ("/a/b?", path_transformer.transform("/a//b?", action).value()); // empty query
+  EXPECT_EQ("/a/?b",
+            path_transformer.transform("//a/?b", action).value()); // ends with slash + query
 }
 
 TEST_F(PathTransformerTest, RfcNormalize) {
   setPathTransformer({"NormalizePathRFC3986"});
+  NormalizePathAction action;
   PathTransformer const& path_transformer = pathTransformer();
-  EXPECT_EQ("/x/y/z",
-            path_transformer.transform("/x/y/z").value()); // Already normalized path don't change.
+  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action)
+                          .value()); // Already normalized path don't change.
 
-  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c").value());         // parent dir
-  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/./c").value());       // current dir
-  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c").value());         // non / start
-  EXPECT_EQ("/c", path_transformer.transform("/a/b/../../../../c").value()); // out number parent
-  EXPECT_EQ("/c", path_transformer.transform("/a/..\\c").value()); // "..\\" canonicalization
-  EXPECT_EQ("/%c0%af",
-            path_transformer.transform("/%c0%af").value()); // 2 bytes unicode reserved characters
-  EXPECT_EQ("/%5c%25", path_transformer.transform("/%5c%25").value());    // reserved characters
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c").value()); // %2E escape
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action).value());   // parent dir
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/./c", action).value()); // current dir
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action).value());   // non / start
+  EXPECT_EQ("/c",
+            path_transformer.transform("/a/b/../../../../c", action).value()); // out number parent
+  EXPECT_EQ("/c",
+            path_transformer.transform("/a/..\\c", action).value()); // "..\\" canonicalization
+  EXPECT_EQ(
+      "/%c0%af",
+      path_transformer.transform("/%c0%af", action).value()); // 2 bytes unicode reserved characters
+  EXPECT_EQ("/%5c%25",
+            path_transformer.transform("/%5c%25", action).value()); // reserved characters
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action).value()); // %2E escape
 
-  EXPECT_EQ("/A/B/C", path_transformer.transform("/A/B/C").value());      // empty
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c").value()); // relative
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2e%2e/c").value()); // ends with slash
+  EXPECT_EQ("/A/B/C", path_transformer.transform("/A/B/C", action).value());      // empty
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action).value()); // relative
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2e%2e/c", action).value()); // ends with slash
   EXPECT_EQ("/a/%2F%2f/c",
-            path_transformer.transform("/a/%2F%2f/c").value()); // relative ends with slash
+            path_transformer.transform("/a/%2F%2f/c", action).value()); // relative ends with slash
 
-  EXPECT_FALSE(path_transformer.transform("/xyz/.%00../abc").has_value());
-  EXPECT_FALSE(path_transformer.transform("/xyz/%00.%00./abc").has_value());
-  EXPECT_FALSE(path_transformer.transform("/xyz/AAAAA%%0000/abc").has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/.%00../abc", action).has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/%00.%00./abc", action).has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/AAAAA%%0000/abc", action).has_value());
 }
 
 TEST_F(PathTransformerTest, DuplicateTransformation) {

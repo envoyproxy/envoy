@@ -179,14 +179,28 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
              : UnescapeSlashesResult::NotFound;
 }
 
-absl::optional<std::string> PathTransformer::transform(absl::string_view original) const {
+absl::optional<std::string>
+PathTransformer::transform(absl::string_view original,
+                           NormalizePathAction& normalize_path_action) const {
   absl::optional<std::string> path_string = std::string(original);
   absl::string_view path_string_view = original;
-  ;
-  for (Transformation const& transformation : transformations_) {
-    path_string = transformation(path_string_view);
+  for (size_t i = 0; i < transformations_.size(); i++) {
+    path_string = transformations_[i](path_string_view);
     if (!path_string.has_value()) {
+      normalize_path_action = NormalizePathAction::Reject;
       return {};
+    }
+    if (absl::string_view(path_string.value()) != path_string_view) {
+      NormalizePathAction this_action = normalize_path_actions_[i];
+      // Terminate path normalization and set action to be reject.
+      if (this_action == NormalizePathAction::Reject) {
+        normalize_path_action = NormalizePathAction::Reject;
+        break;
+      }
+      // Set action to be redirect.
+      if (this_action == NormalizePathAction::Redirect) {
+        normalize_path_action = NormalizePathAction::Redirect;
+      }
     }
     path_string_view = path_string.value();
   }
