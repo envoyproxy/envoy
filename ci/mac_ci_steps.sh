@@ -2,6 +2,10 @@
 
 set -e
 
+echo "hw info:"
+sysctl hw.memsize
+sysctl -a | grep -E "^hw\." | grep cpu
+
 function finish {
   echo "disk space at end of build:"
   df -h
