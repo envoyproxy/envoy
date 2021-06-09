@@ -193,11 +193,10 @@ message JwtProvider {
   // When :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
   // is specified, the base64 encoded payload will be added to the headers.
   // Normally JWT based64 encode doesn't add padding. If this field is true,
-  // the padding will be added to the header.
+  // the header will be padded.
   //
-  // When :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
-  // is unspecified, nothing will be added into the headers and this field is
-  // ineffective.
+  // This field is only relevant if :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
+  // is specified.
   bool pad_forward_payload_header = 11;
 
   // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
