@@ -35,7 +35,7 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
       [child_ = std::weak_ptr<DrainManagerImpl>(child)](std::chrono::milliseconds) mutable {
         // disregard the specified delay time and kick off the child drain immediately
         auto child = child_.lock();
-        if (child) {
+        if (child && !child->draining_) {
           child->startDrainSequence([] {});
         }
       }));
