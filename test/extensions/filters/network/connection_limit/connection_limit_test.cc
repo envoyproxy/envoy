@@ -30,7 +30,6 @@ public:
   }
 
   Thread::ThreadSynchronizer& synchronizer() { return config_->synchronizer_; }
-  bool decrementConnection() { return config_->decrementConnection(); }
 
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -197,32 +196,6 @@ delay: 0s
   // Increase connection counter to 1, which should cause the CAS to fail on the other thread.
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
   synchronizer().signal("increment_pre_cas");
-  t1.join();
-}
-
-// Verify decrement connection counter CAS edge cases.
-TEST_F(ConnectionLimitFilterTest, DecrementCasEdgeCases) {
-  initialize(R"EOF(
-stat_prefix: connection_limit_stats
-max_connections: 1
-delay: 0s
-)EOF");
-
-  InSequence s;
-  ActiveFilter active_filter(config_);
-  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
-
-  synchronizer().enable();
-
-  // Start a thread, this will wait pre-CAS.
-  synchronizer().waitOn("decrement_pre_cas");
-  std::thread t1([&] { EXPECT_FALSE(decrementConnection()); });
-  // Wait until the thread is actually waiting.
-  synchronizer().barrierOn("decrement_pre_cas");
-
-  // Decrease connection counter to 0, which should cause the CAS to fail on the other thread.
-  EXPECT_TRUE(decrementConnection());
-  synchronizer().signal("decrement_pre_cas");
   t1.join();
 }
 

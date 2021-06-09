@@ -39,20 +39,14 @@ bool Config::incrementConnectionWithinLimit() {
 
 void Config::incrementConnection() { connections_++; }
 
-bool Config::decrementConnection() {
-  ASSERT(connections_ > 0);
+void Config::decrementConnection() {
   auto conns = connections_.load(std::memory_order_relaxed);
-  while (conns > 0) {
-    // Testing hook.
-    synchronizer_.syncPoint("decrement_pre_cas");
+  do {
+    ASSERT(conns > 0);
 
-    if (connections_.compare_exchange_weak(conns, conns - 1, std::memory_order_release,
-                                           std::memory_order_relaxed)) {
-      return true;
-    }
-  }
-  ENVOY_LOG(warn, "connection_limit: should not decrement connections_ that already equals 0.");
-  return false;
+    // Loop while the weak CAS fails trying to update the conns value.
+  } while (!connections_.compare_exchange_weak(conns, conns - 1, std::memory_order_release,
+                                               std::memory_order_relaxed));
 }
 
 void Filter::resetTimerState() {
@@ -108,9 +102,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     resetTimerState();
-    if (config_->decrementConnection()) {
-      config_->stats().active_connections_.dec();
-    }
+    config_->decrementConnection();
+    config_->stats().active_connections_.dec();
   }
 }
 

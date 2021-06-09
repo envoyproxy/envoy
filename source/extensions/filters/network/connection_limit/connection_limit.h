@@ -43,7 +43,7 @@ public:
 
   bool incrementConnectionWithinLimit();
   void incrementConnection();
-  bool decrementConnection();
+  void decrementConnection();
   bool enabled() { return enabled_.enabled(); }
   absl::optional<std::chrono::milliseconds> delay() { return delay_; }
   ConnectionLimitStats& stats() { return stats_; }
