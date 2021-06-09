@@ -490,9 +490,12 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   v0.0.4 format. This can be used to integrate with a Prometheus server.
 
-  You can optionally pass the ``usedonly`` URL query argument to only get statistics that
-  Envoy has updated (counters incremented at least once, gauges changed at least once,
-  and histograms added to at least once)
+  If the ``usedonly`` URL query argument is sent, Envoy will only return
+  statistics that it has updated (counters incremented at least once,
+  gauges changed at least once, and histograms added to at least once)
+
+  If the ``format=REGEX`` URL query argument is sent, Envoy will only return
+  statistics whose name matches the given regular expression.
 
   .. http:get:: /stats/recentlookups
 
