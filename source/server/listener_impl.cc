@@ -39,6 +39,9 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+
+const std::string TlsInspector = "envoy.filters.listener.tls_inspector";
+
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
     std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
@@ -61,7 +64,7 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
          !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
                       [](const auto& filter) {
                         return filter.name() == "envoy.filters.listener.tls_inspector" ||
-                               filter.name() == "envoy.listener.tls_inspector";
+                               filter.name() == TlsInspector;
                       });
 }
 
@@ -586,7 +589,7 @@ void ListenerImpl::buildTlsInspectorListenerFilter() {
 
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
-            "envoy.filters.listener.tls_inspector");
+            TlsInspector);
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
