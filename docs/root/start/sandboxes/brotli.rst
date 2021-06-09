@@ -1,7 +1,7 @@
 .. _install_sandboxes_brotli:
 
 Brotli
-====
+======
 
 .. sidebar:: Requirements
 
@@ -54,14 +54,21 @@ You will need to add an ``accept-encoding: br`` request header.
 
 .. code-block:: console
 
-    $ curl -si -H "ccept-Encoding: br" localhost:10000/file.json | grep "content-encoding"
+    $ curl -si -H "Accept-Encoding: br" localhost:10000/file.json | grep "content-encoding"
     content-encoding: br
 
 As only files with a content-type of ``application/json`` are configured to be compressed, the response from requesting ``file.txt`` should not contain the ``content-encoding: br`` header, and the file will not be compressed:
 
 .. code-block:: console
 
-    $ curl -si -H "ccept-Encoding: br" localhost:10000/file.txt | grep "content-encoding"
+    $ curl -si -H "Accept-Encoding: br" localhost:10000/file.txt | grep "content-encoding"
+
+It still works when specify mulitiple compressor filters:
+
+.. code-block:: console
+
+    $ curl -si -H "Accept-Encoding: gzip;q=0.5, br" localhost:10000/file.json | grep "content-encoding"
+    content-encoding: br
 
 Step 3: Test compression of Envoy’s statistics
 **********************************************
@@ -75,13 +82,13 @@ Use ``curl`` to make a request for uncompressed statistics on port ``9901``, it 
 
 .. code-block:: console
 
-    $ curl -si -H "ccept-Encoding: br" localhost:9901/stats/prometheus | grep "content-encoding"
+    $ curl -si -H "Accept-Encoding: br" localhost:9901/stats/prometheus | grep "content-encoding"
 
 Now, use ``curl`` to make a request for the compressed statistics:
 
 .. code-block:: console
 
-    $ curl -si -H "ccept-Encoding: br" localhost:9902/stats/prometheus | grep "content-encoding"
+    $ curl -si -H "Accept-Encoding: br" localhost:9902/stats/prometheus | grep "content-encoding"
     content-encoding: br
 
 .. seealso::

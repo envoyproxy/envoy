@@ -17,6 +17,12 @@ responds_without_header \
     http://localhost:10000/file.txt \
     -i -H "Accept-Encoding: br"
 
+run_log "Test service: localhost:10000/file.json with multiple compression"
+responds_with_header \
+    "content-encoding: br" \
+    http://localhost:10000/file.json \
+    -i -H "Accept-Encoding: gzip;q=0.5, br"
+
 run_log "Test service: localhost:9901/stats/prometheus without compression"
 responds_without_header \
     "content-encoding: br" \
