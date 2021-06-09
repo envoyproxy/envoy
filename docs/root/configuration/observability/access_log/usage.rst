@@ -304,6 +304,7 @@ The following command operators are supported:
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
     * **NC**: Upstream cluster not found.
+    * **DT**: When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
   HTTP only
     * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
