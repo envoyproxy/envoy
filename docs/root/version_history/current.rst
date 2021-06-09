@@ -25,14 +25,14 @@ Minor Behavior Changes
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   ``envoy.reloadable_features.experimental_matching_api`` to true.
-* http: remove transfer-encoding header from 304 response. This behavior can be temporarily reverted by setting
-  ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
   ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
 * http: serve HEAD requests from cache.
+* http: stop sending the transfer-encoding header for 304. This behavior can be temporarily reverted by setting
+  ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: the behavior of the *present_match* in route header matcher changed. The value of *present_match* is ignored in the past. The new behavior is *present_match* performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
