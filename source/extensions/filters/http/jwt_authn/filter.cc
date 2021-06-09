@@ -16,7 +16,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 namespace {
-constexpr absl::string_view InvalidTokenErrorString = "error=\"invalid_token\"";
+constexpr absl::string_view InvalidTokenErrorString = ", error=\"invalid_token\"";
 constexpr uint32_t MaximumUriLength = 256;
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     access_control_request_method_handle(Http::CustomHeaders::get().AccessControlRequestMethod);
@@ -125,7 +125,7 @@ void Filter::onComplete(const Status& status) {
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {
           std::string value = absl::StrCat("Bearer realm=\"", uri, "\"");
           if (status != Status::JwtMissed) {
-            absl::StrAppend(&value, ", ", InvalidTokenErrorString);
+            absl::StrAppend(&value, InvalidTokenErrorString);
           }
           headers.setCopy(Http::Headers::get().WWWAuthenticate, value);
         },
