@@ -41,6 +41,12 @@ public:
   static absl::string_view removeQueryAndFragment(const absl::string_view path);
 };
 
+enum class NormalizePathAction {
+  Continue = 0,
+  Reject = 1,
+  Redirect = 2,
+};
+
 class PathTransformer {
 public:
   PathTransformer() = default;
@@ -60,6 +66,7 @@ private:
   // A sequence of transformations specified by path_transformation.operations()
   // Transformations will be applied to a path string in order in transform().
   std::vector<Transformation> transformations_;
+  std::vector<NormalizePathAction> normalize_path_actions_;
 };
 
 } // namespace Http

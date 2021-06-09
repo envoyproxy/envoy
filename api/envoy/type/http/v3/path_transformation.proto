@@ -20,6 +20,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This API is a work in progress.
 
 message PathTransformation {
+  // Action to take when the path has been modified by a transformation.
+  enum NormalizePathAction {
+    CONTINUE = 0;
+    REJECT = 1;
+    REDIRECT = 2;
+  }
+
   // A type of operation to alter text.
   message Operation {
     // Should text be normalized according to RFC 3986? This typically is used for path headers
@@ -50,6 +57,8 @@ message PathTransformation {
       // Enable merging adjacent slashes.
       MergeSlashes merge_slashes = 3;
     }
+
+    NormalizePathAction normalize_path_action = 4;
   }
 
   // A list of operations to apply. Transformations will be performed in the order that they appear.

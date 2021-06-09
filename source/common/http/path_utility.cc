@@ -111,9 +111,11 @@ PathTransformer::PathTransformer(const bool should_normalize_path,
                                  const bool should_merge_slashes) {
   if (should_normalize_path) {
     transformations_.emplace_back(PathTransformer::rfcNormalize);
+    normalize_path_actions_.push_back(NormalizePathAction::Continue);
   }
   if (should_merge_slashes) {
     transformations_.emplace_back(PathTransformer::mergeSlashes);
+    normalize_path_actions_.push_back(NormalizePathAction::Continue);
   }
 }
 
@@ -129,10 +131,25 @@ PathTransformer::PathTransformer(
       // these transformations.
       throw EnvoyException("Duplicate path transformation");
     }
+    // The transformation to apply
     if (operation.has_normalize_path_rfc_3986()) {
       transformations_.emplace_back(PathTransformer::rfcNormalize);
     } else if (operation.has_merge_slashes()) {
       transformations_.emplace_back(PathTransformer::mergeSlashes);
+    }
+    // The action to be performed if the transformation changed the path.
+    switch (operation.normalize_path_action()) {
+    case envoy::type::http::v3::PathTransformation::CONTINUE:
+      normalize_path_actions_.push_back(NormalizePathAction::Continue);
+      break;
+    case envoy::type::http::v3::PathTransformation::REDIRECT:
+      normalize_path_actions_.push_back(NormalizePathAction::Redirect);
+      break;
+    case envoy::type::http::v3::PathTransformation::REJECT:
+      normalize_path_actions_.push_back(NormalizePathAction::Reject);
+      break;
+    default:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     operation_hashes.push_back(operation_hash);
   }

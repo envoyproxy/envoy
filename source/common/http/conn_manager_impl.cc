@@ -985,14 +985,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
       ConnectionManagerUtility::maybeNormalizePath(*request_headers_, connection_manager_.config_);
   // gRPC requests are rejected if Envoy is configured to redirect post-normalization. This is
   // because gRPC clients do not support redirect.
-  if (action == ConnectionManagerUtility::NormalizePathAction::Reject ||
-      (action == ConnectionManagerUtility::NormalizePathAction::Redirect &&
+  if (action == NormalizePathAction::Reject ||
+      (action == NormalizePathAction::Redirect &&
        Grpc::Common::hasGrpcContentType(*request_headers_))) {
     connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
     sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt,
                    StreamInfo::ResponseCodeDetails::get().PathNormalizationFailed);
     return;
-  } else if (action == ConnectionManagerUtility::NormalizePathAction::Redirect) {
+  } else if (action == NormalizePathAction::Redirect) {
     connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
     sendLocalReply(
         Code::TemporaryRedirect, "",
@@ -1004,7 +1004,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
-  ASSERT(action == ConnectionManagerUtility::NormalizePathAction::Continue);
+  ASSERT(action == NormalizePathAction::Continue);
   auto optional_port = ConnectionManagerUtility::maybeNormalizeHost(
       *request_headers_, connection_manager_.config_, localPort());
   if (optional_port.has_value() &&

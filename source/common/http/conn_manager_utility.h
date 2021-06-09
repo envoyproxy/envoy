@@ -79,12 +79,6 @@ public:
                                     const RequestHeaderMap* request_headers,
                                     ConnectionManagerConfig& config, const std::string& via);
 
-  enum class NormalizePathAction {
-    Continue = 0,
-    Reject = 1,
-    Redirect = 2,
-  };
-
   // Sanitize the path in the header map if the path exists and it is forced by config.
   // Side affect: the string view of Path header is invalidated.
   // Returns the action that should taken based on the results of path normalization.

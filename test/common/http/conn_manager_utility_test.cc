@@ -1406,7 +1406,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
   TestRequestHeaderMapImpl original_headers;
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(original_headers, header_map);
 }
@@ -1597,7 +1597,7 @@ TEST_F(ConnectionManagerUtilityTest, KeepEscapedSlashesWhenConfigured) {
   original_headers.setPath("/xyz%2fabc%5Cqrt");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/xyz%2fabc%5Cqrt");
 }
@@ -1616,12 +1616,12 @@ TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesPresentAndConfiguredT
   original_headers.setPath("/xyz%2F..//abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+  EXPECT_EQ(NormalizePathAction::Reject,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
 
   original_headers.setPath("/xyz%5c..//abc");
   header_map = original_headers;
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+  EXPECT_EQ(NormalizePathAction::Reject,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
 }
 
@@ -1640,7 +1640,7 @@ TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesNotPresentAndConfigur
   original_headers.setPath("/xyz%EA/abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/xyz%EA/abc");
 }
@@ -1660,7 +1660,7 @@ TEST_F(ConnectionManagerUtilityTest, RedirectIfEscapedSlashesPresentAndConfigure
   original_headers.setPath("/xyz%2F../%5cabc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+  EXPECT_EQ(NormalizePathAction::Redirect,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/xyz/../\\abc");
 }
@@ -1680,7 +1680,7 @@ TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesNotFoundAndConfigur
   original_headers.setPath("/xyz%30..//abc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/xyz%30..//abc");
 }
@@ -1700,7 +1700,7 @@ TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesPresentAndConfigure
   original_headers.setPath("/xyz%2F../%5Cabc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/xyz/../\\abc");
 }
@@ -1719,7 +1719,7 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesAndChromiumNormalization) {
   original_headers.setPath("/xyz%2f../%5Cabc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   // Chromium URL path normalization converts \ to /
   EXPECT_EQ(header_map.getPathValue(), "//abc");
@@ -1740,7 +1740,7 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesRedirectAndChromiumNormaliza
   original_headers.setPath("/xyz%2f../%5Cabc%00");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Reject,
+  EXPECT_EQ(NormalizePathAction::Reject,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
 }
 
@@ -1758,7 +1758,7 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeAndMergeSlashes) {
   original_headers.setPath("/xyz%2f/..//abc%5C%5c");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+  EXPECT_EQ(NormalizePathAction::Redirect,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   // Envoy does not merge back slashes
   EXPECT_EQ(header_map.getPathValue(), "/xyz/../abc\\\\");
@@ -1778,7 +1778,7 @@ TEST_F(ConnectionManagerUtilityTest, AllNormalizations) {
   original_headers.setPath("/xyz%2f..%5c/%2Fabc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Continue,
+  EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/abc");
 }
@@ -1797,7 +1797,7 @@ TEST_F(ConnectionManagerUtilityTest, RedirectAfterAllOtherNormalizations) {
   original_headers.setPath("/xyz%2f..%5c/%2Fabc");
 
   TestRequestHeaderMapImpl header_map(original_headers);
-  EXPECT_EQ(ConnectionManagerUtility::NormalizePathAction::Redirect,
+  EXPECT_EQ(NormalizePathAction::Redirect,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
   EXPECT_EQ(header_map.getPathValue(), "/abc");
 }

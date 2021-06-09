@@ -454,7 +454,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
 }
 
-ConnectionManagerUtility::NormalizePathAction
+NormalizePathAction
 ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
