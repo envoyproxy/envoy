@@ -28,12 +28,12 @@ namespace MySQLProxy {
 /**
  * Implementation of MySQL monitor filter, just decode message and collect stats.
  */
-class MySQLMoniterFilter : public Network::Filter,
+class MySQLMonitorFilter : public Network::Filter,
                            public DecoderCallbacks,
                            public Logger::Loggable<Logger::Id::filter> {
 public:
-  MySQLMoniterFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory);
-  ~MySQLMoniterFilter() override = default;
+  MySQLMonitorFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory);
+  ~MySQLMonitorFilter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

@@ -55,9 +55,28 @@ envoy_cc_library(
     ],
     deps = [
         ":filter_lib",
+        ":message_lib",
         ":route_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "message_lib",
+    srcs = [
+        "mysql_message.cc",
+    ],
+    hdrs = [
+        "mysql_message.h",
+    ],
+    deps = [
+        ":codec_lib",
+        ":util_lib",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/config:datasource_lib",
+        "//source/extensions/common/sqlutils:sqlutils_lib",
     ],
 )
 
@@ -108,6 +127,9 @@ envoy_cc_library(
     name = "util_lib",
     srcs = ["mysql_utils.cc"],
     hdrs = ["mysql_utils.h"],
+    external_deps = [
+        "ssl",
+    ],
     deps = [
         ":codec_interface",
         "//source/common/buffer:buffer_lib",

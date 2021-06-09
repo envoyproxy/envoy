@@ -16,14 +16,14 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-MySQLMoniterFilter::MySQLMoniterFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory)
+MySQLMonitorFilter::MySQLMonitorFilter(MySQLFilterConfigSharedPtr config, DecoderFactory& factory)
     : decoder_(factory.create(*this)), config_(std::move(config)) {}
 
-void MySQLMoniterFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void MySQLMonitorFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
 }
 
-Network::FilterStatus MySQLMoniterFilter::onData(Buffer::Instance& data, bool) {
+Network::FilterStatus MySQLMonitorFilter::onData(Buffer::Instance& data, bool) {
   // Safety measure just to make sure that if we have a decoding error we keep going and lose stats.
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
@@ -33,7 +33,7 @@ Network::FilterStatus MySQLMoniterFilter::onData(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus MySQLMoniterFilter::onWrite(Buffer::Instance& data, bool) {
+Network::FilterStatus MySQLMonitorFilter::onWrite(Buffer::Instance& data, bool) {
   // Safety measure just to make sure that if we have a decoding error we keep going and lose stats.
   // This can be removed once we are more confident of this code.
   if (sniffing_) {
@@ -43,7 +43,7 @@ Network::FilterStatus MySQLMoniterFilter::onWrite(Buffer::Instance& data, bool) 
   return Network::FilterStatus::Continue;
 }
 
-void MySQLMoniterFilter::clearDynamicData() {
+void MySQLMonitorFilter::clearDynamicData() {
   // Clear dynamic metadata.
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
@@ -52,7 +52,7 @@ void MySQLMoniterFilter::clearDynamicData() {
   metadata.mutable_fields()->clear();
 }
 
-void MySQLMoniterFilter::doDecode(Buffer::Instance& buffer) {
+void MySQLMonitorFilter::doDecode(Buffer::Instance& buffer) {
   clearDynamicData();
 
   try {
@@ -66,21 +66,21 @@ void MySQLMoniterFilter::doDecode(Buffer::Instance& buffer) {
   }
 }
 
-void MySQLMoniterFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
+void MySQLMonitorFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
-void MySQLMoniterFilter::onNewMessage(MySQLSession::State state) {
+void MySQLMonitorFilter::onNewMessage(MySQLSession::State state) {
   if (state == MySQLSession::State::ChallengeReq) {
     config_->stats_.login_attempts_.inc();
   }
 }
 
-void MySQLMoniterFilter::onClientLogin(ClientLogin& client_login) {
+void MySQLMonitorFilter::onClientLogin(ClientLogin& client_login) {
   if (client_login.isSSLRequest()) {
     config_->stats_.upgraded_to_ssl_.inc();
   }
 }
 
-void MySQLMoniterFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
+void MySQLMonitorFilter::onClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_AUTH_SWITCH) {
     config_->stats_.auth_switch_request_.inc();
   } else if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
@@ -88,13 +88,13 @@ void MySQLMoniterFilter::onClientLoginResponse(ClientLoginResponse& client_login
   }
 }
 
-void MySQLMoniterFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
+void MySQLMonitorFilter::onMoreClientLoginResponse(ClientLoginResponse& client_login_resp) {
   if (client_login_resp.getRespCode() == MYSQL_RESP_ERR) {
     config_->stats_.login_failures_.inc();
   }
 }
 
-void MySQLMoniterFilter::onCommand(Command& command) {
+void MySQLMonitorFilter::onCommand(Command& command) {
   if (!command.isQuery()) {
     return;
   }
@@ -121,7 +121,7 @@ void MySQLMoniterFilter::onCommand(Command& command) {
       NetworkFilterNames::get().MySQLProxy, metadata);
 }
 
-Network::FilterStatus MySQLMoniterFilter::onNewConnection() {
+Network::FilterStatus MySQLMonitorFilter::onNewConnection() {
   config_->stats_.sessions_.inc();
   return Network::FilterStatus::Continue;
 }
