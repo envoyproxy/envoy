@@ -162,8 +162,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(Common::ThreadSafeCallbackHandlePtr, addOnDrainCloseCb,
-              (Event::Dispatcher & dispatcher, DrainCloseCb cb), (const, override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
   MOCK_METHOD(bool, drainClose, (), (const));
 };
 

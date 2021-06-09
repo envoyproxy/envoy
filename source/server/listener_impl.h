@@ -132,9 +132,8 @@ public:
 
   // DrainDecision
   bool drainClose() const override { return drain_manager_->drainClose(); }
-  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
-                                                        DrainCloseCb cb) const override {
-    return drain_manager_->addOnDrainCloseCb(dispatcher, cb);
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override {
+    return drain_manager_->addOnDrainCloseCb(cb);
   }
   Server::DrainManager& drainManager() override;
 

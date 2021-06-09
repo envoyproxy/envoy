@@ -50,6 +50,24 @@ public:
     }
   }
 
+  /**
+   * @brief Run all callbacks with a function that returns the input arguments
+   *
+   * NOTE: This code is currently safe if a callback deletes ITSELF from within a callback. It is
+   *       not safe if a callback deletes other callbacks.
+
+   * @param run_with function that is responsible for generating inputs to callbacks. This will be
+   * executed once for each callback.
+   */
+  void runCallbacksWith(std::function<std::tuple<CallbackArgs...>(void)> run_with) {
+    for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
+      auto cb = *(it++);
+      std::apply(cb->cb_, run_with());
+    }
+  }
+
+  size_t size() const noexcept { return callbacks_.size(); }
+
 private:
   struct CallbackHolder : public CallbackHandle {
     CallbackHolder(CallbackManager& parent, Callback cb)

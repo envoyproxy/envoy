@@ -5,7 +5,6 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
 
 #include "absl/base/attributes.h"
 
@@ -34,8 +33,7 @@ public:
    * @return handle to remove callback
    */
   ABSL_MUST_USE_RESULT
-  virtual Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
-                                                                DrainCloseCb cb) const PURE;
+  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const PURE;
 };
 
 } // namespace Network

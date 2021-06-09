@@ -166,11 +166,6 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  Event::MockDispatcher cb_dispatcher;
-  EXPECT_CALL(cb_dispatcher, post(_))
-      .Times(num_cbs)
-      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
-
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
@@ -190,7 +185,7 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
         EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
       }
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
     }
     drain_manager.startDrainSequence([] {});
   }
@@ -209,12 +204,6 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  Event::MockDispatcher cb_dispatcher;
-  // Wire up the dispatcher for callbacks to execute immediately
-  EXPECT_CALL(cb_dispatcher, post(_))
-      .Times(num_cbs)
-      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
-
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
@@ -230,7 +219,7 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
         EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
       }));
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
     }
     drain_manager.startDrainSequence([] {});
   }
@@ -247,11 +236,6 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
 
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
-  Event::MockDispatcher cb_dispatcher;
-  EXPECT_CALL(cb_dispatcher, post(_))
-      .Times(num_cbs)
-      .WillRepeatedly(Invoke([](std::function<void()> cb) { cb(); }));
-
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
@@ -267,7 +251,7 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
         EXPECT_THAT(delay.count(), AllOf(Ge(i * step - 1), Le(i * step + 1)));
       }));
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb_dispatcher, cb.AsStdFunction());
+      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
     }
 
     drain_manager.startDrainSequence([] {});

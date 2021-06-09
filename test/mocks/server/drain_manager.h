@@ -27,8 +27,7 @@ public:
   MOCK_METHOD(DrainManagerSharedPtr, createChildManager, (Event::Dispatcher&), (override));
 
   MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::ThreadSafeCallbackHandlePtr, addOnDrainCloseCb,
-              (Event::Dispatcher & dispatcher, DrainCloseCb cb), (const, override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 
   // Server::DrainManager
   MOCK_METHOD(bool, draining, (), (const));

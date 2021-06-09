@@ -17,13 +17,12 @@ namespace Server {
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
     : server_(server), dispatcher_(server.dispatcher()), drain_type_(drain_type),
-      cbs_(server_.dispatcher()), children_(server.dispatcher()) {}
+      children_(server.dispatcher()) {}
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type,
                                    Event::Dispatcher& dispatcher)
-    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), cbs_(dispatcher),
-      children_(dispatcher) {}
+    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), children_(dispatcher) {}
 
 DrainManagerSharedPtr
 DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
@@ -81,9 +80,9 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % server_.options().drainTime().count());
 }
 
-Common::ThreadSafeCallbackHandlePtr
-DrainManagerImpl::addOnDrainCloseCb(Event::Dispatcher& dispatcher, DrainCloseCb cb) const {
-  return cbs_.add(dispatcher, cb);
+Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
+  ASSERT(dispatcher_.isThreadSafe());
+  return cbs_.add(cb);
 }
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
@@ -100,10 +99,6 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
-
-  if (cbs_.size() == 0) {
-    return;
-  }
 
   // Call registered on-drain callbacks - immediately
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {

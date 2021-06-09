@@ -50,8 +50,7 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
-  Common::ThreadSafeCallbackHandlePtr addOnDrainCloseCb(Event::Dispatcher& dispatcher,
-                                                        DrainCloseCb cb) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;

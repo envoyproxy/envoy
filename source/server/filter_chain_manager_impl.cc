@@ -46,10 +46,9 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
 }
 
 bool PerFilterChainFactoryContextImpl::drainClose() const { return drain_manager_->drainClose(); }
-Common::ThreadSafeCallbackHandlePtr
-PerFilterChainFactoryContextImpl::addOnDrainCloseCb(Event::Dispatcher& dispatcher,
-                                                    DrainCloseCb cb) const {
-  return drain_manager_->addOnDrainCloseCb(dispatcher, cb);
+Common::CallbackHandlePtr
+PerFilterChainFactoryContextImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
+  return drain_manager_->addOnDrainCloseCb(cb);
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() {
