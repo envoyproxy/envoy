@@ -62,7 +62,7 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/pr
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint and potentially merging active/shadow versions of protos
 # with merge_active_shadow.
-./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}"
+./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}" --ci
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]; then
