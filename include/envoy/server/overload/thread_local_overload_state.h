@@ -73,6 +73,8 @@ public:
 
   virtual bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
                                      int64_t decrement) PURE;
+
+  virtual int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) PURE;
 };
 
 } // namespace Server

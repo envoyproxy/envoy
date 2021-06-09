@@ -16,6 +16,7 @@ public:
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
   MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
   MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
+  MOCK_METHOD(int64_t, currentResourceUsage, (OverloadProactiveResourceName));
 
 private:
   const OverloadActionState disabled_state_;

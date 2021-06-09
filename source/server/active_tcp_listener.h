@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
@@ -35,7 +36,8 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler,
                                 Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
+  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
+                    ThreadLocalOverloadState& overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::ListenerConfig& config);
   ~ActiveTcpListener() override;

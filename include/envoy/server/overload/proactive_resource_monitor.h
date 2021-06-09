@@ -48,7 +48,7 @@ public:
   ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
       : max_(max_active_conns), current_(0){};
 
-  bool tryAllocateResource(int64_t increment) {
+  bool tryAllocateResource(int64_t increment) override {
     int64_t new_val = (current_ += increment);
     if (new_val > static_cast<int64_t>(max_) || new_val < 0) {
       current_ -= increment;
@@ -57,7 +57,7 @@ public:
     return true;
   }
 
-  bool tryDeallocateResource(int64_t decrement) {
+  bool tryDeallocateResource(int64_t decrement) override {
     RELEASE_ASSERT(decrement <= current_,
                    "Cannot deallocate resource, current resource usage is lower than decrement");
     int64_t new_val = (current_ -= decrement);
@@ -68,8 +68,8 @@ public:
     return true;
   }
 
-  int64_t currentResourceUsage() const { return current_.load(); }
-  uint64_t maxResourceUsage() const { return max_; };
+  int64_t currentResourceUsage() const override { return current_.load(); }
+  uint64_t maxResourceUsage() const override { return max_; };
 
 protected:
   uint64_t max_;

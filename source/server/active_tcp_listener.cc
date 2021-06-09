@@ -25,12 +25,13 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config)
-    : ActiveTcpListener(
-          parent,
-          parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                             config.bindToPort(), config.tcpBacklogSize()),
-          config) {}
+                                     Network::ListenerConfig& config,
+                                     ThreadLocalOverloadState& overload_state)
+    : ActiveTcpListener(parent,
+                        parent.dispatcher().createListener(
+                            config.listenSocketFactory().getListenSocket(), *this,
+                            config.bindToPort(), config.tcpBacklogSize(), overload_state),
+                        config) {}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,

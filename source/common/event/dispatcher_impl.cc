@@ -47,12 +47,11 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : DispatcherImpl(
-          name, api, time_system,
-          [](Dispatcher& dispatcher) {
-            return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
-          },
-          watermark_factory) {}
+    : DispatcherImpl(name, api, time_system,
+                     [](Dispatcher& dispatcher) {
+                       return std::make_unique<ScaledRangeTimerManagerImpl>(dispatcher);
+                     },
+                     watermark_factory) {}
 
 DispatcherImpl::DispatcherImpl(const std::string& name, Api::Api& api,
                                Event::TimeSystem& time_system,
@@ -183,13 +182,12 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                              uint32_t events) {
   ASSERT(isThreadSafe());
-  return FileEventPtr{new FileEventImpl(
-      *this, fd,
-      [this, cb](uint32_t events) {
-        touchWatchdog();
-        cb(events);
-      },
-      trigger, events)};
+  return FileEventPtr{new FileEventImpl(*this, fd,
+                                        [this, cb](uint32_t events) {
+                                          touchWatchdog();
+                                          cb(events);
+                                        },
+                                        trigger, events)};
 }
 
 Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
@@ -197,12 +195,14 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
   return Filesystem::WatcherPtr{new Filesystem::WatcherImpl(*this, api_)};
 }
 
-Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
-                                                    Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port, uint32_t backlog_size) {
+Network::ListenerPtr
+DispatcherImpl::createListener(Network::SocketSharedPtr&& socket, Network::TcpListenerCallbacks& cb,
+                               bool bind_to_port, uint32_t backlog_size,
+                               Server::ThreadLocalOverloadState& overload_state) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(*this, api_.randomGenerator(),
+                                                    std::move(socket), cb, bind_to_port,
+                                                    backlog_size, overload_state);
 }
 
 Network::UdpListenerPtr

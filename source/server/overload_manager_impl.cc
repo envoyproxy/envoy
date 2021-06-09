@@ -75,6 +75,16 @@ public:
     }
   }
 
+  int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource != proactive_resources_->end()) {
+      return proactive_resource->second.currentResourceUsage();
+    } else {
+      ENVOY_LOG_MISC(warn, " {Failed to get resource usage for unknown proactive resource }");
+      return false;
+    }
+  }
+
 private:
   static const OverloadActionState always_inactive_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;

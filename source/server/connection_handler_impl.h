@@ -41,8 +41,8 @@ public:
   uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
-  void addListener(absl::optional<uint64_t> overridden_listener,
-                   Network::ListenerConfig& config) override;
+  void addListener(absl::optional<uint64_t> overridden_listener, Network::ListenerConfig& config,
+                   Server::ThreadLocalOverloadState& overload_state) override;
   void removeListeners(uint64_t listener_tag) override;
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,

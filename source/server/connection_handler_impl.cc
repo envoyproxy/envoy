@@ -26,7 +26,8 @@ void ConnectionHandlerImpl::decNumConnections() {
 }
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
-                                        Network::ListenerConfig& config) {
+                                        Network::ListenerConfig& config,
+                                        ThreadLocalOverloadState& overload_state) {
   ActiveListenerDetails details;
   if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (overridden_listener.has_value()) {
@@ -38,7 +39,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config);
+    auto tcp_listener = std::make_unique<ActiveTcpListener>(*this, config, overload_state);
     details.typed_listener_ = *tcp_listener;
     details.listener_ = std::move(tcp_listener);
   } else {

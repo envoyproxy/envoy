@@ -251,6 +251,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:exception_interface",
         "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/server/overload:thread_local_overload_state",
         "//source/common/common:assert_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

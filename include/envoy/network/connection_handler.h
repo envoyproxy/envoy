@@ -8,6 +8,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
 
 #include "common/common/interval_value.h"
@@ -45,8 +46,8 @@ public:
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    */
-  virtual void addListener(absl::optional<uint64_t> overridden_listener,
-                           ListenerConfig& config) PURE;
+  virtual void addListener(absl::optional<uint64_t> overridden_listener, ListenerConfig& config,
+                           Server::ThreadLocalOverloadState& overload_state) PURE;
 
   /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed

@@ -12,6 +12,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -74,7 +75,8 @@ public:
   Filesystem::WatcherPtr createFilesystemWatcher() override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override;
+                                      uint32_t backlog_size,
+                                      Server::ThreadLocalOverloadState& overload_state) override;
   Network::UdpListenerPtr
   createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                     const envoy::config::core::v3::UdpSocketConfig& config) override;

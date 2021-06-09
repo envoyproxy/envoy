@@ -38,6 +38,7 @@ envoy_cc_library(
         ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
+        "//include/envoy/server/overload:thread_local_overload_state",
         "//include/envoy/ssl:context_interface",
         "//source/common/common:interval_value",
     ],
