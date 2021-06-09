@@ -79,6 +79,8 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (isHeartbeatResource(resource)) {
       continue;
     }
+    // TODO (dmitri-d) consider changing onConfigUpdate callback interface to avoid copying of
+    // resources
     non_heartbeat_resources.Add()->CopyFrom(resource);
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
