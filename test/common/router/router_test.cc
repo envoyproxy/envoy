@@ -122,20 +122,20 @@ public:
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
     Http::ResponseHeaderMapPtr response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-    ASSERT_NE(response_decoder, nullptr);
+    // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 5ull));
     Buffer::OwnedImpl response_data("hello");
-    ASSERT_NE(response_decoder, nullptr);
+    // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeData(response_data, !with_trailers);
 
     if (with_trailers) {
       Http::ResponseTrailerMapPtr response_trailers(
           new Http::TestResponseTrailerMapImpl{{"some-trailer", "13"}});
-      ASSERT_NE(response_decoder, nullptr);
+      // NOLINTNEXTLINE: Silence null pointer access warning
       response_decoder->decodeTrailers(std::move(response_trailers));
     }
 
