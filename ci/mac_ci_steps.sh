@@ -2,10 +2,6 @@
 
 set -e
 
-echo "hw info:"
-sysctl hw.memsize
-sysctl -a | grep -E "^hw\." | grep cpu
-
 function finish {
   echo "disk space at end of build:"
   df -h
@@ -35,6 +31,12 @@ BAZEL_BUILD_OPTIONS=(
     "--override_repository=envoy_build_config=${BUILD_CONFIG}"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
+
+NCPU=$(sysctl -n hw.ncpu)
+if [[ $NCPU -gt 0 ]]; then
+    echo "limiting build to $NCPU jobs, based on CPU count"
+    BAZEL_BUILD_OPTIONS+=("--jobs=$NCPU")
+fi
 
 # Build envoy and run tests as separate steps so that failure output
 # is somewhat more deterministic (rather than interleaving the build
