@@ -10,7 +10,6 @@
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/common/platform/api/quiche_text_utils.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -67,6 +66,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -204,7 +204,7 @@ public:
             EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
             break;
           case QuicVersionType::Iquic:
-            EXPECT_EQ("h3-29", socket.requestedApplicationProtocols()[0]);
+            EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
             break;
           }
           EXPECT_EQ("test.example.org", socket.requestedServerName());

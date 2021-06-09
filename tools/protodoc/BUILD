@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@protodoc_pip3//:requirements.bzl", "requirement")
 load("//bazel:envoy_build_system.bzl", "envoy_package", "envoy_proto_library")
+load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 
 licenses(["notice"])  # Apache 2
 
@@ -37,4 +38,9 @@ py_binary(
         requirement("Jinja2"),
         requirement("PyYAML"),
     ],
+)
+
+protodoc_rule(
+    name = "api_v3_protodoc",
+    deps = ["@envoy_api_canonical//:v3_protos"],
 )

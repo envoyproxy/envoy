@@ -26,22 +26,22 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains:
-                - "*"
+              - "*"
               routes:
-                - match:
-                    connect_matcher:
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: service_google
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
                       {}
-                  route:
-                    cluster: service_google
-                    upgrade_configs:
-                      - upgrade_type: CONNECT
-                        connect_config:
-                          {}
           http_filters:
           - name: envoy.filters.http.router
           http_protocol_options: {}
           upgrade_configs:
-            - upgrade_type: CONNECT
+          - upgrade_type: CONNECT
   clusters:
   - name: service_google
     connect_timeout: 0.25s

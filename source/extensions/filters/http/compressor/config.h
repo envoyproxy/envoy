@@ -21,7 +21,7 @@ public:
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::compressor::v3::Compressor& config,
+      const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

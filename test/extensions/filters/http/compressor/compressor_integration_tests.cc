@@ -1,4 +1,4 @@
-#include "test/extensions/filters/http/common/compressor/compressor_integration_tests.h"
+#include "test/extensions/filters/http/compressor/compressor_integration_tests.h"
 
 #include <string>
 

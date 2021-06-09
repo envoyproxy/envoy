@@ -183,7 +183,7 @@ struct DataInputGetResult {
   // which attempts to look a key up in the map: if we don't have access to the map yet, we return
   // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
   // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<absl::string_view> data_;
+  absl::optional<std::string> data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
@@ -209,7 +209,7 @@ template <class DataType> class DataInput {
 public:
   virtual ~DataInput() = default;
 
-  virtual DataInputGetResult get(const DataType& data) PURE;
+  virtual DataInputGetResult get(const DataType& data) const PURE;
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
@@ -245,7 +245,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<absl::string_view> get() PURE;
+  virtual absl::optional<std::string> get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 
