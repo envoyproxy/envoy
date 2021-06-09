@@ -1,7 +1,8 @@
+#include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "source/extensions/filters/http/common/compressor/compressor.h"
+#include "source/extensions/filters/http/compressor/compressor_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -15,29 +16,29 @@ using testing::Return;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Common {
-namespace Compressors {
+namespace Compressor {
 
-class MockCompressorFilterConfig : public CompressorFilterConfig {
+class MockCompressorFactory : public Envoy::Compression::Compressor::CompressorFactory {
 public:
-  MockCompressorFilterConfig(
-      const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
-      const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-      const std::string& compressor_name,
+  MockCompressorFactory(
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level,
       Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy,
       int64_t window_bits, uint64_t memory_level)
-      : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
-                               compressor_name),
-        level_(level), strategy_(strategy), window_bits_(window_bits), memory_level_(memory_level) {
+      : level_(level), strategy_(strategy), window_bits_(window_bits), memory_level_(memory_level) {
   }
 
-  Envoy::Compression::Compressor::CompressorPtr makeCompressor() override {
+  Envoy::Compression::Compressor::CompressorPtr createCompressor() override {
     auto compressor = std::make_unique<Compression::Gzip::Compressor::ZlibCompressorImpl>();
     compressor->init(level_, strategy_, window_bits_, memory_level_);
     return compressor;
   }
 
+  const std::string& statsPrefix() const override { CONSTRUCT_ON_FIRST_USE(std::string, "test."); }
+  const std::string& contentEncoding() const override {
+    return Http::CustomHeaders::get().ContentEncodingValues.Gzip;
+  }
+
+private:
   const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionLevel level_;
   const Compression::Gzip::Compressor::ZlibCompressorImpl::CompressionStrategy strategy_;
   const int64_t window_bits_;
@@ -100,8 +101,10 @@ static Result compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionP
   const auto strategy = std::get<1>(params);
   const auto window_bits = std::get<2>(params);
   const auto memory_level = std::get<3>(params);
-  CompressorFilterConfigSharedPtr config = std::make_shared<MockCompressorFilterConfig>(
-      compressor, "test.", stats, runtime, "gzip", level, strategy, window_bits, memory_level);
+  Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
+      std::make_unique<MockCompressorFactory>(level, strategy, window_bits, memory_level);
+  CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
+      compressor, "test.", stats, runtime, std::move(compressor_factory));
 
   ON_CALL(runtime.snapshot_, featureEnabled("test.filter_enabled", 100))
       .WillByDefault(Return(true));
@@ -134,11 +137,11 @@ static Result compressWith(std::vector<Buffer::OwnedImpl>&& chunks, CompressionP
   }
 
   EXPECT_EQ(res.total_uncompressed_bytes,
-            stats.counterFromString("test.gzip.total_uncompressed_bytes").value());
+            stats.counterFromString("test.compressor..test.total_uncompressed_bytes").value());
   EXPECT_EQ(res.total_compressed_bytes,
-            stats.counterFromString("test.gzip.total_compressed_bytes").value());
+            stats.counterFromString("test.compressor..test.total_compressed_bytes").value());
 
-  EXPECT_EQ(1U, stats.counterFromString("test.gzip.compressed").value());
+  EXPECT_EQ(1U, stats.counterFromString("test.compressor..test.compressed").value());
   auto end = std::chrono::high_resolution_clock::now();
   const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   state.SetIterationTime(elapsed.count());
@@ -286,8 +289,7 @@ static void compressChunks1024(benchmark::State& state) {
 }
 BENCHMARK(compressChunks1024)->DenseRange(0, 8, 1)->UseManualTime()->Unit(benchmark::kMillisecond);
 
-} // namespace Compressors
-} // namespace Common
+} // namespace Compressor
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

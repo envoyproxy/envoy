@@ -193,11 +193,6 @@ envoy.filters.http.grpc_web:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.http.gzip:
-  categories:
-  - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
-  status: stable
 envoy.filters.http.header_to_metadata:
   categories:
   - envoy.filters.http
