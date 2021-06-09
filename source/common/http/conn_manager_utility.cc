@@ -499,11 +499,15 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
     return NormalizePathAction::Reject;
   }
 
-  if (filter_path.has_value()) {
-    request_headers.setPath(filter_path.value());
-    request_headers.setFilterPath(filter_path.value());
-  } else {
-    return NormalizePathAction::Reject;
+  if (final_action == NormalizePathAction::Continue) {
+    if (filter_path.has_value()) {
+      request_headers.setPath(filter_path.value());
+      request_headers.setFilterPath(filter_path.value());
+    } else {
+      return NormalizePathAction::Reject;
+    }
+  } else if (final_action == NormalizePathAction::Redirect) {
+    request_headers.setPath(forwarding_path.value());
   }
   return final_action;
 }
