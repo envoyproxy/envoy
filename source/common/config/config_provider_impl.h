@@ -383,7 +383,8 @@ public:
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
    *                                   config providers.
    */
-  virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
+  virtual ProtobufTypes::MessagePtr
+  dumpConfigs(const Server::Configuration::ConfigDumpFilter& filter) const PURE;
 
 protected:
   // Ordered set for deterministic config dump output.

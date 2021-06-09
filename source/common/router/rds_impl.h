@@ -241,7 +241,8 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  std::unique_ptr<envoy::admin::v3::RoutesConfigDump> dumpRouteConfigs() const;
+  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
+  dumpRouteConfigs(const Server::Configuration::ConfigDumpFilter& filter) const;
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(

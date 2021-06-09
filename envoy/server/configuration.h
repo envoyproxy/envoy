@@ -141,6 +141,11 @@ public:
    * @return Network::Address::OptionsSharedPtr the list of listener socket options.
    */
   virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
+
+  /**
+   * @return ConfigDumpFilterFactory& the factory to use to filter config dumps.
+   */
+  virtual ConfigDumpFilterFactory& configDumpFilterFactory() PURE;
 };
 
 /**

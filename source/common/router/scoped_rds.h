@@ -274,7 +274,8 @@ public:
   ~ScopedRoutesConfigProviderManager() override = default;
 
   // Envoy::Config::ConfigProviderManagerImplBase
-  ProtobufTypes::MessagePtr dumpConfigs() const override;
+  ProtobufTypes::MessagePtr
+  dumpConfigs(const Server::Configuration::ConfigDumpFilter& filter) const override;
 
   // Envoy::Config::ConfigProviderManager
   Envoy::Config::ConfigProviderPtr

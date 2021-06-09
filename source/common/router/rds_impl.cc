@@ -325,8 +325,10 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
-  config_tracker_entry_ =
-      admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+  config_tracker_entry_ = admin.getConfigTracker().add(
+      "routes", [this](const Server::Configuration::ConfigDumpFilter& filter) {
+        return dumpRouteConfigs(filter);
+      });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");
@@ -377,7 +379,8 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
 }
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
+RouteConfigProviderManagerImpl::dumpRouteConfigs(
+    const Server::Configuration::ConfigDumpFilter& filter) const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
@@ -389,6 +392,9 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
+      if (!filter.match(subscription->routeConfigUpdate()->protobufConfiguration())) {
+        continue;
+      }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
       dynamic_config->mutable_route_config()->PackFrom(
@@ -400,6 +406,9 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
+    if (!filter.match(provider->configInfo().value().config_)) {
+      continue;
+    }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
     static_config->mutable_route_config()->PackFrom(
         API_RECOVER_ORIGINAL(provider->configInfo().value().config_));

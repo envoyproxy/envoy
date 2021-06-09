@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
@@ -113,6 +114,9 @@ const char AdminHtmlEnd[] = R"(
 } // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
+void AdminImpl::resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) {
+  config_dump_handler_.resetConfigDumpFilter(filter);
+}
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}

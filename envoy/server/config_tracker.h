@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/server/config_dump_config.h"
 
 #include "source/common/common/non_copyable.h"
 #include "source/common/protobuf/protobuf.h"
@@ -21,7 +22,7 @@ namespace Server {
  */
 class ConfigTracker {
 public:
-  using Cb = std::function<ProtobufTypes::MessagePtr()>;
+  using Cb = std::function<ProtobufTypes::MessagePtr(const Configuration::ConfigDumpFilter&)>;
   using CbsMap = std::map<std::string, Cb>;
 
   /**

@@ -21,6 +21,7 @@
 #include "envoy/router/context.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/config_dump_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -565,7 +566,8 @@ private:
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
-  ProtobufTypes::MessagePtr dumpClusterConfigs();
+  ProtobufTypes::MessagePtr
+  dumpClusterConfigs(const Server::Configuration::ConfigDumpFilter& filter);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
 
   /**

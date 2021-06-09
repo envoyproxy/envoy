@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
@@ -85,6 +86,7 @@ public:
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
+  void resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) override;
 
   void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
                          const std::string& address_out_path,

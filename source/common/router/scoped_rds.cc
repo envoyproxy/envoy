@@ -520,7 +520,8 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
 
-ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
+ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs(
+    const Server::Configuration::ConfigDumpFilter& filter) const {
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
@@ -534,6 +535,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
+        if (!filter.match(it.second->configProto())) {
+          continue;
+        }
         dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
             API_RECOVER_ORIGINAL(it.second->configProto()));
       }
@@ -549,6 +553,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
+      if (!filter.match(*config_proto)) {
+        continue;
+      }
       inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
           API_RECOVER_ORIGINAL(*config_proto));
     }

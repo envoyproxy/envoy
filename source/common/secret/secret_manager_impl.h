@@ -4,6 +4,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
+#include "envoy/server/config_dump_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -68,7 +69,8 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
-  ProtobufTypes::MessagePtr dumpSecretConfigs();
+  ProtobufTypes::MessagePtr
+  dumpSecretConfigs(const Server::Configuration::ConfigDumpFilter& filter);
 
   template <class SecretType>
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {

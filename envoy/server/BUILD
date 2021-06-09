@@ -28,6 +28,18 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:query_params_interface",
         "//envoy/network:listen_socket_interface",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_dump_config_interface",
+    hdrs = ["config_dump_config.h"],
+    external_deps = ["abseil_hash"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//source/common/protobuf",
     ],
 )
 
@@ -53,6 +65,7 @@ envoy_cc_library(
     name = "config_tracker_interface",
     hdrs = ["config_tracker.h"],
     deps = [
+        ":config_dump_config_interface",
         "//source/common/common:non_copyable",
         "//source/common/protobuf",
     ],

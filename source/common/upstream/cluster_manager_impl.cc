@@ -15,6 +15,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/config_dump_config.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
@@ -271,8 +272,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
       cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
-      config_tracker_entry_(
-          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
+      config_tracker_entry_(admin.getConfigTracker().add(
+          "clusters",
+          [this](const Server::Configuration::ConfigDumpFilter& filter) {
+            return dumpClusterConfigs(filter);
+          })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
@@ -1045,11 +1049,15 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
-ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
+ProtobufTypes::MessagePtr
+ClusterManagerImpl::dumpClusterConfigs(const Server::Configuration::ConfigDumpFilter& filter) {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
+    if (!filter.match(cluster.cluster_config_)) {
+      continue;
+    }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
       static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
@@ -1066,6 +1074,9 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
 
   for (const auto& warming_cluster_pair : warming_clusters_) {
     const auto& cluster = *warming_cluster_pair.second;
+    if (!filter.match(cluster.cluster_config_)) {
+      continue;
+    }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
     dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));

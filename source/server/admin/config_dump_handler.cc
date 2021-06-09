@@ -2,19 +2,14 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/server/config_dump_config.h"
 
-<<<<<<< HEAD
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-
-#include "server/admin/utils.h"
-=======
+#include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/admin/config_dump_filter/default_config_dump_filter.h"
 #include "source/server/admin/utils.h"
->>>>>>> upstream/main
 
 namespace Envoy {
 namespace Server {
@@ -114,15 +109,38 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
   return Utility::queryParam(params, "mask");
 }
 
+Server::Configuration::MatchingParameters
+getMatchingParams(const Http::Utility::QueryParams& params) {
+  absl::flat_hash_map<std::string, std::string> matchers;
+  const std::string prefix = "match_";
+  for (const auto& [key, val] : params) {
+    if (absl::string_view match_key = absl::StripPrefix(key, prefix); match_key != key) {
+      matchers[match_key] = val;
+    }
+  }
+  return matchers;
+}
+
 // Helper method to get the eds parameter.
 bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
+Configuration::ConfigDumpFilterFactory& getDefaultConfigDumpFactory() {
+  envoy::config::core::v3::TypedExtensionConfig config;
+  config.set_name("envoy.admin.config_dump_filter.default");
+  return Config::Utility::getAndCheckFactory<Configuration::ConfigDumpFilterFactory>(config);
+}
+
 } // namespace
 
 ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
-    : HandlerContextBase(server), config_tracker_(config_tracker) {}
+    : HandlerContextBase(server), config_tracker_(config_tracker),
+      filter_factory_(getDefaultConfigDumpFactory()) {}
+
+void ConfigDumpHandler::resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) {
+  filter_factory_ = filter;
+}
 
 Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
                                                 Http::ResponseHeaderMap& response_headers,
@@ -131,17 +149,19 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
+  const Server::Configuration::MatchingParameters matching_params = getMatchingParams(query_params);
+  const Configuration::ConfigDumpFilterPtr filter =
+      filter_factory_.createConfigDumpFilter(matching_params);
 
   envoy::admin::v3::ConfigDump dump;
-
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
+    auto err = addResourceToDump(dump, mask, resource.value(), *filter, include_eds);
     if (err.has_value()) {
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask, include_eds);
+    addAllConfigToDump(dump, mask, *filter, include_eds);
   }
   MessageUtil::redact(dump);
 
@@ -150,22 +170,24 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   return Http::Code::OK;
 }
 
-absl::optional<std::pair<Http::Code, std::string>>
-ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
-                                     const absl::optional<std::string>& mask,
-                                     const std::string& resource, bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
+    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+    const std::string& resource, const Configuration::ConfigDumpFilter& filter,
+    bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint", [this](const Configuration::ConfigDumpFilter& filter) {
+        return dumpEndpointConfigs(filter);
+      });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(filter);
     ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
@@ -201,19 +223,22 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
 
 void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                            const absl::optional<std::string>& mask,
+                                           const Configuration::ConfigDumpFilter& filter,
                                            bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint", [this](const Configuration::ConfigDumpFilter& filter) {
+        return dumpEndpointConfigs(filter);
+      });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(filter);
     ASSERT(message);
 
     if (mask.has_value()) {
@@ -229,7 +254,8 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   }
 }
 
-ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
+ProtobufTypes::MessagePtr
+ConfigDumpHandler::dumpEndpointConfigs(const Configuration::ConfigDumpFilter& filter) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -277,7 +303,9 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
         }
       }
     }
-
+    if (!filter.match(cluster_load_assignment)) {
+      continue;
+    }
     if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
       dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);

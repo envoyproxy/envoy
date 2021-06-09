@@ -18,6 +18,7 @@ import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "envoy/type/v3/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -313,7 +314,7 @@ message Bootstrap {
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -339,6 +340,9 @@ message Admin {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated core.v3.SocketOption socket_options = 4;
+
+  // Filter extension to apply to config dumps.
+  core.v3.TypedExtensionConfig config_dump_filter = 6;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
