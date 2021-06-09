@@ -1,6 +1,3 @@
-#include <chrono>
-#include <thread>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
