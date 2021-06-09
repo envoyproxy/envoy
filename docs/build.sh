@@ -80,14 +80,13 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:extensions_security_rst
 # Generate RST for external dependency docs in intro/arch_overview/security.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:external_deps_rst
 
-# Generate RST for api
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
-
 # Fill in boiler plate for extensions that have google.protobuf.Empty as their
 # config. We only have v2 support here for version history anchors, which don't point at any empty
 # configs.
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/protodoc:generate_empty \
-      "${PWD}"/docs/empty_extensions.json "${GENERATED_RST_DIR}/api-v3"/config
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:empty_protos_rst
+
+# Generate RST for api
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
 
 # Edge hardening example YAML.
 mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
@@ -112,6 +111,7 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:redirects
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
 tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/tools/docs/empty_protos_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/api_rst.tar -C "${GENERATED_RST_DIR}"
 cp -a bazel-bin/docs/envoy-redirects.txt "${GENERATED_RST_DIR}"
 
