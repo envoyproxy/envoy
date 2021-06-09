@@ -272,7 +272,7 @@ message KeepaliveSettings {
   // of new stream creation, to quickly detect dead connections.
   // If this is zero, this type of PING will not be sent.
   // If an interval ping is outstanding, a second ping will not be sent as the
-  // interval ping will detremine if the connection is dead.
+  // interval ping will determine if the connection is dead.
   google.protobuf.Duration connection_idle_interval = 4
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
