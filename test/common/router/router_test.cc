@@ -2273,6 +2273,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHeadersRetry();
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
   NiceMock<Http::MockRequestEncoder> encoder2;
@@ -2336,6 +2337,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder3->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
