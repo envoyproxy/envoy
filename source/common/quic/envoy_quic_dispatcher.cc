@@ -94,11 +94,7 @@ quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
     uint8_t expected_server_connection_id_length) const {
   quic::QuicConnectionId new_connection_id = quic::QuicDispatcher::ReplaceLongServerConnectionId(
       version, server_connection_id, expected_server_connection_id_length);
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* server_connection_id_ptr = server_connection_id.data();
-  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(server_connection_id_ptr);
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  adjustNewConnectionIdForRoutine(new_connection_id, server_connection_id);
   return new_connection_id;
 }
 
