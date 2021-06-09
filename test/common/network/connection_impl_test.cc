@@ -2978,11 +2978,6 @@ TEST_F(InternalClientConnectionImplTest,
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
-  MockInternalListenerManager internal_listener_manager;
-
-  dispatcher_->registerInternalListenerManager(internal_listener_manager);
-  const auto& test_internal_listener_manager = dispatcher_->getInternalListenerManager();
-  ASSERT_EQ(&internal_listener_manager, &test_internal_listener_manager.value().get());
   // Not implemented yet.
   ASSERT_DEATH(
       {

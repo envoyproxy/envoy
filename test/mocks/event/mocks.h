@@ -77,14 +77,6 @@ public:
                     const envoy::config::core::v3::UdpSocketConfig& config) override {
     return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
   }
-  void registerInternalListenerManager(
-      Network::InternalListenerManager& internal_listener_manager) override {
-    return registerInternalListenerManager_(internal_listener_manager);
-  }
-
-  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
-    return getInternalListenerManager_();
-  }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
     auto timer = Event::TimerPtr{createTimer_(cb)};
@@ -150,8 +142,6 @@ public:
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                const envoy::config::core::v3::UdpSocketConfig& config));
-  MOCK_METHOD(void, registerInternalListenerManager_, (Network::InternalListenerManager&));
-  MOCK_METHOD(Network::InternalListenerManagerOptRef, getInternalListenerManager_, ());
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));

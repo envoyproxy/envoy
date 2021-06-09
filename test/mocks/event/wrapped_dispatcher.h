@@ -77,15 +77,6 @@ public:
     return impl_.createUdpListener(std::move(socket), cb, config);
   }
 
-  void registerInternalListenerManager(
-      Network::InternalListenerManager& internal_listener_manager) override {
-    impl_.registerInternalListenerManager(internal_listener_manager);
-  }
-
-  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
-    return impl_.getInternalListenerManager();
-  }
-
   TimerPtr createTimer(TimerCb cb) override { return impl_.createTimer(std::move(cb)); }
   TimerPtr createScaledTimer(ScaledTimerMinimum minimum, TimerCb cb) override {
     return impl_.createScaledTimer(minimum, std::move(cb));
