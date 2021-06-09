@@ -264,7 +264,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;
   if (!config.has_crypto_stream_config()) {
     // If not specified, use the quic crypto stream created by QUICHE.
-    crypto_stream_config.set_name("envoy.quic.server.crypto_stream.quiche");
+    crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
     envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
     crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
   } else {

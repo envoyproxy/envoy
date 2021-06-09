@@ -494,7 +494,7 @@ envoy.quic.proof_source.filter_chain:
   - envoy.quic.proof_source
   security_posture: robust_to_untrusted_downstream
   status: alpha
-envoy.quic.server.crypto_stream.quiche:
+envoy.quic.crypto_stream.server.quiche:
   categories:
   - envoy.quic.server.crypto_stream
   security_posture: robust_to_untrusted_downstream

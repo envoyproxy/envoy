@@ -274,7 +274,7 @@ protected:
       runtime_key: quic.enabled
     packets_to_read_to_connection_count_ratio: 50
     crypto_stream_config:
-      name: "envoy.quic.server.crypto_stream.quiche"
+      name: "envoy.quic.crypto_stream.server.quiche"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.quic.crypto_stream.v3.CryptoServerStreamConfig
     proof_source_config:
