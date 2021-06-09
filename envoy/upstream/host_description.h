@@ -123,7 +123,7 @@ public:
   /**
    * @return the address used to connect to the host.
    */
-  virtual const std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
+  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
 
   /**
    * @return host specific stats.

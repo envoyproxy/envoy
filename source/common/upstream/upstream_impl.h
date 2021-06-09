@@ -130,7 +130,7 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
     return address_list_;
   }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
