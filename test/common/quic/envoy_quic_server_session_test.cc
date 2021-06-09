@@ -132,6 +132,7 @@ public:
           SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
@@ -140,7 +141,8 @@ public:
                             std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
                             /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
                             &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5),
+                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
+                            quic_stat_names_, listener_config_.listenerScope()),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -247,6 +249,7 @@ protected:
   quic::ParsedQuicVersionVector quic_version_;
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
+  QuicStatNames quic_stat_names_;
   MockEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;
@@ -368,9 +371,8 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
           EXPECT_EQ(quic::QUIC_RST_ACKNOWLEDGEMENT, frame.rst_stream_frame->error_code);
           return false;
         }));
-  } else {
   }
-  stream1->OnStreamReset(rst1);
+  envoy_quic_session_.OnRstStream(rst1);
 
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
@@ -383,7 +385,16 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrame) {
                                 /*bytes_written=*/0u);
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
-  stream2->OnStreamReset(rst2);
+  envoy_quic_session_.OnRstStream(rst2);
+
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
+                    ->value());
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
+                    ->value());
 }
 
 TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
@@ -1091,6 +1102,11 @@ TEST_P(EnvoyQuicServerSessionTest, HeadersContributeToWatermarkGquic) {
           [this]() { http_connection_->onUnderlyingConnectionBelowWriteBufferLowWatermark(); }));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
   stream1->resetStream(Http::StreamResetReason::LocalReset);
+
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    "http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED")
+                    ->value());
 }
 
 TEST_P(EnvoyQuicServerSessionTest, OnCanWriteUpdateWatermarkGquic) {
