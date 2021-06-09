@@ -102,7 +102,7 @@ void WorkerImpl::start(GuardDog& guard_dog, const Event::PostCb& cb) {
   // architecture is centralized, resulting in clearer names.
   Thread::Options options{absl::StrCat("wrk:", dispatcher_->name())};
   thread_ = api_.threadFactory().createThread(
-      [this, &guard_dog, &cb]() -> void { threadRoutine(guard_dog, cb); }, options);
+      [this, &guard_dog, cb]() -> void { threadRoutine(guard_dog, cb); }, options);
 }
 
 void WorkerImpl::initializeStats(Stats::Scope& scope) { dispatcher_->initializeStats(scope); }
@@ -131,7 +131,7 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb) {
   ENVOY_LOG(debug, "worker entering dispatch loop");
   // The watch dog must be created after the dispatcher starts running and has post events flushed,
   // as this is when TLS stat scopes start working.
-  dispatcher_->post([this, &guard_dog, &cb]() {
+  dispatcher_->post([this, &guard_dog, cb]() {
     cb();
     watch_dog_ = guard_dog.createWatchDog(api_.threadFactory().currentThreadId(),
                                           dispatcher_->name(), *dispatcher_);
