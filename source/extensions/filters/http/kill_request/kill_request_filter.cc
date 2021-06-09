@@ -1,4 +1,4 @@
-#include "extensions/filters/http/kill_request/kill_request_filter.h"
+#include "source/extensions/filters/http/kill_request/kill_request_filter.h"
 
 #include <csignal>
 #include <string>
@@ -6,10 +6,9 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -14,6 +14,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
+* access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
 * aws_request_signing: requests are now buffered by default to compute signatures which include the
   payload hash, making the filter compatible with most AWS services. Previously, requests were
   never buffered, which only produced correct signatures for requests without a body, or for
@@ -57,6 +58,7 @@ Removed Config or Runtime
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * event: removed ``envoy.reloadable_features.activate_timers_next_event_loop`` runtime guard and legacy code path.
+* gzip: removed legacy HTTP Gzip filter and runtime guard `envoy.deprecated_features.allow_deprecated_gzip_http_filter`.
 * http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
 * http: removed ``envoy.reloadable_features.always_apply_route_header_rules`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.

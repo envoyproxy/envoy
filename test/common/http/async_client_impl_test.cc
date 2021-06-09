@@ -6,12 +6,12 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/context_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/router/context_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/context_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -313,12 +313,11 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
       }));
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, auto,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
+          Invoke([&](Upstream::ResourcePriority, auto, Upstream::LoadBalancerContext* context) {
             // this is the hash of :path header value "/"
             // the hash stability across releases is expected, so test the hash value directly here.
             EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
-            return &cm_.thread_local_cluster_.conn_pool_;
+            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
           }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
@@ -358,12 +357,11 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
       }));
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
-            return &cm_.thread_local_cluster_.conn_pool_;
-          }));
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
@@ -402,14 +400,13 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
       }));
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            EXPECT_NE(context->metadataMatchCriteria(), nullptr);
-            EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
-                      "fake_test_key");
-            return &cm_.thread_local_cluster_.conn_pool_;
-          }));
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        EXPECT_NE(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
+                  "fake_test_key");
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");

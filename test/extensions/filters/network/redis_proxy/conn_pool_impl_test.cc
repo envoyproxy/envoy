@@ -6,11 +6,10 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/network/common/redis/utility.h"
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 #include "test/extensions/clusters/redis/mocks.h"
 #include "test/extensions/common/redis/mocks.h"

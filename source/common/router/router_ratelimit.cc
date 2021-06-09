@@ -1,4 +1,4 @@
-#include "common/router/router_ratelimit.h"
+#include "source/common/router/router_ratelimit.h"
 
 #include <cstdint>
 #include <memory>
@@ -8,11 +8,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Router {

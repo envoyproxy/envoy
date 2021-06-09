@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -26,6 +26,7 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),

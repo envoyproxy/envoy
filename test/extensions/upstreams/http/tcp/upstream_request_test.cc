@@ -1,11 +1,10 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/router/config_impl.h"
-#include "common/router/router.h"
-#include "common/router/upstream_request.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/router/upstream_request.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -39,7 +38,8 @@ public:
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
     cm.initializeThreadLocalClusters({"fake_cluster"});
-    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _)).WillOnce(Return(&mock_pool_));
+    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
     conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
                                                Envoy::Http::Protocol::Http11, nullptr);
   }

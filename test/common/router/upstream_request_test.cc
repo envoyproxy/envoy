@@ -1,6 +1,6 @@
-#include "common/common/utility.h"
-#include "common/network/utility.h"
-#include "common/router/upstream_request.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/router/router_filter_interface.h"

@@ -1,10 +1,10 @@
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/macros.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/macros.h"
 
 #include "absl/strings/str_cat.h"
 

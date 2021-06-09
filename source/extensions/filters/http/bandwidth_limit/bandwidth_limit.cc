@@ -1,12 +1,12 @@
-#include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
+#include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include <string>
 #include <vector>
 
 #include "envoy/http/codes.h"
 
-#include "common/http/utility.h"
-#include "common/stats/timespan_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/stats/timespan_impl.h"
 
 using envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit;
 using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;

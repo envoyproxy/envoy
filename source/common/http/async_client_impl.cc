@@ -1,4 +1,4 @@
-#include "common/http/async_client_impl.h"
+#include "source/common/http/async_client_impl.h"
 
 #include <chrono>
 #include <map>
@@ -8,9 +8,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {

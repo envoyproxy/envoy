@@ -16,7 +16,7 @@ envoy_cc_extension(
         "//test:__subpackages__",
     ],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/config:config_provider_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/protobuf",

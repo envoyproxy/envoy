@@ -8,11 +8,10 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/aggregate/lb_context.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/aggregate/lb_context.h"
 
 namespace Envoy {
 namespace Extensions {
