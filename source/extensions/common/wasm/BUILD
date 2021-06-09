@@ -71,6 +71,7 @@ envoy_cc_library(
         ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
+        "//external:zlib",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
