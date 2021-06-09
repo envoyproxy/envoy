@@ -80,7 +80,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
 
   if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
     sub->second->control_plane_identifier_ = message->control_plane().identifier();
-    ENVOY_LOG(info, "Receiving gRPC updates for {} from {}", message->type_url(),
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
               sub->second->control_plane_identifier_);
   }
 
