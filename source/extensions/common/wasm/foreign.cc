@@ -26,7 +26,7 @@ template <typename T> WasmForeignFunction createFromClass() {
 
 RegisterForeignFunction registerCompressForeignFunction(
     "compress",
-    [](WasmBase&, absl::string_view arguments,
+    [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       unsigned long dest_len = compressBound(arguments.size());
       std::unique_ptr<unsigned char[]> b(new unsigned char[dest_len]);
@@ -41,7 +41,7 @@ RegisterForeignFunction registerCompressForeignFunction(
 
 RegisterForeignFunction registerUncompressForeignFunction(
     "uncompress",
-    [](WasmBase&, absl::string_view arguments,
+    [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       unsigned long dest_len = arguments.size() * 2 + 2; // output estimate.
       while (true) {
@@ -118,7 +118,7 @@ class CreateExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<CreateExpressionFactory> self) const {
     WasmForeignFunction f =
-        [self](WasmBase&, absl::string_view expr,
+        [self](WasmBase&, std::string_view expr,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       auto parse_status = google::api::expr::parser::Parse(std::string(expr));
       if (!parse_status.ok()) {
@@ -155,7 +155,7 @@ class EvaluateExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<EvaluateExpressionFactory> self) const {
     WasmForeignFunction f =
-        [self](WasmBase&, absl::string_view argument,
+        [self](WasmBase&, std::string_view argument,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
       if (argument.size() != sizeof(uint32_t)) {
@@ -197,7 +197,7 @@ RegisterForeignFunction
 class DeleteExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<DeleteExpressionFactory> self) const {
-    WasmForeignFunction f = [self](WasmBase&, absl::string_view argument,
+    WasmForeignFunction f = [self](WasmBase&, std::string_view argument,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
       if (argument.size() != sizeof(uint32_t)) {
@@ -220,7 +220,7 @@ RegisterForeignFunction
 class DeclarePropertyFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<DeclarePropertyFactory> self) const {
-    WasmForeignFunction f = [self](WasmBase&, absl::string_view arguments,
+    WasmForeignFunction f = [self](WasmBase&, std::string_view arguments,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {

@@ -17,16 +17,9 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                             {Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-// TODO(alyssawilk) move #defines into getProtocolTestParams in a follow-up
-#ifdef ENVOY_ENABLE_QUIC
-INSTANTIATE_TEST_SUITE_P(ProtocolsWithQuic, Http2UpstreamIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-#endif
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
@@ -333,6 +326,14 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3 &&
+      downstreamProtocol() == Http::CodecType::HTTP2) {
+    // This test depends on fragile preconditions.
+    // With HTTP/2 downstream all the requests are processed before the
+    // responses are sent, then the connection read-disable results in not
+    // receiving flow control window updates.
+    return;
+  }
   config_helper_.addFilter(
       fmt::format(R"EOF(
   name: pause-filter{}

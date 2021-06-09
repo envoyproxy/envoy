@@ -70,7 +70,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes(), crypto_server_stream_factory_);
+      listener_config_.perConnectionBufferLimitBytes(), quic_stat_names_,
+      listener_config_.listenerScope(), crypto_server_stream_factory_);
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(
@@ -98,11 +99,7 @@ quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
     uint8_t expected_server_connection_id_length) const {
   quic::QuicConnectionId new_connection_id = quic::QuicDispatcher::ReplaceLongServerConnectionId(
       version, server_connection_id, expected_server_connection_id_length);
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* server_connection_id_ptr = server_connection_id.data();
-  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(server_connection_id_ptr);
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  adjustNewConnectionIdForRoutine(new_connection_id, server_connection_id);
   return new_connection_id;
 }
 

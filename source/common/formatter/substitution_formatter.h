@@ -81,13 +81,15 @@ public:
             if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
                                          std::string>) {
               // Compile time handler for std::string.
-              param = *it;
+              param = std::string(*it);
               it++;
             } else {
               // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
-              param.insert(param.begin(), it, tokens.end());
-              it = tokens.end();
+              do {
+                param.push_back(std::string(*it));
+                it++;
+              } while (it != tokens.end());
             }
           }
         }(params),

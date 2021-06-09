@@ -7,7 +7,6 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"
 #include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

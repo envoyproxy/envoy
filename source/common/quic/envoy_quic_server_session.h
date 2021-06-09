@@ -24,6 +24,7 @@
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
@@ -43,6 +44,7 @@ public:
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
                          EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   ~EnvoyQuicServerSession() override;
@@ -64,6 +66,9 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+                               quic::QuicStreamOffset bytes_written) override;
+  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdySession
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
   size_t WriteHeadersOnHeadersStream(
@@ -108,6 +113,10 @@ private:
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  QuicStatNames& quic_stat_names_;
+  Stats::Scope& listener_scope_;
+
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 

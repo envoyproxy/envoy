@@ -2342,22 +2342,22 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 123);
+  EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
 // Eds service_name is populated.

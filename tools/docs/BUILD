@@ -49,3 +49,41 @@ genrule(
     ),
     tools = [":generate_external_deps_rst"],
 )
+
+genrule(
+    name = "empty_protos_rst",
+    srcs = [
+        "//docs:empty_extensions.json",
+    ],
+    outs = ["empty_protos_rst.tar"],
+    cmd = (
+        "$(location //tools/protodoc:generate_empty) $(location //docs:empty_extensions.json) $@"
+    ),
+    tools = ["//tools/protodoc:generate_empty"],
+)
+
+py_binary(
+    name = "generate_api_rst",
+    srcs = [
+        "generate_api_rst.py",
+    ],
+)
+
+genquery(
+    name = "v3_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
+    scope = ["@envoy_api_canonical//:v3_protos"],
+)
+
+genrule(
+    name = "api_rst",
+    srcs = [
+        "//tools/protodoc:api_v3_protodoc",
+        ":v3_proto_srcs",
+    ],
+    outs = ["api_rst.tar"],
+    cmd = (
+        "$(location generate_api_rst) $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@"
+    ),
+    tools = [":generate_api_rst"],
+)
