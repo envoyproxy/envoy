@@ -30,7 +30,7 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
   auto child = std::make_shared<DrainManagerImpl>(server_, drain_type, dispatcher);
 
   // Wire up the child so that when the parent starts draining, the child also sees the state-change
-  auto child_cb = children_.add(dispatcher, [child_ = std::weak_ptr(child)] {
+  auto child_cb = children_.add(dispatcher, [child_ = std::weak_ptr<DrainManagerImpl>(child)] {
     auto child = child_.lock();
     if (child && !child->draining_) {
       child->startDrainSequence([] {});
