@@ -6,18 +6,18 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v3";
-option java_outer_classname = "CacheKeysProto";
+option java_outer_classname = "DynamicParametersProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Discovery Resource Cache Key Constraints]
+// [#protodoc-title: Discovery Resource Dynamic Parameter Constraints]
 
-// The cache key for each xDS resource contains the resource's name and a map of
-// key/value pairs. This message represents a set of constraints on those
-// key/value pairs that can be used when subscribing to a resource. This
-// allows xDS servers and caching proxies to determine which variant of a
+// A set of dynamic parameter constraints associated with an individual
+// xDS resource. These constraints determine whether the resource matches
+// a subscription based on the set of dynamic parameters in the subscription.
+// This allows xDS servers and caching proxies to determine which variant of a
 // resource is appropriate for a given client.
-message CacheKeyConstraints {
+message DynamicParameterConstraints {
   message Constraint {
     // A list of one or more integer ranges.
     // A value is considered to match if it falls in any of the ranges.
@@ -38,13 +38,13 @@ message CacheKeyConstraints {
     }
 
     oneof constraint {
-      // The cache key must have this specific value.
+      // The key must have this specific value.
       string value = 1;
 
-      // The cache key's value must be integers and within one of the ranges in this list.
+      // The key's value must be integers and within one of the ranges in this list.
       IntegerRangeList integer_range_list = 2;
 
-      // The cache key exists.
+      // The key exists.
       Exists exists = 3;
     }
 
@@ -52,24 +52,24 @@ message CacheKeyConstraints {
     bool invert = 4;
   }
 
-  // The name of the cache key.
+  // The name of the dynamic parameter to match against.
   string key = 1;
 
-  // A list of one or more constraints on the value of the cache key.
+  // A list of one or more constraints on the value of the key.
   // All constraints must be met.
   repeated Constraint constraints = 2;
 
-  // If specified, the cache key is optional (i.e., a cache entry will match
-  // even if it does not have the specified cache key).
+  // If specified, the key is optional (i.e., a subscription will match
+  // even if it does not have the specified dynamic parameter).
   bool is_optional = 3;
 }
 
-message ResourceCacheKeyConstraints {
-  // Cache key constraints to be used for a given resource type.
-  message ResourceTypeCacheKeyConstraints {
-    repeated CacheKeyConstraints cache_key_constraints = 1;
+message ResourceDynamicParameters {
+  // Dynamic parameters to be used for a given resource type.
+  message ResourceTypeDynamicParameters {
+    map<string, string> dynamic_parameters = 1;
   }
 
   // Key is resource type name (e.g., "envoy.config.cluster.v3.Cluster").
-  map<string, ResourceTypeCacheKeyConstraints> resource_type_cache_key_constraints = 1;
+  map<string, ResourceTypeDynamicParameters> resource_type_dynamic_parameters = 1;
 }
