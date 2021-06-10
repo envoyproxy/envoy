@@ -5,9 +5,6 @@
 #include <memory>
 #include <string>
 
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
@@ -16,6 +13,9 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/network/filter.h"
 
+#include "common/grpc/common.h"
+#include "common/http/headers.h"
+#include "common/protobuf/utility.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/fmt.h"

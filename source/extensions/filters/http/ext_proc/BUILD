@@ -79,6 +79,7 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/stats:stats_macros",
         "//envoy/server:lifecycle_notifier_interface",
+        "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@com_google_absl//absl/strings",
         "@com_google_googleapis//google/api/expr/v1alpha1:value_cc_proto",

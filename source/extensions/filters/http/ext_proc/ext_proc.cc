@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
-#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "envoy/http/header_map.h"
 #include "extensions/filters/http/ext_proc/mutation_utils.h"
 #include "extensions/filters/http/ext_proc/attr_utils.h"
