@@ -8,29 +8,23 @@ export NAME=brotli
 run_log "Test service: localhost:10000/file.json with compression"
 responds_with_header \
     "content-encoding: br" \
-    http://localhost:10000/file.json \
-    -i -H "Accept-Encoding: br"
+    https://localhost:10000/file.json \
+    -ki -H "Accept-Encoding: br"
 
 run_log "Test service: localhost:10000/file.txt without compression"
 responds_without_header \
     "content-encoding: br" \
-    http://localhost:10000/file.txt \
-    -i -H "Accept-Encoding: br"
-
-run_log "Test service: localhost:10000/file.json with multiple compression"
-responds_with_header \
-    "content-encoding: br" \
-    http://localhost:10000/file.json \
-    -i -H "Accept-Encoding: gzip;q=0.5, br"
+    https://localhost:10000/file.txt \
+    -ki -H "Accept-Encoding: br"
 
 run_log "Test service: localhost:9901/stats/prometheus without compression"
 responds_without_header \
     "content-encoding: br" \
     http://localhost:9901/stats/prometheus \
-    -i -H "Accept-Encoding: br"
+    -ki -H "Accept-Encoding: br"
 
 run_log "Test service: localhost:9902/stats/prometheus with compression"
 responds_with_header \
     "content-encoding: br" \
-    http://localhost:9902/stats/prometheus \
-    -i -H "Accept-Encoding: br"
+    https://localhost:9902/stats/prometheus \
+    -ki -H "Accept-Encoding: br"

@@ -14,7 +14,7 @@ By enabling compression in Envoy you can save some network bandwidth, at the exp
 
 Envoy supports compression and decompression for both requests and responses.
 
-This sandbox provides an example of response compression served over ``HTTP``. Although ``HTTPS`` is not demonstrated, compression can be used for this also.
+This sandbox provides an example of response compression served over ``HTTPS``.
 
 The sandbox covers two scenarios:
 
@@ -54,41 +54,34 @@ You will need to add an ``accept-encoding: br`` request header.
 
 .. code-block:: console
 
-    $ curl -si -H "Accept-Encoding: br" localhost:10000/file.json | grep "content-encoding"
+    $ curl -ski -H "Accept-Encoding: br" https://localhost:10000/file.json | grep "content-encoding"
     content-encoding: br
 
 As only files with a content-type of ``application/json`` are configured to be compressed, the response from requesting ``file.txt`` should not contain the ``content-encoding: br`` header, and the file will not be compressed:
 
 .. code-block:: console
 
-    $ curl -si -H "Accept-Encoding: br" localhost:10000/file.txt | grep "content-encoding"
-
-It still works when specify mulitiple compressor filters:
-
-.. code-block:: console
-
-    $ curl -si -H "Accept-Encoding: gzip;q=0.5, br" localhost:10000/file.json | grep "content-encoding"
-    content-encoding: br
+    $ curl -ski -H "Accept-Encoding: br" https://localhost:10000/file.txt | grep "content-encoding"
 
 Step 3: Test compression of Envoy’s statistics
 **********************************************
 
 The sandbox is configured with two ports serving Envoy’s admin and statistics interface:
 
-- ``9901`` exposes the standard admin interface
-- ``9902`` exposes a compressed version of the admin interface
+- ``9901`` exposes the standard admin interface without tls
+- ``9902`` exposes a compressed version of the admin interface with tls
 
 Use ``curl`` to make a request for uncompressed statistics on port ``9901``, it should not contain the ``content-encoding`` header in the response:
 
 .. code-block:: console
 
-    $ curl -si -H "Accept-Encoding: br" localhost:9901/stats/prometheus | grep "content-encoding"
+    $ curl -ski -H "Accept-Encoding: br" http://localhost:9901/stats/prometheus | grep "content-encoding"
 
 Now, use ``curl`` to make a request for the compressed statistics:
 
 .. code-block:: console
 
-    $ curl -si -H "Accept-Encoding: br" localhost:9902/stats/prometheus | grep "content-encoding"
+    $ curl -ski -H "Accept-Encoding: br" https://localhost:9902/stats/prometheus | grep "content-encoding"
     content-encoding: br
 
 .. seealso::
