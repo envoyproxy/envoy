@@ -12,7 +12,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/non_copyable.h"
+#include "source/common/common/non_copyable.h"
 
 #include "spdlog/spdlog.h"
 

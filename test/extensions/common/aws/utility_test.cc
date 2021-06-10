@@ -1,4 +1,4 @@
-#include "extensions/common/aws/utility.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "test/test_common/utility.h"
 

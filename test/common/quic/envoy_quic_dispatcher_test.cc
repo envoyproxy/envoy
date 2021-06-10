@@ -10,7 +10,6 @@
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/common/platform/api/quiche_text_utils.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -18,22 +17,22 @@
 
 #include <memory>
 
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/network/listen_socket_impl.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/network/listen_socket_impl.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/environment.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
-#include "common/quic/platform/envoy_quic_clock.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_dispatcher.h"
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "server/configuration_impl.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -67,6 +66,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -76,13 +76,14 @@ public:
         per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         connection_handler_(*dispatcher_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_),
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_),
         connection_id_(quic::test::TestConnectionId(1)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
@@ -203,7 +204,7 @@ public:
             EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
             break;
           case QuicVersionType::Iquic:
-            EXPECT_EQ("h3-29", socket.requestedApplicationProtocols()[0]);
+            EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
             break;
           }
           EXPECT_EQ("test.example.org", socket.requestedServerName());
@@ -252,6 +253,7 @@ protected:
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
   Server::PerHandlerListenerStats per_worker_stats_;
+  QuicStatNames quic_stat_names_;
   Server::ConnectionHandlerImpl connection_handler_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   const quic::QuicConnectionId connection_id_;

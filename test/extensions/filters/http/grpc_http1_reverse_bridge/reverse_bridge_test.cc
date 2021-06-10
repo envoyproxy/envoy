@@ -3,13 +3,12 @@
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/codec.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -616,7 +615,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   filter_config_per_route.set_disabled(true);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
@@ -645,7 +644,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
@@ -733,7 +732,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
-  ON_CALL(*decoder_callbacks_.route_,
+  ON_CALL(decoder_callbacks_.route_->route_entry_,
           perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 

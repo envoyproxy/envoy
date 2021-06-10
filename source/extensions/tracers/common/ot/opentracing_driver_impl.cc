@@ -1,15 +1,15 @@
-#include "extensions/tracers/common/ot/opentracing_driver_impl.h"
+#include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include <sstream>
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/tracing/common_values.h"
-#include "common/tracing/null_span_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
 
 namespace Envoy {
 namespace Extensions {

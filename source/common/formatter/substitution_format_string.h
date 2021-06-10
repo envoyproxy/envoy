@@ -6,7 +6,7 @@
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Formatter {

@@ -3,7 +3,7 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/interval_value.h"
+#include "source/common/common/interval_value.h"
 
 #include "absl/strings/string_view.h"
 #include "base_listener_impl.h"
@@ -19,7 +19,11 @@ public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                   SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
                   uint32_t backlog_size, Server::ThreadLocalOverloadState& overload_state);
-  ~TcpListenerImpl() override { socket_->ioHandle().resetFileEvents(); }
+  ~TcpListenerImpl() override {
+    if (bind_to_port_) {
+      socket_->ioHandle().resetFileEvents();
+    }
+  }
   void disable() override;
   void enable() override;
   void setRejectFraction(UnitFloat reject_fraction) override;
@@ -40,6 +44,7 @@ private:
   bool rejectCxOverGlobalLimit();
 
   Random::RandomGenerator& random_;
+  bool bind_to_port_;
   UnitFloat reject_fraction_;
   Server::ThreadLocalOverloadState& overload_state_;
 };

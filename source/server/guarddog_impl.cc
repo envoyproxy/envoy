@@ -1,4 +1,4 @@
-#include "server/guarddog_impl.h"
+#include "source/server/guarddog_impl.h"
 
 #include <sys/types.h>
 
@@ -15,15 +15,14 @@
 #include "envoy/stats/scope.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "server/watchdog_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"
 

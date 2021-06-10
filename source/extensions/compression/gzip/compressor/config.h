@@ -4,11 +4,9 @@
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.validate.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/compression/common/compressor/factory_base.h"
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/compression/common/compressor/factory_base.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 namespace Envoy {
 namespace Extensions {

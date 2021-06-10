@@ -8,7 +8,7 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {

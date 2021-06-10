@@ -1,9 +1,9 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"

@@ -1,7 +1,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/grpc/async_client_manager_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/grpc/async_client_manager_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"

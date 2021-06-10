@@ -1,4 +1,4 @@
-#include "common/upstream/subset_lb.h"
+#include "source/common/upstream/subset_lb.h"
 
 #include <memory>
 
@@ -6,13 +6,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/assert.h"
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/maglev_lb.h"
-#include "common/upstream/ring_hash_lb.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/maglev_lb.h"
+#include "source/common/upstream/ring_hash_lb.h"
 
 #include "absl/container/node_hash_set.h"
 

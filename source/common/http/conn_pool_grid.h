@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_base.h"
-#include "common/http/http3_status_tracker.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 

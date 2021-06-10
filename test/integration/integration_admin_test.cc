@@ -9,11 +9,11 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/profiler/profiler.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/profiler/profiler.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
@@ -563,8 +563,8 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
 
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeRequests)) {
   v2_bootstrap_ = true;
-  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
-      ".*requests.*");
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*requests.*"));
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), Not(HasSubstr("requests")));
@@ -580,8 +580,8 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
 TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeMultipleExact)) {
   v2_bootstrap_ = true;
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
-  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
-      ".*live");
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*live"));
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.concurrency")));

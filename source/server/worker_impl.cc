@@ -1,4 +1,4 @@
-#include "server/worker_impl.h"
+#include "source/server/worker_impl.h"
 
 #include <functional>
 #include <memory>
@@ -9,7 +9,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "server/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {

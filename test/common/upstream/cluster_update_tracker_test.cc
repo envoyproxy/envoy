@@ -1,4 +1,4 @@
-#include "common/upstream/cluster_update_tracker.h"
+#include "source/common/upstream/cluster_update_tracker.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"

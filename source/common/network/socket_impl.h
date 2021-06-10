@@ -2,8 +2,8 @@
 
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
 
 namespace Envoy {
 namespace Network {
