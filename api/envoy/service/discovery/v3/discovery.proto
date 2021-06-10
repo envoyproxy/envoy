@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.service.discovery.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/service/discovery/v3/dynamic_parameters.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -52,7 +51,7 @@ message DiscoveryRequest {
 
   // [#not-implemented-hide:]
   // Alternative to resource_names field that allows specifying cache
-  // keys along with each resource name.  If this is populated in the
+  // keys along with each resource name. If this is populated in the
   // first request for a resource type on a stream, resource_names is ignored
   // for all subsequent requests for that resource type on that stream.
   // Clients that populate this field must be able to handle responses
@@ -196,7 +195,7 @@ message DeltaDiscoveryRequest {
 
   // [#not-implemented-hide:]
   // Alternative to resource_names_subscribe field that allows specifying cache
-  // keys along with each resource name.  If this is populated in the
+  // keys along with each resource name. If this is populated in the
   // first request for a resource type on a stream, resource_names_subscribe
   // and resource_names_unsubscribe are ignored for all subsequent requests
   // for that resource type on that stream.
@@ -204,11 +203,11 @@ message DeltaDiscoveryRequest {
 
   // [#not-implemented-hide:]
   // Alternative to resource_names_unsubscribe field that allows specifying cache
-  // keys along with each resource name.  If resource_locators_subscribe is
+  // keys along with each resource name. If resource_locators_subscribe is
   // populated in the first request for a resource type on a stream,
   // this field is used instead of resource_named_unsubscribe for all
   // subsequent requests for that resource type on that stream.
-  repeated ResourceLocator resource_locators_subscribe = 9;
+  repeated ResourceLocator resource_locators_unsubscribe = 9;
 
   // Informs the server of the versions of the resources the xDS client knows of, to enable the
   // client to continue the same logical xDS session even in the face of gRPC stream reconnection.
@@ -261,6 +260,58 @@ message DeltaDiscoveryResponse {
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 7;
+}
+
+// A set of dynamic parameter constraints associated with an individual
+// xDS resource. These constraints determine whether the resource matches
+// a subscription based on the set of dynamic parameters in the subscription.
+// This allows xDS servers and caching proxies to determine which variant of a
+// resource is appropriate for a given client.
+message DynamicParameterConstraints {
+  message Constraint {
+    // A list of one or more integer ranges.
+    // A value is considered to match if it falls in any of the ranges.
+    message IntegerRangeList {
+      // At least one of *min_value* or *max_value* must be set.
+      message Range {
+        // If specified, value may not be less than this.
+        uint64 min_value = 1;
+
+        // If specified, value may not be greater than this.
+        uint64 max_value = 2;
+      }
+
+      repeated Range range = 1;
+    }
+
+    message Exists {
+    }
+
+    oneof constraint {
+      // The key must have this specific value.
+      string value = 1;
+
+      // The key's value must be integers and within one of the ranges in this list.
+      IntegerRangeList integer_range_list = 2;
+
+      // The key exists.
+      Exists exists = 3;
+    }
+
+    // If true, the constraint is inverted (i.e., logical-not of the constraint).
+    bool invert = 4;
+  }
+
+  // The name of the dynamic parameter to match against.
+  string key = 1;
+
+  // A list of one or more constraints on the value of the key.
+  // All constraints must be met.
+  repeated Constraint constraints = 2;
+
+  // If specified, the key is optional (i.e., a subscription will match
+  // even if it does not have the specified dynamic parameter).
+  bool is_optional = 3;
 }
 
 // [#next-free-field: 9]
