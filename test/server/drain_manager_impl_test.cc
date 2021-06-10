@@ -261,8 +261,8 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
 }
 
 // Validate the expected behavior when a drain-close callback is registered after draining has begun
-// (should immediately fire).
-TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBegin) {
+// with a Gradual drain strategy (should be called with delay between 0 and maximum)
+TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginGradualStrategy) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
@@ -272,7 +272,34 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBegin) {
   testing::MockFunction<void(std::chrono::milliseconds)> cb_after_drain;
 
   EXPECT_CALL(cb_before_drain, Call(_));
-  EXPECT_CALL(cb_after_drain, Call(_));
+  EXPECT_CALL(cb_after_drain, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
+    // Validate that cbs after the drain sequence has started are called with a random value
+    // between 0 (immidiate) and the max drain window.
+    EXPECT_THAT(delay.count(), Ge(0));
+    EXPECT_THAT(delay.count(), Le(1000));
+  }));
+
+  auto before_handle = drain_manager.addOnDrainCloseCb(cb_before_drain.AsStdFunction());
+  drain_manager.startDrainSequence([] {});
+  auto after_handle = drain_manager.addOnDrainCloseCb(cb_after_drain.AsStdFunction());
+  EXPECT_EQ(after_handle, nullptr);
+}
+
+// Validate the expected behavior when a drain-close callback is registered after draining has begun
+// with an Immediate drain strategy (should be called with 0 delay)
+TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginImmediateStrategy) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_before_drain;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_after_drain;
+
+  EXPECT_CALL(cb_before_drain, Call(_));
+  EXPECT_CALL(cb_after_drain, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
+    EXPECT_EQ(delay.count(), 0);
+  }));
 
   auto before_handle = drain_manager.addOnDrainCloseCb(cb_before_drain.AsStdFunction());
   drain_manager.startDrainSequence([] {});

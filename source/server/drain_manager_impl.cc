@@ -84,7 +84,21 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
   ASSERT(dispatcher_.isThreadSafe());
 
   if (draining_) {
-    cb(std::chrono::milliseconds{0});
+    const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
+
+    // If we've already passed our deadline, or we have an immediate drain-strategy, call the
+    // callback with no delay specified
+    if (current_time > drain_deadline_ ||
+        server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
+      cb(std::chrono::milliseconds{0});
+      return nullptr;
+    }
+
+    // Otherwise we're using a gradual drain strategy, pick a random value within the remaining time
+    std::chrono::milliseconds remaining_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(drain_deadline_ - current_time);
+    cb(std::chrono::milliseconds(server_.api().randomGenerator().random() %
+                                 remaining_time.count()));
     return nullptr;
   }
 
