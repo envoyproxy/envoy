@@ -260,6 +260,203 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
   EXPECT_TRUE(drain_manager.draining());
 }
 
+// Validate the expected behavior when a drain-close callback is registered after draining has begun
+// (should immediately fire).
+TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBegin) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_before_drain;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_after_drain;
+
+  EXPECT_CALL(cb_before_drain, Call(_));
+  EXPECT_CALL(cb_after_drain, Call(_));
+
+  auto before_handle = drain_manager.addOnDrainCloseCb(cb_before_drain.AsStdFunction());
+  drain_manager.startDrainSequence([] {});
+  auto after_handle = drain_manager.addOnDrainCloseCb(cb_after_drain.AsStdFunction());
+  EXPECT_EQ(after_handle, nullptr);
+}
+
+// Destruction doesn't trigger draining, so it should be for a child's parent to be cleaned up
+// before the child.
+TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto parent =
+      std::make_unique<DrainManagerImpl>(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto child_a = parent->createChildManager(server_.dispatcher());
+  auto child_b = parent->createChildManager(server_.dispatcher());
+
+  EXPECT_FALSE(parent->draining());
+  EXPECT_FALSE(child_a->draining());
+  EXPECT_FALSE(child_b->draining());
+
+  parent.release();
+
+  // parent destruction should not effect drain state
+  EXPECT_FALSE(child_a->draining());
+  EXPECT_FALSE(child_b->draining());
+
+  // Further children creation (from existing children) is still possible
+  auto child_a1 = child_a->createChildManager(server_.dispatcher());
+  auto child_b1 = child_b->createChildManager(server_.dispatcher());
+  EXPECT_TRUE(child_a1 != nullptr);
+  EXPECT_TRUE(child_b1 != nullptr);
+
+  // draining cascades as expected
+  int called = 0;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_a1;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_b1;
+  EXPECT_CALL(cb_a1, Call(_)).WillRepeatedly(Invoke([&called](std::chrono::milliseconds) {
+    called += 1;
+  }));
+  EXPECT_CALL(cb_b1, Call(_)).WillRepeatedly(Invoke([&called](std::chrono::milliseconds) {
+    called += 1;
+  }));
+  auto handle_a1 = child_a1->addOnDrainCloseCb(cb_a1.AsStdFunction());
+  auto handle_b1 = child_b1->addOnDrainCloseCb(cb_b1.AsStdFunction());
+  child_a->startDrainSequence([] {});
+  child_b->startDrainSequence([] {});
+  EXPECT_EQ(called, 2);
+
+  // It is safe to clean up children
+  child_a.reset();
+  child_b.reset();
+}
+
+// Validate that draining will cascade through all nodes in the tree. This test uses the following
+// tree structure:
+//             a
+//             │
+//      ┌──────┴────────┐
+//      ▼               ▼
+//      b               c
+//      │               │
+//  ┌───┴────┐     ┌────┴───┐
+//  ▼        ▼     ▼        ▼
+//  d        e     f        g
+TEST_F(DrainManagerImplTest, DrainingCascadesThroughAllNodesInTree) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  auto b = a.createChildManager(server_.dispatcher());
+  auto d = b->createChildManager(server_.dispatcher());
+  auto e = b->createChildManager(server_.dispatcher());
+
+  auto c = a.createChildManager(server_.dispatcher());
+  auto f = c->createChildManager(server_.dispatcher());
+  auto g = c->createChildManager(server_.dispatcher());
+
+  // wire up callbacks at all levels
+  int call_count = 0;
+  std::array<testing::MockFunction<void(std::chrono::milliseconds)>, 7> cbs;
+
+  for (auto& cb : cbs) {
+    EXPECT_CALL(cb, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+      call_count++;
+    }));
+  }
+  auto handle_a = a.addOnDrainCloseCb(cbs[0].AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(cbs[1].AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(cbs[2].AsStdFunction());
+  auto handle_d = d->addOnDrainCloseCb(cbs[3].AsStdFunction());
+  auto handle_e = e->addOnDrainCloseCb(cbs[4].AsStdFunction());
+  auto handle_f = f->addOnDrainCloseCb(cbs[5].AsStdFunction());
+  auto handle_g = g->addOnDrainCloseCb(cbs[6].AsStdFunction());
+
+  a.startDrainSequence([] {});
+  EXPECT_EQ(call_count, 7);
+}
+
+// Validate that sub-trees are independent of each other (a tree's drain-state is not effected by
+// its neighbors). This test uses the following tree structure:
+//             a
+//             │
+//      ┌──────┴────────┐
+//      ▼               ▼
+//      b               c
+//      │               │
+//  ┌───┴────┐     ┌────┴───┐
+//  ▼        ▼     ▼        ▼
+//  d        e     f        g
+//
+// Draining will happen on B and validate that no impact is seen on C.
+TEST_F(DrainManagerImplTest, DrainingIsIndependentToNeighbors) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+
+  auto b = a.createChildManager(server_.dispatcher());
+  auto d = b->createChildManager(server_.dispatcher());
+  auto e = b->createChildManager(server_.dispatcher());
+
+  auto c = a.createChildManager(server_.dispatcher());
+  auto f = c->createChildManager(server_.dispatcher());
+  auto g = c->createChildManager(server_.dispatcher());
+
+  int call_count = 0;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_d;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_e;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_f;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_g;
+
+  EXPECT_CALL(cb_d, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  EXPECT_CALL(cb_e, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  // validate neighbor remains uneffected
+  EXPECT_CALL(cb_f, Call(_)).Times(0);
+  EXPECT_CALL(cb_g, Call(_)).Times(0);
+
+  auto handle_d = d->addOnDrainCloseCb(cb_d.AsStdFunction());
+  auto handle_e = e->addOnDrainCloseCb(cb_e.AsStdFunction());
+  auto handle_f = f->addOnDrainCloseCb(cb_f.AsStdFunction());
+  auto handle_g = g->addOnDrainCloseCb(cb_g.AsStdFunction());
+
+  b->startDrainSequence([] {});
+  EXPECT_EQ(call_count, 2);
+}
+
+// Validate that draining of a child does not impact the drain-state of the parent
+TEST_F(DrainManagerImplTest, DrainOnlyCascadesDownwards) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto b = a.createChildManager(server_.dispatcher());
+  auto c = b->createChildManager(server_.dispatcher());
+
+  int call_count = 0;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_a;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_b;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb_c;
+
+  // validate top-level callback is never fired
+  EXPECT_CALL(cb_a, Call(_)).Times(0);
+  EXPECT_CALL(cb_b, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  EXPECT_CALL(cb_c, Call(_)).WillOnce(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  auto handle_a = a.addOnDrainCloseCb(cb_a.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(cb_b.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(cb_c.AsStdFunction());
+
+  // drain the middle of the tree
+  b->startDrainSequence([] {});
+  EXPECT_EQ(call_count, 2);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy

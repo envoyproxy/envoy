@@ -82,6 +82,12 @@ bool DrainManagerImpl::drainClose() const {
 
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) const {
   ASSERT(dispatcher_.isThreadSafe());
+
+  if (draining_) {
+    cb(std::chrono::milliseconds{0});
+    return nullptr;
+  }
+
   return cbs_.add(cb);
 }
 
