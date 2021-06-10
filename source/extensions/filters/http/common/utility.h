@@ -53,7 +53,6 @@ private:
             {"envoy.grpc_http1_bridge", HttpFilters::HttpFilterNames::get().GrpcHttp1Bridge},
             {"envoy.grpc_json_transcoder", HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder},
             {"envoy.grpc_web", HttpFilters::HttpFilterNames::get().GrpcWeb},
-            {"envoy.gzip", HttpFilters::HttpFilterNames::get().EnvoyGzip},
             {"envoy.health_check", HttpFilters::HttpFilterNames::get().HealthCheck},
             {"envoy.http_dynamic_filter", HttpFilters::HttpFilterNames::get().Dynamo},
             {"envoy.ip_tagging", HttpFilters::HttpFilterNames::get().IpTagging},

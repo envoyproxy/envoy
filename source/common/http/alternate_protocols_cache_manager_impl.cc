@@ -10,8 +10,8 @@ namespace Http {
 
 SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
 
-AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(TimeSource& time_source,
-                                                                       ThreadLocal::Instance& tls)
+AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(
+    TimeSource& time_source, ThreadLocal::SlotAllocator& tls)
     : time_source_(time_source), slot_(tls) {
   slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }

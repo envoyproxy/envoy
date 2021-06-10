@@ -51,6 +51,8 @@ licenses(["notice"])  # Apache 2
 api_proto_package($fields)
 """)
 
+IGNORED_V2_PROTOS = ["envoy/config/filter/http/squash/v2"]
+
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
 PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
@@ -239,8 +241,10 @@ def get_previous_message_type_deps(proto_path):
     matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
     deps = []
     for m in matches:
-        target = '//%s:pkg' % get_directory_from_package(m)
-        deps.append(target)
+        pkg = get_directory_from_package(m)
+        if pkg in IGNORED_V2_PROTOS:
+            continue
+        deps.append('//%s:pkg' % pkg)
     return deps
 
 
@@ -327,6 +331,9 @@ def generate_current_api_dir(api_dir, dst_dir):
     # so we ignore it here.
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
+    for proto in IGNORED_V2_PROTOS:
+        shutil.rmtree(str(dst.joinpath(proto[6:])))
+
 
 def git_status(path):
     return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
@@ -387,7 +394,7 @@ def sync(api_root, mode, is_ci, labels, shadow):
                     if shadow else '.next_major_version_candidate.proto'))
         dst_src_paths = defaultdict(list)
         for path in paths:
-            if os.stat(path).st_size > 0:
+            if os.path.exists(path) and os.stat(path).st_size > 0:
                 abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
                 if should_sync(path, api_proto_modified_files, py_tools_modified_files):
                     dst_src_paths[abs_dst_path].append(path)
