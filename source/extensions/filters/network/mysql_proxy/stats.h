@@ -41,6 +41,7 @@ public:
 
   Stats::Scope& scope_;
   MySQLProxyStats stats_;
+
   static MySQLProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return MySQLProxyStats{ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }

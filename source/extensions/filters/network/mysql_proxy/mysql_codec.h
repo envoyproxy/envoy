@@ -139,15 +139,17 @@ public:
     return parseMessage(data, len);
   }
 
-  Buffer::OwnedImpl encodePacket() const {
+  Buffer::OwnedImpl encodePacket(uint8_t seq) const {
     Buffer::OwnedImpl pkg;
     Buffer::OwnedImpl buffer;
     encode(pkg);
-    uint32_t header = (seq_ << 24) | (pkg.length() & MYSQL_HDR_PKT_SIZE_MASK);
+    uint32_t header = (seq << 24) | (pkg.length() & MYSQL_HDR_PKT_SIZE_MASK);
     buffer.writeLEInt<uint32_t>(header);
     buffer.move(pkg);
     return buffer;
   }
+
+  Buffer::OwnedImpl encodePacket() const { return encodePacket(seq_); }
 
 protected:
   friend class MySQLTestUtils;

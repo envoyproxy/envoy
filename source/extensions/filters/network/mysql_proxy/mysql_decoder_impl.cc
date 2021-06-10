@@ -197,8 +197,8 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
       session_.setExpectedSeq(MYSQL_REQUEST_PKT_NUM);
       session_.setState(MySQLSession::State::Req);
     } else {
-      callbacks_.onProtocolError();
       ENVOY_LOG(info, "mysql_proxy: ignoring out-of-sync packet");
+      callbacks_.onProtocolError();
       data.drain(len); // Ensure that the whole message was consumed
       return true;
     }

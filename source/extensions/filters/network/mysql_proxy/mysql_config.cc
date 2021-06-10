@@ -57,9 +57,16 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   auto router = std::make_shared<RouterImpl>(catch_all_route, std::move(routes));
 
-  return [filter_config, router](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<MySQLTerminalFilter>(
-        filter_config, router, DecoderFactoryImpl::instance_));
+  auto username =
+      Config::DataSource::read(proto_config.downstream_auth_info().username(), true, context.api());
+  auto password =
+      Config::DataSource::read(proto_config.downstream_auth_info().password(), true, context.api());
+  return [filter_config, router, &context, username,
+          password](Network::FilterManager& filter_manager) -> void {
+    auto filter = std::make_shared<MySQLTerminalFilter>(
+        filter_config, router, DecoderFactoryImpl::instance_, context.api());
+    filter->initDownstreamAuthInfo(username, password);
+    filter_manager.addReadFilter(filter);
   };
 }
 

@@ -7,6 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/tcp/conn_pool.h"
 
+#include "mysql_codec_clogin_resp.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
@@ -26,11 +27,12 @@ class MySQLTerminalFilter : public Tcp::ConnectionPool::Callbacks,
                             public Network::ConnectionCallbacks {
 public:
   MySQLTerminalFilter(MySQLFilterConfigSharedPtr config, RouterSharedPtr router,
-                      DecoderFactory& factory);
+                      DecoderFactory& factory, Api::Api& api);
   ~MySQLTerminalFilter() override = default;
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
+
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
@@ -46,14 +48,14 @@ public:
 
   void closeLocal();
   void closeRemote();
-  void sendLocal(MySQLCodec& message);
-  void sendRemote(MySQLCodec& message);
+  void sendLocal(const MySQLCodec& message);
+  void sendRemote(const MySQLCodec& message);
   void gotoCommandPhase();
   void stepLocalSession(uint8_t expected_seq, MySQLSession::State expected_state);
   void stepRemoteSession(uint8_t expected_seq, MySQLSession::State expected_state);
-  void onFailure(const ClientLoginResponse& err);
-  void onAuthSucc();
-
+  void onFailure(const ErrMessage& err);
+  void initUpstreamAuthInfo(Upstream::ThreadLocalCluster* cluster, const std::string& db);
+  void initDownstreamAuthInfo(const std::string& username, const std::string& password);
   struct DownstreamEventHandler : public DecoderCallbacks {
     DownstreamEventHandler(MySQLTerminalFilter& filter);
 
@@ -71,6 +73,7 @@ public:
     absl::optional<ErrMessage> checkAuth(const std::string& username,
                                          const std::vector<uint8_t>& login,
                                          const std::vector<uint8_t>& expect_sig);
+    void onAuthSucc(const OkMessage& ok);
 
     MySQLTerminalFilter& parent;
     DecoderPtr decoder;
@@ -99,10 +102,13 @@ public:
     void onCommand(Command&) override;
     void onCommandResponse(CommandResponse&) override;
 
+    void onAuthSucc();
+
     MySQLTerminalFilter& parent;
     DecoderPtr decoder;
     Buffer::OwnedImpl buffer;
     std::vector<uint8_t> seed;
+    bool ready{false};
   };
   using UpstreamEventHandlerPtr = std::unique_ptr<UpstreamEventHandler>;
 
@@ -112,11 +118,16 @@ public:
 private:
   UpstreamEventHandlerPtr upstream_event_handler_;
   DownstreamEventHandlerPtr downstream_event_handler_;
+  DecoderFactory& decoder_factory_;
   RouterSharedPtr router_;
   Envoy::ConnectionPool::Cancellable* canceler_{nullptr};
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  Api::Api& api_;
+  std::string connect_db_;
   std::string downstream_username_;
   std::string downstream_password_;
+  std::string upstream_username_;
+  std::string upstream_password_;
 };
 
 using MySQLTerminalFilterPtr = std::unique_ptr<MySQLTerminalFilter>;

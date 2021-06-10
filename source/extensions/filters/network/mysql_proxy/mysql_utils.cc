@@ -220,6 +220,12 @@ DecodeStatus BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint
   return DecodeStatus::Success;
 }
 
+std::vector<uint8_t> AuthHelper::generateSeed(int len) {
+  std::vector<uint8_t> res(len);
+  RAND_bytes(res.data(), len);
+  return res;
+}
+
 AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_name) {
 
   if (auth_plugin_name.empty()) {

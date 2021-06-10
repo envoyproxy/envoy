@@ -13,28 +13,38 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
-ClientLogin MessageHelper::encodeClientLogin(const std::string& username, const std::string& db,
-                                             const std::vector<uint8_t>& auth_resp) {
-  ClientLogin client_login{};
-  client_login.setClientCap(CLIENT_SECURE_CONNECTION | CLIENT_LONG_PASSWORD | CLIENT_TRANSACTIONS |
-                            CLIENT_MULTI_STATEMENTS | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA |
-                            CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_PLUGIN_AUTH);
-  client_login.setMaxPacket(0);
-  client_login.setUsername(username);
-  client_login.setClientCap(client_login.getClientCap());
-  client_login.setAuthResp(auth_resp);
-  client_login.setAuthPluginName("mysql_native_password");
-  client_login.setDb(db);
-  client_login.setCharset(DEFAULT_MYSQL_CHARSET);
-  return client_login;
+ClientLogin MessageHelper::encodeClientLogin(AuthMethod auth_method, const std::string& username,
+                                             const std::string& password, const std::string& db,
+                                             const std::vector<uint8_t>& seed) {
+  ClientLogin login{};
+  login.setClientCap(CLIENT_SECURE_CONNECTION | CLIENT_LONG_PASSWORD | CLIENT_TRANSACTIONS |
+                     CLIENT_MULTI_STATEMENTS | CLIENT_PLUGIN_AUTH_LENENC_CLIENT_DATA);
+  if (db.length()) {
+    login.setClientCap(login.getClientCap() | CLIENT_CONNECT_WITH_DB);
+  }
+  login.setUsername(username);
+  login.setMaxPacket(0);
+  auto nseed = seed;
+  if (auth_method == AuthMethod::OldPassword) {
+    nseed.resize(8);
+    login.setAuthResp(OldPassword::signature(password, nseed));
+  } else {
+    nseed.resize(20);
+    login.setAuthResp(NativePassword::signature(password, nseed));
+    login.setClientCap(login.getClientCap() | CLIENT_PLUGIN_AUTH | CLIENT_PROTOCOL_41);
+    login.setAuthPluginName("mysql_native_password");
+  }
+  login.setDb(db);
+  login.setCharset(DEFAULT_MYSQL_CHARSET);
+  return login;
 }
 
 ClientLogin MessageHelper::encodeSslUpgrade() {
-  ClientLogin client_login{};
-  client_login.setClientCap(CLIENT_SSL);
-  client_login.setMaxPacket(0);
-  client_login.setCharset(DEFAULT_MYSQL_CHARSET);
-  return client_login;
+  ClientLogin login{};
+  login.setClientCap(CLIENT_SSL);
+  login.setMaxPacket(0);
+  login.setCharset(DEFAULT_MYSQL_CHARSET);
+  return login;
 }
 
 ServerGreeting MessageHelper::encodeGreeting(const std::vector<uint8_t>& seed,
@@ -46,8 +56,9 @@ ServerGreeting MessageHelper::encodeGreeting(const std::vector<uint8_t>& seed,
   greet.setThreadId(10);
   greet.setServerCharset(DEFAULT_MYSQL_CHARSET);
   greet.setServerStatus(DEFALUT_MYSQL_SERVER_STATUS);
-  greet.setServerCap(CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB |
-                     CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION);
+
+  greet.setServerCap(CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_PROTOCOL_41 |
+                     CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION | CLIENT_CONNECT_WITH_DB);
   greet.setAuthPluginName(auth_plugin_name);
   return greet;
 }

@@ -54,6 +54,7 @@ envoy_cc_library(
         "mysql_terminal_filter.h",
     ],
     deps = [
+        ":config_interface",
         ":filter_lib",
         ":message_lib",
         ":route_lib",
