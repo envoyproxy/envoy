@@ -1157,8 +1157,7 @@ bool ConfigHelper::setAccessLog(
     if (!formatters.empty()) {
       for (const auto& formatter : formatters) {
         auto* added_formatter = log_format->add_formatters();
-        added_formatter->set_name(formatter.name());
-        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+        added_formatter->CopyFrom(formatter);
       }
     }
   }
