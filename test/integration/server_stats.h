@@ -91,6 +91,11 @@ public:
    * @return std::vector<Stats::GaugeSharedPtr> snapshot of server counters.
    */
   virtual std::vector<Stats::GaugeSharedPtr> gauges() PURE;
+
+  /**
+   * @return std::vector<Stats::ParentHistogramSharedPtr> snapshot of server histograms.
+   */
+  virtual std::vector<Stats::ParentHistogramSharedPtr> histograms() PURE;
 };
 
 } // namespace Envoy

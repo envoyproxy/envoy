@@ -489,6 +489,10 @@ public:
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
 
+  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
+    return statStore().histograms();
+  }
+
   // ListenerHooks
   void onWorkerListenerAdded() override;
   void onWorkerListenerRemoved() override;
