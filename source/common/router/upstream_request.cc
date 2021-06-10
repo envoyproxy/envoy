@@ -98,19 +98,11 @@ UpstreamRequest::~UpstreamRequest() {
   if (req_resp_stats_opt.has_value()) {
     auto& req_resp_stats = req_resp_stats_opt->get();
     req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
-
-    auto rq_body_size = stream_info_.bytesSent();
-    if (rq_body_size != 0) {
-      req_resp_stats.upstream_rq_body_size_.recordValue(rq_body_size);
-    }
+    req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
 
     if (response_headers_size_.has_value()) {
       req_resp_stats.upstream_rs_headers_size_.recordValue(response_headers_size_.value());
-
-      auto rs_body_size = stream_info_.bytesReceived();
-      if (rs_body_size != 0) {
-        req_resp_stats.upstream_rs_body_size_.recordValue(rs_body_size);
-      }
+      req_resp_stats.upstream_rs_body_size_.recordValue(stream_info_.bytesReceived());
     }
   }
 
