@@ -143,7 +143,8 @@ public:
                                                        Callback callback) {
     Thread::LockGuard lock(lock_);
     auto new_callback = std::make_shared<CallbackHolder>(*this, callback);
-    callbacks_.push_back(CallbackListEntry(std::weak_ptr(new_callback), dispatcher));
+    callbacks_.push_back(
+        CallbackListEntry(std::weak_ptr<CallbackHolder>(new_callback), dispatcher));
     // Get the list iterator of added callback handle, which will be used to remove itself from
     // callbacks_ list.
     new_callback->it_ = (--callbacks_.end());
