@@ -1460,7 +1460,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
-        if (cluster_info_->eraseIdlePools()) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.conn_pool_delete_when_idle")) {
           pool->addIdleCallback(
               [&container, &pool_map = parent_.host_http_conn_pool_map_, host, priority,
                hash_key](bool drained) {
@@ -1541,7 +1542,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.cluster_manager_state_));
     ASSERT(inserted);
-    if (cluster_info_->eraseIdlePools()) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
       pool_iter->second->addIdleCallback(
           [&container, &pool_map = parent_.host_tcp_conn_pool_map_,
            &dispatcher = parent_.thread_local_dispatcher_, host, hash_key](bool drained) {

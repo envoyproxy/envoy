@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 55]
+// [#next-free-field: 54]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -947,12 +947,6 @@ message Cluster {
   // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
-
-  // If `erase_idle_pools` is true, the cluster will remove connection pools
-  // that no longer have active connections. The time between the last activity
-  // in a pool and its cleanup can be adjusted via the cluster's connection
-  // :ref:`idle_timeout <envoy_api_field_config.cluster.v4alpha.Cluster.common_http_protocol_options>`
-  bool erase_idle_pools = 54;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.
