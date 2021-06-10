@@ -403,30 +403,34 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
   bool drain_received = false;
   bool second_drain_received = false;
 
-  ConnectionPool::Instance::DrainedCb pool1_cb;
-  ConnectionPool::Instance::DrainedCb pool2_cb;
+  ConnectionPool::Instance::IdleCb pool1_cb;
+  ConnectionPool::Instance::IdleCb pool2_cb;
   // The first time a drained callback is added, the Grid's callback should be
   // added to both pools.
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool1_cb = cb; })));
-    EXPECT_CALL(*grid_.second(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool2_cb = cb; })));
-    grid_.addDrainedCallback([&drain_received]() -> void { drain_received = true; });
+    EXPECT_CALL(*grid_.first(), addIdleCallback(_, _))
+        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::IdleCb cb,
+                                    ConnectionPool::Instance::DrainPool) { pool1_cb = cb; })));
+    EXPECT_CALL(*grid_.second(), addIdleCallback(_, _))
+        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::IdleCb cb,
+                                    ConnectionPool::Instance::DrainPool) { pool2_cb = cb; })));
+    grid_.addIdleCallback([&drain_received](bool) -> void { drain_received = true; },
+                          ConnectionPool::Instance::DrainPool::Yes);
   }
 
   // The second time a drained callback is added, the pools will not see any
   // change.
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_)).Times(0);
-    EXPECT_CALL(*grid_.second(), addDrainedCallback(_)).Times(0);
-    grid_.addDrainedCallback([&second_drain_received]() -> void { second_drain_received = true; });
+    EXPECT_CALL(*grid_.first(), addIdleCallback(_, _)).Times(0);
+    EXPECT_CALL(*grid_.second(), addIdleCallback(_, _)).Times(0);
+    grid_.addIdleCallback([&second_drain_received](bool) -> void { second_drain_received = true; },
+                          ConnectionPool::Instance::DrainPool::Yes);
   }
   {
     // Notify the grid the second pool has been drained. This should not be
     // passed up to the original callers.
     EXPECT_FALSE(drain_received);
-    (pool2_cb)();
+    (pool2_cb)(true);
     EXPECT_FALSE(drain_received);
   }
 
@@ -434,7 +438,7 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
     // Notify the grid that another pool has been drained. Now that all pools are
     // drained, the original callers should be informed.
     EXPECT_FALSE(drain_received);
-    (pool1_cb)();
+    (pool1_cb)(true);
     EXPECT_TRUE(drain_received);
     EXPECT_TRUE(second_drain_received);
   }
@@ -445,16 +449,18 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
   grid_.createNextPool();
 
   bool drain_received = false;
-  ConnectionPool::Instance::DrainedCb pool1_cb;
+  ConnectionPool::Instance::IdleCb pool1_cb;
 
   {
-    EXPECT_CALL(*grid_.first(), addDrainedCallback(_))
-        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::DrainedCb cb) { pool1_cb = cb; })));
-    grid_.addDrainedCallback([&drain_received]() -> void { drain_received = true; });
+    EXPECT_CALL(*grid_.first(), addIdleCallback(_, _))
+        .WillOnce(Invoke(Invoke([&](ConnectionPool::Instance::IdleCb cb,
+                                    ConnectionPool::Instance::DrainPool) { pool1_cb = cb; })));
+    grid_.addIdleCallback([&drain_received](bool) -> void { drain_received = true; },
+                          ConnectionPool::Instance::DrainPool::Yes);
   }
 
   grid_.setDestroying(); // Fake being in the destructor.
-  (pool1_cb)();
+  (pool1_cb)(true);
   EXPECT_FALSE(drain_received);
 }
 

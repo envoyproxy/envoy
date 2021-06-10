@@ -1130,23 +1130,23 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 
 TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
   testing::MockFunction<void(bool)> idle_callback;
-  conn_pool_.addIdleCallback(idle_callback.AsStdFunction(),
-                             Envoy::ConnectionPool::Instance::DrainPool::No);
+  conn_pool_->addIdleCallback(idle_callback.AsStdFunction(),
+                              Envoy::ConnectionPool::Instance::DrainPool::No);
 
   EXPECT_CALL(idle_callback, Call(false));
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
-  EXPECT_CALL(conn_pool_, onConnReleasedForTest());
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
   c1.releaseConn();
-  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   ENVOY_LOG_MISC(debug, "Should have called idle callback");
 
   testing::MockFunction<void(bool)> drained_callback;
   EXPECT_CALL(idle_callback, Call(true));
   EXPECT_CALL(drained_callback, Call(true));
-  conn_pool_.addIdleCallback(drained_callback.AsStdFunction(),
-                             ConnectionPool::Instance::DrainPool::Yes);
-  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  conn_pool_->addIdleCallback(drained_callback.AsStdFunction(),
+                              ConnectionPool::Instance::DrainPool::Yes);
+  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   dispatcher_.clearDeferredDeleteList();
 }
 
