@@ -72,11 +72,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/envoy_headersplit"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/ci/flaky_test"
   schedule:
     interval: "daily"

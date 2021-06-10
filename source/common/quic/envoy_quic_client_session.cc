@@ -10,12 +10,13 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     std::unique_ptr<EnvoyQuicClientConnection> connection, const quic::QuicServerId& server_id,
     std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     quic::QuicClientPushPromiseIndex* push_promise_index, Event::Dispatcher& dispatcher,
-    uint32_t send_buffer_limit)
+    uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
-      host_name_(server_id.host()), crypto_config_(crypto_config) {}
+      host_name_(server_id.host()), crypto_config_(crypto_config),
+      crypto_stream_factory_(crypto_stream_factory) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -127,6 +128,12 @@ size_t EnvoyQuicClientSession::WriteHeadersOnHeadersStream(
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(headers_stream(), this);
   return quic::QuicSpdyClientSession::WriteHeadersOnHeadersStream(id, std::move(headers), fin,
                                                                   precedence, ack_listener);
+}
+
+std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
+  return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
+      server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
+      this, /*has_application_state = */ version().UsesHttp3());
 }
 
 } // namespace Quic
