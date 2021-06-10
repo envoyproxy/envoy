@@ -90,26 +90,9 @@ connection pools are also allocated for each of the following features:
 * :ref:`Routing priority <arch_overview_http_routing_priority>`
 * :ref:`Socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
 * :ref:`Transport socket (e.g. TLS) options <envoy_v3_api_msg_config.core.v3.TransportSocket>`
-* :ref:`Downstream connection (disabled by default) <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>`
 
 Each worker thread maintains its own connection pools for each cluster, so if an Envoy has two
 threads and a cluster with both HTTP/1 and HTTP/2 support, there will be at least 4 connection pools.
-
-.. _arch_overview_conn_pool_lifetime:
-
-Connection pool lifetime
-------------------------
-
-By default, connection pools exist until their host is removed. This behavior can be modified in a few ways:
-
-* If the :ref:`max_connection_pools <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_connection_pools>`
-  circuit breaker threshold has been configured and the threshold is exceeded, Envoy will attempt to
-  free up a connection pool that does not have any active connections.
-
-* If a cluster has :ref:`erase_idle_pools <envoy_v3_api_field_config.cluster.v3.Cluster.erase_idle_pools>`
-  configured, then a connection pool associated with the cluster will be removed when the pool no longer has any
-  active connections.
-
 
 .. _arch_overview_conn_pool_health_checking:
 
