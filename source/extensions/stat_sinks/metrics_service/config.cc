@@ -32,7 +32,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
                                       envoy::service::metrics::v3::StreamMetricsResponse>>
       grpc_metrics_streamer = std::make_shared<GrpcMetricsStreamerImpl>(
-          server.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+          server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
               grpc_service, server.scope(), false),
           server.localInfo(), transport_api_version);
 

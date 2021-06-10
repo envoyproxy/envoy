@@ -207,7 +207,6 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     grpc_status = Status::WellKnownGrpcStatus::InvalidCode;
     parent_.stats_.streams_closed_[Status::WellKnownGrpcStatus::Unknown]->inc();
   } else {
-    ENVOY_LOG(debug, "panda notifyRemoteClose {} {}", grpc_status, message);
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
