@@ -1,4 +1,4 @@
-#include "common/config/config_provider_impl.h"
+#include "source/common/config/config_provider_impl.h"
 
 namespace Envoy {
 namespace Config {

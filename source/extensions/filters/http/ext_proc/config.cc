@@ -1,9 +1,9 @@
-#include "extensions/filters/http/ext_proc/config.h"
+#include "source/extensions/filters/http/ext_proc/config.h"
 
 #include <string>
 
-#include "extensions/filters/http/ext_proc/client_impl.h"
-#include "extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 namespace Envoy {
 namespace Extensions {

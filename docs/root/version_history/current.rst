@@ -14,6 +14,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
+* access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
 * aws_request_signing: requests are now buffered by default to compute signatures which include the
   payload hash, making the filter compatible with most AWS services. Previously, requests were
   never buffered, which only produced correct signatures for requests without a body, or for
@@ -30,6 +31,8 @@ Minor Behavior Changes
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
 * http: serve HEAD requests from cache.
+* http: stop sending the transfer-encoding header for 304. This behavior can be temporarily reverted by setting
+  ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: the behavior of the *present_match* in route header matcher changed. The value of *present_match* is ignored in the past. The new behavior is *present_match* performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
@@ -56,6 +59,7 @@ Removed Config or Runtime
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * event: removed ``envoy.reloadable_features.activate_timers_next_event_loop`` runtime guard and legacy code path.
+* gzip: removed legacy HTTP Gzip filter and runtime guard `envoy.deprecated_features.allow_deprecated_gzip_http_filter`.
 * http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
 * http: removed ``envoy.reloadable_features.always_apply_route_header_rules`` runtime guard and legacy code path.
 * http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.
@@ -69,8 +73,13 @@ New Features
 ------------
 
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
+* bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query.
+* cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
 * crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
-* dynamic_forward_proxy: added :ref:`dns_resolver<envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolver>` option to the DNS cache config in order use custom DNS resolvers instead of the system default resolvers.
+* dns resolver: added *DnsResolverOptions* protobuf message to reconcile all of the DNS lookup option flags. By setting the configuration option :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.core.v3.DnsResolverOptions.use_tcp_for_dns_lookups>` as true we can make the underlying dns resolver library to make only TCP queries to the DNS servers and by setting the configuration option :ref:`no_default_search_domain <envoy_v3_api_field_config.core.v3.DnsResolverOptions.no_default_search_domain>` as true the DNS resolver library will not use the default search domains.
+* dns resolver: added *DnsResolutionConfig* to combine :ref:`dns_resolver_options <envoy_v3_api_field_config.core.v3.DnsResolutionConfig.dns_resolver_options>` and :ref:`resolvers <envoy_v3_api_field_config.core.v3.DnsResolutionConfig.resolvers>` in a single protobuf message. The field *resolvers* can be specified with a list of DNS resolver addresses. If specified, DNS client library will perform resolution via the underlying DNS resolvers. Otherwise, the default system resolvers (e.g., /etc/resolv.conf) will be used.
+* dns_filter: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting the configuration option *use_tcp_for_dns_lookups* to true we can make dns filter's external resolvers to answer queries using TCP only, by setting the configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query which replaces the pre-existing alpha api field *upstream_resolvers*.
+* dynamic_forward_proxy: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` option to the DNS cache config in order to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query instead of the system default resolvers.
 * http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
   value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
   in the typed per filter config. For more information, please reference
@@ -91,8 +100,12 @@ New Features
 * thrift_proxy: added per upstream metrics within the :ref:`thrift router <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>` for request and response size histograms.
 * tls: allow dual ECDSA/RSA certs via SDS. Previously, SDS only supported a single certificate per context, and dual cert was only supported via non-SDS.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
+* windows container image: added user, EnvoyUser which is part of the Network Configuration Operators group to the container image.
 
 Deprecated
 ----------
 
+* bootstrap: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
+* cluster: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` and :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` are deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
+* dynamic_forward_proxy: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
 * http: :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` is deprecated in favor of :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.

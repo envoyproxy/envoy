@@ -8,10 +8,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/event/libevent.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/libevent.h"
 
 namespace Envoy {
 namespace Buffer {

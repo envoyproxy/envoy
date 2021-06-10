@@ -10,6 +10,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.compressor.v3";
 option java_outer_classname = "CompressorProto";
@@ -101,9 +102,9 @@ message Compressor {
   // A compressor library to use for compression. Currently only
   // :ref:`envoy.compression.gzip.compressor<envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
-  // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
   // [#extension-category: envoy.compression.compressor]
-  config.core.v3.TypedExtensionConfig compressor_library = 6;
+  config.core.v3.TypedExtensionConfig compressor_library = 6
+      [(validate.rules).message = {required: true}];
 
   // Configuration for request compression. Compression is disabled by default if left empty.
   RequestDirectionConfig request_direction_config = 7;

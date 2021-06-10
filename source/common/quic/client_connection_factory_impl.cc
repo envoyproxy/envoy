@@ -1,7 +1,7 @@
-#include "common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/client_connection_factory_impl.h"
 
-#include "common/quic/envoy_quic_session_cache.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/envoy_quic_session_cache.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -74,7 +74,7 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   auto ret = std::make_unique<EnvoyQuicClientSession>(
       info_impl->quic_config_, info_impl->supported_versions_, std::move(connection),
       info_impl->server_id_, std::move(config), &info_impl->push_promise_index_, dispatcher,
-      info_impl->buffer_limit_);
+      info_impl->buffer_limit_, info_impl->crypto_stream_factory_);
   return ret;
 }
 

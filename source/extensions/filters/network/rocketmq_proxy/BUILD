@@ -19,8 +19,8 @@ envoy_cc_library(
     name = "stats_interface",
     hdrs = ["stats.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
     ],
 )
 
@@ -74,7 +74,7 @@ envoy_cc_library(
     ],
     deps = [
         ":protocol_lib",
-        "//include/envoy/network:filter_interface",
+        "//envoy/network:filter_interface",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -95,11 +95,11 @@ envoy_cc_library(
         ":rocketmq_lib",
         ":stats_interface",
         ":well_known_names",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -124,8 +124,8 @@ envoy_cc_extension(
     ],
     deps = [
         ":conn_manager_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",

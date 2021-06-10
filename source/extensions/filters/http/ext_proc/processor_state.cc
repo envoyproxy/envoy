@@ -1,10 +1,9 @@
-#include "extensions/filters/http/ext_proc/processor_state.h"
+#include "source/extensions/filters/http/ext_proc/processor_state.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/ext_proc/ext_proc.h"
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 namespace Envoy {
 namespace Extensions {

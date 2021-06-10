@@ -197,6 +197,8 @@ envoy_cmake_external(
     cache_entries = {
         # Disable both: BUILD and INCLUDE, since some of the INCLUDE
         # targets build code instead of only generating build files.
+        "LLVM_BUILD_BENCHMARKS": "off",
+        "LLVM_INCLUDE_BENCHMARKS": "off",
         "LLVM_BUILD_DOCS": "off",
         "LLVM_INCLUDE_DOCS": "off",
         "LLVM_BUILD_EXAMPLES": "off",
@@ -210,6 +212,7 @@ envoy_cmake_external(
         "LLVM_INCLUDE_TOOLS": "off",
         "LLVM_BUILD_UTILS": "off",
         "LLVM_INCLUDE_UTILS": "off",
+        "LLVM_ENABLE_IDE": "off",
         "LLVM_ENABLE_LIBEDIT": "off",
         "LLVM_ENABLE_LIBXML2": "off",
         "LLVM_ENABLE_TERMINFO": "off",

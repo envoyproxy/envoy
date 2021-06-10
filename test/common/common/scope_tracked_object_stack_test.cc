@@ -2,8 +2,8 @@
 
 #include "envoy/common/scope_tracker.h"
 
-#include "common/common/scope_tracked_object_stack.h"
-#include "common/common/utility.h"
+#include "source/common/common/scope_tracked_object_stack.h"
+#include "source/common/common/utility.h"
 
 #include "test/test_common/utility.h"
 
