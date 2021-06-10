@@ -18,8 +18,8 @@ envoy_cc_library(
     hdrs = ["header_to_metadata_filter.h"],
     deps = [
         "//envoy/server:filter_config_interface",
-        "//source/common/config:well_known_names",
         "//source/common/common:base64_lib",
+        "//source/common/config:well_known_names",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",

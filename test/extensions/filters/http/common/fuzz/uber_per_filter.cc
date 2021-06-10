@@ -111,7 +111,7 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
-  } else if (name == "envoy.filters.http.Squash") {
+  } else if (name == "envoy.filters.http.squash") {
     cleanAttachmentTemplate(message);
   } else if (name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented

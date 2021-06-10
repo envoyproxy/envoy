@@ -36,7 +36,7 @@ TEST(FilterNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedName)) {
 
   EXPECT_EQ("envoy.filters.http.buffer",
             FilterNameUtil::canonicalFilterName("envoy.buffer", &runtime));
-  EXPECT_EQ("envoy.filters.http.Squash",
+  EXPECT_EQ("envoy.filters.http.squash",
             FilterNameUtil::canonicalFilterName("envoy.squash", &runtime));
 }
 

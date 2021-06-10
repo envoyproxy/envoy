@@ -16,7 +16,7 @@ namespace Compressor {
 class CompressorFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::compressor::v3::Compressor> {
 public:
-  CompressorFilterFactory() : FactoryBase("envoy.filters.http.composite") {}
+  CompressorFilterFactory() : FactoryBase("envoy.filters.http.compressor") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

@@ -16,7 +16,7 @@ namespace Squash {
 class SquashFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::squash::v3::Squash> {
 public:
-  SquashFilterConfigFactory() : FactoryBase("envoy.filters.http.Squash") {}
+  SquashFilterConfigFactory() : FactoryBase("envoy.filters.http.squash") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
