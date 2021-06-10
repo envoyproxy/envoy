@@ -295,7 +295,7 @@ TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
   EXPECT_FALSE(child_a->draining());
   EXPECT_FALSE(child_b->draining());
 
-  parent.release();
+  parent.reset();
 
   // parent destruction should not effect drain state
   EXPECT_FALSE(child_a->draining());

@@ -12,8 +12,6 @@
 
 #include "gmock/gmock.h"
 
-using ::testing::NiceMock;
-
 namespace Envoy {
 namespace Server {
 class MockDrainManager : public DrainManager {
