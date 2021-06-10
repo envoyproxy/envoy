@@ -489,6 +489,16 @@ envoy.matching.input_matchers.consistent_hashing:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.quic.proof_source.filter_chain:
+  categories:
+  - envoy.quic.proof_source
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.quic.crypto_stream.server.quiche:
+  categories:
+  - envoy.quic.server.crypto_stream
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.rate_limit_descriptors.expr:
   categories:
   - envoy.rate_limit_descriptors

@@ -18,6 +18,8 @@
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
+
 #include "test/common/quic/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
@@ -74,22 +76,17 @@ public:
   bool encryption_established() const override { return true; }
 };
 
-class TestEnvoyQuicClientSession : public EnvoyQuicClientSession {
+class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
-  TestEnvoyQuicClientSession(const quic::QuicConfig& config,
-                             const quic::ParsedQuicVersionVector& supported_versions,
-                             std::unique_ptr<EnvoyQuicClientConnection> connection,
-                             const quic::QuicServerId& server_id,
-                             std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-                             quic::QuicClientPushPromiseIndex* push_promise_index,
-                             Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
-      : EnvoyQuicClientSession(config, supported_versions, std::move(connection), server_id,
-                               crypto_config, push_promise_index, dispatcher, send_buffer_limit) {}
-
-  std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
-    return std::make_unique<TestQuicCryptoClientStream>(
-        server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this, true);
+  std::unique_ptr<quic::QuicCryptoClientStreamBase>
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                                    quic::QuicCryptoClientConfig* crypto_config,
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                                    bool has_application_state) override {
+    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
+                                                        std::move(verify_context), crypto_config,
+                                                        proof_handler, has_application_state);
   }
 };
 
@@ -116,7 +113,7 @@ public:
                             std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
                             quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024),
+                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -176,7 +173,8 @@ protected:
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  TestEnvoyQuicClientSession envoy_quic_session_;
+  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
+  EnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
