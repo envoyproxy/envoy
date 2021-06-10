@@ -55,9 +55,9 @@ public:
   /**
    * All children created by calls to `createChildManager`
    */
-  std::vector<std::weak_ptr<DrainManager>> children_;
+  std::vector<std::weak_ptr<DrainManager>> children_{};
 
-  std::atomic<bool> draining_;
+  std::atomic<bool> draining_{false};
 };
 } // namespace Server
 } // namespace Envoy
