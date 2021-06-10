@@ -74,7 +74,7 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
   return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
 }
 
-void EnvoyQuicClientConnection::setUpConnectionSocket(PacketsToReadDelegate& delegate) {
+void EnvoyQuicClientConnection::setUpConnectionSocket(OptRef<PacketsToReadDelegate> delegate) {
   delegate_ = delegate;
   if (connectionSocket()->ioHandle().isOpen()) {
     connectionSocket()->ioHandle().initializeFileEvent(
@@ -105,7 +105,7 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
 
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
-  setUpConnectionSocket(delegate_.value().get());
+  setUpConnectionSocket(delegate_);
   if (connection_migration_use_new_cid()) {
     MigratePath(self_address, peer_address, writer.release(), true);
   } else {
