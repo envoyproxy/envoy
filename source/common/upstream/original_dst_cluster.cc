@@ -119,8 +119,7 @@ OriginalDstCluster::OriginalDstCluster(
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
       host_map_(std::make_shared<HostMap>()) {
-  // TODO(dio): Remove hosts check once the hosts field is removed.
-  if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
+  if (config.has_load_assignment()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);

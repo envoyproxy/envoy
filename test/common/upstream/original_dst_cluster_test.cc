@@ -147,25 +147,6 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
       "ORIGINAL_DST clusters must have no load assignment or hosts configured");
 }
 
-TEST_F(OriginalDstClusterTest, DEPRECATED_FEATURE_TEST(BadConfigWithDeprecatedHosts)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-    cleanup_interval: 1s
-    hosts:
-      - socket_address:
-          address: 127.0.0.1
-          port_value: 8000
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml, false), EnvoyException,
-      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
-}
-
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
   std::string yaml = R"EOF(
     name: name

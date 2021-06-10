@@ -452,14 +452,6 @@ public:
                                 Stats::Scope& scope, bool skip_cluster_check);
 
   /**
-   * Translate a set of cluster's hosts into a load assignment configuration.
-   * @param hosts cluster's list of hosts.
-   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
-   */
-  static envoy::config::endpoint::v3::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
-
-  /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
    * message.
    * @param typed_config opaque config packed in google.protobuf.Any

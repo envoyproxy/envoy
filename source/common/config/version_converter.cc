@@ -110,7 +110,7 @@ void VersionConverter::annotateWithOriginalType(const Protobuf::Descriptor& prev
       // ClusterManagerImpl with type erasure, but protobuf doesn't free up memory
       // as expected, we probably need some arena level trick to address this.
       if (prev_descriptor->full_name() == "envoy.api.v2.Cluster" &&
-          (field.name() == "hidden_envoy_deprecated_hosts" || field.name() == "load_assignment")) {
+          field.name() == "load_assignment") {
         // This will cause the sub-message visit to abort early.
         return field.message_type();
       }
