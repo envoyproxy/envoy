@@ -432,16 +432,57 @@ name "*". In this case, the server should use site-specific business logic to de
 set of resources that the client is interested in, typically based on the client's
 :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
 
-For historical reasons, if the initial request on the stream for a given resource type contains no
-resource names, the server should treat that as a subscription to "*". A client may later
-unsubscribe to "*", or it may later add a subscription to an additional resource name.
+For historical reasons, if the client sends a request for a given resource type but has never
+explicitly subscribed to any resource names (i.e., in SotW, all requests on the stream for that
+resource type have had an empty :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+field, or in incremental, having never sent a request on the stream for that resource type with a
+non-empty :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+field), the server should treat that identically to how it would treat the client having
+explicitly subscribed to "*". However, once the client does explicitly subscribe to a resource
+name (whether it be "*" or any other name), then this legacy semantic is no longer available; at
+that point, clearing the list of subscribed resources is interpretted as an unsubscription (see
+:ref:`Unsubscribing From Resources<xds_protocol_unsubscribing>`) rather than as a subscription
+to "*".
+
+For example, in SotW:
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+  unset. Server interprets this as a subscription to "*".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+  set to "*" and "A". Server interprets this as continuing the existing subscription to "*"
+  and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+  set to "A". Server interprets this as unsubscribing to "*" and continuing the existing
+  subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+  unset. Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed
+  to all resources). Although this request is identical to the first one, it is not interpreted
+  as a wildcard subscription, because there has previously been a request on this stream for this
+  resource type that set the :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+  field.
+
+And in incremental:
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+  unset. Server interprets this as a subscription to "*".
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+  set to "A". Server interprets this as continuing the existing subscription to "*"
+  and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>`
+  set to "*". Server interprets this as unsubscribing to "*" and continuing the existing
+  subscription to "A".
+- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>`
+  set to "A". Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed
+  to all resources). Although the set of subscribed resources is now empty, just as it was after the
+  initial request, it is not interpreted as a wildcard subscription, because there has previously
+  been a request on this stream for this resource type that set the
+  :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+  field.
 
 Client Behavior
 """""""""""""""
 
 Envoy will always use wildcard subscriptions for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and
 :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources. However, other xDS clients (such as gRPC clients
-that use xDS) may specify specific resource names for these resource types, for example if they
+that use xDS) may explicitly subscribe to specific resource names for these resource types, for example if they
 only have a singleton listener and already know its name from some out-of-band configuration.
 
 Grouping Resources into Responses
@@ -528,6 +569,8 @@ that resource could be created at any time. Management servers must remember the
 being requested by the client, and if one of those resources springs into existence later, the
 server must send an update to the client informing it of the new resource. Clients that initially
 see a resource that does not exist must be prepared for the resource to be created at any time.
+
+.. _xds_protocol_unsubscribing:
 
 Unsubscribing From Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
