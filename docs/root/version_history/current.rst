@@ -33,10 +33,10 @@ Minor Behavior Changes
 * http: serve HEAD requests from cache.
 * http: the behavior of the *present_match* in route header matcher changed. The value of *present_match* is ignored in the past. The new behavior is *present_match* performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
+* listener: added an option when balancing across active listeners and wildcard matching is used to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
-* listener: added an option when balancing across active listeners and wildcard matching is used to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 
 Bug Fixes
 ---------
