@@ -88,7 +88,6 @@ envoy_cc_library(
         ":matchers_lib",
         "//envoy/http:filter_interface",
         "//source/common/http:headers_lib",
-        "//source/extensions/filters/http:well_known_names",
     ],
 )
 
@@ -99,7 +98,6 @@ envoy_cc_extension(
     deps = [
         ":filter_lib",
         "//envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
