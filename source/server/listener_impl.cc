@@ -40,7 +40,7 @@ namespace Server {
 
 namespace {
 
-const std::string TlsInspector = "envoy.filters.listener.tls_inspector";
+const std::string TlsInspector = ""envoy.listener.tls_inspector"";
 
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
