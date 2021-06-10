@@ -1,14 +1,14 @@
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,29 +31,15 @@ void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
-  timeout_timer_.reset();
 }
 
-void GrpcClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+void GrpcClientImpl::check(RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& request,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
-
   Http::AsyncClient::RequestOptions options;
-  if (timeout_.has_value()) {
-    if (timeoutStartsAtCheckCreation()) {
-      // TODO(yuval-k): We currently use dispatcher based timeout even if the underlying client is
-      // Google gRPC client, which has its own timeout mechanism. We may want to change that in the
-      // future if the implementations converge.
-      timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
-      timeout_timer_->enableTimer(timeout_.value());
-    } else {
-      // not starting timer on check creation, set the timeout on the request.
-      options.setTimeout(timeout_);
-    }
-  }
-
+  options.setTimeout(timeout_);
   options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
@@ -73,6 +59,12 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       if (response->ok_response().headers_to_remove_size() > 0) {
         for (const auto& header : response->ok_response().headers_to_remove()) {
           authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
+        }
+      }
+      if (response->ok_response().response_headers_to_add_size() > 0) {
+        for (const auto& header : response->ok_response().response_headers_to_add()) {
+          authz_response->response_headers_to_add.emplace_back(
+              Http::LowerCaseString(header.header().key()), header.header().value());
         }
       }
     }
@@ -99,7 +91,6 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
-  timeout_timer_.reset();
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
@@ -107,23 +98,9 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ENVOY_LOG(trace, "CheckRequest call failed with status: {}",
             Grpc::Utility::grpcStatusToString(status));
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  timeout_timer_.reset();
-  respondFailure(ErrorKind::Other);
-}
-
-void GrpcClientImpl::onTimeout() {
-  ENVOY_LOG(trace, "CheckRequest timed-out");
-  ASSERT(request_ != nullptr);
-  request_->cancel();
-  // let the client know of failure:
-  respondFailure(ErrorKind::Timedout);
-}
-
-void GrpcClientImpl::respondFailure(ErrorKind kind) {
   Response response{};
   response.status = CheckStatus::Error;
   response.status_code = Http::Code::Forbidden;
-  response.error_kind = kind;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }

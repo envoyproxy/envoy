@@ -1,10 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/listener/original_src/v3/original_src.pb.h"
 
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/listener/original_src/original_src.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/listener/original_src/original_src.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
@@ -39,7 +38,7 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.socket_.remote_address_ = Network::Utility::resolveUrl(address);
+    callbacks_.socket_.address_provider_->setRemoteAddress(Network::Utility::resolveUrl(address));
   }
 
 protected:
@@ -81,8 +80,9 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressAddsOption) {
   ASSERT_NE(options->at(0), nullptr);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.socket_.remote_address_)));
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  EXPECT_EQ(*socket.addressProvider().localAddress(),
+            *callbacks_.socket_.addressProvider().remoteAddress());
 }
 
 TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressUsesCorrectAddress) {
@@ -111,11 +111,11 @@ TEST_F(OriginalSrcTest, OnNewConnectionIpv4AddressBleachesPort) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
 
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
   options->at(0)->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  EXPECT_EQ(*socket.addressProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcTest, FilterAddsTransparentOption) {

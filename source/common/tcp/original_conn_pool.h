@@ -12,9 +12,9 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -33,8 +33,8 @@ public:
   void drainConnections() override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
-  // The old pool does not implement prefetching.
-  bool maybePrefetch(float) override { return false; }
+  // The old pool does not implement preconnecting.
+  bool maybePreconnect(float) override { return false; }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
 
 protected:

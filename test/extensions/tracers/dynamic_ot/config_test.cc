@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 
-#include "extensions/tracers/dynamic_ot/config.h"
+#include "source/extensions/tracers/dynamic_ot/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -24,7 +24,8 @@ namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  EXPECT_CALL(context.server_factory_context_.cluster_manager_, get(Eq("fake_cluster")))
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq("fake_cluster")))
       .WillRepeatedly(
           Return(&context.server_factory_context_.cluster_manager_.thread_local_cluster_));
   ON_CALL(*context.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
@@ -48,7 +49,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   DynamicOpenTracingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  const Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 

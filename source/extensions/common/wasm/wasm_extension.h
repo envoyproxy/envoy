@@ -7,10 +7,10 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/common/wasm/context.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,9 +32,9 @@ using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 using CreateContextFn =
     std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
 using PluginHandleExtensionFactory = std::function<PluginHandleBaseSharedPtr(
-    const WasmHandleSharedPtr& base_wasm, absl::string_view plugin_key)>;
+    const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)>;
 using WasmHandleExtensionFactory = std::function<WasmHandleBaseSharedPtr(
-    const VmConfig& vm_config, const Stats::ScopeSharedPtr& scope,
+    WasmConfig& config, const Stats::ScopeSharedPtr& scope,
     Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
     Server::ServerLifecycleNotifier& lifecycle_notifier, absl::string_view vm_key)>;
 using WasmHandleExtensionCloneFactory = std::function<WasmHandleBaseSharedPtr(
@@ -53,9 +53,6 @@ public:
   virtual ~WasmExtension() = default;
 
   virtual void initialize() = 0;
-  virtual std::unique_ptr<EnvoyWasmVmIntegration>
-  createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
-                               absl::string_view short_runtime) = 0;
   virtual PluginHandleExtensionFactory pluginFactory() = 0;
   virtual WasmHandleExtensionFactory wasmFactory() = 0;
   virtual WasmHandleExtensionCloneFactory wasmCloneFactory() = 0;
@@ -77,8 +74,8 @@ public:
   virtual void onEvent(WasmEvent event, const PluginSharedPtr& plugin) = 0;
   virtual void onRemoteCacheEntriesChanged(int remote_cache_entries) = 0;
   virtual void createStats(const Stats::ScopeSharedPtr& scope, const PluginSharedPtr& plugin)
-      EXCLUSIVE_LOCKS_REQUIRED(mutex_) = 0;
-  virtual void resetStats() EXCLUSIVE_LOCKS_REQUIRED(mutex_) = 0; // Delete stats pointers
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) = 0;
+  virtual void resetStats() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) = 0; // Delete stats pointers
 
   // NB: the Scope can become invalid if, for example, the owning FilterChain is deleted. When that
   // happens the stats must be recreated. This hook verifies the Scope of any existing stats and if
@@ -100,9 +97,6 @@ public:
   EnvoyWasm() = default;
   ~EnvoyWasm() override = default;
   void initialize() override {}
-  std::unique_ptr<EnvoyWasmVmIntegration>
-  createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope, absl::string_view runtime,
-                               absl::string_view short_runtime) override;
   PluginHandleExtensionFactory pluginFactory() override;
   WasmHandleExtensionFactory wasmFactory() override;
   WasmHandleExtensionCloneFactory wasmCloneFactory() override;

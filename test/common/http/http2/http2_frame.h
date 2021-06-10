@@ -6,13 +6,26 @@
 
 #include "envoy/http/metadata_interface.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+template <typename Flag> constexpr uint8_t orFlags(Flag flag) { return static_cast<uint8_t>(flag); }
+
+// All this templatized stuff is for the typesafe constexpr bitwise ORing of the "enum class" values
+template <typename First, typename... Rest> struct FirstArgType {
+  using type = First; // NOLINT(readability-identifier-naming)
+};
+
+template <typename Flag, typename... Flags> constexpr uint8_t orFlags(Flag first, Flags... rest) {
+  static_assert(std::is_same<Flag, typename FirstArgType<Flags...>::type>::value,
+                "All flag types must be the same!");
+  return static_cast<uint8_t>(first) | orFlags(rest...);
+}
 
 // Rudimentary facility for building and parsing of HTTP2 frames for unit tests
 class Http2Frame {
@@ -120,8 +133,9 @@ public:
                                           HeadersFlags flags = HeadersFlags::None);
   static Http2Frame makeHeadersFrameNoStatus(uint32_t stream_index);
   static Http2Frame makeHeadersFrameWithStatus(
-      std::string status,
-      uint32_t stream_index); // Want to test overridden int here, so make it string
+      std::string status, uint32_t stream_index,
+      HeadersFlags flags = static_cast<HeadersFlags>(orFlags(HeadersFlags::EndStream,
+                                                             HeadersFlags::EndHeaders)));
   // TODO: MakeHeadersFrameWithStatusAndNonStaticHeaders
   static Http2Frame makeEmptyContinuationFrame(uint32_t stream_index,
                                                HeadersFlags flags = HeadersFlags::None);
@@ -135,7 +149,7 @@ public:
 
   static Http2Frame makeWindowUpdateFrame(uint32_t stream_index, uint32_t increment);
   static Http2Frame makeMetadataFrameFromMetadataMap(uint32_t stream_index,
-                                                     MetadataMap& metadata_map,
+                                                     const MetadataMap& metadata_map,
                                                      MetadataFlags flags);
 
   static Http2Frame makeMalformedRequest(uint32_t stream_index);

@@ -4,8 +4,8 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "extensions/health_checkers/redis/redis.h"
-#include "extensions/health_checkers/redis/utility.h"
+#include "source/extensions/health_checkers/redis/redis.h"
+#include "source/extensions/health_checkers/redis/utility.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
@@ -34,7 +34,8 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 class RedisHealthCheckerTest
-    : public testing::Test,
+    : public Event::TestUsingSimulatedTime,
+      public testing::Test,
       public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
   RedisHealthCheckerTest()
@@ -52,7 +53,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
@@ -75,7 +76,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
@@ -112,7 +113,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
@@ -135,7 +136,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 
@@ -159,7 +160,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 
@@ -220,7 +221,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
@@ -268,7 +269,8 @@ public:
   }
 
   void exerciseStubs() {
-    Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100");
+    Upstream::HostSharedPtr host =
+        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100", simTime());
     RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
         std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
 
@@ -308,7 +310,7 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   setupWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -356,7 +358,7 @@ TEST_F(RedisHealthCheckerTest, ExistsWithAuth) {
   setupExistsHealthcheckWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -402,7 +404,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   exerciseStubs();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -470,7 +472,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   setupAlwaysLogHealthCheckFailures();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -528,7 +530,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   setup();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -579,7 +581,7 @@ TEST_F(RedisHealthCheckerTest, DEPRECATED_FEATURE_TEST(ExistsDeprecated)) {
   setupExistsHealthcheckDeprecated(false);
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -631,7 +633,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -683,7 +685,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();
@@ -727,7 +729,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   setupDontReuseConnection();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
 
   expectSessionCreate();
   expectClientCreate();

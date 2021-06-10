@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
-#include "extensions/filters/network/thrift_proxy/config.h"
-#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -57,7 +57,7 @@ public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilter());
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));
@@ -204,6 +204,24 @@ thrift_filters:
   EXPECT_EQ(1, factory.config_struct_.fields_size());
   EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
+}
+
+// Test config with payload passthrough enabled.
+TEST_F(ThriftFilterConfigTest, ThriftProxyPayloadPassthrough) {
+  const std::string yaml = R"EOF(
+stat_prefix: ingress
+payload_passthrough: true
+route_config:
+  name: local_route
+thrift_filters:
+  - name: envoy.filters.thrift.router
+)EOF";
+
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config =
+      parseThriftProxyFromV2Yaml(yaml);
+  testConfig(config);
+
+  EXPECT_EQ(true, config.payload_passthrough());
 }
 
 } // namespace ThriftProxy

@@ -23,6 +23,11 @@ public:
   virtual void onWorkerListenerRemoved() PURE;
 
   /**
+   * Called when all workers have started.
+   */
+  virtual void onWorkersStarted() PURE;
+
+  /**
    * Called when the Runtime::ScopedLoaderSingleton is created by the server.
    */
   virtual void onRuntimeCreated() PURE;
@@ -36,6 +41,7 @@ public:
   // ListenerHooks
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
+  void onWorkersStarted() override {}
   void onRuntimeCreated() override {}
 };
 

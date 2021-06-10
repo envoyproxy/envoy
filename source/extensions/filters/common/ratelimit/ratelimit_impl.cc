@@ -1,4 +1,4 @@
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -9,9 +9,9 @@
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -105,15 +105,20 @@ void GrpcClientImpl::onSuccess(
 
   DescriptorStatusListPtr descriptor_statuses = std::make_unique<DescriptorStatusList>(
       response->statuses().begin(), response->statuses().end());
+  DynamicMetadataPtr dynamic_metadata =
+      response->has_dynamic_metadata()
+          ? std::make_unique<ProtobufWkt::Struct>(response->dynamic_metadata())
+          : nullptr;
   callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
-                       std::move(request_headers_to_add));
+                       std::move(request_headers_to_add), response->raw_body(),
+                       std::move(dynamic_metadata));
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr);
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
   callbacks_ = nullptr;
 }
 

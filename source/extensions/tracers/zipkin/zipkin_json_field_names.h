@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "common/singleton/const_singleton.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +24,7 @@ constexpr char SPAN_ANNOTATIONS[] = "annotations";
 constexpr char SPAN_LOCAL_ENDPOINT[] = "localEndpoint";
 constexpr char SPAN_BINARY_ANNOTATIONS[] = "binaryAnnotations";
 
+constexpr char ANNOTATIONS[] = "annotations";
 constexpr char ANNOTATION_VALUE[] = "value";
 constexpr char ANNOTATION_ENDPOINT[] = "endpoint";
 constexpr char ANNOTATION_TIMESTAMP[] = "timestamp";

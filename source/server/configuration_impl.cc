@@ -1,4 +1,4 @@
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 #include <chrono>
 #include <list>
@@ -16,12 +16,14 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/runtime_utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/protobuf/utility.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/runtime_utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -54,6 +56,21 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  if (bootstrap.has_stats_flush_interval() &&
+      bootstrap.stats_flush_case() !=
+          envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {
+    throw EnvoyException("Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+  }
+
+  flush_interval_ =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
+
+  if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
+    flush_on_admin_ = bootstrap.stats_flush_on_admin();
+  }
+}
+
 void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
@@ -83,11 +100,26 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
 
-  stats_flush_interval_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_flush_interval, 5000));
-
   initializeWatchdogs(bootstrap, server);
-  initializeStatsSinks(bootstrap, server);
+  initializeStatsConfig(bootstrap, server);
+}
+
+void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server) {
+  ENVOY_LOG(info, "loading stats configuration");
+
+  // stats_config_ should be set before populating the sinks so that it is available
+  // from the ServerFactoryContext when creating the stats sinks.
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+
+  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
+    // Generate factory and translate stats sink custom config.
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
+
+    stats_config_->addSink(factory.createStatsSink(*message, server.serverFactoryContext()));
+  }
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& configuration,
@@ -114,20 +146,6 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& config
   // in the context of "envoy.filters.network.http_connection_manager" filter.
   // The side effect of this is that provider-specific configuration
   // is no longer validated in this step.
-}
-
-void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                    Instance& server) {
-  ENVOY_LOG(info, "loading stats sink configuration");
-
-  for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
-    // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
-
-    stats_sinks_.emplace_back(factory.createStatsSink(*message, server.serverFactoryContext()));
-  }
 }
 
 void MainImpl::initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -174,9 +192,25 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                         const Options& options, Instance& server)
+    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
-  admin_.access_log_path_ = admin.access_log_path();
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
+                                          admin.access_log_path()};
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
+  }
+
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
@@ -198,8 +232,16 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     if (layered_runtime_.layers().empty()) {
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
-  } else {
-    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
+  }
+  if (enable_deprecated_v2_api_) {
+    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
+    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
+    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
+    ProtobufWkt::Value val;
+    val.set_bool_value(true);
+    (*static_layer
+          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
+        val;
   }
 }
 

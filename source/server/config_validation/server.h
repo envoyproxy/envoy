@@ -11,23 +11,23 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/access_log/access_log_manager_impl.h"
-#include "common/common/assert.h"
-#include "common/common/random_generator.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/router/rds_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/secret/secret_manager_impl.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/admin/admin.h"
-#include "server/config_validation/admin.h"
-#include "server/config_validation/api.h"
-#include "server/config_validation/cluster_manager.h"
-#include "server/config_validation/dns.h"
-#include "server/listener_manager_impl.h"
-#include "server/server.h"
+#include "source/common/access_log/access_log_manager_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/admin/admin.h"
+#include "source/server/config_validation/admin.h"
+#include "source/server/config_validation/api.h"
+#include "source/server/config_validation/cluster_manager.h"
+#include "source/server/config_validation/dns.h"
+#include "source/server/listener_manager_impl.h"
+#include "source/server/server.h"
 
 #include "absl/types/optional.h"
 
@@ -68,13 +68,13 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
-  Admin& admin() override { return admin_; }
+  Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({}, false);
+    return dispatcher().createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -98,18 +98,18 @@ public:
   Stats::Store& stats() override { return stats_store_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  Router::Context& routerContext() override { return router_context_; }
   ProcessContextOptRef processContext() override { return absl::nullopt; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
+  LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return api_->timeSource(); }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
-  std::chrono::milliseconds statsFlushInterval() const override {
-    return config_.statsFlushInterval();
-  }
   void flushStats() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+
+  Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -120,7 +120,7 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                         const udpa::core::v1::ResourceLocator* lds_resources_locator) override {
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(lds_config, lds_resources_locator, clusterManager(),
                                         initManager(), stats(), listenerManager(),
                                         messageValidationContext().dynamicValidationVisitor());
@@ -191,7 +191,7 @@ private:
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  Server::ValidationAdmin admin_;
+  std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;
@@ -205,6 +205,7 @@ private:
   MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
 };

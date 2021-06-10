@@ -1,12 +1,12 @@
-#include "common/config/remote_data_fetcher.h"
+#include "source/common/config/remote_data_fetcher.h"
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,10 +33,16 @@ void RemoteDataFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
-  request_ = cm_.httpAsyncClientForCluster(uri_.cluster())
-                 .send(std::move(message), *this,
-                       Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-                           DurationUtil::durationToMilliseconds(uri_.timeout()))));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+  if (thread_local_cluster != nullptr) {
+    request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(message), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(
+            std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
+  } else {
+    ENVOY_LOG(debug, "fetch remote data [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
+    callback_.onFailure(FailureReason::Network);
+  }
 }
 
 void RemoteDataFetcher::onSuccess(const Http::AsyncClient::Request&,

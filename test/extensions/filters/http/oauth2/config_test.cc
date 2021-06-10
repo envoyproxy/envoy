@@ -3,11 +3,10 @@
 
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
 
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/secret_provider_impl.h"
-
-#include "extensions/filters/http/oauth2/config.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/secret_provider_impl.h"
+#include "source/extensions/filters/http/oauth2/config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -47,6 +46,14 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;
@@ -87,12 +94,21 @@ config:
   signout_path:
     path:
       exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
     )EOF";
 
   OAuth2Config factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   Server::Configuration::MockFactoryContext context;
+  context.cluster_manager_.initializeClusters({"foo"}, {});
 
   // This returns non-nullptr for token_secret and hmac_secret.
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();

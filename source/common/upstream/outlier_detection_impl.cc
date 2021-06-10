@@ -1,4 +1,4 @@
-#include "common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,16 +8,16 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
-#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
+#include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -39,8 +39,8 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                                                  HostSharedPtr host)
     : detector_(detector), host_(host),
       // add Success Rate monitors
-      external_origin_sr_monitor_(envoy::data::cluster::v2alpha::SUCCESS_RATE),
-      local_origin_sr_monitor_(envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN) {
+      external_origin_sr_monitor_(envoy::data::cluster::v3::SUCCESS_RATE),
+      local_origin_sr_monitor_(envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN) {
   // Setup method to call when putResult is invoked. Depending on the config's
   // split_external_local_origin_errors_ boolean value different method is called.
   put_result_func_ = detector->config().splitExternalLocalOriginErrors()
@@ -73,18 +73,17 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       return;
     }
     if (Http::CodeUtility::isGatewayError(response_code)) {
-      if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
-                                                "outlier_detection.consecutive_gateway_failure",
-                                                detector->config().consecutiveGatewayFailure())) {
+      if (++consecutive_gateway_failure_ ==
+          detector->runtime().snapshot().getInteger(
+              ConsecutiveGatewayFailureRuntime, detector->config().consecutiveGatewayFailure())) {
         detector->onConsecutiveGatewayFailure(host_.lock());
       }
     } else {
       consecutive_gateway_failure_ = 0;
     }
 
-    if (++consecutive_5xx_ ==
-        detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
-                                                  detector->config().consecutive5xx())) {
+    if (++consecutive_5xx_ == detector->runtime().snapshot().getInteger(
+                                  Consecutive5xxRuntime, detector->config().consecutive5xx())) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
@@ -188,7 +187,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
   local_origin_sr_monitor_.incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
-          "outlier_detection.consecutive_local_origin_failure",
+          ConsecutiveLocalOriginFailureRuntime,
           detector->config().consecutiveLocalOriginFailure())) {
     detector->onConsecutiveLocalOriginFailure(host_.lock());
   }
@@ -250,7 +249,12 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
                                           DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE))),
       enforcing_local_origin_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_local_origin_success_rate,
-                                          DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))) {}
+                                          DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE))),
+      // If max_ejection_time was not specified in the config, apply the default or
+      // base_ejection_time whatever is larger.
+      max_ejection_time_ms_(static_cast<uint64_t>(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, max_ejection_time,
+          std::max(DEFAULT_MAX_EJECTION_TIME_MS, base_ejection_time_ms_)))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::config::cluster::v3::OutlierDetection& config,
@@ -281,6 +285,12 @@ DetectorImpl::create(const Cluster& cluster,
                      TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
+
+  if (detector->config().maxEjectionTimeMs() < detector->config().baseEjectionTimeMs()) {
+    throw EnvoyException(
+        "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
+  }
+
   detector->initialize(cluster);
 
   return detector;
@@ -292,7 +302,7 @@ void DetectorImpl::initialize(const Cluster& cluster) {
       addHostMonitor(host);
     }
   }
-  cluster.prioritySet().addMemberUpdateCb(
+  member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         for (const HostSharedPtr& host : hosts_added) {
           addHostMonitor(host);
@@ -321,20 +331,26 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
 
 void DetectorImpl::armIntervalTimer() {
   interval_timer_->enableTimer(std::chrono::milliseconds(
-      runtime_.snapshot().getInteger("outlier_detection.interval_ms", config_.intervalMs())));
+      runtime_.snapshot().getInteger(IntervalMsRuntime, config_.intervalMs())));
 }
 
 void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor,
                                        MonotonicTime now) {
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+    // Node seems to be healthy and was not ejected since the last check.
+    if (monitor->ejectTimeBackoff() != 0) {
+      monitor->ejectTimeBackoff()--;
+    }
     return;
   }
 
-  std::chrono::milliseconds base_eject_time =
-      std::chrono::milliseconds(runtime_.snapshot().getInteger(
-          "outlier_detection.base_ejection_time_ms", config_.baseEjectionTimeMs()));
+  const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+  const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+      runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
   ASSERT(monitor->numEjections() > 0);
-  if ((base_eject_time * monitor->numEjections()) <= (now - monitor->lastEjectionTime().value())) {
+  if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time)) <=
+      (now - monitor->lastEjectionTime().value())) {
     ejections_active_helper_.dec();
     host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
@@ -350,33 +366,29 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   }
 }
 
-bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_consecutive_5xx",
+  case envoy::data::cluster::v3::CONSECUTIVE_5XX:
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutive5xxRuntime,
                                               config_.enforcingConsecutive5xx());
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_gateway_failure",
-        config_.enforcingConsecutiveGatewayFailure());
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
+  case envoy::data::cluster::v3::CONSECUTIVE_GATEWAY_FAILURE:
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveGatewayFailureRuntime,
+                                              config_.enforcingConsecutiveGatewayFailure());
+  case envoy::data::cluster::v3::SUCCESS_RATE:
+    return runtime_.snapshot().featureEnabled(EnforcingSuccessRateRuntime,
                                               config_.enforcingSuccessRate());
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_consecutive_local_origin_failure",
-        config_.enforcingConsecutiveLocalOriginFailure());
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_local_origin_success_rate",
-        config_.enforcingLocalOriginSuccessRate());
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE:
-    return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_failure_percentage",
+  case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
+    return runtime_.snapshot().featureEnabled(EnforcingConsecutiveLocalOriginFailureRuntime,
+                                              config_.enforcingConsecutiveLocalOriginFailure());
+  case envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN:
+    return runtime_.snapshot().featureEnabled(EnforcingLocalOriginSuccessRateRuntime,
+                                              config_.enforcingLocalOriginSuccessRate());
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageRuntime,
                                               config_.enforcingFailurePercentage());
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
-    return runtime_.snapshot().featureEnabled(
-        "outlier_detection.enforcing_failure_percentage_local_origin",
-        config_.enforcingFailurePercentageLocalOrigin());
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+    return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
+                                              config_.enforcingFailurePercentageLocalOrigin());
   default:
     // Checked by schema.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -385,29 +397,28 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectio
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void DetectorImpl::updateEnforcedEjectionStats(
-    envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+void DetectorImpl::updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
   stats_.ejections_enforced_total_.inc();
   switch (type) {
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE:
+  case envoy::data::cluster::v3::SUCCESS_RATE:
     stats_.ejections_enforced_success_rate_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
+  case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_enforced_consecutive_5xx_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_GATEWAY_FAILURE:
     stats_.ejections_enforced_consecutive_gateway_failure_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     stats_.ejections_enforced_consecutive_local_origin_failure_.inc();
     break;
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN:
+  case envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_success_rate_.inc();
     break;
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE:
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     stats_.ejections_enforced_failure_percentage_.inc();
     break;
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_enforced_local_origin_failure_percentage_.inc();
     break;
   default:
@@ -416,28 +427,27 @@ void DetectorImpl::updateEnforcedEjectionStats(
   }
 }
 
-void DetectorImpl::updateDetectedEjectionStats(
-    envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type) {
   switch (type) {
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE:
+  case envoy::data::cluster::v3::SUCCESS_RATE:
     stats_.ejections_detected_success_rate_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
+  case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_detected_consecutive_5xx_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_GATEWAY_FAILURE:
     stats_.ejections_detected_consecutive_gateway_failure_.inc();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     stats_.ejections_detected_consecutive_local_origin_failure_.inc();
     break;
-  case envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN:
+  case envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_success_rate_.inc();
     break;
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE:
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE:
     stats_.ejections_detected_failure_percentage_.inc();
     break;
-  case envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
+  case envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN:
     stats_.ejections_detected_local_origin_failure_percentage_.inc();
     break;
   default:
@@ -447,16 +457,15 @@ void DetectorImpl::updateDetectedEjectionStats(
 }
 
 void DetectorImpl::ejectHost(HostSharedPtr host,
-                             envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+                             envoy::data::cluster::v3::OutlierEjectionType type) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
-      100, runtime_.snapshot().getInteger("outlier_detection.max_ejection_percent",
-                                          config_.maxEjectionPercent()));
+      100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * ejections_active_helper_.value() / host_monitors_.size();
   // Note this is not currently checked per-priority level, so it is possible
   // for outlier detection to eject all hosts at any given priority level.
   if (ejected_percent < max_ejection_percent) {
-    if (type == envoy::data::cluster::v2alpha::CONSECUTIVE_5XX ||
-        type == envoy::data::cluster::v2alpha::SUCCESS_RATE) {
+    if (type == envoy::data::cluster::v3::CONSECUTIVE_5XX ||
+        type == envoy::data::cluster::v3::SUCCESS_RATE) {
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
@@ -464,6 +473,15 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
+      const std::chrono::milliseconds base_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(BaseEjectionTimeMsRuntime, config_.baseEjectionTimeMs()));
+      const std::chrono::milliseconds max_eject_time = std::chrono::milliseconds(
+          runtime_.snapshot().getInteger(MaxEjectionTimeMsRuntime, config_.maxEjectionTimeMs()));
+      if ((host_monitors_[host]->ejectTimeBackoff() * base_eject_time) <
+          (max_eject_time + base_eject_time)) {
+        host_monitors_[host]->ejectTimeBackoff()++;
+      }
+
       runCallbacks(host);
       if (event_logger_) {
         event_logger_->logEject(host, *this, type, true);
@@ -485,7 +503,7 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
 }
 
 void DetectorImpl::notifyMainThreadConsecutiveError(
-    HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+    HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
   //       we catch consecutive errors on worker threads and then post back to the main thread.
@@ -506,21 +524,20 @@ void DetectorImpl::notifyMainThreadConsecutiveError(
 }
 
 void DetectorImpl::onConsecutive5xx(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host, envoy::data::cluster::v2alpha::CONSECUTIVE_5XX);
+  notifyMainThreadConsecutiveError(host, envoy::data::cluster::v3::CONSECUTIVE_5XX);
 }
 
 void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
-  notifyMainThreadConsecutiveError(host,
-                                   envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE);
+  notifyMainThreadConsecutiveError(host, envoy::data::cluster::v3::CONSECUTIVE_GATEWAY_FAILURE);
 }
 
 void DetectorImpl::onConsecutiveLocalOriginFailure(HostSharedPtr host) {
   notifyMainThreadConsecutiveError(host,
-                                   envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE);
+                                   envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE);
 }
 
-void DetectorImpl::onConsecutiveErrorWorker(
-    HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type) {
+void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
+                                            envoy::data::cluster::v3::OutlierEjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
@@ -537,14 +554,14 @@ void DetectorImpl::onConsecutiveErrorWorker(
 
   // reset counters
   switch (type) {
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_5XX:
+  case envoy::data::cluster::v3::CONSECUTIVE_5XX:
     stats_.ejections_consecutive_5xx_.inc(); // Deprecated
     host_monitors_[host]->resetConsecutive5xx();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_GATEWAY_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_GATEWAY_FAILURE:
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
-  case envoy::data::cluster::v2alpha::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
+  case envoy::data::cluster::v3::CONSECUTIVE_LOCAL_ORIGIN_FAILURE:
     host_monitors_[host]->resetConsecutiveLocalOriginFailure();
     break;
   default:
@@ -586,15 +603,13 @@ DetectorImpl::EjectionPair DetectorImpl::successRateEjectionThreshold(
 void DetectorImpl::processSuccessRateEjections(
     DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
-      "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
+      SuccessRateMinimumHostsRuntime, config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
-      "outlier_detection.success_rate_request_volume", config_.successRateRequestVolume());
-  uint64_t failure_percentage_minimum_hosts =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_minimum_hosts",
-                                     config_.failurePercentageMinimumHosts());
-  uint64_t failure_percentage_request_volume =
-      runtime_.snapshot().getInteger("outlier_detection.failure_percentage_request_volume",
-                                     config_.failurePercentageRequestVolume());
+      SuccessRateRequestVolumeRuntime, config_.successRateRequestVolume());
+  uint64_t failure_percentage_minimum_hosts = runtime_.snapshot().getInteger(
+      FailurePercentageMinimumHostsRuntime, config_.failurePercentageMinimumHosts());
+  uint64_t failure_percentage_request_volume = runtime_.snapshot().getInteger(
+      FailurePercentageRequestVolumeRuntime, config_.failurePercentageRequestVolume());
 
   std::vector<HostSuccessRatePair> valid_success_rate_hosts;
   std::vector<HostSuccessRatePair> valid_failure_percentage_hosts;
@@ -645,7 +660,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_success_rate_hosts.empty() &&
       valid_success_rate_hosts.size() >= success_rate_minimum_hosts) {
     const double success_rate_stdev_factor =
-        runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
+        runtime_.snapshot().getInteger(SuccessRateStdevFactorRuntime,
                                        config_.successRateStdevFactor()) /
         1000.0;
     getSRNums(monitor_type) = successRateEjectionThreshold(
@@ -654,7 +669,7 @@ void DetectorImpl::processSuccessRateEjections(
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold) {
         stats_.ejections_success_rate_.inc(); // Deprecated.
-        const envoy::data::cluster::v2alpha::OutlierEjectionType type =
+        const envoy::data::cluster::v3::OutlierEjectionType type =
             host_monitors_[host_success_rate_pair.host_]
                 ->getSRMonitor(monitor_type)
                 .getEjectionType();
@@ -667,7 +682,7 @@ void DetectorImpl::processSuccessRateEjections(
   if (!valid_failure_percentage_hosts.empty() &&
       valid_failure_percentage_hosts.size() >= failure_percentage_minimum_hosts) {
     const double failure_percentage_threshold = runtime_.snapshot().getInteger(
-        "outlier_detection.failure_percentage_threshold", config_.failurePercentageThreshold());
+        FailurePercentageThresholdRuntime, config_.failurePercentageThreshold());
 
     for (const auto& host_success_rate_pair : valid_failure_percentage_hosts) {
       if ((100.0 - host_success_rate_pair.success_rate_) >= failure_percentage_threshold) {
@@ -675,10 +690,10 @@ void DetectorImpl::processSuccessRateEjections(
 
         // The ejection type returned by the SuccessRateMonitor's getEjectionType() will be a
         // SUCCESS_RATE type, so we need to figure it out for ourselves.
-        const envoy::data::cluster::v2alpha::OutlierEjectionType type =
+        const envoy::data::cluster::v3::OutlierEjectionType type =
             (monitor_type == DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin)
-                ? envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE
-                : envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN;
+                ? envoy::data::cluster::v3::FAILURE_PERCENTAGE
+                : envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN;
         updateDetectedEjectionStats(type);
         ejectHost(host_success_rate_pair.host_, type);
       }
@@ -713,22 +728,21 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
 }
 
 void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                               envoy::data::cluster::v2alpha::OutlierEjectionType type,
-                               bool enforced) {
-  envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
+                               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) {
+  envoy::data::cluster::v3::OutlierDetectionEvent event;
   event.set_type(type);
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastUnejectionTime();
   setCommonEventParams(event, host, time);
 
-  event.set_action(envoy::data::cluster::v2alpha::EJECT);
+  event.set_action(envoy::data::cluster::v3::EJECT);
 
   event.set_enforced(enforced);
 
-  if ((type == envoy::data::cluster::v2alpha::SUCCESS_RATE) ||
-      (type == envoy::data::cluster::v2alpha::SUCCESS_RATE_LOCAL_ORIGIN)) {
+  if ((type == envoy::data::cluster::v3::SUCCESS_RATE) ||
+      (type == envoy::data::cluster::v3::SUCCESS_RATE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
-        (type == envoy::data::cluster::v2alpha::SUCCESS_RATE)
+        (type == envoy::data::cluster::v3::SUCCESS_RATE)
             ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
             : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
@@ -737,10 +751,10 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
         detector.successRateEjectionThreshold(monitor_type));
     event.mutable_eject_success_rate_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
-  } else if ((type == envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE) ||
-             (type == envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE_LOCAL_ORIGIN)) {
+  } else if ((type == envoy::data::cluster::v3::FAILURE_PERCENTAGE) ||
+             (type == envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN)) {
     const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
-        (type == envoy::data::cluster::v2alpha::FAILURE_PERCENTAGE)
+        (type == envoy::data::cluster::v3::FAILURE_PERCENTAGE)
             ? DetectorHostMonitor::SuccessRateMonitorType::ExternalOrigin
             : DetectorHostMonitor::SuccessRateMonitorType::LocalOrigin;
     event.mutable_eject_failure_percentage_event()->set_host_success_rate(
@@ -749,27 +763,29 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_consecutive_event();
   }
 
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
+  const auto json =
+      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
 void EventLoggerImpl::logUneject(const HostDescriptionConstSharedPtr& host) {
-  envoy::data::cluster::v2alpha::OutlierDetectionEvent event;
+  envoy::data::cluster::v3::OutlierDetectionEvent event;
 
   absl::optional<MonotonicTime> time = host->outlierDetector().lastEjectionTime();
   setCommonEventParams(event, host, time);
 
-  event.set_action(envoy::data::cluster::v2alpha::UNEJECT);
+  event.set_action(envoy::data::cluster::v3::UNEJECT);
 
-  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
-                                                          /* always_print_primitive_fields */ true);
+  const auto json =
+      MessageUtil::getJsonStringFromMessageOrError(event, /* pretty_print */ false,
+                                                   /* always_print_primitive_fields */ true);
   file_->write(fmt::format("{}\n", json));
 }
 
-void EventLoggerImpl::setCommonEventParams(
-    envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
-    const HostDescriptionConstSharedPtr& host, absl::optional<MonotonicTime> time) {
+void EventLoggerImpl::setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,
+                                           const HostDescriptionConstSharedPtr& host,
+                                           absl::optional<MonotonicTime> time) {
   MonotonicTime monotonic_now = time_source_.monotonicTime();
   if (time) {
     std::chrono::seconds secsFromLastAction =

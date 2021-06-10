@@ -1,4 +1,4 @@
-#include "common/router/header_parser.h"
+#include "source/common/router/header_parser.h"
 
 #include <cctype>
 #include <memory>
@@ -6,9 +6,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/assert.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -46,8 +47,10 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
   // will cause us to have to worry about interaction with other aspects of the
   // RouteAction, e.g. prefix rewriting. We also reject other :-prefixed
   // headers, since it seems dangerous and there doesn't appear a use case.
-  if (key[0] == ':') {
-    throw EnvoyException(":-prefixed headers may not be modified");
+  // Host is disallowed as it created confusing and inconsistent behaviors for
+  // HTTP/1 and HTTP/2. It could arguably be allowed on the response path.
+  if (!Http::HeaderUtility::isModifiableHeader(key)) {
+    throw EnvoyException(":-prefixed or host headers may not be modified");
   }
 
   absl::string_view format(header_value.value());
@@ -258,7 +261,7 @@ HeaderParserPtr HeaderParser::configure(
     // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
     // request finalization assume their existence and they are needed for well-formedness in most
     // cases.
-    if (header[0] == ':' || Http::LowerCaseString(header).get() == "host") {
+    if (!Http::HeaderUtility::isRemovableHeader(header)) {
       throw EnvoyException(":-prefixed or host headers may not be removed");
     }
     header_parser->headers_to_remove_.emplace_back(header);
@@ -291,6 +294,34 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       }
     }
   }
+}
+
+Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                         bool do_formatting) const {
+  Http::HeaderTransforms transforms;
+
+  for (const auto& [key, entry] : headers_to_add_) {
+    if (do_formatting) {
+      const std::string value = entry.formatter_->format(stream_info);
+      if (!value.empty()) {
+        if (entry.formatter_->append()) {
+          transforms.headers_to_append.push_back({key, value});
+        } else {
+          transforms.headers_to_overwrite.push_back({key, value});
+        }
+      }
+    } else {
+      if (entry.formatter_->append()) {
+        transforms.headers_to_append.push_back({key, entry.original_value_});
+      } else {
+        transforms.headers_to_overwrite.push_back({key, entry.original_value_});
+      }
+    }
+  }
+
+  transforms.headers_to_remove = headers_to_remove_;
+
+  return transforms;
 }
 
 } // namespace Router

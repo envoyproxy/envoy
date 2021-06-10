@@ -4,8 +4,7 @@
 #include "envoy/server/access_log_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
+#include "source/extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -26,7 +25,7 @@ public:
   void SetUp() override {
     factory_ =
         Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            AccessLogNames::get().HttpGrpc);
+            "envoy.access_loggers.http_grpc");
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();
@@ -40,11 +39,12 @@ public:
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
     common_config->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
+    common_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
     TestUtility::jsonConvert(http_grpc_access_log_, *message_);
   }
 
   AccessLog::FilterPtr filter_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig http_grpc_access_log_;
   ProtobufTypes::MessagePtr message_;
   Server::Configuration::AccessLogInstanceFactory* factory_{};

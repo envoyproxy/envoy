@@ -2,10 +2,9 @@
 
 #include <memory>
 
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/jwt_authn/authenticator.h"
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -64,8 +63,8 @@ public:
 class MockUpstream {
 public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
-      : request_(&mock_cm.async_client_), response_body_(response_body) {
-    ON_CALL(mock_cm.async_client_, send_(_, _, _))
+      : request_(&mock_cm.thread_local_cluster_.async_client_), response_body_(response_body) {
+    ON_CALL(mock_cm.thread_local_cluster_.async_client_, send_(_, _, _))
         .WillByDefault(
             Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {

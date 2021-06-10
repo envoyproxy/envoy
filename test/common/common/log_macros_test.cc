@@ -4,8 +4,8 @@
 #include <string>
 #include <thread>
 
-#include "common/common/fancy_logger.h"
-#include "common/common/logger.h"
+#include "source/common/common/fancy_logger.h"
+#include "source/common/common/logger.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -333,7 +333,7 @@ TEST(Fancy, Iteration) {
   FANCY_LOG(info, "Info: iteration test begins.");
   getFancyContext().setAllFancyLoggers(spdlog::level::info);
   std::string output = getFancyContext().listFancyLoggers();
-  EXPECT_EQ(output, "   test/common/common/log_macros_test.cc: 2\n");
+  EXPECT_EQ(output, "   " __FILE__ ": 2\n");
   std::string log_format = "[%T.%e][%t][%l][%n] %v";
   getFancyContext().setFancyLogger(__FILE__, spdlog::level::err);
   // setDefaultFancyLevelFormat relies on previous default and might cause error online

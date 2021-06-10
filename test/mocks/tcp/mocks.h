@@ -15,6 +15,13 @@ namespace Envoy {
 namespace Tcp {
 namespace ConnectionPool {
 
+class MockCallbacks : public Callbacks {
+  MOCK_METHOD(void, onPoolFailure,
+              (PoolFailureReason reason, Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (ConnectionDataPtr && conn, Upstream::HostDescriptionConstSharedPtr host));
+};
+
 class MockUpstreamCallbacks : public UpstreamCallbacks {
 public:
   MockUpstreamCallbacks();
@@ -55,7 +62,7 @@ public:
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
-  MOCK_METHOD(bool, maybePrefetch, (float), ());
+  MOCK_METHOD(bool, maybePreconnect, (float), ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);

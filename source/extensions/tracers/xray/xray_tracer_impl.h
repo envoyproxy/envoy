@@ -2,12 +2,10 @@
 
 #include "envoy/server/tracer_config.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/trace_driver.h"
 
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 namespace Envoy {
 namespace Extensions {

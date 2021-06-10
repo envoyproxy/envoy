@@ -12,6 +12,10 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+exports_files([
+    "uber_per_readfilter.cc",
+])
+
 envoy_package()
 
 envoy_proto_library(
@@ -67,6 +71,7 @@ envoy_cc_fuzz_test(
         ":uber_readfilter_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
+        "//test/test_common:test_runtime_lib",
     ] + envoy_all_network_filters(),
 )
 

@@ -13,10 +13,10 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:timespan_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:timespan_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/stats:histogram_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
@@ -24,6 +24,5 @@ envoy_cc_mock(
         "//source/common/stats:timespan_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",
-        "//test/test_common:global_lib",
     ],
 )

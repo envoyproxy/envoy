@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"
@@ -14,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::ReturnRef;
 using testing::WithArgs;
 
 namespace Envoy {
@@ -75,15 +73,15 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   static Network::Address::InstanceConstSharedPtr addr =
       std::make_shared<Network::Address::PipeInstance>("/test/test.sock");
 
-  ON_CALL(filter_callbacks.connection_, remoteAddress()).WillByDefault(ReturnRef(addr));
-  ON_CALL(filter_callbacks.connection_, localAddress()).WillByDefault(ReturnRef(addr));
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr);
+  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr);
 
   for (const auto& action : input.actions()) {
     switch (action.action_selector_case()) {
     case envoy::extensions::filters::network::ext_authz::Action::kOnData: {
       // Optional input field to set default authorization check result for the following "onData()"
       if (action.on_data().has_result()) {
-        ON_CALL(*client, check(_, _, _, _, _))
+        ON_CALL(*client, check(_, _, _, _))
             .WillByDefault(WithArgs<0>(
                 Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                   callbacks.onComplete(makeAuthzResponse(

@@ -9,12 +9,12 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/base_logger.h"
-#include "common/common/fancy_logger.h"
-#include "common/common/fmt.h"
-#include "common/common/logger_impl.h"
-#include "common/common/macros.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/base_logger.h"
+#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -56,6 +56,7 @@ namespace Logger {
   FUNCTION(kafka)                                                                                  \
   FUNCTION(lua)                                                                                    \
   FUNCTION(main)                                                                                   \
+  FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(quic)                                                                                   \
@@ -353,6 +354,22 @@ private:
   const static ReplacementMap& replacements() {
     CONSTRUCT_ON_FIRST_USE(ReplacementMap, ReplacementMap{{"\n", "\\n"}});
   }
+};
+
+/**
+ * When added to a formatter, this adds 'j' as a user defined flag in the log pattern that makes a
+ * log payload message a valid JSON escaped string.
+ */
+class EscapeMessageJsonString : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<EscapeMessageJsonString>();
+  }
+
+  constexpr static char Placeholder = 'j';
 };
 
 } // namespace CustomFlagFormatter

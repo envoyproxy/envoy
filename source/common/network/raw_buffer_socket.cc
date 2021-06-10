@@ -1,9 +1,9 @@
-#include "common/network/raw_buffer_socket.h"
+#include "source/common/network/raw_buffer_socket.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Network {
@@ -18,8 +18,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   uint64_t bytes_read = 0;
   bool end_stream = false;
   do {
-    // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, 16384);
+    Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, absl::nullopt);
 
     if (result.ok()) {
       ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
@@ -30,7 +29,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       }
       bytes_read += result.rc_;
       if (callbacks_->shouldDrainReadBuffer()) {
-        callbacks_->setReadBufferReady();
+        callbacks_->setTransportSocketIsReadable();
         break;
       }
     } else {

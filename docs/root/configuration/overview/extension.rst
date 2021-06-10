@@ -3,10 +3,10 @@
 Extension configuration
 -----------------------
 
-Each configuration resource in Envoy has a type URL in the `typed_config`. This
+Each configuration resource in Envoy has a type URL in the ``typed_config``. This
 type corresponds to a versioned schema. If the type URL uniquely identifies an
 extension capable of interpreting the configuration, then the extension is
-selected regardless of the `name` field. In this case the `name` field becomes
+selected regardless of the ``name`` field. In this case the ``name`` field becomes
 optional and can be used as an identifier or as an annotation for the
 particular instance of the extension configuration. For example, the following
 filter configuration snippet is permitted:
@@ -21,8 +21,10 @@ filter configuration snippet is permitted:
     rds:
       route_config_name: local_route
       config_source:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: xds_cluster
@@ -33,7 +35,7 @@ filter configuration snippet is permitted:
         dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
-`udpa.type.v1.TypedStruct` should be used as a generic container. The type URL
+``udpa.type.v1.TypedStruct`` should be used as a generic container. The type URL
 inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
@@ -49,9 +51,11 @@ follows:
       codec_type: AUTO
       rds:
         route_config_name: local_route
+        resource_api_version: V3
         config_source:
           api_config_source:
             api_type: GRPC
+            transport_api_version: V3
             grpc_services:
               envoy_grpc:
                 cluster_name: xds_cluster
@@ -85,3 +89,4 @@ to the common subscription statistics, it also provides the following:
 
   config_reload, Counter, Total number of successful configuration updates
   config_fail, Counter, Total number of failed configuration updates
+  config_conflict, Counter, Total number of conflicting applications of configuration updates; this may happen when a new listener cannot reuse a subscribed extension configuration due to an invalid type URL.

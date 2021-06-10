@@ -1,7 +1,6 @@
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"
@@ -48,6 +47,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& i
   try {
     // Catch invalid header characters.
     TestUtility::validate(input);
+    ENVOY_LOG_MISC(debug, "Filter configuration: {}", input.config().DebugString());
     // Fuzz filter.
     static UberFilterFuzzer fuzzer;
     fuzzer.fuzz(input.config(), input.data(), input.upstream_data());

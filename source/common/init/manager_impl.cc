@@ -1,9 +1,9 @@
-#include "common/init/manager_impl.h"
+#include "source/common/init/manager_impl.h"
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/init/watcher_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/init/watcher_impl.h"
 
 namespace Envoy {
 namespace Init {
@@ -61,10 +61,6 @@ void ManagerImpl::initialize(const Watcher& watcher) {
       }
     }
   }
-}
-
-const absl::flat_hash_map<std::string, uint32_t>& ManagerImpl::unreadyTargets() const {
-  return target_names_count_;
 }
 
 void ManagerImpl::dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& unready_targets_dumps) {

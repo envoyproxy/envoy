@@ -7,9 +7,9 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/cds_api_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/cds_api_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -37,10 +37,10 @@ class CdsApiImplTest : public testing::Test {
 protected:
   void setup() {
     envoy::config::core::v3::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, cm_, store_, validation_visitor_);
+    cds_ = CdsApiImpl::create(cds_config, nullptr, cm_, store_, validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
-    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_, _));
+    EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));
     cds_->initialize();
     cds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -91,6 +91,7 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =
@@ -262,12 +263,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster2
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =
@@ -291,12 +294,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster3
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response2 =
@@ -327,12 +332,14 @@ resources:
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: cluster1
   type: EDS
   eds_cluster_config:
     eds_config:
+      resource_api_version: V3
       path: eds path
 )EOF";
   auto response1 =

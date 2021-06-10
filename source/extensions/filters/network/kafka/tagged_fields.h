@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "extensions/filters/network/kafka/serialization.h"
+#include "source/extensions/filters/network/kafka/serialization.h"
 
 /**
  * This header file provides serialization support for tagged fields structure added in 2.4.
@@ -70,7 +70,7 @@ public:
     const uint32_t data_consumed = std::min<uint32_t>(required_, data.size());
     const uint32_t written = data_buffer_.size() - required_;
     if (data_consumed > 0) {
-      memcpy(data_buffer_.data() + written, data.data(), data_consumed);
+      memcpy(data_buffer_.data() + written, data.data(), data_consumed); // NOLINT(safe-memcpy)
       required_ -= data_consumed;
       data = {data.data() + data_consumed, data.size() - data_consumed};
     }

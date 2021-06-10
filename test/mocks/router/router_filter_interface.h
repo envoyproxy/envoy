@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/router/router.h"
+#include "source/common/router/router.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -54,6 +54,8 @@ public:
 
   envoy::extensions::filters::http::router::v3::Router router_proto;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
+  Stats::StatNamePool pool_;
   FilterConfig config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   std::list<UpstreamRequestPtr> requests_;

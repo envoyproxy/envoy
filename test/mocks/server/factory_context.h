@@ -2,7 +2,8 @@
 
 #include "envoy/server/configuration.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"
@@ -25,6 +26,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(bool, healthCheckFailed, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
@@ -43,6 +45,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
+  Router::Context& routerContext() override { return router_context_; }
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
@@ -68,6 +71,7 @@ public:
   testing::NiceMock<MockOverloadManager> overload_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  Router::ContextImpl router_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
 } // namespace Configuration

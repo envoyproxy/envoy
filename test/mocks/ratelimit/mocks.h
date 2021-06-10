@@ -14,10 +14,6 @@ inline bool operator==(const RateLimitOverride& lhs, const RateLimitOverride& rh
   return lhs.requests_per_unit_ == rhs.requests_per_unit_ && lhs.unit_ == rhs.unit_;
 }
 
-inline bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
-  return lhs.key_ == rhs.key_ && lhs.value_ == rhs.value_;
-}
-
 inline bool operator==(const Descriptor& lhs, const Descriptor& rhs) {
   return lhs.entries_ == rhs.entries_ && lhs.limit_ == rhs.limit_;
 }

@@ -4,7 +4,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -17,11 +17,12 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   using DestroyCb = std::function<void(CodecClient*)>;
-  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+  CodecClientForTest(Http::CodecType type, Network::ClientConnectionPtr&& connection,
                      Http::ClientConnection* codec, DestroyCb destroy_cb,
                      Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
       : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
+    connect();
   }
   ~CodecClientForTest() override {
     if (destroy_cb_) {
@@ -30,6 +31,7 @@ public:
   }
   void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+  using Http::CodecClient::onSettings;
 
   DestroyCb destroy_cb_;
 };
@@ -39,7 +41,7 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo&) override {
+                   const StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
@@ -53,8 +55,8 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   }
 
   ConnectionPool::PoolFailureReason reason_;
-  ReadyWatcher pool_failure_;
-  ReadyWatcher pool_ready_;
+  testing::NiceMock<ReadyWatcher> pool_failure_;
+  testing::NiceMock<ReadyWatcher> pool_ready_;
   Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };

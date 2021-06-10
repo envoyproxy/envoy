@@ -5,8 +5,8 @@
 #include <chrono>
 #include <cstdint>
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -40,6 +40,32 @@
 #define PERF_RECORD(perf, category, description)                                                   \
   do {                                                                                             \
     perf.record(category, description);                                                            \
+  } while (false)
+
+/**
+ * Declares a storage member for a performance operation inside an owner class.
+ * A perf_var can then be instantiated in one of the owner's methods with
+ * PERF_OWNED_OPERATION(perf_var) and reported multiple times in any method with
+ * PERF_OWNED_RECORD(perf_var, category, description).
+ */
+#define PERF_OWNER(perf_var) std::unique_ptr<Envoy::PerfOperation> perf_var
+
+/**
+ * Instantiates a performance operation, initiates and stores it in the owner annotated with
+ * PERF_OWNER.
+ */
+#define PERF_OWNED_OPERATION(perf_var)                                                             \
+  do {                                                                                             \
+    perf_var = std::make_unique<Envoy::PerfOperation>();                                           \
+  } while (false)
+
+/**
+ * Records performance data initiated with PERF_OWNED_OPERATION. The category
+ * and descriptions have the same meaning as in PERF_RECORD.
+ */
+#define PERF_OWNED_RECORD(perf_var, category, description)                                         \
+  do {                                                                                             \
+    perf_var->record(category, description);                                                       \
   } while (false)
 
 /**
@@ -190,6 +216,12 @@ private:
 #define PERF_RECORD(perf, category, description)                                                   \
   do {                                                                                             \
   } while (false)
+#define PERF_OWNED_OPERATION(perf_var)                                                             \
+  do {                                                                                             \
+  } while (false)
+#define PERF_OWNED_RECORD(perf, category, description)                                             \
+  do {                                                                                             \
+  } while (false)
 #define PERF_DUMP()                                                                                \
   do {                                                                                             \
   } while (false)
@@ -197,5 +229,8 @@ private:
 #define PERF_CLEAR()                                                                               \
   do {                                                                                             \
   } while (false)
+
+// Empty declaration used when performance collection is disabled.
+#define PERF_OWNER(perf_var)
 
 #endif

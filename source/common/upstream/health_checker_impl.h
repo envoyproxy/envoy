@@ -6,15 +6,17 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/network/socket.h"
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/common/logger.h"
-#include "common/grpc/codec.h"
-#include "common/http/codec_client.h"
-#include "common/router/header_parser.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/health_checker_base_impl.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 
 #include "src/proto/grpc/health/v1/health.pb.h"
 
@@ -97,6 +99,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override { onResponseComplete(); }
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(HttpActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,
@@ -105,6 +110,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     void onEvent(Network::ConnectionEvent event);
+    void onGoAway(Http::GoAwayErrorCode error_code);
 
     class ConnectionCallbackImpl : public Network::ConnectionCallbacks {
     public:
@@ -118,14 +124,27 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
+    class HttpConnectionCallbackImpl : public Http::ConnectionCallbacks {
+    public:
+      HttpConnectionCallbackImpl(HttpActiveHealthCheckSession& parent) : parent_(parent) {}
+      // Http::ConnectionCallbacks
+      void onGoAway(Http::GoAwayErrorCode error_code) override { parent_.onGoAway(error_code); }
+
+    private:
+      HttpActiveHealthCheckSession& parent_;
+    };
+
     ConnectionCallbackImpl connection_callback_impl_{*this};
+    HttpConnectionCallbackImpl http_connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::Address::InstanceConstSharedPtr local_address_;
+    Network::SocketAddressProviderSharedPtr local_address_provider_;
     bool expect_reset_{};
+    bool reuse_connection_ = false;
+    bool request_in_flight_ = false;
   };
 
   using HttpActiveHealthCheckSessionPtr = std::unique_ptr<HttpActiveHealthCheckSession>;
@@ -140,7 +159,7 @@ private:
     return envoy::data::core::v3::HTTP;
   }
 
-  Http::CodecClient::Type codecClientType(const envoy::type::v3::CodecClientType& type);
+  Http::CodecType codecClientType(const envoy::type::v3::CodecClientType& type);
 
   const std::string path_;
   const std::string host_value_;
@@ -149,7 +168,7 @@ private:
   const HttpStatusChecker http_status_checker_;
 
 protected:
-  const Http::CodecClient::Type codec_client_type_;
+  const Http::CodecType codec_client_type_;
   Random::RandomGenerator& random_generator_;
 };
 
@@ -317,6 +336,9 @@ private:
     void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override;
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(GrpcActiveHealthCheckSession);
+    }
 
     // Http::StreamCallbacks
     void onResetStream(Http::StreamResetReason reason,

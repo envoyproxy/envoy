@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/upstream/conn_pool_map_impl.h"
-#include "common/upstream/priority_conn_pool_map.h"
+#include "source/common/upstream/conn_pool_map_impl.h"
+#include "source/common/upstream/priority_conn_pool_map.h"
 
 namespace Envoy {
 namespace Upstream {

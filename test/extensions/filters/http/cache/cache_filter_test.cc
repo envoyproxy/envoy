@@ -1,9 +1,8 @@
 #include "envoy/event/dispatcher.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/cache/cache_filter.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
@@ -49,7 +48,7 @@ protected:
               Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
     // The filter should continue decoding when the cache lookup result (miss) is ready.
-    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(1);
+    EXPECT_CALL(decoder_callbacks_, continueDecoding);
 
     // The cache lookup callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
@@ -60,10 +59,11 @@ protected:
 
   void testDecodeRequestHitNoBody(CacheFilterSharedPtr filter) {
     // The filter should encode cached headers.
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               true));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       true));
 
     // The filter should not encode any data as the response has no body.
     EXPECT_CALL(decoder_callbacks_, encodeData).Times(0);
@@ -86,10 +86,11 @@ protected:
 
   void testDecodeRequestHitWithBody(CacheFilterSharedPtr filter, std::string body) {
     // The filter should encode cached headers.
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     // The filter should encode cached data.
     EXPECT_CALL(
@@ -420,10 +421,11 @@ TEST_F(CacheFilterTest, SingleSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -469,10 +471,11 @@ TEST_F(CacheFilterTest, MultipleSatisfiableRanges) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               false));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       false));
 
     EXPECT_CALL(
         decoder_callbacks_,
@@ -521,10 +524,11 @@ TEST_F(CacheFilterTest, NotSatisfiableRange) {
     CacheFilterSharedPtr filter = makeFilter(simple_cache_);
 
     // Decode request 2 header
-    EXPECT_CALL(decoder_callbacks_,
-                encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
-                                              HeaderHasValueRef(Http::Headers::get().Age, age)),
-                               true));
+    EXPECT_CALL(
+        decoder_callbacks_,
+        encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                      HeaderHasValueRef(Http::CustomHeaders::get().Age, age)),
+                       true));
 
     // 416 response should not have a body, so we don't expect a call to encodeData
     EXPECT_CALL(decoder_callbacks_,
@@ -568,7 +572,7 @@ TEST_F(CacheFilterTest, GetRequestWithBodyAndTrailers) {
 // was deleted (e.g. connection dropped with the client) before the posted callback was executed. In
 // this case the CacheFilter should not be accessed after it was deleted, which is ensured by using
 // a weak_ptr to the CacheFilter in the posted callback.
-// This test may mistakenly pass (false positive) even if the the CacheFilter is accessed after
+// This test may mistakenly pass (false positive) even if the CacheFilter is accessed after
 // being deleted, as filter_state_ may be accessed and read as "FilterState::Destroyed" which will
 // result in a correct behavior. However, running the test with ASAN sanitizer enabled should
 // reliably fail if the CacheFilter is accessed after being deleted.

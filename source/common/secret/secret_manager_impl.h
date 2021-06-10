@@ -8,8 +8,8 @@
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "common/common/logger.h"
-#include "common/secret/sds_api.h"
+#include "source/common/common/logger.h"
+#include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -92,6 +92,10 @@ private:
                                              config_name, unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
+      // It is important to add the init target to the manager regardless the secret provider is new
+      // or existing. Different clusters / listeners can share same secret so they have to be marked
+      // warming correctly.
+      secret_provider_context.initManager().add(*secret_provider->initTarget());
       return secret_provider;
     }
 

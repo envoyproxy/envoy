@@ -14,12 +14,8 @@ level the router takes an incoming HTTP request, matches it to an upstream clust
 request. The router filter supports the following features:
 
 * Virtual hosts that map domains/authorities to a set of routing rules.
-* Prefix and exact path matching rules (both :ref:`case sensitive
-  <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive). Regex/slug
-  matching is not currently supported, mainly because it makes it difficult/impossible to
-  programmatically determine whether routing rules conflict with each other. For this reason we
-  don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
-  future depending on demand.
+* Prefix and exact path matching rules (both :ref:`case sensitive <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive).
+* :ref:`Regex path matching <envoy_v3_api_field_config.route.v3.RouteMatch.safe_regex>` rules.
 * :ref:`TLS redirection <envoy_v3_api_field_config.route.v3.VirtualHost.require_tls>` at the virtual host
   level.
 * :ref:`Path <envoy_v3_api_field_config.route.v3.RedirectAction.path_redirect>`/:ref:`host
@@ -57,13 +53,13 @@ Route Scope
 -----------
 
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
-A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
-For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
+For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
 RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
-defining the key construction algorithm used by Envoy to look up the scope corresponding to each request. 
+defining the key construction algorithm used by Envoy to look up the scope corresponding to each request.
 
 For example, for the following scoped route configuration, Envoy will look into the "addr" header value, split the header value by ";" first, and use the first value for key 'x-foo-key' as the scope key.
 If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", then "127.0.0.1" will be computed as the scope key to look up for corresponding route configuration.
@@ -114,7 +110,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
-* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>` that can be retries to
+* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` that can be retries to
   prevent their contribution to large increases in traffic volume.
 * **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
@@ -126,7 +122,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 
 Note that Envoy retries requests when :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to either configure
-:ref:`retry budgets (preferred) <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` or set
+:ref:`retry budgets (preferred) <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` or set
 :ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:
@@ -186,10 +182,13 @@ upon configuration load and cache the contents.
 
 .. attention::
 
-   If a response body is specified, it must be no more than 4KB in size, regardless of
+   If a response body is specified, by default it is limited to 4KB in size, regardless of
    whether it is provided inline or in a file. Envoy currently holds the entirety of the
-   body in memory, so the 4KB limit is intended to keep the proxy's memory footprint
-   from growing too large.
+   body in memory, so the 4KB default is intended to keep the proxy's memory footprint
+   from growing too large. However, if required, this limit can be changed through setting
+   the :ref:`max_direct_response_body_size_bytes
+   <envoy_v3_api_field_config.route.v3.RouteConfiguration.max_direct_response_body_size_bytes>`
+   field.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
 Envoy will include the specified headers in the direct HTTP response.

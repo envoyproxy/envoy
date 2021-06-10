@@ -1,13 +1,12 @@
-#include "extensions/filters/network/rocketmq_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
 
-#include "common/common/enum_to_int.h"
-
-#include "extensions/filters/network/rocketmq_proxy/active_message.h"
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
-#include "extensions/filters/network/rocketmq_proxy/well_known_names.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/extensions/filters/network/rocketmq_proxy/active_message.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,27 +34,25 @@ void RouterImpl::onBelowWriteBufferLowWatermark() {
 }
 
 void RouterImpl::onEvent(Network::ConnectionEvent event) {
-  switch (event) {
+  switch (event)
   case Network::ConnectionEvent::RemoteClose: {
     ENVOY_LOG(error, "Connection to upstream: {} is closed by remote peer",
               upstream_host_->address()->asString());
     // Send local reply to downstream
     active_message_->onError("Connection to upstream is closed by remote peer");
     break;
-  }
-  case Network::ConnectionEvent::LocalClose: {
+  case Network::ConnectionEvent::LocalClose:
     ENVOY_LOG(error, "Connection to upstream: {} has been closed",
               upstream_host_->address()->asString());
     // Send local reply to downstream
     active_message_->onError("Connection to upstream has been closed");
     break;
-  }
   default:
     // Ignore other events for now
     ENVOY_LOG(trace, "Ignore event type");
     return;
   }
-  active_message_->onReset();
+    active_message_->onReset();
 }
 
 const Envoy::Router::MetadataMatchCriteria* RouterImpl::metadataMatchCriteria() {
@@ -89,7 +86,7 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
 
   route_entry_ = route->routeEntry();
   const std::string cluster_name = route_entry_->clusterName();
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!cluster) {
     active_message.onError("Cluster does not exist.");
     ENVOY_LOG(warn, "Cluster for {} is not available", cluster_name);
@@ -106,9 +103,8 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
     return;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!data) {
     ENVOY_LOG(warn, "No host available for cluster {}. Opaque: {}", cluster_name, opaque);
     active_message.onError("No host available");
     reset();
@@ -116,7 +112,7 @@ void RouterImpl::sendRequestToUpstream(ActiveMessage& active_message) {
   }
 
   upstream_request_ = std::make_unique<UpstreamRequest>(*this);
-  Tcp::ConnectionPool::Cancellable* cancellable = conn_pool->newConnection(*upstream_request_);
+  Tcp::ConnectionPool::Cancellable* cancellable = data.value().newConnection(*upstream_request_);
   if (cancellable) {
     handle_ = cancellable;
     ENVOY_LOG(trace, "No connection is available for now. Create a cancellable handle. Opaque: {}",

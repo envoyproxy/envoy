@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/router/string_accessor_impl.h"
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"
@@ -40,7 +39,7 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -74,7 +73,7 @@ rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -104,7 +103,7 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl::create(proto_config, "", context), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(FilterConfigImpl(proto_config, "", context), EnvoyException,
                             "Wrong requirement_name: rr. It should be one of [r1]");
 }
 
@@ -137,7 +136,7 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_TRUE(filter_conf->findVerifier(
@@ -168,7 +167,7 @@ rules:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   // Make sure that the thread callbacks are not invoked inline.
-  server_context.thread_local_.defer_data = true;
+  server_context.thread_local_.defer_data_ = true;
   {
     // Scope in all the things that the filter depends on, so they are destroyed as we leave the
     // scope.
@@ -182,7 +181,7 @@ rules:
 
     JwtAuthentication proto_config;
     TestUtility::loadFromYaml(config, proto_config);
-    auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+    auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
   }
 
   // Even though filter_conf is now de-allocated, using a reference to it might still work, as its
@@ -222,7 +221,7 @@ filter_state_rules:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   // Empty filter_state
   StreamInfo::FilterStateImpl filter_state1(StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -276,7 +275,7 @@ requirement_map:
   TestUtility::loadFromYaml(config, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  auto filter_conf = FilterConfigImpl::create(proto_config, "", context);
+  auto filter_conf = std::make_unique<FilterConfigImpl>(proto_config, "", context);
 
   PerRouteConfig per_route;
   const Verifier* verifier;

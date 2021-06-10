@@ -13,7 +13,6 @@ A minimal fully static bootstrap config is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -66,7 +65,6 @@ on 127.0.0.1:5678 is provided below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -99,8 +97,10 @@ on 127.0.0.1:5678 is provided below:
       type: EDS
       eds_cluster_config:
         eds_config:
+          resource_api_version: V3
           api_config_source:
             api_type: GRPC
+            transport_api_version: V3
             grpc_services:
               - envoy_grpc:
                   cluster_name: xds_cluster
@@ -108,10 +108,14 @@ on 127.0.0.1:5678 is provided below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options:
-        connection_keepalive:
-          interval: 30s
-          timeout: 5s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options:
+              connection_keepalive:
+                interval: 30s
+                timeout: 5s
       upstream_connection_options:
         # configure a TCP keep-alive to detect and reconnect to the admin
         # server in the event of a TCP socket half open connection
@@ -131,7 +135,7 @@ an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
 
 It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_v3_api_msg_config.core.v3.TcpKeepalive>`
-in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
+in the ``tcp_keepalive`` block. This will help detect TCP half open connections to the xDS management
 server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
@@ -168,20 +172,23 @@ below:
   :type-name: envoy.config.bootstrap.v3.Bootstrap
 
   admin:
-    access_log_path: /tmp/admin_access.log
     address:
       socket_address: { address: 127.0.0.1, port_value: 9901 }
 
   dynamic_resources:
     lds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
+        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
     cds_config:
+      resource_api_version: V3
       api_config_source:
         api_type: GRPC
+        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
@@ -192,12 +199,16 @@ below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      http2_protocol_options:
-        # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
-        # to the admin server if the connection is no longer responsive.
-        connection_keepalive:
-          interval: 30s
-          timeout: 5s
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options:
+              # Configure an HTTP/2 keep-alive to detect connection issues and reconnect
+              # to the admin server if the connection is no longer responsive.
+              connection_keepalive:
+                interval: 30s
+                timeout: 5s
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -230,8 +241,10 @@ The management server could respond to LDS requests with:
           rds:
             route_config_name: local_route
             config_source:
+              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
+                transport_api_version: V3
                 grpc_services:
                   - envoy_grpc:
                       cluster_name: xds_cluster
@@ -266,8 +279,10 @@ The management server could respond to CDS requests with:
     type: EDS
     eds_cluster_config:
       eds_config:
+        resource_api_version: V3
         api_config_source:
           api_type: GRPC
+          transport_api_version: V3
           grpc_services:
             - envoy_grpc:
                 cluster_name: xds_cluster
@@ -287,3 +302,36 @@ The management server could respond to EDS requests with:
             socket_address:
               address: 127.0.0.2
               port_value: 1234
+
+Special YAML usage
+~~~~~~~~~~~~~~~~~~
+
+When loading YAML configuration, the Envoy loader will interpret map keys tagged with !ignore
+specially, and omit them entirely from the native configuration tree. Ordinarily, the YAML stream
+must adhere strictly to the proto schemas defined for Envoy configuration. This allows content to
+be declared that is explicitly handled as a non-represented type.
+
+This lets you split your file into two parts: one in which we have YAML content not subject to
+parsing according to the schema and another part that is parsed. YAML anchors in the first part
+may be referenced by aliases in the second part. This mechanism can simplify setups that need to
+re-use or dynamically generate configuration fragments.
+
+See the following example:
+
+.. literalinclude:: _include/tagged.yaml
+    :language: yaml
+
+.. warning::
+    If you parse Envoy YAML configuration using external loaders, you may need to inform these
+    loaders about the !ignore tag. Compliant YAML loaders will typically expose an interface to
+    allow you to choose how to handle a custom tag.
+
+For example, this will instruct `PyYAML <https://github.com/yaml/pyyaml>`_ to treat an ignored
+node as a simple scalar when loading:
+
+.. code-block:: python3
+
+    yaml.SafeLoader.add_constructor('!ignore', yaml.loader.SafeConstructor.construct_scalar)
+
+Alternatively, :repo:`this is how <tools/config_validation/validate_fragment.py>`
+Envoy registers the !ignore tag in config validation.

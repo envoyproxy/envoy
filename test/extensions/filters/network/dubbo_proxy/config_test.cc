@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
-#include "extensions/filters/network/dubbo_proxy/config.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
+#include "source/extensions/filters/network/dubbo_proxy/config.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter_config.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -62,7 +62,7 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
-  EXPECT_TRUE(factory.isTerminalFilter());
+  EXPECT_TRUE(factory.isTerminalFilterByProto(config, context));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

@@ -1,12 +1,11 @@
-#include "extensions/tracers/xray/daemon_broker.h"
+#include "source/extensions/tracers/xray/daemon_broker.h"
 
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
 
 namespace Envoy {
@@ -22,8 +21,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
   source::extensions::tracers::xray::daemon::Header header;
   header.set_format(format);
   header.set_version(version);
-  return MessageUtil::getJsonStringFromMessage(header, false /* pretty_print  */,
-                                               false /* always_print_primitive_fields */);
+  return MessageUtil::getJsonStringFromMessageOrDie(header, false /* pretty_print  */,
+                                                    false /* always_print_primitive_fields */);
 }
 
 } // namespace

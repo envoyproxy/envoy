@@ -5,10 +5,8 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/http/header_map.h"
 
-#include "common/http/message_impl.h"
-
-#include "extensions/common/aws/signer.h"
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/common/aws/signer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +26,7 @@ public:
     return std::make_unique<envoy::config::grpc_credential::v3::AwsIamConfig>();
   }
 
-  std::string name() const override { return GrpcCredentialsNames::get().AwsIam; }
+  std::string name() const override { return "envoy.grpc_credentials.aws_iam"; }
 
 private:
   static std::string getRegion(const envoy::config::grpc_credential::v3::AwsIamConfig& config);

@@ -1,13 +1,13 @@
-#include "common/config/filesystem_subscription_impl.h"
+#include "source/common/config/filesystem_subscription_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -27,13 +27,13 @@ FilesystemSubscriptionImpl::FilesystemSubscriptionImpl(
 }
 
 // Config::Subscription
-void FilesystemSubscriptionImpl::start(const std::set<std::string>&, const bool) {
+void FilesystemSubscriptionImpl::start(const absl::flat_hash_set<std::string>&) {
   started_ = true;
   // Attempt to read in case there is a file there already.
   refresh();
 }
 
-void FilesystemSubscriptionImpl::updateResourceInterest(const std::set<std::string>&) {
+void FilesystemSubscriptionImpl::updateResourceInterest(const absl::flat_hash_set<std::string>&) {
   // Bump stats for consistent behavior with other xDS.
   stats_.update_attempt_.inc();
 }
@@ -61,7 +61,7 @@ void FilesystemSubscriptionImpl::refresh() {
   ENVOY_LOG(debug, "Filesystem config refresh for {}", path_);
   stats_.update_attempt_.inc();
   ProtobufTypes::MessagePtr config_update;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     const std::string version = refreshInternal(&config_update);
     stats_.update_time_.set(DateUtil::nowToMilliseconds(api_.timeSource()));
     stats_.version_.set(HashUtil::xxHash64(version));
@@ -69,9 +69,12 @@ void FilesystemSubscriptionImpl::refresh() {
     stats_.update_success_.inc();
     ENVOY_LOG(debug, "Filesystem config update accepted for {}: {}", path_,
               config_update->DebugString());
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
+  }
+  END_TRY
+  catch (const ProtobufMessage::UnknownProtoFieldException& e) {
     configRejected(e, config_update == nullptr ? "" : config_update->DebugString());
-  } catch (const EnvoyException& e) {
+  }
+  catch (const EnvoyException& e) {
     if (config_update != nullptr) {
       configRejected(e, config_update->DebugString());
     } else {
@@ -113,7 +116,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   if (collection_entries_field_descriptor == nullptr ||
       collection_entries_field_descriptor->type() != Protobuf::FieldDescriptor::TYPE_MESSAGE ||
       collection_entries_field_descriptor->message_type()->full_name() !=
-          "udpa.core.v1.CollectionEntry" ||
+          "xds.core.v3.CollectionEntry" ||
       !collection_entries_field_descriptor->is_repeated()) {
     throw EnvoyException(fmt::format("Invalid structure for collection type {} in {}",
                                      collection_type, resource_message.DebugString()));
@@ -123,7 +126,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
       reflection->FieldSize(*collection_message, collection_entries_field_descriptor);
   DecodedResourcesWrapper decoded_resources;
   for (uint32_t i = 0; i < num_entries; ++i) {
-    udpa::core::v1::CollectionEntry collection_entry;
+    xds::core::v3::CollectionEntry collection_entry;
     collection_entry.MergeFrom(reflection->GetRepeatedMessage(
         *collection_message, collection_entries_field_descriptor, i));
     // TODO(htuch): implement indirect collection entries.

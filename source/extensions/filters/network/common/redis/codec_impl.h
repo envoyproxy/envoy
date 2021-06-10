@@ -5,9 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/common/redis/codec.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {

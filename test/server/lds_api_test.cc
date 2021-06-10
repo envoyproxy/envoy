@@ -4,9 +4,8 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "server/lds_api.h"
+#include "source/common/protobuf/utility.h"
+#include "source/server/lds_api.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -42,7 +41,7 @@ public:
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
                                         store_, listener_manager_, validation_visitor_);
-    EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_, _));
+    EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
   }

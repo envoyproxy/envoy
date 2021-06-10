@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
 #include "envoy/network/address.h"
 
-#include "extensions/filters/udp/dns_filter/dns_filter_constants.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

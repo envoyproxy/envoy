@@ -2,8 +2,8 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "extensions/filters/network/thrift_proxy/decoder_events.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder_events.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +25,11 @@ public:
   }
 
   // DecoderEventHandler
+  FilterStatus passthroughData(Buffer::Instance& data) override {
+    buffer_->move(data);
+    return FilterStatus::Continue;
+  }
+
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;

@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -23,6 +24,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/router:context_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -85,6 +87,7 @@ envoy_cc_fuzz_test(
     corpus = "codec_impl_corpus",
     deps = [
         ":codec_impl_fuzz_proto_cc_proto",
+        "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
@@ -153,8 +156,8 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:conn_pool_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -176,13 +179,11 @@ envoy_cc_fuzz_test(
     corpus = "conn_manager_impl_corpus",
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
-        "//include/envoy/http:request_id_extension_interface",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_utility_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/server:drain_manager_lib",
@@ -213,9 +214,12 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
-        "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
@@ -225,6 +229,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:delegating_route_utility_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -235,14 +240,16 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
-        "//include/envoy/http:request_id_extension_interface",
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http:request_id_extension_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/request_id/uuid:config",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -369,24 +376,22 @@ envoy_cc_test(
     ],
 )
 
+PATH_UTILITY_TEST_DEPS = [
+    "//source/common/http:header_map_lib",
+    "//source/common/http:path_utility_lib",
+]
+
 envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
-    deps = [
-        "//source/common/http:header_map_lib",
-        "//source/common/http:path_utility_lib",
-    ],
+    deps = PATH_UTILITY_TEST_DEPS,
 )
 
 envoy_cc_test(
-    name = "request_id_extension_uuid_impl_test",
-    srcs = ["request_id_extension_uuid_impl_test.cc"],
-    deps = [
-        "//source/common/http:request_id_extension_lib",
-        "//source/common/runtime:runtime_lib",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:utility_lib",
-    ],
+    name = "legacy_path_utility_test",
+    srcs = ["path_utility_test.cc"],
+    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_forked_chromium_url"],
+    deps = PATH_UTILITY_TEST_DEPS,
 )
 
 envoy_cc_test(
@@ -401,15 +406,73 @@ envoy_cc_test(
     name = "mixed_conn_pool_test",
     srcs = ["mixed_conn_pool_test.cc"],
     deps = [
-        "//source/common/http:conn_pool_base_lib",
+        ":common_lib",
+        "//source/common/http:mixed_conn_pool",
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_pool_grid_test",
+    srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
+    deps = envoy_select_enable_http3([
+        ":common_lib",
+        "//source/common/http:conn_pool_grid",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/common/quic:client_connection_factory_lib",
+    ]),
+)
+
+envoy_cc_test(
+    name = "http3_status_tracker_test",
+    srcs = ["http3_status_tracker_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:http3_status_tracker",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_manager_test",
+    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -430,5 +493,23 @@ envoy_cc_fuzz_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "custom_header_extension_lib",
+    srcs = ["custom_header_extension.cc"],
+    hdrs = ["custom_header_extension.h"],
+    deps = [
+        "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xff_extension_lib",
+    srcs = ["xff_extension.cc"],
+    hdrs = ["xff_extension.h"],
+    deps = [
+        "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )

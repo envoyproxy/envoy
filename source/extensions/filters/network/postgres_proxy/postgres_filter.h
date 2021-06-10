@@ -5,10 +5,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,6 +29,7 @@ namespace PostgresProxy {
   COUNTER(messages_unknown)                                                                        \
   COUNTER(sessions)                                                                                \
   COUNTER(sessions_encrypted)                                                                      \
+  COUNTER(sessions_terminated_ssl)                                                                 \
   COUNTER(sessions_unencrypted)                                                                    \
   COUNTER(statements)                                                                              \
   COUNTER(statements_insert)                                                                       \
@@ -62,10 +62,15 @@ struct PostgresProxyStats {
  */
 class PostgresFilterConfig {
 public:
-  PostgresFilterConfig(const std::string& stat_prefix, bool enable_sql_parsing,
-                       Stats::Scope& scope);
+  struct PostgresFilterConfigOptions {
+    std::string stats_prefix_;
+    bool enable_sql_parsing_;
+    bool terminate_ssl_;
+  };
+  PostgresFilterConfig(const PostgresFilterConfigOptions& config_options, Stats::Scope& scope);
 
   bool enable_sql_parsing_{true};
+  bool terminate_ssl_{false};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 
@@ -105,8 +110,9 @@ public:
   void incTransactionsCommit() override;
   void incTransactionsRollback() override;
   void processQuery(const std::string&) override;
+  bool onSSLRequest() override;
 
-  void doDecode(Buffer::Instance& data, bool);
+  Network::FilterStatus doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
   void setDecoder(std::unique_ptr<Decoder> decoder) { decoder_ = std::move(decoder); }
   Decoder* getDecoder() const { return decoder_.get(); }

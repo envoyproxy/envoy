@@ -1,9 +1,9 @@
-#include "server/proto_descriptors.h"
+#include "source/server/proto_descriptors.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/str_cat.h"
 

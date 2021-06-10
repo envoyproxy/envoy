@@ -1,0 +1,13 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+static_resources:
+  clusters:
+  - name: dummy_cluster
+    connect_timeout: 1s
+hds_config:
+  api_type: GRPC
+  transport_api_version: V2
+  grpc_services:
+    envoy_grpc:
+      cluster_name: "dummy_cluster"

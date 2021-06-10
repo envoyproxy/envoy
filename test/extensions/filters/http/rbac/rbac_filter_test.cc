@@ -1,12 +1,11 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/utility.h"
-#include "extensions/filters/http/rbac/rbac_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"
@@ -34,8 +33,8 @@ public:
 
     envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
-    policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
-        ".*cncf.io");
+    policy_rules->add_rules()->mutable_requested_server_name()->MergeFrom(
+        TestUtility::createRegexMatcher(".*cncf.io"));
     policy_rules->add_rules()->set_destination_port(123);
     policy_rules->add_rules()->mutable_url_path()->mutable_path()->set_suffix("suffix");
     policy.add_principals()->set_any(true);
@@ -49,6 +48,7 @@ public:
     shadow_policy.add_principals()->set_any(true);
     config.mutable_shadow_rules()->set_action(action);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
+    config.set_shadow_rules_stat_prefix("prefix_");
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
@@ -64,7 +64,7 @@ public:
 
   void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    ON_CALL(req_info_, downstreamLocalAddress()).WillByDefault(ReturnRef(address_));
+    req_info_.downstream_address_provider_->setLocalAddress(address_);
   }
 
   void setRequestedServerName(std::string server_name) {
@@ -127,6 +127,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -145,6 +149,10 @@ TEST_F(RoleBasedAccessControlFilterTest, RequestedServerName) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -182,10 +190,14 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, true));
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
-  EXPECT_EQ("allowed", filter_meta.fields().at("shadow_engine_result").string_value());
-  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policy_id").string_value());
+  EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
 }
@@ -221,6 +233,10 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldLog) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));
@@ -240,6 +256,10 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
+  EXPECT_EQ("testrbac.allowed", config_->stats().allowed_.name());
+  EXPECT_EQ("testrbac.denied", config_->stats().denied_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
+  EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, false));

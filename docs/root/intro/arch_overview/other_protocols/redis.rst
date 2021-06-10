@@ -8,8 +8,8 @@ In this mode, the goals of Envoy are to maintain availability and partition tole
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
 <https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
-view of cluster membership. It also supports routing commands from different workload to
-different to different upstream clusters based on their access patterns, eviction, or isolation
+view of cluster membership. It also supports routing commands from different workloads to
+different upstream clusters based on their access patterns, eviction, or isolation
 requirements.
 
 The Redis project offers a thorough reference on partitioning as it relates to Redis. See
@@ -82,7 +82,7 @@ following information:
 * Nodes entering or leaving the cluster.
 
 For topology configuration details, see the Redis Cluster
-:ref:`v2 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
+:ref:`v3 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
 
 Every Redis cluster has its own extra statistics tree rooted at *cluster.<name>.redis_cluster.* with the following statistics:
 

@@ -1,19 +1,19 @@
-#include "extensions/filters/http/squash/squash_filter.h"
+#include "source/extensions/filters/http/squash/squash_filter.h"
 
 #include <memory>
 
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/codes.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -41,7 +41,7 @@ SquashFilterConfig::SquashFilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(proto_config, attachment_poll_period, 1000)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, request_timeout, 1000)) {
 
-  if (!cluster_manager.get(cluster_name_)) {
+  if (!cluster_manager.clusters().hasCluster(cluster_name_)) {
     throw EnvoyException(
         fmt::format("squash filter: unknown cluster '{}' in squash config", cluster_name_));
   }
@@ -50,7 +50,7 @@ SquashFilterConfig::SquashFilterConfig(
 std::string SquashFilterConfig::getAttachment(const ProtobufWkt::Struct& attachment_template) {
   ProtobufWkt::Struct attachment_json(attachment_template);
   updateTemplateInStruct(attachment_json);
-  return MessageUtil::getJsonStringFromMessage(attachment_json);
+  return MessageUtil::getJsonStringFromMessageOrDie(attachment_json);
 }
 
 void SquashFilterConfig::updateTemplateInStruct(ProtobufWkt::Struct& attachment_template) {
@@ -152,10 +152,12 @@ Http::FilterHeadersStatus SquashFilter::decodeHeaders(Http::RequestHeaderMap& he
   request->body().add(config_->attachmentJson());
 
   is_squashing_ = true;
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), create_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), create_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  }
 
   if (in_flight_request_ == nullptr) {
     ENVOY_LOG(debug, "Squash: can't create request for squash server");
@@ -274,10 +276,14 @@ void SquashFilter::pollForAttachment() {
   request->headers().setReferencePath(debug_attachment_path_);
   request->headers().setReferenceHost(SERVER_AUTHORITY);
 
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(config_->clusterName())
-          .send(std::move(request), check_attachment_callback_,
-                Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(config_->clusterName());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(request), check_attachment_callback_,
+        Http::AsyncClient::RequestOptions().setTimeout(config_->requestTimeout()));
+  } else {
+    scheduleRetry();
+  }
   // No need to check if in_flight_request_ is null as onFailure will take care of
   // cleanup.
 }

@@ -22,8 +22,9 @@ constructByteVectorForRandom(const Protobuf::RepeatedField<Protobuf::uint32>& ra
 HostVector
 LoadBalancerFuzzBase::initializeHostsForUseInFuzzing(std::shared_ptr<MockClusterInfo> info) {
   HostVector hosts;
+  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   for (uint32_t i = 1; i <= 60000; ++i) {
-    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i)));
+    hosts.push_back(makeTestHost(info, "tcp://127.0.0.1:" + std::to_string(i), *time_source));
   }
   return hosts;
 }
@@ -213,7 +214,7 @@ void LoadBalancerFuzzBase::updateHealthFlagsForAHostSet(
   host_set.runCallbacks({}, {});
 }
 
-void LoadBalancerFuzzBase::prefetch() {
+void LoadBalancerFuzzBase::preconnect() {
   // TODO: context, could generate it in proto action
   lb_->peekAnotherHost(nullptr);
 }
@@ -238,8 +239,8 @@ void LoadBalancerFuzzBase::replay(
                                    event.update_health_flags().random_bytestring());
       break;
     }
-    case test::common::upstream::LbAction::kPrefetch:
-      prefetch();
+    case test::common::upstream::LbAction::kPreconnect:
+      preconnect();
       break;
     case test::common::upstream::LbAction::kChooseHost:
       chooseHost();

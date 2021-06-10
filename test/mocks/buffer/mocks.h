@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -76,7 +76,9 @@ public:
 
   Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) override {
-    return Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+    auto buffer = Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+    ASSERT(buffer != nullptr);
+    return buffer;
   }
 
   MOCK_METHOD(Buffer::Instance*, create_,

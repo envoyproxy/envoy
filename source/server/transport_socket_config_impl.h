@@ -19,11 +19,11 @@ public:
                                     Singleton::Manager& singleton_manager,
                                     ThreadLocal::SlotAllocator& tls,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Api::Api& api)
+                                    Api::Api& api, const Server::Options& options)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
         cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), stats_(stats),
         singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
-        api_(api) {}
+        api_(api), options_(options) {}
 
   /**
    * Pass an init manager to register dynamic secret provider.
@@ -52,6 +52,7 @@ public:
     return validation_visitor_;
   }
   Api::Api& api() override { return api_; }
+  const Server::Options& options() override { return options_; }
 
 private:
   Server::Admin& admin_;
@@ -66,6 +67,7 @@ private:
   Init::Manager* init_manager_{};
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  const Server::Options& options_;
 };
 
 } // namespace Configuration

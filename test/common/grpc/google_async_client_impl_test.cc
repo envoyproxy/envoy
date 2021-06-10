@@ -1,12 +1,12 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/grpc/google_async_client_impl.h"
-#include "common/network/address_impl.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -121,9 +121,9 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, MetadataIsInitialized) {
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Unavailable, ""));
 
   // Prepare the parent context of this call.
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem()};
-  stream_info.setDownstreamLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address));
+  auto address_provider = std::make_shared<Network::SocketAddressSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), address_provider};
   Http::AsyncClient::ParentContext parent_context{&stream_info};
 
   Http::AsyncClient::StreamOptions stream_options;

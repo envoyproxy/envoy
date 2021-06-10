@@ -1,4 +1,4 @@
-#include "common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -31,8 +31,8 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       const Network::Connection* connection = context->downstreamConnection();
       // The local address of the downstream connection is the original destination address,
       // if localAddressRestored() returns 'true'.
-      if (connection && connection->localAddressRestored()) {
-        dst_host = connection->localAddress();
+      if (connection && connection->addressProvider().localAddressRestored()) {
+        dst_host = connection->addressProvider().localAddress();
       }
     }
 
@@ -57,7 +57,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, 1,
             envoy::config::core::v3::Locality().default_instance(),
             envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN));
+            envoy::config::core::v3::UNKNOWN, parent_->time_source_));
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
 
         // Tell the cluster about the new host
@@ -89,14 +89,16 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
     override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
   }
   if (!override_header.empty()) {
-    try {
-      // This is an implicitly untrusted header, so per the API documentation only the first
-      // value is used.
-      const std::string request_override_host(override_header[0]->value().getStringView());
-      request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
+    // This is an implicitly untrusted header, so per the API documentation only the first
+    // value is used.
+    const std::string request_override_host(override_header[0]->value().getStringView());
+    request_host =
+        Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
+    if (request_host != nullptr) {
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
-    } catch (const Envoy::EnvoyException& e) {
-      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
+    } else {
+      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
+                request_override_host);
       parent_->info()->stats().original_dst_host_invalid_.inc();
     }
   }
@@ -107,7 +109,8 @@ OriginalDstCluster::OriginalDstCluster(
     const envoy::config::cluster::v3::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      factory_context.dispatcher().timeSource()),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),

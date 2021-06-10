@@ -23,7 +23,7 @@ public:
    * Returns the host's currently resolved address. This address may change periodically due to
    * async re-resolution.
    */
-  virtual Network::Address::InstanceConstSharedPtr address() PURE;
+  virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
@@ -86,8 +86,10 @@ public:
 
     /**
      * Called when the DNS cache load is complete (or failed).
+     *
+     * @param host_info the DnsHostInfo for the resolved host.
      */
-    virtual void onLoadDnsCacheComplete() PURE;
+    virtual void onLoadDnsCacheComplete(const DnsHostInfoSharedPtr& host_info) PURE;
   };
 
   /**
@@ -160,6 +162,7 @@ public:
   struct LoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandlePtr handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   virtual LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
@@ -172,10 +175,14 @@ public:
    */
   virtual AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) PURE;
 
+  using IterateHostMapCb = std::function<void(absl::string_view, const DnsHostInfoSharedPtr&)>;
+
   /**
-   * @return all hosts currently stored in the cache.
+   * Iterates over all entries in the cache, calling a callback for each entry
+   *
+   * @param iterate_callback the callback to invoke for each entry in the cache
    */
-  virtual absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() PURE;
+  virtual void iterateHostMap(IterateHostMapCb iterate_callback) PURE;
 
   /**
    * Retrieve the DNS host info of a given host currently stored in the cache.
@@ -187,12 +194,9 @@ public:
 
   /**
    * Check if a DNS request is allowed given resource limits.
-   * @param pending_request optional pending request resource limit. If no resource limit is
-   * provided the internal DNS cache limit is used.
    * @return RAII handle for pending request circuit breaker if the request was allowed.
    */
-  virtual Upstream::ResourceAutoIncDecPtr
-  canCreateDnsRequest(ResourceLimitOptRef pending_request) PURE;
+  virtual Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;
@@ -214,15 +218,6 @@ public:
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
-
-/**
- * Get the singleton cache manager for the entire server.
- */
-DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& manager,
-                                         Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls,
-                                         Random::RandomGenerator& random, Runtime::Loader& loader,
-                                         Stats::Scope& root_scope);
 
 /**
  * Factory for getting a DNS cache manager.

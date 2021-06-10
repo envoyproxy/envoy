@@ -13,14 +13,14 @@
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/cleanup.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -58,6 +58,8 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override;
+
   // UpstreamToDownstream (Http::StreamCallbacks)
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override;
@@ -77,7 +79,8 @@ public:
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-                   const StreamInfo::StreamInfo& info) override;
+                   const StreamInfo::StreamInfo& info,
+                   absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override { return *this; }
 
   void clearRequestEncoder();
@@ -131,7 +134,7 @@ private:
   Event::TimerPtr per_try_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
-  Buffer::WatermarkBufferPtr buffered_request_body_;
+  Buffer::InstancePtr buffered_request_body_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;

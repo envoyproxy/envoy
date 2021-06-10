@@ -1,15 +1,14 @@
-#include "extensions/filters/http/admission_control/config.h"
+#include "source/extensions/filters/http/admission_control/config.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/enum_to_int.h"
-
-#include "extensions/filters/http/admission_control/admission_control.h"
-#include "extensions/filters/http/admission_control/evaluators/response_evaluator.h"
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/extensions/filters/http/admission_control/admission_control.h"
+#include "source/extensions/filters/http/admission_control/evaluators/response_evaluator.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,8 +21,8 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  if (config.has_sr_threshold() && config.sr_threshold().default_value().value() == 0) {
-    throw EnvoyException("Success Rate Threshold cannot be zero percent");
+  if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {
+    throw EnvoyException("Success rate threshold cannot be less than 1.0%.");
   }
 
   const std::string prefix = stats_prefix + "admission_control.";

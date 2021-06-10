@@ -2,7 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/thread_aware_lb_impl.h"
+#include "source/common/upstream/thread_aware_lb_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
@@ -44,7 +44,8 @@ private:
   }
 };
 
-class BoundedLoadHashingLoadBalancerTest : public testing::Test {
+class BoundedLoadHashingLoadBalancerTest : public Event::TestUsingSimulatedTime,
+                                           public testing::Test {
 public:
   HostOverloadFactorPredicate
   getHostOverloadFactorPredicate(const std::vector<std::string>& addresses) {
@@ -65,7 +66,7 @@ public:
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
       normalized_host_weights.push_back(
-          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i)), equal_weight});
+          {makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime()), equal_weight});
     }
   }
 
@@ -74,7 +75,7 @@ public:
                    NormalizedHostWeightVector& ring) {
     const double equal_weight = static_cast<double>(1.0 / num_hosts);
     for (uint32_t i = 0; i < num_hosts; i++) {
-      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i));
+      HostConstSharedPtr h = makeTestHost(info_, fmt::format("tcp://127.0.0.1{}:90", i), simTime());
       ring.push_back({h, equal_weight});
       ring.push_back({h, equal_weight});
       hosts.push_back({h, equal_weight});
@@ -86,6 +87,44 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 
   HostOverloadFactorPredicate host_overload_factor_predicate_;
+};
+
+class HashingLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
+public:
+  ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr hlb_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+};
+
+// Test hashKey for host
+TEST_F(HashingLoadBalancerTest, HashKey) {
+  NormalizedHostWeightVector normalized_host_weights;
+  hlb_ = std::make_shared<TestHashingLoadBalancer>(normalized_host_weights);
+
+  HostSharedPtr host = makeTestHost(info_, "hostname", "tcp://127.0.0.1:90", simTime());
+  // don't use hostname
+  EXPECT_EQ(hlb_->hashKey(host, false), "127.0.0.1:90");
+  // use hostname
+  EXPECT_EQ(hlb_->hashKey(host, true), "hostname");
+
+  // string metadata
+  envoy::config::core::v3::Metadata string_metadata;
+  Config::Metadata::mutableMetadataValue(string_metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().HASH_KEY)
+      .set_string_value("hash_key");
+  host = makeTestHostWithMetadata(
+      info_, std::make_shared<const envoy::config::core::v3::Metadata>(string_metadata),
+      "tcp://127.0.0.1:90", simTime());
+  EXPECT_EQ(hlb_->hashKey(host, false), "hash_key");
+
+  // other type(int) metadata
+  envoy::config::core::v3::Metadata int_metadata;
+  Config::Metadata::mutableMetadataValue(int_metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().HASH_KEY)
+      .set_number_value(1337);
+  host = makeTestHostWithMetadata(
+      info_, std::make_shared<const envoy::config::core::v3::Metadata>(int_metadata),
+      "tcp://127.0.0.1:90", simTime());
+  EXPECT_EQ(hlb_->hashKey(host, false), "127.0.0.1:90");
 };
 
 // Works correctly without any hosts.

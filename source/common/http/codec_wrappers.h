@@ -49,6 +49,10 @@ public:
     inner_.decodeMetadata(std::move(metadata_map));
   }
 
+  void dumpState(std::ostream& os, int indent_level) const override {
+    inner_.dumpState(os, indent_level);
+  }
+
 protected:
   ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
 
@@ -87,6 +91,8 @@ public:
     inner_.encodeTrailers(trailers);
     onEncodeComplete();
   }
+
+  void enableTcpTunneling() override { inner_.enableTcpTunneling(); }
 
   void encodeMetadata(const MetadataMapVector& metadata_map_vector) override {
     inner_.encodeMetadata(metadata_map_vector);

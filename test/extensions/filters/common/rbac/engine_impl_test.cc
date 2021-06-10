@@ -2,9 +2,8 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/engine_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -177,11 +176,11 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedAllowlist) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
@@ -200,11 +199,11 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedDenylist) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, LogResult::Undecided, info, conn, headers);
 }
 
@@ -413,7 +412,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).Times(1).WillRepeatedly(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, false, LogResult::Undecided, info, conn, headers);
 }
 
@@ -445,11 +444,11 @@ TEST(RoleBasedAccessControlEngineImpl, LogIfMatched) {
 
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, RBAC::LogResult::Yes, info, conn, headers);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(Const(info), downstreamLocalAddress()).WillOnce(ReturnRef(addr));
+  info.downstream_address_provider_->setLocalAddress(addr);
   checkEngine(engine, true, RBAC::LogResult::No, info, conn, headers);
 }
 

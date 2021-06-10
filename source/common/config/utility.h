@@ -14,19 +14,21 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
 
@@ -118,9 +120,12 @@ public:
    * @param cm supplies the cluster manager.
    * @param allow_added_via_api indicates whether a cluster is allowed to be added via api
    *                            rather than be a static resource from the bootstrap config.
+   * @return the main thread cluster if it exists.
    */
-  static void checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
-                           Upstream::ClusterManager& cm, bool allow_added_via_api = false);
+  static Upstream::ClusterConstOptRef checkCluster(absl::string_view error_prefix,
+                                                   absl::string_view cluster_name,
+                                                   Upstream::ClusterManager& cm,
+                                                   bool allow_added_via_api = false);
 
   /**
    * Check cluster/local info for API config sanity. Throws on error.
@@ -128,10 +133,11 @@ public:
    * @param cluster_name supplies the cluster name to check.
    * @param cm supplies the cluster manager.
    * @param local_info supplies the local info.
+   * @return the main thread cluster if it exists.
    */
-  static void checkClusterAndLocalInfo(absl::string_view error_prefix,
-                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
-                                       const LocalInfo::LocalInfo& local_info);
+  static Upstream::ClusterConstOptRef
+  checkClusterAndLocalInfo(absl::string_view error_prefix, absl::string_view cluster_name,
+                           Upstream::ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
 
   /**
    * Check local info for API config sanity. Throws on error.
@@ -179,6 +185,36 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Access transport_api_version field in ApiConfigSource, while validating version
+   * compatibility.
+   * @param api_config_source the config source to extract transport API version from.
+   * @return envoy::config::core::v3::ApiVersion transport API version
+   * @throws DeprecatedMajorVersionException when the transport version is disabled.
+   */
+  template <class Proto>
+  static envoy::config::core::v3::ApiVersion
+  getAndCheckTransportVersion(const Proto& api_config_source) {
+    const auto transport_api_version = api_config_source.transport_api_version();
+    ASSERT(Thread::MainThread::isMainThread());
+    if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
+        transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
+      Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
+      const std::string& warning = fmt::format(
+          "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
+          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
+          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
+          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
+          api_config_source.DebugString());
+      ENVOY_LOG_MISC(warn, warning);
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.test_only.broken_in_production.enable_deprecated_v2_api")) {
+        throw DeprecatedMajorVersionException(warning);
+      }
+    }
+    return transport_api_version;
+  }
+
+  /**
    * Parses RateLimit configuration from envoy::config::core::v3::ApiConfigSource to
    * RateLimitSettings.
    * @param api_config_source ApiConfigSource.
@@ -205,8 +241,31 @@ public:
    * @return SubscriptionStats for scope.
    */
   static SubscriptionStats generateStats(Stats::Scope& scope) {
-    return {
-        ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope))};
+    return {ALL_SUBSCRIPTION_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_TEXT_READOUT(scope),
+                                   POOL_HISTOGRAM(scope))};
+  }
+
+  /**
+   * Get a Factory from the registry with a particular name (and templated type) with error checking
+   * to ensure the name and factory are valid.
+   * @param name string identifier for the particular implementation.
+   * @param is_optional exception will be throw when the value is false and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory>
+  static Factory* getAndCheckFactoryByName(const std::string& name, bool is_optional) {
+    if (name.empty()) {
+      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
+
+    if (factory == nullptr && !is_optional) {
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Didn't find a registered implementation for name: '{}'", name));
+    }
+
+    return factory;
   }
 
   /**
@@ -216,18 +275,7 @@ public:
    * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
-    if (name.empty()) {
-      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
-    }
-
-    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
-
-    if (factory == nullptr) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Didn't find a registered implementation for name: '{}'", name));
-    }
-
-    return *factory;
+    return *getAndCheckFactoryByName<Factory>(name, false);
   }
 
   /**
@@ -258,17 +306,29 @@ public:
 
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid. And a flag to control return nullptr or throw an exception.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   * @param is_optional an exception will be throw when the value is true and no factory found.
+   * @return factory the factory requested or nullptr if it does not exist.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
+    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
+    if (factory != nullptr) {
+      return factory;
+    }
+
+    return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid.
    * @param message proto that contains fields 'name' and 'typed_config'.
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return *factory;
-    }
-
-    return Utility::getAndCheckFactoryByName<Factory>(message.name());
+    return *getAndCheckFactory<Factory>(message, false);
   }
 
   /**
@@ -303,8 +363,8 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
-   * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
-   * provided because for statically registered implementations, a custom config is generally
+   * @param enclosing_message proto that contains a field 'typed_config'. Note: the enclosing proto
+   * is provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
    * @param validation_visitor message validation visitor instance.
    * @param factory implementation factory with the method 'createEmptyConfigProto' to produce a
@@ -422,7 +482,7 @@ public:
    * @throws EnvoyException if there is a mismatch between design and configuration.
    */
   static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const char* filter_chain_type, bool is_terminal_filter,
+                                      const std::string& filter_chain_type, bool is_terminal_filter,
                                       bool last_filter_in_current_config) {
     if (is_terminal_filter && !last_filter_in_current_config) {
       ExceptionUtil::throwEnvoyException(

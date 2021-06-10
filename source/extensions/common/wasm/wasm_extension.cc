@@ -1,8 +1,8 @@
-#include "extensions/common/wasm/wasm_extension.h"
+#include "source/extensions/common/wasm/wasm_extension.h"
 
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,29 +39,20 @@ RegisterWasmExtension::RegisterWasmExtension(WasmExtension* extension) {
   wasm_extension = extension;
 }
 
-std::unique_ptr<EnvoyWasmVmIntegration>
-EnvoyWasm::createEnvoyWasmVmIntegration(const Stats::ScopeSharedPtr& scope,
-                                        absl::string_view runtime,
-                                        absl::string_view short_runtime) {
-  return std::make_unique<EnvoyWasmVmIntegration>(scope, runtime, short_runtime);
-}
-
 PluginHandleExtensionFactory EnvoyWasm::pluginFactory() {
-  return [](const WasmHandleSharedPtr& base_wasm,
-            absl::string_view plugin_key) -> PluginHandleBaseSharedPtr {
+  return [](const WasmHandleSharedPtr& wasm_handle,
+            const PluginSharedPtr& plugin) -> PluginHandleBaseSharedPtr {
     return std::static_pointer_cast<PluginHandleBase>(
-        std::make_shared<PluginHandle>(base_wasm, plugin_key));
+        std::make_shared<PluginHandle>(wasm_handle, plugin));
   };
 }
 
 WasmHandleExtensionFactory EnvoyWasm::wasmFactory() {
-  return [](const VmConfig vm_config, const Stats::ScopeSharedPtr& scope,
+  return [](WasmConfig& config, const Stats::ScopeSharedPtr& scope,
             Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
             Server::ServerLifecycleNotifier& lifecycle_notifier,
             absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-    auto wasm = std::make_shared<Wasm>(vm_config.runtime(), vm_config.vm_id(),
-                                       anyToBytes(vm_config.configuration()), vm_key, scope,
-                                       cluster_manager, dispatcher);
+    auto wasm = std::make_shared<Wasm>(config, vm_key, scope, cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };

@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 
-#include "extensions/common/wasm/wasm_runtime_factory.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 
 #include "include/proxy-wasm/wavm.h"
 
@@ -14,7 +14,6 @@ public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createWavmVm(); }
 
   absl::string_view name() override { return "envoy.wasm.runtime.wavm"; }
-  absl::string_view shortName() override { return "wavm"; }
 };
 
 #if defined(ENVOY_WASM_WAVM)

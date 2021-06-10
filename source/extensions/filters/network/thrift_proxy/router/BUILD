@@ -13,14 +13,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":router_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
-        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
     ],
 )
 
@@ -29,7 +27,7 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/router:router_interface",
+        "//envoy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
     ],
 )
@@ -39,7 +37,7 @@ envoy_cc_library(
     hdrs = ["router_ratelimit.h"],
     deps = [
         ":router_interface",
-        "//include/envoy/router:router_ratelimit_interface",
+        "//envoy/router:router_ratelimit_interface",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
     ],
 )
@@ -51,10 +49,10 @@ envoy_cc_library(
     deps = [
         ":router_interface",
         ":router_ratelimit_lib",
-        "//include/envoy/tcp:conn_pool_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:load_balancer_interface",
-        "//include/envoy/upstream:thread_local_cluster_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:load_balancer_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
         "//source/common/common:logger_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",

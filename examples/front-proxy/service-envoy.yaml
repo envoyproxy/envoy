@@ -9,7 +9,7 @@ static_resources:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -27,9 +27,8 @@ static_resources:
             typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 0.25s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
       endpoints:
@@ -40,7 +39,6 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 8080
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0

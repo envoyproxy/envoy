@@ -25,10 +25,10 @@ envoy_cc_library(
         "utils.h",
     ],
     deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
         "//source/common/network:filter_lib",
@@ -43,8 +43,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",

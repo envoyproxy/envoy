@@ -3,7 +3,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/upstream/conn_pool_map_impl.h"
+#include "source/common/upstream/conn_pool_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"

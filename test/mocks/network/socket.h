@@ -14,14 +14,17 @@ public:
   MockSocket();
   ~MockSocket() override;
 
+  SocketAddressSetter& addressProvider() override { return *address_provider_; }
+  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
+  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+    return address_provider_;
+  }
   IoHandle& ioHandle() override;
   const IoHandle& ioHandle() const override;
   Api::SysCallIntResult setSocketOption(int level, int optname, const void* optval,
                                         socklen_t len) override;
 
-  MOCK_METHOD(const Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
-  MOCK_METHOD(void, setLocalAddress, (const Address::InstanceConstSharedPtr&), (override));
-  MOCK_METHOD(Network::SocketPtr, duplicate, (), ());
+  MOCK_METHOD(Network::SocketPtr, duplicate, (), (override));
   MOCK_METHOD(Socket::Type, socketType, (), (const, override));
   MOCK_METHOD(Address::Type, addressType, (), (const, override));
   MOCK_METHOD(absl::optional<Address::IpVersion>, ipVersion, (), (const, override));
@@ -33,11 +36,14 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, listen, (int), (override));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*),
               (const, override));
+  MOCK_METHOD(Api::SysCallIntResult, ioctl,
+              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
   MOCK_METHOD(void, addOption, (const Socket::OptionConstSharedPtr&), (override));
   MOCK_METHOD(void, addOptions, (const Socket::OptionsSharedPtr&), (override));
 
   const std::unique_ptr<MockIoHandle> io_handle_;
+  Network::SocketAddressSetterSharedPtr address_provider_;
 };
 
 } // namespace Network

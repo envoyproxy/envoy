@@ -1,4 +1,4 @@
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 #include <chrono>
 #include <string>
@@ -7,13 +7,13 @@
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -104,7 +104,11 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::ResponseHeaderM
     }
 
     headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
-  } else if (context_.healthCheckFailed()) {
+  }
+
+  if (context_.healthCheckFailed() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster")) {
     headers.setReferenceEnvoyImmediateHealthCheckFail(
         Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }
@@ -135,7 +139,7 @@ void HealthCheckFilter::onComplete() {
         details = &RcDetails::get().HealthCheckClusterHealthy;
         const std::string& cluster_name = item.first;
         const uint64_t min_healthy_percentage = static_cast<uint64_t>(item.second);
-        auto* cluster = clusterManager.get(cluster_name);
+        auto* cluster = clusterManager.getThreadLocalCluster(cluster_name);
         if (cluster == nullptr) {
           // If the cluster does not exist at all, consider the service unhealthy.
           final_status = Http::Code::ServiceUnavailable;

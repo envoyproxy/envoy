@@ -13,11 +13,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/synchronization/mutex.h"
@@ -62,6 +61,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  bool startSecureTransport() override { return false; }
   // Ssl::PrivateKeyConnectionCallbacks
   void onPrivateKeyMethodComplete() override;
   // Ssl::HandshakeCallbacks
@@ -77,7 +77,7 @@ protected:
 
 private:
   struct ReadResult {
-    bool commit_slice_{};
+    uint64_t bytes_read_{0};
     absl::optional<int> error_;
   };
   ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
@@ -110,9 +110,14 @@ public:
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
+  bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
+
+  const Ssl::ClientContextConfig& config() const { return *config_; }
+
+  Envoy::Ssl::ClientContextSharedPtr sslCtx();
 
 private:
   Envoy::Ssl::ContextManager& manager_;

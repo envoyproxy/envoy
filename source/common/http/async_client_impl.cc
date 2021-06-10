@@ -1,4 +1,4 @@
-#include "common/http/async_client_impl.h"
+#include "source/common/http/async_client_impl.h"
 
 #include <chrono>
 #include <map>
@@ -8,9 +8,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -41,10 +41,10 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
-                                 Http::Context& http_context)
-    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true, false, false, false, {},
-                                 dispatcher.timeSource(), http_context),
+                                 Http::Context& http_context, Router::Context& router_context)
+    : cluster_(cluster), config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm,
+                                 runtime, random, std::move(shadow_writer), true, false, false,
+                                 false, {}, dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -81,11 +81,15 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
+      router_(parent.config_),
+      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
                                          options.hash_policy)),
       send_xff_(options.send_xff) {
+
+  stream_info_.dynamicMetadata().MergeFrom(options.metadata);
+
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
@@ -148,6 +152,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(dispatcher().isThreadSafe());
   // Map send calls after local closure to no-ops. The send call could have been queued prior to
   // remote reset or closure, and/or closure could have occurred synchronously in response to a
   // previous send. In these cases the router will have already cleaned up stream state. This
@@ -168,6 +173,7 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
 }
 
 void AsyncStreamImpl::sendTrailers(RequestTrailerMap& trailers) {
+  ASSERT(dispatcher().isThreadSafe());
   // See explanation in sendData.
   if (local_closed_) {
     return;
@@ -225,6 +231,7 @@ void AsyncStreamImpl::reset() {
 }
 
 void AsyncStreamImpl::cleanup() {
+  ASSERT(dispatcher().isThreadSafe());
   local_closed_ = remote_closed_ = true;
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.

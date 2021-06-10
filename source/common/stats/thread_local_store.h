@@ -10,15 +10,15 @@
 #include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/hash.h"
-#include "common/common/thread_synchronizer.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/null_counter.h"
-#include "common/stats/null_gauge.h"
-#include "common/stats/null_text_readout.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
+#include "source/common/stats/null_text_readout.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -141,7 +141,7 @@ using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
 
 /**
  * Store implementation with thread local caching. For design details see
- * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md
+ * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
@@ -159,6 +159,7 @@ public:
     return default_scope_->counterFromString(name);
   }
   ScopePtr createScope(const std::string& name) override;
+  ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
@@ -321,7 +322,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -337,6 +338,10 @@ private:
                                                  StatNameTagVectorOptConstRef tags) override;
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
+    }
+    ScopePtr scopeFromStatName(StatName name) override {
+      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+      return parent_.scopeFromStatName(StatName(joined.get()));
     }
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -440,8 +445,8 @@ private:
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     TlsCacheEntry& insertScope(uint64_t scope_id);
-    void eraseScope(uint64_t scope_id);
-    void eraseHistogram(uint64_t histogram);
+    void eraseScopes(const std::vector<uint64_t>& scope_ids);
+    void eraseHistograms(const std::vector<uint64_t>& histograms);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
@@ -467,8 +472,8 @@ private:
   }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
-  void clearHistogramFromCaches(uint64_t histogram_id);
+  void clearScopesFromCaches();
+  void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -494,6 +499,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   AllocatorImpl heap_allocator_;
+  OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
@@ -521,6 +527,19 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
+
+  // Scope IDs and central cache entries that are queued for cross-scope release.
+  // Because there can be a large number of scopes, all of which are released at once,
+  // (e.g. when a scope is deleted), it is more efficient to batch their cleanup,
+  // which would otherwise entail a post() per scope per thread.
+  std::vector<uint64_t> scopes_to_cleanup_ ABSL_GUARDED_BY(lock_);
+  std::vector<CentralCacheEntrySharedPtr> central_cache_entries_to_cleanup_ ABSL_GUARDED_BY(lock_);
+
+  // Histograms IDs that are queued for cross-scope release. Because there
+  // can be a large number of histograms, all of which are released at once,
+  // (e.g. when a scope is deleted), it is likely more efficient to batch their
+  // cleanup, which would otherwise entail a post() per histogram per thread.
+  std::vector<uint64_t> histograms_to_cleanup_ ABSL_GUARDED_BY(hist_mutex_);
 };
 
 using ThreadLocalStoreImplPtr = std::unique_ptr<ThreadLocalStoreImpl>;

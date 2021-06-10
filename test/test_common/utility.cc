@@ -20,18 +20,17 @@
 #include "envoy/http/codec.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread_impl.h"
-#include "common/common/utility.h"
-#include "common/config/resource_name.h"
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
-#include "common/http/header_utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
@@ -352,8 +351,6 @@ void ConditionalInitializer::wait() {
   mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
 }
-
-constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 
 namespace Api {
 

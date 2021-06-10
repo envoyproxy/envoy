@@ -1,10 +1,9 @@
-#include "server/admin/init_dump_handler.h"
+#include "source/server/admin/init_dump_handler.h"
 
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-
-#include "server/admin/utils.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {
@@ -29,7 +28,7 @@ Http::Code InitDumpHandler::handlerInitDump(absl::string_view url,
   MessageUtil::redact(dump);
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessageOrError(dump, true)); // pretty-print
   return Http::Code::OK;
 }
 

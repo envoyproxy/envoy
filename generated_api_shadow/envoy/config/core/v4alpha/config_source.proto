@@ -7,7 +7,7 @@ import "envoy/config/core/v4alpha/grpc_service.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/core/v1/authority.proto";
+import "xds/core/v3/authority.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -27,10 +27,12 @@ enum ApiVersion {
   // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
-  AUTO = 0;
+  hidden_envoy_deprecated_AUTO = 0
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 
   // Use xDS v2 API.
-  V2 = 1;
+  hidden_envoy_deprecated_V2 = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"];
 
   // Use xDS v3 API.
   V3 = 2;
@@ -47,8 +49,11 @@ message ApiConfigSource {
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
-    hidden_envoy_deprecated_DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
-        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
+    hidden_envoy_deprecated_DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [
+      deprecated = true,
+      (envoy.annotations.disallowed_by_default_enum) = true,
+      (envoy.annotations.deprecated_at_minor_version_enum) = "3.0"
+    ];
 
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
@@ -110,7 +115,7 @@ message ApiConfigSource {
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_config.core.v4alpha.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>` can be used to
 // specify that ADS is to be used.
 message AggregatedConfigSource {
   option (udpa.annotations.versioning).previous_message_type =
@@ -119,7 +124,7 @@ message AggregatedConfigSource {
 
 // [#not-implemented-hide:]
 // Self-referencing config source options. This is currently empty, but when
-// set in :ref:`ConfigSource <envoy_api_msg_config.core.v4alpha.ConfigSource>` can be used to
+// set in :ref:`ConfigSource <envoy_v3_api_msg_config.core.v3.ConfigSource>` can be used to
 // specify that other data can be obtained from the same server.
 message SelfConfigSource {
   option (udpa.annotations.versioning).previous_message_type =
@@ -146,7 +151,7 @@ message RateLimitSettings {
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
-// <envoy_api_msg_config.route.v4alpha.RouteConfiguration>`, :ref:`endpoints
+// <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
@@ -154,18 +159,17 @@ message RateLimitSettings {
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.ConfigSource";
 
-  // Authorities that this config source may be used for. An authority specified
-  // in a *udpa.core.v1.ResourceLocator* is resolved to a *ConfigSource* prior
-  // to configuration fetch. This field provides the association between
-  // authority name and configuration source.
+  // Authorities that this config source may be used for. An authority specified in a xdstp:// URL
+  // is resolved to a *ConfigSource* prior to configuration fetch. This field provides the
+  // association between authority name and configuration source.
   // [#not-implemented-hide:]
-  repeated udpa.core.v1.Authority authorities = 7;
+  repeated xds.core.v3.Authority authorities = 7;
 
   oneof config_source_specifier {
     option (validate.required) = true;
 
     // Path on the filesystem to source and watch for configuration updates.
-    // When sourcing configuration for :ref:`secret <envoy_api_msg_extensions.transport_sockets.tls.v4alpha.Secret>`,
+    // When sourcing configuration for :ref:`secret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.Secret>`,
     // the certificate and key files are also watched for updates.
     //
     // .. note::
@@ -189,7 +193,7 @@ message ConfigSource {
     // [#not-implemented-hide:]
     // When set, the client will access the resources from the same server it got the
     // ConfigSource from, although not necessarily from the same stream. This is similar to the
-    // :ref:`ads<envoy_api_field.ConfigSource.ads>` field, except that the client may use a
+    // :ref:`ads<envoy_v3_api_field.ConfigSource.ads>` field, except that the client may use a
     // different stream to the same server. As a result, this field can be used for things
     // like LRS that cannot be sent on an ADS stream. It can also be used to link from (e.g.)
     // LDS to RDS on the same server without requiring the management server to know its name

@@ -1,0 +1,23 @@
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "2"
+        stat_prefix: "*"
+        channel_args {
+          args {
+            key: "grpc.channelz_channel_node"
+            value {
+              string_value: "\177\177\177\177\177\177\177#"
+            }
+          }
+        }
+      }
+    }
+    set_node_on_first_message_only: true
+  }
+}
+flags_path: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+enable_dispatcher_stats: true
+header_prefix: "\001"

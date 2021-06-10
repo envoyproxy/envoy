@@ -29,7 +29,7 @@ public:
   MOCK_METHOD(Stats::Allocator&, statsAllocator, ());
 
 private:
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::AllocatorImpl stats_allocator_;

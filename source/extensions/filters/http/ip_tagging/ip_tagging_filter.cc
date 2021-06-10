@@ -1,10 +1,10 @@
-#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
 #include "absl/strings/str_join.h"
 
@@ -78,7 +78,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
   }
 
   std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
+      config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");

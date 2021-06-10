@@ -3,12 +3,11 @@
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/statsd/config.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -40,6 +39,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
@@ -137,6 +137,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 
@@ -162,6 +163,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
+  server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
   ASSERT_NE(sink, nullptr);
 

@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 
 namespace Envoy {
 namespace Extensions {

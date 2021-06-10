@@ -1,15 +1,14 @@
-#include "extensions/common/tap/tap_config_base.h"
+#include "source/extensions/common/tap/tap_config_base.h"
 
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/common/matcher/matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -209,7 +208,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
-    output_file_ << MessageUtil::getJsonStringFromMessage(*trace, true, true);
+    output_file_ << MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

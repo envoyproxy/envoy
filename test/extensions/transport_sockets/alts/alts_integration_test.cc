@@ -1,9 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
-#include "common/common/thread.h"
-
-#include "extensions/transport_sockets/alts/config.h"
+#include "source/common/common/thread.h"
+#include "source/extensions/transport_sockets/alts/config.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #ifdef major
 #undef major
@@ -70,6 +70,9 @@ public:
       }
       stream->Write(response);
       request.Clear();
+      if (response.has_status()) {
+        return grpc::Status::OK;
+      }
     }
     return grpc::Status::OK;
   }
@@ -77,15 +80,20 @@ public:
   // Storing client and server RPC versions for later verification.
   grpc::gcp::RpcProtocolVersions client_versions;
   grpc::gcp::RpcProtocolVersions server_versions;
+
+  // TODO(yihuazhang): Test maximum frame size stored in handshake messages
+  // after updating test/core/tsi/alts/fake_handshaker/handshaker.proto to
+  // support maximum frame size negotiation.
 };
 
-class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
+class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
+                                public testing::TestWithParam<Network::Address::IpVersion>,
                                 public HttpIntegrationTest {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
                           bool client_connect_handshaker, bool capturing_handshaker = false)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
         server_connect_handshaker_(server_connect_handshaker),
         client_connect_handshaker_(client_connect_handshaker),
@@ -117,7 +125,9 @@ public:
         service = std::unique_ptr<grpc::Service>{capturing_handshaker_service_};
       } else {
         capturing_handshaker_service_ = nullptr;
-        service = grpc::gcp::CreateFakeHandshakerService();
+        // If max_expected_concurrent_rpcs is zero, the fake handshaker service will not track
+        // concurrent RPCs and abort if it exceeds the value.
+        service = grpc::gcp::CreateFakeHandshakerService(/* max_expected_concurrent_rpcs */ 0);
       }
 
       std::string server_address = Network::Test::getLoopbackAddressUrlString(version_) + ":0";
@@ -163,16 +173,24 @@ public:
     HttpIntegrationTest::cleanupUpstreamAndDownstream();
     dispatcher_->clearDeferredDeleteList();
     if (fake_handshaker_server_ != nullptr) {
-      fake_handshaker_server_->Shutdown();
+      fake_handshaker_server_->Shutdown(timeSystem().systemTime());
     }
     fake_handshaker_server_thread_->join();
   }
 
   Network::ClientConnectionPtr makeAltsConnection() {
     Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+    auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
+    client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
+    client_tsi_socket_->setActualFrameSizeToUse(16384);
+    client_tsi_socket_->setFrameOverheadSize(4);
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_alts_->createTransportSocket(nullptr),
-                                               nullptr);
+                                               std::move(client_transport_socket), nullptr);
+  }
+
+  void verifyActualFrameSizeToUse() {
+    EXPECT_NE(client_tsi_socket_, nullptr);
+    EXPECT_EQ(client_tsi_socket_->actualFrameSizeToUse(), 16384);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
@@ -201,6 +219,7 @@ public:
   ConditionalInitializer fake_handshaker_server_ci_;
   int fake_handshaker_server_port_{};
   Network::TransportSocketFactoryPtr client_alts_;
+  TsiSocket* client_tsi_socket_{nullptr};
   bool capturing_handshaker_;
   CapturingHandshakerService* capturing_handshaker_service_;
 };
@@ -226,6 +245,7 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -247,6 +267,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {

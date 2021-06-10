@@ -8,15 +8,15 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/lc_trie.h"
-
-#include "server/filter_chain_factory_context_callback.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/lc_trie.h"
+#include "source/server/filter_chain_factory_context_callback.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -52,8 +52,10 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
@@ -88,10 +90,11 @@ class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                   std::vector<Network::FilterFactoryCb>&& filters_factory,
-                  std::chrono::milliseconds transport_socket_connect_timeout)
+                  std::chrono::milliseconds transport_socket_connect_timeout,
+                  absl::string_view name)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
-        transport_socket_connect_timeout_(transport_socket_connect_timeout) {}
+        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -111,11 +114,14 @@ public:
     factory_context_ = std::move(filter_chain_factory_context);
   }
 
+  absl::string_view name() const override { return name_; }
+
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
+  const std::string name_;
 };
 
 /**
@@ -131,7 +137,9 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
+  const Server::Options& options() override;
   Grpc::Context& grpcContext() override;
+  Router::Context& routerContext() override;
   bool healthCheckFailed() override;
   Http::Context& httpContext() override;
   Init::Manager& initManager() override;
@@ -244,8 +252,7 @@ private:
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -253,8 +260,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
@@ -262,8 +268,7 @@ private:
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForServerNames(
       ServerNamesMapSharedPtr& server_names_map_ptr,
-      const absl::Span<const std::string* const> server_names,
-      const std::string& transport_protocol,
+      const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,

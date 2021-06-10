@@ -1,12 +1,12 @@
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 
 #include <sys/mman.h>
 
 #include <csignal>
 
-#include "common/common/assert.h"
-#include "common/signal/fatal_action.h"
-#include "common/version/version.h"
+#include "source/common/common/assert.h"
+#include "source/common/signal/fatal_action.h"
+#include "source/common/version/version.h"
 
 namespace Envoy {
 
@@ -32,7 +32,7 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
     FatalErrorHandler::callFatalErrorHandlers(std::cerr);
     FatalErrorHandler::runUnsafeActions();
     break;
-  case FatalAction::Status::ActionManangerUnset:
+  case FatalAction::Status::ActionManagerUnset:
     FatalErrorHandler::callFatalErrorHandlers(std::cerr);
     break;
   case FatalAction::Status::RunningOnAnotherThread: {

@@ -1,7 +1,7 @@
-#include "common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -29,10 +29,9 @@ void ZeroCopyInputStreamImpl::drainLastSlice() {
 bool ZeroCopyInputStreamImpl::Next(const void** data, int* size) {
   drainLastSlice();
 
-  Buffer::RawSliceVector slices = buffer_->getRawSlices(1);
+  Buffer::RawSlice slice = buffer_->frontSlice();
 
-  if (!slices.empty() && slices[0].len_ > 0) {
-    auto& slice = slices[0];
+  if (slice.len_ > 0) {
     *data = slice.mem_;
     *size = slice.len_;
     position_ = slice.len_;

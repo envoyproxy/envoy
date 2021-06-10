@@ -27,9 +27,9 @@ responds_with_header \
     -H "Authorization: Bearer token1" \
     http://localhost:8000/service
 
-run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v2.yaml"
+run_log "Restart front-envoy with FRONT_ENVOY_YAML=config/opa-service/v3.yaml"
 docker-compose down
-FRONT_ENVOY_YAML=config/opa-service/v2.yaml docker-compose up -d
+FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker-compose up -d
 sleep 10
 
 run_log "Test OPA service responds with 200"

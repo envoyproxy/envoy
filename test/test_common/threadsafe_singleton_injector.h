@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 
@@ -12,6 +12,7 @@ public:
     ThreadSafeSingleton<T>::instance_ = instance;
   }
   ~TestThreadsafeSingletonInjector() { ThreadSafeSingleton<T>::instance_ = latched_instance_; }
+  T& latched() { return *latched_instance_; }
 
 private:
   T* latched_instance_;

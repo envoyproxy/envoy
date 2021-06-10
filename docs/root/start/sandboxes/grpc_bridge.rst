@@ -13,7 +13,8 @@ The gRPC bridge sandbox is an example usage of Envoy's
 This is an example of a key-value store where an ``http``-based client CLI, written in ``Python``,
 updates a remote store, written in ``Go``, using the stubs generated for both languages.
 
-The client send messages through a proxy that upgrades the HTTP requests from ``http/1.1`` to ``http/2``.
+The client send messages through a proxy that upgrades the HTTP requests from ``http/1.1`` to ``http/2`` or
+``http/3``
 
 ``[client](http/1.1) -> [client-egress-proxy](http/2) -> [server-ingress-proxy](http/2) -> [server]``
 
@@ -98,7 +99,7 @@ Set a key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py set foo bar
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py set foo bar
   setf foo to bar
 
 
@@ -106,21 +107,21 @@ Get a key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py get foo
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py get foo
   bar
 
 Modify an existing key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py set foo baz
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py set foo baz
   setf foo to baz
 
 Get the modified key:
 
 .. code-block:: console
 
-  $ docker-compose exec python /client/client.py get foo
+  $ docker-compose exec grpc-client python /client/grpc-kv-client.py get foo
   baz
 
 In the running docker-compose container, you should see the gRPC service printing a record of its activity:

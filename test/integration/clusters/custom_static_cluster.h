@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <list>
 #include <string>
@@ -9,10 +11,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
@@ -27,7 +28,8 @@ public:
                       Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
-      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
+                        factory_context.dispatcher().timeSource()),
         priority_(priority), address_(std::move(address)), port_(port), host_(makeHost()) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

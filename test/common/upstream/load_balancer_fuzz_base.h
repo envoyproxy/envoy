@@ -1,6 +1,8 @@
+#pragma once
+
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "test/common/upstream/load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/random.h"
@@ -18,7 +20,9 @@ namespace Upstream {
 // the subsequent updates to those sets.
 class LoadBalancerFuzzBase {
 public:
-  LoadBalancerFuzzBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)){};
+  LoadBalancerFuzzBase()
+      : stat_names_(stats_store_.symbolTable()),
+        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)){};
 
   // Initializes load balancer components shared amongst every load balancer, random_, and
   // priority_set_
@@ -31,13 +35,14 @@ public:
   // balancer needs to run its algorithm is already encapsulated within the load balancer. Thus,
   // once the load balancer is constructed, all this class has to do is call lb_->peekAnotherHost()
   // and lb_->chooseHost().
-  void prefetch();
+  void preconnect();
   void chooseHost();
   void replay(const Protobuf::RepeatedPtrField<test::common::upstream::LbAction>& actions);
 
   // These public objects shared amongst all types of load balancers will be used to construct load
   // balancers in specific load balancer fuzz classes
   Stats::IsolatedStoreImpl stats_store_;
+  ClusterStatNames stat_names_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   Random::PsuedoRandomGenerator64 random_;

@@ -14,10 +14,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/matchers.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +30,6 @@ namespace ExtAuthz {
   COUNTER(cx_closed)                                                                               \
   COUNTER(denied)                                                                                  \
   COUNTER(error)                                                                                   \
-  COUNTER(timeout)                                                                                 \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(ok)                                                                                      \
   COUNTER(total)                                                                                   \

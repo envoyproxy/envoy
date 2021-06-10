@@ -3,10 +3,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/assert.h"
-#include "common/common/random_generator.h"
-#include "common/http/request_id_extension_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -20,7 +21,7 @@ public:
     // Use 1999-01-01 00:00:00 +0
     time_t fake_time = 915148800;
     start_time_ = std::chrono::system_clock::from_time_t(fake_time);
-    request_id_extension_ = Http::RequestIDExtensionFactory::defaultInstance(random_);
+    request_id_provider_ = Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(random_);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -38,6 +39,7 @@ public:
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
   }
+  void setResponseCode(uint32_t code) override { response_code_ = code; }
   void setResponseCodeDetails(absl::string_view rc_details) override {
     response_code_details_.emplace(rc_details);
   }
@@ -73,29 +75,9 @@ public:
   }
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
-
-  void setDownstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
-    downstream_local_address_ = downstream_local_address;
+  const Network::SocketAddressSetter& downstreamAddressProvider() const override {
+    return *downstream_address_provider_;
   }
-  const Network::Address::InstanceConstSharedPtr& downstreamLocalAddress() const override {
-    return downstream_local_address_;
-  }
-  void setDownstreamDirectRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_direct_remote_address) override {
-    downstream_direct_remote_address_ = downstream_direct_remote_address;
-  }
-  const Network::Address::InstanceConstSharedPtr& downstreamDirectRemoteAddress() const override {
-    return downstream_direct_remote_address_;
-  }
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) override {
-    downstream_remote_address_ = downstream_remote_address;
-  }
-  const Network::Address::InstanceConstSharedPtr& downstreamRemoteAddress() const override {
-    return downstream_remote_address_;
-  }
-
   void
   setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     downstream_connection_info_ = connection_info;
@@ -216,12 +198,16 @@ public:
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDExtension(Http::RequestIDExtensionSharedPtr request_id_extension) override {
-    request_id_extension_ = request_id_extension;
+  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
+    ASSERT(provider != nullptr);
+    request_id_provider_ = provider;
   }
-  Http::RequestIDExtensionSharedPtr getRequestIDExtension() const override {
-    return request_id_extension_;
+  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
+    return request_id_provider_.get();
   }
+
+  void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
+  Tracing::Reason traceReason() const override { return trace_reason_; }
 
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
@@ -236,6 +222,12 @@ public:
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
 
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+
+  void setFilterChainName(absl::string_view filter_chain_name) override {
+    filter_chain_name_ = std::string(filter_chain_name);
+  }
+
+  const std::string& filterChainName() const override { return filter_chain_name_; }
 
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
@@ -259,9 +251,8 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_local_address_;
-  Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
-  Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  Network::SocketAddressSetterSharedPtr downstream_address_provider_{
+      std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
@@ -276,8 +267,10 @@ public:
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_{};
-  Http::RequestIDExtensionSharedPtr request_id_extension_;
+  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   absl::optional<uint64_t> connection_id_;
+  std::string filter_chain_name_;
+  Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
 };
 
 } // namespace Envoy

@@ -3,7 +3,7 @@
 #include <functional>
 #include <list>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 
@@ -55,4 +55,47 @@ private:
   bool cancelled_;
 };
 
+// RAII helper class to add an element to a std::list held inside an absl::flat_hash_map on
+// construction and erase it on destruction, unless the cancel method has been called. If the list
+// is empty after removal of the element, the destructor will also remove the list from the map.
+template <class Key, class Value> class RaiiMapOfListElement {
+public:
+  using MapOfList = absl::flat_hash_map<Key, std::list<Value>>;
+
+  template <typename ConvertibleToKey>
+  RaiiMapOfListElement(MapOfList& map, const ConvertibleToKey& key, Value value)
+      : map_(map), key_(key), cancelled_(false) {
+    // The list reference itself cannot be saved because it is not stable in the event of a
+    // absl::flat_hash_map rehash.
+    std::list<Value>& list = map_.try_emplace(key).first->second;
+    it_ = list.emplace(list.begin(), value);
+  }
+
+  virtual ~RaiiMapOfListElement() {
+    if (!cancelled_) {
+      erase();
+    }
+  }
+
+  void cancel() { cancelled_ = true; }
+
+private:
+  void erase() {
+    ASSERT(!cancelled_);
+    auto list_it = map_.find(key_);
+    ASSERT(list_it != map_.end());
+
+    list_it->second.erase(it_);
+    if (list_it->second.empty()) {
+      map_.erase(key_);
+    }
+    cancelled_ = true;
+  }
+
+  MapOfList& map_;
+  // Because of absl::flat_hash_map iterator instability we have to keep a copy of the key.
+  const Key key_;
+  typename MapOfList::mapped_type::iterator it_;
+  bool cancelled_;
+};
 } // namespace Envoy

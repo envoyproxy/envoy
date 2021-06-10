@@ -1,4 +1,4 @@
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_join.h"
@@ -9,43 +9,53 @@ namespace Assert {
 
 class ActionRegistrationImpl : public ActionRegistration {
 public:
-  ActionRegistrationImpl(std::function<void()> action) {
-    ASSERT(debug_assertion_failure_record_action_ == nullptr);
-    debug_assertion_failure_record_action_ = action;
+  ActionRegistrationImpl(std::function<void(const char* location)> action) : action_(action) {
+    next_action_ = debug_assertion_failure_record_action_;
+    debug_assertion_failure_record_action_ = this;
   }
 
   ~ActionRegistrationImpl() override {
-    ASSERT(debug_assertion_failure_record_action_ != nullptr);
-    debug_assertion_failure_record_action_ = nullptr;
+    ASSERT(debug_assertion_failure_record_action_ == this);
+    debug_assertion_failure_record_action_ = next_action_;
   }
 
-  static void invokeAction() {
+  void invoke(const char* location) {
+    action_(location);
+    if (next_action_) {
+      next_action_->invoke(location);
+    }
+  }
+
+  static void invokeAction(const char* location) {
     if (debug_assertion_failure_record_action_ != nullptr) {
-      debug_assertion_failure_record_action_();
+      debug_assertion_failure_record_action_->invoke(location);
     }
   }
 
 private:
-  // This implementation currently only handles one action being set at a time. This is currently
-  // sufficient. If multiple actions are ever needed, the actions should be chained when
-  // additional actions are registered.
-  static std::function<void()> debug_assertion_failure_record_action_;
+  std::function<void(const char* location)> action_;
+  ActionRegistrationImpl* next_action_ = nullptr;
+
+  // Pointer to the first action in the chain or nullptr if no action is currently registered.
+  static ActionRegistrationImpl* debug_assertion_failure_record_action_;
 };
 
 // This class implements the logic for triggering ENVOY_BUG logs and actions. Logging and actions
 // will be triggered with exponential back-off per file and line bug.
 class EnvoyBugRegistrationImpl : public ActionRegistration {
 public:
-  EnvoyBugRegistrationImpl(std::function<void()> action) {
-    ASSERT(envoy_bug_failure_record_action_ == nullptr,
-           "An ENVOY_BUG action was already set. Currently only a single action is supported.");
-    envoy_bug_failure_record_action_ = action;
+  EnvoyBugRegistrationImpl(std::function<void(const char* location)> action) : action_(action) {
+    next_action_ = envoy_bug_failure_record_action_;
+    envoy_bug_failure_record_action_ = this;
+
+    // Reset counters when a registration is added.
+    absl::MutexLock lock(&mutex_);
     counters_.clear();
   }
 
   ~EnvoyBugRegistrationImpl() override {
-    ASSERT(envoy_bug_failure_record_action_ != nullptr);
-    envoy_bug_failure_record_action_ = nullptr;
+    ASSERT(envoy_bug_failure_record_action_ == this);
+    envoy_bug_failure_record_action_ = next_action_;
   }
 
   // This method is invoked when an ENVOY_BUG condition fails. It increments a per file and line
@@ -53,7 +63,7 @@ public:
   // The implementation may also be a inline static counter per-file and line. There is no benchmark
   // to show that the performance of this mutex is any worse than atomic counters. Acquiring and
   // releasing a mutex is cheaper than a cache miss, but the mutex here is contended for every
-  // ENVOY_BUG failure rather than per individual bug. Logging ENVOY_BUGs is not a performance
+  // ENVOY_BUG failure rather than per individual bug. Hitting ENVOY_BUGs is not a performance
   // critical path, and mutex contention would indicate that there is a serious failure.
   // Currently, this choice reduces code size and has the advantage that behavior is easier to
   // understand and debug, and test behavior is predictable.
@@ -69,47 +79,66 @@ public:
     return (counter_value & (counter_value - 1)) == 0;
   }
 
-  static void invokeAction() {
+  void invoke(const char* location) {
+    action_(location);
+    if (next_action_) {
+      next_action_->invoke(location);
+    }
+  }
+
+  static void invokeAction(const char* location) {
     if (envoy_bug_failure_record_action_ != nullptr) {
-      envoy_bug_failure_record_action_();
+      envoy_bug_failure_record_action_->invoke(location);
+    }
+  }
+
+  static void resetEnvoyBugCounters() {
+    {
+      absl::MutexLock lock(&mutex_);
+      counters_.clear();
     }
   }
 
 private:
-  // This implementation currently only handles one action being set at a time. This is currently
-  // sufficient. If multiple actions are ever needed, the actions should be chained when
-  // additional actions are registered.
-  static std::function<void()> envoy_bug_failure_record_action_;
+  std::function<void(const char* location)> action_;
+  EnvoyBugRegistrationImpl* next_action_ = nullptr;
+
+  // Pointer to the first action in the chain or nullptr if no action is currently registered.
+  static EnvoyBugRegistrationImpl* envoy_bug_failure_record_action_;
 
   using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
   static absl::Mutex mutex_;
-  static EnvoyBugMap counters_ GUARDED_BY(mutex_);
+  static EnvoyBugMap counters_ ABSL_GUARDED_BY(mutex_);
 };
 
-std::function<void()> ActionRegistrationImpl::debug_assertion_failure_record_action_;
-std::function<void()> EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_;
+ActionRegistrationImpl* ActionRegistrationImpl::debug_assertion_failure_record_action_ = nullptr;
+EnvoyBugRegistrationImpl* EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_ = nullptr;
 EnvoyBugRegistrationImpl::EnvoyBugMap EnvoyBugRegistrationImpl::counters_;
 absl::Mutex EnvoyBugRegistrationImpl::mutex_;
 
-ActionRegistrationPtr setDebugAssertionFailureRecordAction(const std::function<void()>& action) {
+ActionRegistrationPtr
+addDebugAssertionFailureRecordAction(const std::function<void(const char* location)>& action) {
   return std::make_unique<ActionRegistrationImpl>(action);
 }
 
-ActionRegistrationPtr setEnvoyBugFailureRecordAction(const std::function<void()>& action) {
+ActionRegistrationPtr
+addEnvoyBugFailureRecordAction(const std::function<void(const char* location)>& action) {
   return std::make_unique<EnvoyBugRegistrationImpl>(action);
 }
 
-void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly() {
-  ActionRegistrationImpl::invokeAction();
+void invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly(const char* location) {
+  ActionRegistrationImpl::invokeAction(location);
 }
 
-void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly() {
-  EnvoyBugRegistrationImpl::invokeAction();
+void invokeEnvoyBugFailureRecordActionForEnvoyBugMacroUseOnly(const char* location) {
+  EnvoyBugRegistrationImpl::invokeAction(location);
 }
 
 bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_name) {
   return EnvoyBugRegistrationImpl::shouldLogAndInvoke(bug_name);
 }
+
+void resetEnvoyBugCountersForTest() { EnvoyBugRegistrationImpl::resetEnvoyBugCounters(); }
 
 } // namespace Assert
 } // namespace Envoy

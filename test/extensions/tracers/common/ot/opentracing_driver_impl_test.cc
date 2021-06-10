@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "extensions/tracers/common/ot/opentracing_driver_impl.h"
+#include "source/extensions/tracers/common/ot/opentracing_driver_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -213,6 +213,18 @@ TEST_F(OpenTracingDriverTest, ExtractWithUnindexedHeader) {
 
   auto spans = driver_->recorder().spans();
   EXPECT_EQ(spans.at(1).span_context.span_id, spans.at(0).references.at(0).span_id);
+}
+
+TEST_F(OpenTracingDriverTest, GetTraceId) {
+  setupValidDriver();
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  first_span->setTag("abc", "123");
+  first_span->finishSpan();
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(first_span->getTraceIdAsHex(), "");
 }
 
 } // namespace

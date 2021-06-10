@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,15 +11,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_join.h"
 
@@ -150,9 +150,9 @@ TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
       cluster_manager_(cluster_manager),
       cx_overflow_stat_(scope.counterFromStatName(
           Stats::StatNameManagedStorage("statsd.cx_overflow", scope.symbolTable()).statName())) {
-  Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name, cluster_manager,
-                                            local_info);
-  cluster_info_ = cluster_manager.get(cluster_name)->info();
+  const auto cluster = Config::Utility::checkClusterAndLocalInfo("tcp statsd", cluster_name,
+                                                                 cluster_manager, local_info);
+  cluster_info_ = cluster->get().info();
   tls_->set([this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsSink>(*this, dispatcher);
   });
@@ -188,12 +188,12 @@ TcpStatsdSink::TlsSink::~TlsSink() {
 void TcpStatsdSink::TlsSink::beginFlush(bool expect_empty_buffer) {
   ASSERT(!expect_empty_buffer || buffer_.length() == 0);
   ASSERT(current_slice_mem_ == nullptr);
+  ASSERT(!current_buffer_reservation_.has_value());
 
-  uint64_t num_iovecs = buffer_.reserve(FLUSH_SLICE_SIZE_BYTES, &current_buffer_slice_, 1);
-  ASSERT(num_iovecs == 1);
+  current_buffer_reservation_.emplace(buffer_.reserveSingleSlice(FLUSH_SLICE_SIZE_BYTES));
 
-  ASSERT(current_buffer_slice_.len_ >= FLUSH_SLICE_SIZE_BYTES);
-  current_slice_mem_ = reinterpret_cast<char*>(current_buffer_slice_.mem_);
+  ASSERT(current_buffer_reservation_->slice().len_ >= FLUSH_SLICE_SIZE_BYTES);
+  current_slice_mem_ = reinterpret_cast<char*>(current_buffer_reservation_->slice().mem_);
 }
 
 void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value, char stat_type) {
@@ -201,7 +201,7 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // 36 > 1 ("." after prefix) + 1 (":" after name) + 4 (postfix chars, e.g., "|ms\n") + 30 for
   // number (bigger than it will ever be)
   const uint32_t max_size = name.size() + parent_.getPrefix().size() + 36;
-  if (current_buffer_slice_.len_ - usedBuffer() < max_size) {
+  if (current_buffer_reservation_->slice().len_ - usedBuffer() < max_size) {
     endFlush(false);
     beginFlush(false);
   }
@@ -210,10 +210,11 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // This written this way for maximum perf since with a large number of stats and at a high flush
   // rate this can become expensive.
   const char* snapped_current = current_slice_mem_;
-  memcpy(current_slice_mem_, parent_.getPrefix().c_str(), parent_.getPrefix().size());
-  current_slice_mem_ += parent_.getPrefix().size();
+  const std::string prefix = parent_.getPrefix();
+  memcpy(current_slice_mem_, prefix.data(), prefix.size()); // NOLINT(safe-memcpy)
+  current_slice_mem_ += prefix.size();
   *current_slice_mem_++ = '.';
-  memcpy(current_slice_mem_, name.c_str(), name.size());
+  memcpy(current_slice_mem_, name.data(), name.size()); // NOLINT(safe-memcpy)
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
   current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);
@@ -234,8 +235,9 @@ void TcpStatsdSink::TlsSink::flushGauge(const std::string& name, uint64_t value)
 
 void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
   ASSERT(current_slice_mem_ != nullptr);
-  current_buffer_slice_.len_ = usedBuffer();
-  buffer_.commit(&current_buffer_slice_, 1);
+  ASSERT(current_buffer_reservation_.has_value());
+  current_buffer_reservation_->commit(usedBuffer());
+  current_buffer_reservation_.reset();
   current_slice_mem_ = nullptr;
   if (do_write) {
     write(buffer_);
@@ -283,8 +285,12 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   }
 
   if (!connection_) {
-    Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
+    const auto thread_local_cluster =
+        parent_.cluster_manager_.getThreadLocalCluster(parent_.cluster_info_->name());
+    Upstream::Host::CreateConnectionData info;
+    if (thread_local_cluster != nullptr) {
+      info = thread_local_cluster->tcpConn(nullptr);
+    }
     if (!info.connection_) {
       buffer.drain(buffer.length());
       return;
@@ -305,7 +311,8 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
 uint64_t TcpStatsdSink::TlsSink::usedBuffer() const {
   ASSERT(current_slice_mem_ != nullptr);
-  return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
+  ASSERT(current_buffer_reservation_.has_value());
+  return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_reservation_->slice().mem_);
 }
 
 } // namespace Statsd

@@ -1,4 +1,4 @@
-#include "common/upstream/logical_dns_cluster.h"
+#include "source/common/upstream/logical_dns_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -12,12 +12,12 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -48,7 +48,8 @@ LogicalDnsCluster::LogicalDnsCluster(
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
+                      factory_context.dispatcher().timeSource()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
@@ -82,7 +83,11 @@ LogicalDnsCluster::LogicalDnsCluster(
   }
 
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-  hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  if (lbEndpoint().endpoint().hostname().empty()) {
+    hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  } else {
+    hostname_ = lbEndpoint().endpoint().hostname();
+  }
   Network::Utility::portFromTcpUrl(dns_url_);
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
@@ -121,8 +126,9 @@ void LogicalDnsCluster::startResolve() {
                                                    Network::Utility::portFromTcpUrl(dns_url_));
 
           if (!logical_host_) {
-            logical_host_ = std::make_shared<LogicalHost>(
-                info_, hostname_, new_address, localityLbEndpoint(), lbEndpoint(), nullptr);
+            logical_host_ =
+                std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),
+                                              lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr);

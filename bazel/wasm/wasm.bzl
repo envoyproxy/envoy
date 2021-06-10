@@ -1,41 +1,26 @@
-load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary")
-load("@rules_cc//cc:defs.bzl", "cc_binary")
-
-def _wasm_cc_transition_impl(settings, attr):
-    return {
-        "//command_line_option:cpu": "wasm32",
-        "//command_line_option:crosstool_top": "@proxy_wasm_cpp_sdk//toolchain:emscripten",
-
-        # Overriding copt/cxxopt/linkopt to prevent sanitizers/coverage options leak
-        # into WASM build configuration
-        "//command_line_option:copt": [],
-        "//command_line_option:cxxopt": [],
-        "//command_line_option:linkopt": [],
-        "//command_line_option:collect_code_coverage": "false",
-        "//command_line_option:fission": "no",
-    }
+load("@proxy_wasm_cpp_sdk//bazel/wasm:wasm.bzl", "wasm_cc_binary")
+load("@rules_rust//rust:rust.bzl", "rust_binary")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
-        "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasm",
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasm",
     }
 
-wasm_cc_transition = transition(
-    implementation = _wasm_cc_transition_impl,
-    inputs = [],
-    outputs = [
-        "//command_line_option:cpu",
-        "//command_line_option:crosstool_top",
-        "//command_line_option:copt",
-        "//command_line_option:cxxopt",
-        "//command_line_option:fission",
-        "//command_line_option:linkopt",
-        "//command_line_option:collect_code_coverage",
-    ],
-)
+def _wasi_rust_transition_impl(settings, attr):
+    return {
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasi",
+    }
 
 wasm_rust_transition = transition(
     implementation = _wasm_rust_transition_impl,
+    inputs = [],
+    outputs = [
+        "//command_line_option:platforms",
+    ],
+)
+
+wasi_rust_transition = transition(
+    implementation = _wasi_rust_transition_impl,
     inputs = [],
     outputs = [
         "//command_line_option:platforms",
@@ -70,51 +55,25 @@ def _wasm_attrs(transition):
         "_whitelist_function_transition": attr.label(default = "@bazel_tools//tools/whitelists/function_transition_whitelist"),
     }
 
-# WASM binary rule implementation.
-# This copies the binary specified in binary attribute in WASM configuration to
-# target configuration, so a binary in non-WASM configuration can depend on them.
-wasm_cc_binary_rule = rule(
-    implementation = _wasm_binary_impl,
-    attrs = _wasm_attrs(wasm_cc_transition),
-)
-
 wasm_rust_binary_rule = rule(
     implementation = _wasm_binary_impl,
     attrs = _wasm_attrs(wasm_rust_transition),
 )
 
-def wasm_cc_binary(name, tags = [], repository = "", **kwargs):
-    wasm_name = "_wasm_" + name
-    kwargs.setdefault("additional_linker_inputs", ["@proxy_wasm_cpp_sdk//:jslib", "@envoy//source/extensions/common/wasm/ext:jslib"])
+wasi_rust_binary_rule = rule(
+    implementation = _wasm_binary_impl,
+    attrs = _wasm_attrs(wasi_rust_transition),
+)
 
-    if repository == "@envoy":
-        envoy_js = "--js-library external/envoy/source/extensions/common/wasm/ext/envoy_wasm_intrinsics.js"
-    else:
-        envoy_js = "--js-library source/extensions/common/wasm/ext/envoy_wasm_intrinsics.js"
-    kwargs.setdefault("linkopts", [
-        envoy_js,
-        "--js-library external/proxy_wasm_cpp_sdk/proxy_wasm_intrinsics.js",
-    ])
-    kwargs.setdefault("visibility", ["//visibility:public"])
-    cc_binary(
-        name = wasm_name,
-        # Adding manual tag it won't be built in non-WASM (e.g. x86_64 config)
-        # when an wildcard is specified, but it will be built in WASM configuration
-        # when the wasm_binary below is built.
-        tags = ["manual"],
+def envoy_wasm_cc_binary(name, deps = [], tags = [], **kwargs):
+    wasm_cc_binary(
+        name = name,
+        deps = deps + ["@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics"],
+        tags = tags + ["manual"],
         **kwargs
     )
 
-    wasm_cc_binary_rule(
-        name = name,
-        binary = ":" + wasm_name,
-        tags = tags + ["manual"],
-    )
-
-def envoy_wasm_cc_binary(name, tags = [], **kwargs):
-    wasm_cc_binary(name, tags, repository = "", **kwargs)
-
-def wasm_rust_binary(name, tags = [], **kwargs):
+def wasm_rust_binary(name, tags = [], wasi = False, **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
@@ -127,7 +86,11 @@ def wasm_rust_binary(name, tags = [], **kwargs):
         **kwargs
     )
 
-    wasm_rust_binary_rule(
+    bin_rule = wasm_rust_binary_rule
+    if wasi:
+        bin_rule = wasi_rust_binary_rule
+
+    bin_rule(
         name = name,
         precompile = select({
             "@envoy//bazel:linux_x86_64": True,

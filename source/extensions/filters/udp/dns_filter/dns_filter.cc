@@ -1,13 +1,12 @@
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "envoy/network/listener.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/config/datasource.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -140,15 +139,18 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   forward_queries_ = config.has_client_config();
   if (forward_queries_) {
     const auto& client_config = config.client_config();
-    const auto& upstream_resolvers = client_config.upstream_resolvers();
-    resolvers_.reserve(upstream_resolvers.size());
-    for (const auto& resolver : upstream_resolvers) {
-      auto ipaddr = Network::Utility::protobufAddressToAddress(resolver);
-      resolvers_.emplace_back(std::move(ipaddr));
+    if (client_config.has_dns_resolution_config()) {
+      dns_resolver_options_.CopyFrom(client_config.dns_resolution_config().dns_resolver_options());
+      if (!client_config.dns_resolution_config().resolvers().empty()) {
+        const auto& resolver_addrs = client_config.dns_resolution_config().resolvers();
+        resolvers_.reserve(resolver_addrs.size());
+        for (const auto& resolver_addr : resolver_addrs) {
+          resolvers_.push_back(Network::Utility::protobufAddressToAddress(resolver_addr));
+        }
+      }
     }
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
-
     max_pending_lookups_ = client_config.max_pending_lookups();
   }
 }
@@ -220,9 +222,9 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     sendDnsResponse(std::move(context));
   };
 
-  resolver_ = std::make_unique<DnsFilterResolver>(resolver_callback_, config->resolvers(),
-                                                  config->resolverTimeout(), listener_.dispatcher(),
-                                                  config->maxPendingLookups());
+  resolver_ = std::make_unique<DnsFilterResolver>(
+      resolver_callback_, config->resolvers(), config->resolverTimeout(), listener_.dispatcher(),
+      config->maxPendingLookups(), config->dnsResolverOptions());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {
@@ -383,7 +385,6 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
   // Get the service_list config for the domain
   const auto* service_config = getServiceConfigForDomain(query.name_);
   if (service_config != nullptr) {
-
     // We can redirect to more than one cluster, but only one is supported
     const auto& cluster_target = service_config->targets_.begin();
     const auto& target_name = cluster_target->first;
@@ -395,7 +396,7 @@ bool DnsFilter::resolveClusterService(DnsQueryContextPtr& context, const DnsQuer
     }
 
     // Determine if there is a cluster
-    Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(target_name);
+    Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(target_name);
     if (cluster == nullptr) {
       ENVOY_LOG(trace, "No cluster found for service target: {}", target_name);
       return false;
@@ -453,7 +454,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   // Return an address for all discovered endpoints. The address and query type must match
   // for the host to be included in the response
   size_t cluster_endpoints = 0;
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(lookup_name);
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
     // TODO(abaptiste): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);

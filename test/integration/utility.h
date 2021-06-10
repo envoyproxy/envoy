@@ -9,11 +9,13 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/http/codec_client.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -40,6 +42,9 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override {
+    DUMP_STATE_UNIMPLEMENTED(BufferingStreamDecoder);
+  }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -163,7 +168,7 @@ public:
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
-                    const std::string& url, const std::string& body, Http::CodecClient::Type type,
+                    const std::string& url, const std::string& body, Http::CodecType type,
                     const std::string& host = "host", const std::string& content_type = "");
 
   /**
@@ -179,11 +184,21 @@ public:
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
    *         remote early disconnection.
    */
-  static BufferingStreamDecoderPtr
-  makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
-                    const std::string& body, Http::CodecClient::Type type,
-                    Network::Address::IpVersion ip_version, const std::string& host = "host",
-                    const std::string& content_type = "");
+  static BufferingStreamDecoderPtr makeSingleRequest(uint32_t port, const std::string& method,
+                                                     const std::string& url,
+                                                     const std::string& body, Http::CodecType type,
+                                                     Network::Address::IpVersion ip_version,
+                                                     const std::string& host = "host",
+                                                     const std::string& content_type = "");
+
+  /**
+   * Create transport socket factory for Quic upstream transport socket.
+   * @return TransportSocketFactoryPtr the client transport socket factory.
+   */
+  static Network::TransportSocketFactoryPtr
+  createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
+                                           Ssl::ContextManager& context_manager,
+                                           const std::string& san_to_match);
 };
 
 // A set of connection callbacks which tracks connection state.
@@ -191,6 +206,10 @@ class ConnectionStatusCallbacks : public Network::ConnectionCallbacks {
 public:
   bool connected() const { return connected_; }
   bool closed() const { return closed_; }
+  void reset() {
+    connected_ = false;
+    closed_ = false;
+  }
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {

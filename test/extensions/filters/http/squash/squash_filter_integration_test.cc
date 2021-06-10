@@ -2,7 +2,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -19,7 +19,7 @@ namespace Envoy {
 class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   ~SquashFilterIntegrationTest() override {
     if (fake_squash_connection_) {
@@ -71,7 +71,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   /**
@@ -88,7 +88,7 @@ public:
       auto* squash_cluster = bootstrap.mutable_static_resources()->add_clusters();
       squash_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       squash_cluster->set_name("squash");
-      squash_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*squash_cluster);
     });
 
     HttpIntegrationTest::initialize();
@@ -129,7 +129,7 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   // Respond to read attachment request
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attached"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("POST", create_stream->headers().getMethodValue());
   EXPECT_EQ("/api/v2/debugattachment/", create_stream->headers().getPathValue());
@@ -158,7 +158,7 @@ TEST_P(SquashFilterIntegrationTest, ErrorAttaching) {
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("error"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -174,7 +174,7 @@ TEST_P(SquashFilterIntegrationTest, TimeoutAttaching) {
   // before issuing another get attachment request.
   FakeStreamPtr get_stream = sendSquashOk(squashGetAttachmentBodyWithState("attaching"));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -185,7 +185,7 @@ TEST_P(SquashFilterIntegrationTest, ErrorNoSquashServer) {
 
   // Don't respond to anything. squash filter should timeout within
   // squash_request_timeout and continue the request.
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -197,7 +197,7 @@ TEST_P(SquashFilterIntegrationTest, BadCreateResponse) {
   // Respond to create request
   FakeStreamPtr create_stream = sendSquashCreate("not json...");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -211,7 +211,7 @@ TEST_P(SquashFilterIntegrationTest, BadGetResponse) {
   // Respond to read attachment request with error!
   FakeStreamPtr get_stream = sendSquashOk("not json...");
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());

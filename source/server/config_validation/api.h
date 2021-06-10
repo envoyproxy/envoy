@@ -4,7 +4,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 
-#include "common/api/api_impl.h"
+#include "source/common/api/api_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -20,6 +20,8 @@ public:
                  Random::RandomGenerator& random_generator);
 
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
+  Event::DispatcherPtr allocateDispatcher(const std::string& name,
+                                          const Event::ScaledRangeTimerManagerFactory&) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,
                                           Buffer::WatermarkFactoryPtr&& watermark_factory) override;
 

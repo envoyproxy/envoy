@@ -12,11 +12,11 @@
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/http/codec_wrappers.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codec_wrappers.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -47,7 +47,7 @@ public:
  * This is an HTTP client that multiple stream management and underlying connection management
  * across multiple HTTP codec types.
  */
-class CodecClient : Logger::Loggable<Logger::Id::client>,
+class CodecClient : protected Logger::Loggable<Logger::Id::client>,
                     public Http::ConnectionCallbacks,
                     public Network::ConnectionCallbacks,
                     public Event::DeferredDeletable {
@@ -55,7 +55,8 @@ public:
   /**
    * Type of HTTP codec to use.
    */
-  enum class Type { HTTP1, HTTP2, HTTP3 };
+  // This is a legacy alias.
+  using Type = Envoy::Http::CodecType;
 
   ~CodecClient() override;
 
@@ -65,6 +66,11 @@ public:
   void addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
     connection_->addConnectionCallbacks(cb);
   }
+
+  /**
+   * Return if half-close semantics are enabled on the underlying connection.
+   */
+  bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
 
   /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
@@ -120,8 +126,9 @@ public:
 
   bool remoteClosed() const { return remote_closed_; }
 
-  Type type() const { return type_; }
+  CodecType type() const { return type_; }
 
+  // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
 protected:
@@ -131,13 +138,24 @@ protected:
    * @param connection supplies the connection to communicate on.
    * @param host supplies the owning host.
    */
-  CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+  CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
+
+  /**
+   * Connect to the host.
+   * Needs to be called after codec_ is instantiated.
+   */
+  void connect();
 
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
     if (codec_callbacks_) {
       codec_callbacks_->onGoAway(error_code);
+    }
+  }
+  void onSettings(ReceivedSettings& settings) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onSettings(settings);
     }
   }
 
@@ -158,7 +176,7 @@ protected:
     }
   }
 
-  const Type type_;
+  const CodecType type_;
   // The order of host_, connection_, and codec_ matter as during destruction each can refer to
   // the previous, at least in tests.
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -176,8 +194,14 @@ private:
     CodecReadFilter(CodecClient& parent) : parent_(parent) {}
 
     // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool) override {
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
       parent_.onData(data);
+      if (end_stream && parent_.isHalfCloseEnabled()) {
+        // Note that this results in the connection closed as if it was closed
+        // locally, it would be more correct to convey the end stream to the
+        // response decoder, but it would require some refactoring.
+        parent_.close();
+      }
       return Network::FilterStatus::StopIteration;
     }
 
@@ -239,6 +263,8 @@ private:
   CodecClientCallbacks* codec_client_callbacks_{};
   bool connected_{};
   bool remote_closed_{};
+  bool protocol_error_{false};
+  bool connect_called_{false};
 };
 
 using CodecClientPtr = std::unique_ptr<CodecClient>;
@@ -248,7 +274,7 @@ using CodecClientPtr = std::unique_ptr<CodecClient>;
  */
 class CodecClientProd : public CodecClient {
 public:
-  CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
+  CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
                   Random::RandomGenerator& random_generator);
 };

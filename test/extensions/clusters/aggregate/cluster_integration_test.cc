@@ -2,9 +2,9 @@
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -31,7 +31,11 @@ const int SecondUpstreamIndex = 3;
 const std::string& config() {
   CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -41,14 +45,19 @@ dynamic_resources:
     resource_api_version: V3
     api_config_source:
       api_type: GRPC
+      transport_api_version: V3
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
-      set_node_on_first_message_only: false
+      set_node_on_first_message_only: true
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: my_cds_cluster
       endpoints:
@@ -61,7 +70,6 @@ static_resources:
   - name: aggregate_cluster
     connect_timeout: 0.25s
     lb_policy: CLUSTER_PROVIDED
-    protocol_selection: USE_DOWNSTREAM_PROTOCOL # this should be ignored, as cluster_1 and cluster_2 specify HTTP/2.
     cluster_type:
       name: envoy.clusters.aggregate
       typed_config:
@@ -104,7 +112,7 @@ static_resources:
                     retry_priority:
                       name: envoy.retry_priorities.previous_priorities
                       typed_config:
-                        "@type": type.googleapis.com/envoy.config.retry.previous_priorities.PreviousPrioritiesConfig
+                        "@type": type.googleapis.com/envoy.extensions.retry.priority.previous_priorities.v3.PreviousPrioritiesConfig
                         update_frequency: 1
                 match:
                   prefix: "/aggregatecluster"
@@ -116,8 +124,7 @@ static_resources:
 class AggregateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
-  AggregateIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), config()) {
+  AggregateIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), config()) {
     use_lds_ = false;
   }
 
@@ -125,14 +132,14 @@ public:
 
   void initialize() override {
     use_lds_ = false;
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     defer_listener_finalization_ = true;
     HttpIntegrationTest::initialize();
 
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         FirstClusterName, fake_upstreams_[FirstUpstreamIndex]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(GetParam()));
@@ -280,7 +287,7 @@ TEST_P(AggregateIntegrationTest, PreviousPrioritiesRetryPredicate) {
   waitForNextUpstreamRequest(SecondUpstreamIndex);
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
 
   EXPECT_TRUE(response->complete());

@@ -1,19 +1,33 @@
-#include "extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+// PassthroughData -> PassthroughData
+// PassthroughData -> MessageEnd (all body bytes received)
+DecoderStateMachine::DecoderStatus DecoderStateMachine::passthroughData(Buffer::Instance& buffer) {
+  if (body_bytes_ > buffer.length()) {
+    return {ProtocolState::WaitForData};
+  }
+
+  Buffer::OwnedImpl body;
+  body.move(buffer, body_bytes_);
+
+  return {ProtocolState::MessageEnd, handler_.passthroughData(body)};
+}
+
 // MessageBegin -> StructBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
+  const auto total = buffer.length();
   if (!proto_.readMessageBegin(buffer, *metadata_)) {
     return {ProtocolState::WaitForData};
   }
@@ -21,7 +35,14 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Ins
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
 
-  return {ProtocolState::StructBegin, handler_.messageBegin(metadata_)};
+  const auto status = handler_.messageBegin(metadata_);
+
+  if (callbacks_.passthroughEnabled()) {
+    body_bytes_ = metadata_->frameSize() - (total - buffer.length());
+    return {ProtocolState::PassthroughData, status};
+  }
+
+  return {ProtocolState::StructBegin, status};
 }
 
 // MessageEnd -> Done
@@ -293,6 +314,8 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleValue(Buffer::Inst
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {
   switch (state_) {
+  case ProtocolState::PassthroughData:
+    return passthroughData(buffer);
   case ProtocolState::MessageBegin:
     return messageBegin(buffer);
   case ProtocolState::StructBegin:
@@ -416,7 +439,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler());
     frame_started_ = true;
     state_machine_ =
-        std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_);
+        std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_, callbacks_);
 
     if (request_->handler_.transportBegin(metadata_) == FilterStatus::StopIteration) {
       return FilterStatus::StopIteration;

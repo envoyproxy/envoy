@@ -1,11 +1,12 @@
-#include "extensions/tracers/opencensus/opencensus_tracer_impl.h"
+#include "source/extensions/tracers/opencensus/opencensus_tracer_impl.h"
 
 #include <grpcpp/grpcpp.h>
 
 #include "envoy/config/trace/v3/opencensus.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/base64.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
 
 #include "absl/strings/str_cat.h"
 #include "google/devtools/cloudtrace/v2/tracing.grpc.pb.h"
@@ -24,7 +25,7 @@
 #include "opencensus/trace/trace_params.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_grpc_utils.h"
+#include "source/common/grpc/google_grpc_utils.h"
 #endif
 
 namespace Envoy {
@@ -75,7 +76,9 @@ public:
 
   // OpenCensus doesn't support baggage, so noop these OpenTracing functions.
   void setBaggage(absl::string_view, absl::string_view) override{};
-  std::string getBaggage(absl::string_view) override { return std::string(); };
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
+
+  std::string getTraceIdAsHex() const override;
 
 private:
   ::opencensus::trace::Span span_;
@@ -241,6 +244,11 @@ void Span::injectContext(Http::RequestHeaderMap& request_headers) {
       break;
     }
   }
+}
+
+std::string Span::getTraceIdAsHex() const {
+  const auto& ctx = span_.context();
+  return ctx.trace_id().ToHex();
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& /*config*/, const std::string& name,

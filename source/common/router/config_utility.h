@@ -9,12 +9,12 @@
 #include "envoy/http/codes.h"
 #include "envoy/upstream/resource_manager.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/matchers.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -86,13 +86,14 @@ public:
    * Returns the content of the response body to send with direct responses from a route.
    * @param route supplies the Route configuration.
    * @param api reference to the Api object
+   * @param max_body_size_bytes supplies the maximum response body size in bytes.
    * @return absl::optional<std::string> the response body provided inline in the route's
    *         direct_response if specified, or the contents of the file named in the
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.
    */
   static std::string parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                             Api::Api& api);
+                                             Api::Api& api, uint32_t max_body_size_bytes);
 
   /**
    * Returns the HTTP Status Code enum parsed from proto.

@@ -1,11 +1,16 @@
-#include "common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
 
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
+#include "envoy/config/extension_config_provider.h"
+#include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/config/utility.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/containers.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -13,19 +18,39 @@ namespace Envoy {
 namespace Filter {
 namespace Http {
 
+namespace {
+void validateTypeUrlHelper(const std::string& type_url,
+                           const absl::flat_hash_set<std::string> require_type_urls) {
+  if (!require_type_urls.contains(type_url)) {
+    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
+                                     type_url, absl::StrJoin(require_type_urls, ", ")));
+  }
+}
+
+} // namespace
+
 DynamicFilterConfigProviderImpl::DynamicFilterConfigProviderImpl(
-    FilterConfigSubscriptionSharedPtr&& subscription,
-    const std::set<std::string>& require_type_urls,
-    Server::Configuration::FactoryContext& factory_context)
-    : subscription_(std::move(subscription)), require_type_urls_(require_type_urls),
-      tls_(factory_context.threadLocal()),
-      init_target_("DynamicFilterConfigProviderImpl", [this]() {
-        subscription_->start();
-        // This init target is used to activate the subscription but not wait
-        // for a response. It is used whenever a default config is provided to be
-        // used while waiting for a response.
-        init_target_.ready();
-      }) {
+    FilterConfigSubscriptionSharedPtr& subscription,
+    const absl::flat_hash_set<std::string>& require_type_urls,
+
+    Server::Configuration::FactoryContext& factory_context,
+    Envoy::Http::FilterFactoryCb default_config, bool last_filter_in_filter_chain,
+    const std::string& filter_chain_type)
+    : subscription_(subscription), require_type_urls_(require_type_urls),
+      default_configuration_(default_config ? absl::make_optional(default_config) : absl::nullopt),
+      tls_(factory_context.threadLocal()), init_target_("DynamicFilterConfigProviderImpl",
+                                                        [this]() {
+                                                          subscription_->start();
+                                                          // This init target is used to activate
+                                                          // the subscription but not wait for a
+                                                          // response. It is used whenever a default
+                                                          // config is provided to be used while
+                                                          // waiting for a response.
+                                                          init_target_.ready();
+                                                        }),
+      last_filter_in_filter_chain_(last_filter_in_filter_chain),
+      filter_chain_type_(filter_chain_type) {
+
   subscription_->filter_config_providers_.insert(this);
   tls_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalConfig>(); });
 }
@@ -34,19 +59,14 @@ DynamicFilterConfigProviderImpl::~DynamicFilterConfigProviderImpl() {
   subscription_->filter_config_providers_.erase(this);
 }
 
+void DynamicFilterConfigProviderImpl::validateTypeUrl(const std::string& type_url) const {
+  validateTypeUrlHelper(type_url, require_type_urls_);
+}
+
 const std::string& DynamicFilterConfigProviderImpl::name() { return subscription_->name(); }
 
 absl::optional<Envoy::Http::FilterFactoryCb> DynamicFilterConfigProviderImpl::config() {
   return tls_->config_;
-}
-
-void DynamicFilterConfigProviderImpl::validateConfig(
-    const ProtobufWkt::Any& proto_config, Server::Configuration::NamedHttpFilterConfigFactory&) {
-  auto type_url = Config::Utility::getFactoryType(proto_config);
-  if (require_type_urls_.count(type_url) == 0) {
-    throw EnvoyException(fmt::format("Error: filter config has type URL {} but expect {}.",
-                                     type_url, absl::StrJoin(require_type_urls_, ", ")));
-  }
 }
 
 void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryCb config,
@@ -63,6 +83,27 @@ void DynamicFilterConfigProviderImpl::onConfigUpdate(Envoy::Http::FilterFactoryC
         // This happens after all workers have discarded the previous config so it can be safely
         // deleted on the main thread by an update with the new config.
         this->current_config_ = config;
+      });
+}
+
+void DynamicFilterConfigProviderImpl::validateTerminalFilter(const std::string& name,
+                                                             const std::string& filter_type,
+                                                             bool is_terminal_filter) {
+  Config::Utility::validateTerminalFilters(name, filter_type, filter_chain_type_,
+                                           is_terminal_filter, last_filter_in_filter_chain_);
+}
+
+void DynamicFilterConfigProviderImpl::onConfigRemoved(
+    Config::ConfigAppliedCb applied_on_all_threads) {
+  tls_.runOnAllThreads(
+      [config = default_configuration_](OptRef<ThreadLocalConfig> tls) { tls->config_ = config; },
+      [this, applied_on_all_threads]() {
+        // This happens after all workers have discarded the previous config so it can be safely
+        // deleted on the main thread by an update with the new config.
+        this->current_config_ = default_configuration_;
+        if (applied_on_all_threads) {
+          applied_on_all_threads();
+        }
       });
 }
 
@@ -87,7 +128,8 @@ FilterConfigSubscription::FilterConfigSubscription(
   const auto resource_name = getResourceName();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+          config_source, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_,
+          {});
 }
 
 void FilterConfigSubscription::start() {
@@ -123,36 +165,54 @@ void FilterConfigSubscription::onConfigUpdate(
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
   // Validation happens before updating to prevent a partial update application. It might be
   // possible that the providers have distinct type URL constraints.
+  const auto type_url = Config::Utility::getFactoryType(filter_config.typed_config());
   for (auto* provider : filter_config_providers_) {
-    provider->validateConfig(filter_config.typed_config(), factory);
+    provider->validateTypeUrl(type_url);
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       filter_config.typed_config(), validator_, factory);
+  bool is_terminal_filter = factory.isTerminalFilterByProto(*message, factory_context_);
+  for (auto* provider : filter_config_providers_) {
+    provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
+  }
   Envoy::Http::FilterFactoryCb factory_callback =
       factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
-  const auto pending_update = std::make_shared<std::atomic<uint64_t>>(
-      (factory_context_.admin().concurrency() + 1) * filter_config_providers_.size());
-  for (auto* provider : filter_config_providers_) {
-    provider->onConfigUpdate(factory_callback, version_info, [this, pending_update]() {
-      if (--(*pending_update) == 0) {
-        stats_.config_reload_.inc();
-      }
-    });
-  }
+
+  Common::applyToAllWithCleanup<DynamicFilterConfigProviderImpl*>(
+      filter_config_providers_,
+      [&factory_callback, &version_info](DynamicFilterConfigProviderImpl* provider,
+                                         std::shared_ptr<Cleanup> cleanup) {
+        provider->onConfigUpdate(factory_callback, version_info, [cleanup] {});
+      },
+      [this]() { stats_.config_reload_.inc(); });
   last_config_hash_ = new_hash;
+  last_config_ = factory_callback;
+  last_type_url_ = type_url;
+  last_version_info_ = version_info;
+  last_filter_name_ = factory.name();
+  last_filter_is_terminal_ = is_terminal_filter;
 }
 
 void FilterConfigSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
-    ENVOY_LOG(error,
-              "Server sent a delta ExtensionConfigDS update attempting to remove a resource (name: "
-              "{}). Ignoring.",
-              removed_resources[0]);
-  }
-  if (!added_resources.empty()) {
+    ASSERT(removed_resources.size() == 1);
+    ENVOY_LOG(debug, "Removing filter config {}", filter_config_name_);
+    Common::applyToAllWithCleanup<DynamicFilterConfigProviderImpl*>(
+        filter_config_providers_,
+        [](DynamicFilterConfigProviderImpl* provider, std::shared_ptr<Cleanup> cleanup) {
+          provider->onConfigRemoved([cleanup] {});
+        },
+        [this]() { stats_.config_reload_.inc(); });
+
+    last_config_hash_ = 0;
+    last_config_ = absl::nullopt;
+    last_type_url_ = "";
+    last_filter_is_terminal_ = false;
+    last_filter_name_ = "";
+  } else if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
   }
 }
@@ -171,6 +231,8 @@ FilterConfigSubscription::~FilterConfigSubscription() {
   // Remove the subscription from the provider manager.
   filter_config_provider_manager_.subscriptions_.erase(subscription_id_);
 }
+
+void FilterConfigSubscription::incrementConflictCounter() { stats_.config_conflict_.inc(); }
 
 std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSubscription(
     const envoy::config::core::v3::ConfigSource& config_source, const std::string& name,
@@ -194,24 +256,85 @@ std::shared_ptr<FilterConfigSubscription> FilterConfigProviderManagerImpl::getSu
   }
 }
 
-FilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ConfigSource& config_source,
-    const std::string& filter_config_name, const std::set<std::string>& require_type_urls,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    bool apply_without_warming) {
-  auto subscription =
-      getSubscription(config_source, filter_config_name, factory_context, stat_prefix);
+DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
+    const envoy::config::core::v3::ExtensionConfigSource& config_source,
+    const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
+    const std::string& stat_prefix, bool last_filter_in_filter_config,
+    const std::string& filter_chain_type) {
+  auto subscription = getSubscription(config_source.config_source(), filter_config_name,
+                                      factory_context, stat_prefix);
   // For warming, wait until the subscription receives the first response to indicate readiness.
   // Otherwise, mark ready immediately and start the subscription on initialization. A default
   // config is expected in the latter case.
-  if (!apply_without_warming) {
+  if (!config_source.apply_default_config_without_warming()) {
     factory_context.initManager().add(subscription->initTarget());
   }
+  absl::flat_hash_set<std::string> require_type_urls;
+  for (const auto& type_url : config_source.type_urls()) {
+    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
+    require_type_urls.emplace(factory_type_url);
+  }
+
+  Envoy::Http::FilterFactoryCb default_config = nullptr;
+  if (config_source.has_default_config()) {
+    auto* default_factory =
+        Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+            config_source.default_config());
+    if (default_factory == nullptr) {
+      throw EnvoyException(fmt::format("Error: cannot find filter factory {} for default filter "
+                                       "configuration with type URL {}.",
+                                       filter_config_name,
+                                       config_source.default_config().type_url()));
+    }
+    validateTypeUrlHelper(Config::Utility::getFactoryType(config_source.default_config()),
+                          require_type_urls);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config_source.default_config(), factory_context.messageValidationVisitor(),
+        *default_factory);
+    Config::Utility::validateTerminalFilters(
+        filter_config_name, default_factory->name(), filter_chain_type,
+        default_factory->isTerminalFilterByProto(*message, factory_context),
+        last_filter_in_filter_config);
+    default_config =
+        default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
+  }
+
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      std::move(subscription), require_type_urls, factory_context);
+      subscription, require_type_urls, factory_context, default_config,
+      last_filter_in_filter_config, filter_chain_type);
+
   // Ensure the subscription starts if it has not already.
-  if (apply_without_warming) {
+  if (config_source.apply_default_config_without_warming()) {
     factory_context.initManager().add(provider->init_target_);
+  }
+
+  // If the subscription already received a config, attempt to apply it.
+  // It is possible that the received extension config fails to satisfy the listener
+  // type URL constraints. This may happen if ECDS and LDS updates are racing, and the LDS
+  // update arrives first. In this case, use the default config, increment a metric,
+  // and the applied config eventually converges once ECDS update arrives.
+  bool last_config_valid = false;
+  if (subscription->lastConfig().has_value()) {
+    TRY_ASSERT_MAIN_THREAD {
+      provider->validateTypeUrl(subscription->lastTypeUrl());
+      provider->validateTerminalFilter(filter_config_name, subscription->lastFilterName(),
+                                       subscription->isLastFilterTerminal());
+      last_config_valid = true;
+    }
+    END_TRY catch (const EnvoyException& e) {
+      ENVOY_LOG(debug, "ECDS subscription {} is invalid in a listener context: {}.",
+                filter_config_name, e.what());
+      subscription->incrementConflictCounter();
+    }
+    if (last_config_valid) {
+      provider->onConfigUpdate(subscription->lastConfig().value(), subscription->lastVersionInfo(),
+                               nullptr);
+    }
+  }
+
+  // Apply the default config if none has been applied.
+  if (!last_config_valid) {
+    provider->applyDefaultConfiguration();
   }
   return provider;
 }

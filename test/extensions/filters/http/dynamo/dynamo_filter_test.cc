@@ -1,10 +1,9 @@
 #include <memory>
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/dynamo/dynamo_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/dynamo/dynamo_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -635,11 +634,9 @@ TEST_F(DynamoFilterTest, PartitionIdStats) {
           Property(&Stats::Metric::name, "prefix.dynamodb.table.locations.upstream_rq_time"), _));
 
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_1"))
-      .Times(1);
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_1"));
   EXPECT_CALL(stats_,
-              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_2"))
-      .Times(1);
+              counter("prefix.dynamodb.table.locations.capacity.GetItem.__partition_id=ition_2"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -812,12 +809,10 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
 
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"))
-      .Times(1);
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_1"));
   EXPECT_CALL(
       stats_,
-      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"))
-      .Times(1);
+      counter("prefix.dynamodb.table.locations.capacity.BatchGetItem.__partition_id=ition_2"));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

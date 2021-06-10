@@ -8,9 +8,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/filter/http/filter_config_discovery_impl.h"
-#include "common/json/json_loader.h"
+#include "source/common/config/utility.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/json/json_loader.h"
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -22,6 +22,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/substitute.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -76,20 +77,45 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  FilterConfigProviderPtr createProvider(std::string name, bool warm) {
+  DynamicFilterConfigProviderPtr createProvider(std::string name, bool warm,
+                                                bool default_configuration,
+                                                bool last_filter_config = true) {
+
     EXPECT_CALL(init_manager_, add(_));
-    envoy::config::core::v3::ConfigSource config_source;
-    TestUtility::loadFromYaml("ads: {}", config_source);
+    envoy::config::core::v3::ExtensionConfigSource config_source;
+
+    std::string inject_default_configuration;
+    if (default_configuration) {
+      inject_default_configuration = R"EOF(
+default_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  suppress_envoy_headers: true
+)EOF";
+    }
+    TestUtility::loadFromYaml(absl::Substitute(R"EOF(
+config_source: { ads: {} }
+$0
+type_urls:
+- envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                               inject_default_configuration),
+                              config_source);
+    if (!warm) {
+      config_source.set_apply_default_config_without_warming(true);
+      TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+)EOF",
+                                *config_source.mutable_default_config());
+    }
+
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, {"envoy.extensions.filters.http.router.v3.Router"}, factory_context_,
-        "xds.", !warm);
+        config_source, name, factory_context_, "xds.", last_filter_config, "http");
   }
 
-  void setup(bool warm = true) {
-    provider_ = createProvider("foo", warm);
+  void setup(bool warm = true, bool default_configuration = false, bool last_filter_config = true) {
+    provider_ = createProvider("foo", warm, default_configuration, last_filter_config);
     callbacks_ = factory_context_.cluster_manager_.subscription_factory_.callbacks_;
-    EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
-                start(_, _));
+    EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     if (!warm) {
       EXPECT_CALL(init_watcher_, ready());
     }
@@ -97,7 +123,7 @@ public:
   }
 
   std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
-  FilterConfigProviderPtr provider_;
+  DynamicFilterConfigProviderPtr provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
@@ -214,24 +240,81 @@ TEST_F(FilterConfigDiscoveryImplTest, WrongName) {
 TEST_F(FilterConfigDiscoveryImplTest, Incremental) {
   InSequence s;
   setup();
-  const std::string response_yaml = R"EOF(
+
+  // Bool parameter allows generating two different filter configs.
+  auto do_xds_response = [this](bool b) {
+    const std::string response_yaml = fmt::format(R"EOF(
 version_info: "1"
 resources:
 - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
   name: foo
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-)EOF";
-  const auto response =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-  Protobuf::RepeatedPtrField<std::string> remove;
-  *remove.Add() = "bar";
+    suppress_envoy_headers: {}
+)EOF",
+                                                  b);
+    const auto response =
+        TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+    callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, response.version_info());
+  };
+
   EXPECT_CALL(init_watcher_, ready());
-  callbacks_->onConfigUpdate(decoded_resources.refvec_, remove, response.version_info());
+  do_xds_response(true);
   EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+
+  // Ensure that we honor resource removals.
+  Protobuf::RepeatedPtrField<std::string> remove;
+  *remove.Add() = "foo";
+  callbacks_->onConfigUpdate({}, remove, "1");
+  EXPECT_EQ(absl::nullopt, provider_->config());
+  EXPECT_EQ(2UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+}
+
+TEST_F(FilterConfigDiscoveryImplTest, IncrementalWithDefault) {
+  InSequence s;
+  setup(true, true);
+
+  // Bool parameter allows generating two different filter configs. The default configuration has
+  // b=true.
+  auto do_xds_response = [this](bool b) {
+    const std::string response_yaml = fmt::format(R"EOF(
+version_info: "1"
+resources:
+- "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+  name: foo
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    suppress_envoy_headers: {}
+)EOF",
+                                                  b);
+
+    const auto response =
+        TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+    const auto decoded_resources =
+        TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+    callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, response.version_info());
+  };
+
+  EXPECT_NE(absl::nullopt, provider_->config());
+
+  EXPECT_CALL(init_watcher_, ready());
+  do_xds_response(false);
+  EXPECT_NE(absl::nullopt, provider_->config());
+  EXPECT_EQ(1UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
+
+  // If we get a removal while a default is configured, we should revert back to the default
+  // instead of clearing out the factory.
+  Protobuf::RepeatedPtrField<std::string> remove;
+  *remove.Add() = "foo";
+  callbacks_->onConfigUpdate({}, remove, "1");
+  EXPECT_NE(absl::nullopt, provider_->config());
+  EXPECT_EQ(2UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
 
@@ -239,7 +322,7 @@ TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
   InSequence s;
   setup(false);
   EXPECT_EQ("foo", provider_->name());
-  EXPECT_EQ(absl::nullopt, provider_->config());
+  EXPECT_NE(absl::nullopt, provider_->config());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_fail").value());
 }
@@ -247,7 +330,7 @@ TEST_F(FilterConfigDiscoveryImplTest, ApplyWithoutWarming) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
   InSequence s;
   setup();
-  auto provider2 = createProvider("foo", true);
+  auto provider2 = createProvider("foo", true, false);
   EXPECT_EQ("foo", provider2->name());
   EXPECT_EQ(absl::nullopt, provider2->config());
   const std::string response_yaml = R"EOF(
@@ -272,7 +355,7 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProviders) {
 TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
   InSequence s;
   setup();
-  auto provider2 = createProvider("foo", true);
+  auto provider2 = createProvider("foo", true, false);
   const std::string response_yaml = R"EOF(
   version_info: "1"
   resources:
@@ -292,6 +375,32 @@ TEST_F(FilterConfigDiscoveryImplTest, DualProvidersInvalid) {
       EnvoyException,
       "Error: filter config has type URL envoy.config.filter.http.health_check.v2.HealthCheck but "
       "expect envoy.extensions.filters.http.router.v3.Router.");
+  EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
+}
+
+// Raise exception when filter is not the last filter in filter chain, but the filter is terminal
+// filter.
+TEST_F(FilterConfigDiscoveryImplTest, TerminalFilterInvalid) {
+  InSequence s;
+  setup(true, false, false);
+  const std::string response_yaml = R"EOF(
+  version_info: "1"
+  resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+  const auto response =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
+  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_THROW_WITH_MESSAGE(
+      callbacks_->onConfigUpdate(decoded_resources.refvec_, response.version_info()),
+      EnvoyException,
+      "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
+      "in a http filter chain.");
   EXPECT_EQ(0UL, scope_.counter("xds.extension_config_discovery.foo.config_reload").value());
 }
 

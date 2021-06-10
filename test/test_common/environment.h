@@ -7,7 +7,7 @@
 #include "envoy/network/address.h"
 #include "envoy/server/options.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -16,6 +16,14 @@
 #include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
+
+namespace Grpc {
+
+// Support parameterizing over gRPC client type.
+enum class ClientType { EnvoyGrpc, GoogleGrpc };
+
+} // namespace Grpc
+
 class TestEnvironment {
 public:
   using PortMap = absl::node_hash_map<std::string, uint32_t>;
@@ -53,6 +61,13 @@ public:
    * types to test.
    */
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
+
+  /**
+   * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
+   * `--define google_grpc=disabled`.
+   * @return a vector of Grpc versions to test.
+   */
+  static std::vector<Grpc::ClientType> getsGrpcVersionsForTest();
 
   /**
    * Obtain command-line options reference.
@@ -194,12 +209,8 @@ public:
    * Dumps the contents of the file into the string.
    *
    * @param filename: the fully qualified name of the file to use
-   * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
-   *   If false, an empty string will be returned if the file is not present.
-   * @return string the contents of the file.
    */
-  static std::string readFileToStringForTest(const std::string& filename,
-                                             bool require_existence = true);
+  static std::string readFileToStringForTest(const std::string& filename);
 
   /**
    * Create a path on the filesystem (mkdir -p ... equivalent).

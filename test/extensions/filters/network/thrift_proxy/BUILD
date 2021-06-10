@@ -267,6 +267,7 @@ envoy_extension_cc_test(
         ":mocks",
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/mocks/network:network_mocks",
@@ -285,7 +286,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
-        "//include/envoy/common:base_includes",
+        "//envoy/common:base_includes",
         "//source/common/network:address_lib",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
@@ -333,7 +334,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
-    tags = ["fails_on_windows"],
+    shard_count = 4,
     deps = [
         ":integration_lib",
         ":utility_lib",
@@ -350,7 +351,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_name = "envoy.filters.network.thrift_proxy",
-    tags = ["fails_on_windows"],
     deps = [
         ":integration_lib",
         ":utility_lib",

@@ -2,15 +2,15 @@
 
 #include "envoy/router/router.h"
 
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/conn_state.h"
-#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_state.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -132,6 +132,7 @@ public:
 
   // ThriftProxy::DecoderCallbacks
   MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, ());
+  MOCK_METHOD(bool, passthroughEnabled, (), (const));
 };
 
 class MockDecoderEventHandler : public DecoderEventHandler {
@@ -140,6 +141,7 @@ public:
   ~MockDecoderEventHandler() override;
 
   // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data));
   MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(FilterStatus, transportEnd, ());
   MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
@@ -207,8 +209,10 @@ public:
   MOCK_METHOD(void, onDestroy, ());
   MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
   MOCK_METHOD(void, resetUpstreamConnection, ());
+  MOCK_METHOD(bool, passthroughSupported, (), (const));
 
   // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data));
   MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
   MOCK_METHOD(FilterStatus, transportEnd, ());
   MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
@@ -242,6 +246,7 @@ public:
   // ThriftProxy::ThriftFilters::DecoderFilterCallbacks
   MOCK_METHOD(uint64_t, streamId, (), (const));
   MOCK_METHOD(const Network::Connection*, connection, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueDecoding, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(TransportType, downstreamTransportType, (), (const));
@@ -251,10 +256,13 @@ public:
   MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+  MOCK_METHOD(MessageMetadataSharedPtr, responseMetadata, ());
+  MOCK_METHOD(bool, responseSuccess, ());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  MessageMetadataSharedPtr metadata_;
   std::shared_ptr<Router::MockRoute> route_;
 };
 

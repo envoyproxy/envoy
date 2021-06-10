@@ -2,10 +2,9 @@
 
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/common/expr/context.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/expr/context.h"
 
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
@@ -51,6 +50,9 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 // Returns false if the expression fails to evaluate.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers);
+
+// Returns a string for a CelValue.
+std::string print(CelValue value);
 
 // Thrown when there is an CEL library error.
 class CelException : public EnvoyException {

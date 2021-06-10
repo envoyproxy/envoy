@@ -1,13 +1,13 @@
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include <atomic>
 #include <list>
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/signal/fatal_action.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/signal/fatal_action.h"
 
 #include "absl/base/attributes.h"
 #include "absl/synchronization/mutex.h"
@@ -67,7 +67,7 @@ FatalAction::Status runFatalActions(FatalActionType action_type) {
   FatalAction::FatalActionManager* action_manager = fatal_action_manager.load();
 
   if (action_manager == nullptr) {
-    return FatalAction::Status::ActionManangerUnset;
+    return FatalAction::Status::ActionManagerUnset;
   }
 
   int64_t my_tid = action_manager->getThreadFactory().currentThreadId().getId();

@@ -4,12 +4,11 @@
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/filter_manager_impl.h"
-#include "common/tcp_proxy/tcp_proxy.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/network/ratelimit/ratelimit.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
@@ -50,6 +49,7 @@ public:
   }
 
   NiceMock<MockFilterManagerConnection> connection_;
+  NiceMock<MockListenSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -73,13 +73,15 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
+  EXPECT_EQ(&read_filter->callbacks_->socket(), &socket_);
+  EXPECT_EQ(&write_filter->write_callbacks_->socket(), &socket_);
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(manager.initializeReadFilters(), true);
@@ -119,7 +121,7 @@ TEST_F(NetworkFilterManagerTest, ConnectionClosedBeforeRunningFilter) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -146,7 +148,7 @@ TEST_F(NetworkFilterManagerTest, FilterReturnStopAndNoCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -174,7 +176,7 @@ TEST_F(NetworkFilterManagerTest, ReadFilterCloseConnectionAndReturnContinue) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -206,7 +208,7 @@ TEST_F(NetworkFilterManagerTest, WriteFilterCloseConnectionAndReturnContinue) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -245,7 +247,7 @@ TEST_F(NetworkFilterManagerTest, ReadCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -279,7 +281,7 @@ TEST_F(NetworkFilterManagerTest, WriteCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -320,7 +322,7 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -363,7 +365,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<MockClientConnection> upstream_connection;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
 
   std::string rl_yaml = R"EOF(
 domain: foo
@@ -392,6 +394,7 @@ stat_prefix: name
   manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
       rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
 
+  factory_context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
   tcp_proxy.set_stat_prefix("name");
   tcp_proxy.set_cluster("fake_cluster");
@@ -411,11 +414,11 @@ stat_prefix: name
 
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
-  EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
-      .WillOnce(Return(&conn_pool));
+  EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr, nullptr);
+                              nullptr, nullptr, "", nullptr);
 
   conn_pool.poolReady(upstream_connection);
 
@@ -434,7 +437,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -466,7 +469,7 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});

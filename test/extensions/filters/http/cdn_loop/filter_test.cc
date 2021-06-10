@@ -1,7 +1,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
-#include "extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
@@ -41,7 +41,7 @@ TEST(CdnLoopFilterTest, OtherCdnsInHeader) {
 
 TEST(CdnLoopFilterTest, LoopDetected) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadGateway, _, _, _, _)).Times(1);
+  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
   CdnLoopFilter filter("cdn", 0);
   filter.setDecoderFilterCallbacks(decoder_callbacks);
 
@@ -52,7 +52,7 @@ TEST(CdnLoopFilterTest, LoopDetected) {
 
 TEST(CdnLoopFilterTest, MultipleTransitsAllowed) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadGateway, _, _, _, _)).Times(1);
+  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadGateway, _, _, _, _));
   CdnLoopFilter filter("cdn", 3);
   filter.setDecoderFilterCallbacks(decoder_callbacks);
 
@@ -101,7 +101,7 @@ TEST(CdnLoopFilterTest, MultipleHeadersAllowed) {
 
 TEST(CdnLoopFilterTest, UnparseableHeader) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadRequest, _, _, _, _)).Times(1);
+  EXPECT_CALL(decoder_callbacks, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
   CdnLoopFilter filter("cdn", 0);
   filter.setDecoderFilterCallbacks(decoder_callbacks);
 

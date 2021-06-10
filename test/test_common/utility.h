@@ -15,19 +15,20 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/c_smart_ptr.h"
-#include "common/common/empty_string.h"
-#include "common/common/thread.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/config/version_converter.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
@@ -44,6 +45,12 @@ using testing::AssertionSuccess;
 using testing::Invoke; //  NOLINT(misc-unused-using-decls)
 
 namespace Envoy {
+
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#define TSAN_TIMEOUT_FACTOR 3
+#else
+#define TSAN_TIMEOUT_FACTOR 1
+#endif
 
 /*
   Macro to use for validating that a statement throws the specified type of exception, and that
@@ -80,6 +87,16 @@ namespace Envoy {
   EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception,                                        \
                              ::testing::Not(::testing::ContainsRegex(regex_str)))
 
+// Expect that the statement hits an ENVOY_BUG containing the specified message.
+#if defined(NDEBUG) || defined(ENVOY_CONFIG_COVERAGE)
+// ENVOY_BUGs in release mode or in a coverage test log error.
+#define EXPECT_ENVOY_BUG(statement, message) EXPECT_LOG_CONTAINS("error", message, statement)
+#else
+// ENVOY_BUGs in (non-coverage) debug mode is fatal.
+#define EXPECT_ENVOY_BUG(statement, message)                                                       \
+  EXPECT_DEBUG_DEATH(statement, ::testing::HasSubstr(message))
+#endif
+
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \
     statement;                                                                                     \
@@ -107,6 +124,11 @@ namespace Envoy {
 #else
 #define DEPRECATED_FEATURE_TEST(X) DISABLED_##X
 #endif
+
+class TestEnvoyBug {
+public:
+  static void callEnvoyBug() { ENVOY_BUG(false, ""); }
+};
 
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
@@ -340,10 +362,16 @@ public:
    *
    * @param lhs JSON string on LHS.
    * @param rhs JSON string on RHS.
+   * @param support_root_array Whether to support parsing JSON arrays.
    * @return bool indicating whether the JSON strings are equal.
    */
-  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
-    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs,
+                              bool support_root_array = false) {
+    if (!support_root_array) {
+      return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+    }
+
+    return protoEqual(jsonArrayToStruct(lhs), jsonArrayToStruct(rhs));
   }
 
   /**
@@ -526,7 +554,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -615,6 +645,15 @@ public:
   static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
     ProtobufWkt::Struct message;
     MessageUtil::loadFromJson(json, message);
+    return message;
+  }
+
+  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+    // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
+    std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
+
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(root_message, message);
     return message;
   }
 
@@ -810,8 +849,21 @@ namespace Http {
  * All of the inline header functions that just pass through to the child header map.
  */
 #define DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                      \
-public:                                                                                            \
   const HeaderEntry* name() const override { return header_map_->name(); }                         \
+  size_t remove##name() override {                                                                 \
+    const size_t headers_removed = header_map_->remove##name();                                    \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+    return headers_removed;                                                                        \
+  }                                                                                                \
+  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }  \
+  void set##name(absl::string_view value) override {                                               \
+    header_map_->set##name(value);                                                                 \
+    header_map_->verifyByteSizeInternalForTest();                                                  \
+  }
+
+#define DEFINE_TEST_INLINE_STRING_HEADER_FUNCS(name)                                               \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void append##name(absl::string_view data, absl::string_view delimiter) override {                \
     header_map_->append##name(data, delimiter);                                                    \
     header_map_->verifyByteSizeInternalForTest();                                                  \
@@ -819,21 +871,15 @@ public:                                                                         
   void setReference##name(absl::string_view value) override {                                      \
     header_map_->setReference##name(value);                                                        \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  void set##name(absl::string_view value) override {                                               \
-    header_map_->set##name(value);                                                                 \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
+  }
+
+#define DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS(name)                                              \
+public:                                                                                            \
+  DEFINE_TEST_INLINE_HEADER_FUNCS(name)                                                            \
   void set##name(uint64_t value) override {                                                        \
     header_map_->set##name(value);                                                                 \
     header_map_->verifyByteSizeInternalForTest();                                                  \
-  }                                                                                                \
-  size_t remove##name() override {                                                                 \
-    const size_t headers_removed = header_map_->remove##name();                                    \
-    header_map_->verifyByteSizeInternalForTest();                                                  \
-    return headers_removed;                                                                        \
-  }                                                                                                \
-  absl::string_view get##name##Value() const override { return header_map_->get##name##Value(); }
+  }
 
 /**
  * Base class for all test header map types. This class wraps an underlying real header map
@@ -854,6 +900,11 @@ public:
   TestHeaderMapImplBase(const TestHeaderMapImplBase& rhs)
       : TestHeaderMapImplBase(*rhs.header_map_) {}
   TestHeaderMapImplBase(const HeaderMap& rhs) {
+    HeaderMapImpl::copyFrom(*header_map_, rhs);
+    header_map_->verifyByteSizeInternalForTest();
+  }
+  void copyFrom(const TestHeaderMapImplBase& rhs) { copyFrom(*rhs.header_map_); }
+  void copyFrom(const HeaderMap& rhs) {
     HeaderMapImpl::copyFrom(*header_map_, rhs);
     header_map_->verifyByteSizeInternalForTest();
   }
@@ -985,6 +1036,10 @@ public:
     header_map_->verifyByteSizeInternalForTest();
     return rc;
   }
+  StatefulHeaderKeyFormatterOptConstRef formatter() const override {
+    return StatefulHeaderKeyFormatterOptConstRef(header_map_->formatter());
+  }
+  StatefulHeaderKeyFormatterOptRef formatter() override { return header_map_->formatter(); }
 
   std::unique_ptr<Impl> header_map_{Impl::create()};
 };
@@ -997,8 +1052,10 @@ class TestRequestHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_REQ_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_REQ_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;
@@ -1008,9 +1065,12 @@ class TestResponseHeaderMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_REQ_RESP_HEADERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 class TestResponseTrailerMapImpl
@@ -1018,7 +1078,8 @@ class TestResponseTrailerMapImpl
 public:
   using TestHeaderMapImplBase::TestHeaderMapImplBase;
 
-  INLINE_RESP_HEADERS_TRAILERS(DEFINE_TEST_INLINE_HEADER_FUNCS)
+  INLINE_RESP_STRING_HEADERS_TRAILERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
+  INLINE_RESP_NUMERIC_HEADERS_TRAILERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's
@@ -1041,6 +1102,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& rando
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Useful for testing ScopeTrackedObject order of deletion.
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);

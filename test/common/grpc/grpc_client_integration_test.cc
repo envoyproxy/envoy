@@ -1,9 +1,7 @@
 #ifdef ENVOY_GOOGLE_GRPC
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/google_async_client_impl.h"
-
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #endif
 
@@ -80,11 +78,9 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
         {":status", std::to_string(http_response_status)}};
     stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
-    // Technically this should be
-    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as WellKnownGrpcStatus::Canceled.
-    stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Canceled);
+    // Translate status per
+    // // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
+    stream->expectGrpcStatus(Utility::httpToGrpcStatus(http_response_status));
     stream->fake_stream_->encodeHeaders(reply_headers, true);
     dispatcher_helper_.runDispatcher();
   }
@@ -454,8 +450,7 @@ INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrati
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -466,8 +461,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -482,8 +476,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, MultipleAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   access_token_value_2_ = "accesstokenvalue2";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -495,8 +488,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   refresh_token_value_ = "refreshtokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -506,8 +498,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
 // Validate that no access token still works
 TEST_P(GrpcAccessTokenClientIntegrationTest, NoAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

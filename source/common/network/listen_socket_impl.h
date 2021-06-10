@@ -10,8 +10,10 @@
 #include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
 
-#include "common/common/assert.h"
-#include "common/network/socket_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
@@ -19,11 +21,13 @@ namespace Network {
 class ListenSocketImpl : public SocketImpl {
 protected:
   ListenSocketImpl(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& local_address)
-      : SocketImpl(std::move(io_handle), local_address) {}
+      : SocketImpl(std::move(io_handle), local_address, nullptr) {}
 
   SocketPtr duplicate() override {
     // Using `new` to access a non-public constructor.
-    return absl::WrapUnique(new ListenSocketImpl(io_handle_->duplicate(), local_address_));
+    return absl::WrapUnique(
+        new ListenSocketImpl(io_handle_ == nullptr ? nullptr : io_handle_->duplicate(),
+                             address_provider_->localAddress()));
   }
 
   void setupSocket(const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
@@ -48,11 +52,23 @@ template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-      : ListenSocketImpl(Network::ioHandleForAddr(T::type, address), address) {
-    RELEASE_ASSERT(io_handle_->isOpen(), "");
-
-    setPrebindSocketOptions();
-
+      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address) : nullptr,
+                         address) {
+    // Prebind is applied if the socket is bind to port.
+    if (bind_to_port) {
+      RELEASE_ASSERT(io_handle_->isOpen(), "");
+      setPrebindSocketOptions();
+    } else {
+      // If the tcp listener does not bind to port, we test that the ip family is supported.
+      if (auto ip = address->ip(); ip != nullptr) {
+        RELEASE_ASSERT(
+            Network::SocketInterfaceSingleton::get().ipFamilySupported(ip->ipv4() ? AF_INET
+                                                                                  : AF_INET6),
+            fmt::format(
+                "Creating listen socket address {} but the address familiy is not supported",
+                address->asStringView()));
+      }
+    }
     setupSocket(options, bind_to_port);
   }
 
@@ -65,8 +81,29 @@ public:
   Socket::Type socketType() const override { return T::type; }
 
 protected:
-  void setPrebindSocketOptions();
+  void setPrebindSocketOptions() {
+    // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
+    // on Linux and later BSD socket stacks
+#ifndef WIN32
+    int on = 1;
+    auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
+#endif
+  }
 };
+
+template <>
+inline void
+NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
+
+// UDP listen socket desires io handle regardless bind_to_port is true or false.
+template <>
+NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
+    const Address::InstanceConstSharedPtr& address,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
+
+template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
+template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
 
 using TcpListenSocket = NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 using TcpListenSocketPtr = std::unique_ptr<TcpListenSocket>;
@@ -86,33 +123,18 @@ public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
                        const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(std::move(io_handle), local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {}
+      : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
                        const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(type, local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {
-    setLocalAddress(local_address);
+      : SocketImpl(type, local_address, remote_address) {
+    address_provider_->setLocalAddress(local_address);
   }
 
   // Network::Socket
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 
   // Network::ConnectionSocket
-  const Address::InstanceConstSharedPtr& remoteAddress() const override { return remote_address_; }
-  const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
-    return direct_remote_address_;
-  }
-  void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
-    setLocalAddress(local_address);
-    local_address_restored_ = true;
-  }
-  void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) override {
-    remote_address_ = remote_address;
-  }
-  bool localAddressRestored() const override { return local_address_restored_; }
-
   void setDetectedTransportProtocol(absl::string_view protocol) override {
     transport_protocol_ = std::string(protocol);
   }
@@ -129,7 +151,8 @@ public:
   }
 
   void setRequestedServerName(absl::string_view server_name) override {
-    server_name_ = std::string(server_name);
+    // Always keep the server_name_ as lower case.
+    server_name_ = absl::AsciiStrToLower(server_name);
   }
   absl::string_view requestedServerName() const override { return server_name_; }
 
@@ -137,10 +160,14 @@ public:
     return ioHandle().lastRoundTripTime();
   }
 
+  void dumpState(std::ostream& os, int indent_level) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_)
+       << DUMP_MEMBER(server_name_) << "\n";
+    DUMP_DETAILS(address_provider_);
+  }
+
 protected:
-  Address::InstanceConstSharedPtr remote_address_;
-  const Address::InstanceConstSharedPtr direct_remote_address_;
-  bool local_address_restored_{false};
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
   std::string server_name_;

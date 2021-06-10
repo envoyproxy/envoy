@@ -2,9 +2,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
@@ -165,9 +166,8 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
   test_stream_info->upstream_local_address_ = upstream_local_address;
-  test_stream_info->downstream_local_address_ = address;
-  test_stream_info->downstream_direct_remote_address_ = address;
-  test_stream_info->downstream_remote_address_ = address;
+  test_stream_info->downstream_address_provider_ =
+      std::make_shared<Network::SocketAddressSetterImpl>(address, address);
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));

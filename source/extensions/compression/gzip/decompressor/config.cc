@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/decompressor/config.h"
+#include "source/extensions/compression/gzip/decompressor/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -7,7 +7,7 @@ namespace Gzip {
 namespace Decompressor {
 
 namespace {
-const uint32_t DefaultWindowBits = 12;
+const uint32_t DefaultWindowBits = 15;
 const uint32_t DefaultChunkSize = 4096;
 // When logical OR'ed to window bits, this tells zlib library to decompress gzip data per:
 // inflateInit2 in https://www.zlib.net/manual.html

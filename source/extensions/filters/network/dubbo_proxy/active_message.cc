@@ -1,9 +1,8 @@
-#include "extensions/filters/network/dubbo_proxy/active_message.h"
+#include "source/extensions/filters/network/dubbo_proxy/active_message.h"
 
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/conn_manager.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,7 +44,7 @@ void ActiveResponseDecoder::onStreamDecoded(MessageMetadataSharedPtr metadata,
     throw DownstreamConnectionCloseException("Downstream has closed or closing");
   }
 
-  response_connection_.write(ctx->messageOriginData(), false);
+  response_connection_.write(ctx->originMessage(), false);
   ENVOY_LOG(debug,
             "dubbo response: the upstream response message has been forwarded to the downstream");
 
@@ -128,7 +127,7 @@ ActiveMessageDecoderFilter::ActiveMessageDecoderFilter(ActiveMessage& parent,
 void ActiveMessageDecoderFilter::continueDecoding() {
   ASSERT(parent_.context());
   auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
-  if (0 != parent_.context()->messageOriginData().length()) {
+  if (0 != parent_.context()->originMessage().length()) {
     state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
     ENVOY_LOG(warn, "The original message data is not consumed, triggering the decoder filter from "
                     "the current location");
@@ -170,7 +169,7 @@ ActiveMessageEncoderFilter::ActiveMessageEncoderFilter(ActiveMessage& parent,
 void ActiveMessageEncoderFilter::continueEncoding() {
   ASSERT(parent_.context());
   auto state = ActiveMessage::FilterIterationStartState::AlwaysStartFromNext;
-  if (0 != parent_.context()->messageOriginData().length()) {
+  if (0 != parent_.context()->originMessage().length()) {
     state = ActiveMessage::FilterIterationStartState::CanStartFromCurrent;
     ENVOY_LOG(warn, "The original message data is not consumed, triggering the encoder filter from "
                     "the current location");
@@ -186,12 +185,9 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::HistogramCompletableTimespanImpl>(
                            parent_.stats().request_time_ms_, parent.timeSystem())),
       request_id_(-1), stream_id_(parent.randomGenerator().random()),
-      stream_info_(parent.timeSystem()), pending_stream_decoded_(false),
-      local_response_sent_(false) {
+      stream_info_(parent.timeSystem(), parent_.connection().addressProviderSharedPtr()),
+      pending_stream_decoded_(false), local_response_sent_(false) {
   parent_.stats().request_active_.inc();
-  stream_info_.setDownstreamLocalAddress(parent_.connection().localAddress());
-  stream_info_.setDownstreamRemoteAddress(parent_.connection().remoteAddress());
-  stream_info_.setDownstreamDirectRemoteAddress(parent_.connection().directRemoteAddress());
 }
 
 ActiveMessage::~ActiveMessage() {

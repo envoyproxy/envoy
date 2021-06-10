@@ -1,4 +1,6 @@
-#include "common/buffer/buffer_impl.h"
+#pragma once
+
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

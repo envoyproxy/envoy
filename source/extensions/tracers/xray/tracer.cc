@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/tracer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -7,10 +7,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/listener.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
@@ -92,7 +91,7 @@ void Span::finishSpan() {
     s.mutable_annotations()->insert({item.first, item.second});
   }
 
-  const std::string json = MessageUtil::getJsonStringFromMessage(
+  const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
 
   broker_.send(json);

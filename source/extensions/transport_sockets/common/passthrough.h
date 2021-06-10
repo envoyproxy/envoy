@@ -3,7 +3,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,6 +22,8 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override;
+  // startSecureTransport method should not be called for this transport socket.
+  bool startSecureTransport() override { return false; }
 
 protected:
   Network::TransportSocketPtr transport_socket_;

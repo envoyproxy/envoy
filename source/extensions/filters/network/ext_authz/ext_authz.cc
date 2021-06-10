@@ -1,14 +1,13 @@
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include <cstdint>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,9 +29,8 @@ void Filter::callCheck() {
   config_->stats().total_.inc();
 
   calling_check_ = true;
-  auto& connection = filter_callbacks_->connection();
-  client_->check(*this, connection.dispatcher(), check_request_, Tracing::NullSpan::instance(),
-                 connection.streamInfo());
+  client_->check(*this, check_request_, Tracing::NullSpan::instance(),
+                 filter_callbacks_->connection().streamInfo());
   calling_check_ = false;
 }
 
@@ -78,9 +76,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();
-    if (response->error_kind == Filters::Common::ExtAuthz::ErrorKind::Timedout) {
-      config_->stats().timeout_.inc();
-    }
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Denied:
     config_->stats().denied_.inc();

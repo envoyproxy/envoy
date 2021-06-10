@@ -1,8 +1,8 @@
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/thread_impl.h"
-#include "common/filesystem/watcher_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/filesystem/watcher_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -205,9 +205,8 @@ void WatcherImpl::directoryChangeCompletion(DWORD err, DWORD num_bytes, LPOVERLA
         // this tells the libevent callback to pull this callback off the active_callbacks_
         // queue. We do this so that the callbacks are executed in the main libevent loop,
         // not in this completion routine
-        Buffer::OwnedImpl buffer;
-        buffer.add(data);
-        auto result = watcher->write_handle_->write(buffer);
+        Buffer::RawSlice buffer{(void*)data.data(), 1};
+        auto result = watcher->write_handle_->writev(&buffer, 1);
         RELEASE_ASSERT(result.rc_ == 1,
                        fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
       }

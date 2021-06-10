@@ -1,11 +1,10 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/router/config_impl.h"
-#include "common/router/router.h"
-#include "common/router/upstream_request.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/router/upstream_request.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -38,9 +37,11 @@ public:
   TcpConnPoolTest() : host_(std::make_shared<NiceMock<Upstream::MockHost>>()) {
     NiceMock<Router::MockRouteEntry> route_entry;
     NiceMock<Upstream::MockClusterManager> cm;
-    EXPECT_CALL(cm, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&mock_pool_));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm, true, route_entry, Envoy::Http::Protocol::Http11,
-                                               nullptr);
+    cm.initializeThreadLocalClusters({"fake_cluster"});
+    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
+        .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
+    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, true, route_entry,
+                                               Envoy::Http::Protocol::Http11, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
@@ -57,7 +58,7 @@ TEST_F(TcpConnPoolTest, Basic) {
   conn_pool_->newStream(&mock_generic_callbacks_);
 
   EXPECT_CALL(mock_generic_callbacks_, upstreamToDownstream());
-  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolReady(_, _, _, _, _));
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).Times(AnyNumber()).WillRepeatedly(ReturnRef(connection));
   conn_pool_->onPoolReady(std::move(data), host_);
@@ -143,10 +144,10 @@ TEST_F(TcpUpstreamTest, V1Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
-  mock_router_filter_.client_connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
-  mock_router_filter_.client_connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+      ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
@@ -166,10 +167,10 @@ TEST_F(TcpUpstreamTest, V2Header) {
   envoy::config::core::v3::ProxyProtocolConfig* proxy_config =
       mock_router_filter_.route_entry_.connect_config_->mutable_proxy_protocol_config();
   proxy_config->set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
-  mock_router_filter_.client_connection_.remote_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5);
-  mock_router_filter_.client_connection_.local_address_ =
-      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8);
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_
+      ->setRemoteAddress(std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 5));
+  mock_router_filter_.client_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("4.5.6.7", 8));
 
   Buffer::OwnedImpl expected_data;
   Extensions::Common::ProxyProtocol::generateProxyProtoHeader(

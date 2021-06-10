@@ -1,16 +1,16 @@
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/matchers.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -32,7 +32,7 @@ const Http::HeaderMap& lengthZeroHeader() {
 // Static response used for creating authorization ERROR responses.
 const Response& errorResponse() {
   CONSTRUCT_ON_FIRST_USE(Response, Response{CheckStatus::Error,
-                                            ErrorKind::Other,
+                                            Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
@@ -45,9 +45,10 @@ const Response& errorResponse() {
 // SuccessResponse used for creating either DENIED or OK authorization responses.
 struct SuccessResponse {
   SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
-                  const MatcherSharedPtr& append_matchers, Response&& response)
+                  const MatcherSharedPtr& append_matchers,
+                  const MatcherSharedPtr& response_matchers, Response&& response)
       : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
-        response_(std::make_unique<Response>(response)) {
+        response_matchers_(response_matchers), response_(std::make_unique<Response>(response)) {
     headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
       // UpstreamHeaderMatcher
       if (matchers_->matches(header.key().getStringView())) {
@@ -65,6 +66,11 @@ struct SuccessResponse {
             Http::LowerCaseString{std::string(header.key().getStringView())},
             std::string(header.value().getStringView()));
       }
+      if (response_matchers_->matches(header.key().getStringView())) {
+        response_->response_headers_to_add.emplace_back(
+            Http::LowerCaseString{std::string(header.key().getStringView())},
+            std::string(header.value().getStringView()));
+      }
       return Http::HeaderMap::Iterate::Continue;
     });
   }
@@ -72,6 +78,7 @@ struct SuccessResponse {
   const Http::HeaderMap& headers_;
   const MatcherSharedPtr& matchers_;
   const MatcherSharedPtr& append_matchers_;
+  const MatcherSharedPtr& response_matchers_;
   ResponsePtr response_;
 };
 
@@ -107,6 +114,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
       client_header_matchers_(toClientMatchers(
           config.http_service().authorization_response().allowed_client_headers())),
+      client_header_on_success_matchers_(toClientMatchersOnSuccess(
+          config.http_service().authorization_response().allowed_client_headers_on_success())),
       upstream_header_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
@@ -130,6 +139,12 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::v3::ListStringMatche
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher));
   }
 
+  return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
+}
+
+MatcherSharedPtr
+ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list) {
+  std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list));
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
@@ -176,11 +191,10 @@ void RawHttpClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
   request_->cancel();
   callbacks_ = nullptr;
-  timeout_timer_.reset();
 }
 
 // Client
-void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
+void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                               const envoy::service::auth::v3::CheckRequest& request,
                               Tracing::Span& parent_span,
                               const StreamInfo::StreamInfo& stream_info) {
@@ -224,30 +238,24 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks, Event::Dispatcher& di
 
   // It's possible that the cluster specified in the filter configuration no longer exists due to a
   // CDS removal.
-  if (cm_.get(cluster) == nullptr) {
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster);
+  if (thread_local_cluster == nullptr) {
     // TODO(dio): Add stats related to this.
     ENVOY_LOG(debug, "ext_authz cluster '{}' does not exist", cluster);
     callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
     callbacks_ = nullptr;
   } else {
     auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName());
 
-    if (timeoutStartsAtCheckCreation()) {
-      timeout_timer_ = dispatcher.createTimer([this]() -> void { onTimeout(); });
-      timeout_timer_->enableTimer(config_->timeout());
-    } else {
-      options.setTimeout(config_->timeout());
-    }
-
-    request_ = cm_.httpAsyncClientForCluster(cluster).send(std::move(message), *this, options);
+    request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
 }
 
 void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& message) {
-  timeout_timer_.reset();
   callbacks_->onComplete(toResponse(std::move(message)));
   callbacks_ = nullptr;
 }
@@ -255,7 +263,6 @@ void RawHttpClientImpl::onSuccess(const Http::AsyncClient::Request&,
 void RawHttpClientImpl::onFailure(const Http::AsyncClient::Request&,
                                   Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  timeout_timer_.reset();
   callbacks_->onComplete(std::make_unique<Response>(errorResponse()));
   callbacks_ = nullptr;
 }
@@ -270,18 +277,6 @@ void RawHttpClientImpl::onBeforeFinalizeUpstreamSpan(
                                                          ? TracingConstants::get().TraceOk
                                                          : TracingConstants::get().TraceUnauthz);
   }
-}
-
-void RawHttpClientImpl::onTimeout() {
-  ENVOY_LOG(trace, "CheckRequest timed-out");
-  ASSERT(request_ != nullptr);
-  request_->cancel();
-  // let the client know of failure:
-  ASSERT(callbacks_ != nullptr);
-  Response response = errorResponse();
-  response.error_kind = ErrorKind::Timedout;
-  callbacks_->onComplete(std::make_unique<Response>(response));
-  callbacks_ = nullptr;
 }
 
 ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
@@ -321,20 +316,21 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
-                       config_->upstreamHeaderToAppendMatchers(),
-                       Response{CheckStatus::OK, ErrorKind::Other, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{},
-                                std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+    SuccessResponse ok{
+        message->headers(), config_->upstreamHeaderMatchers(),
+        config_->upstreamHeaderToAppendMatchers(), config_->clientHeaderOnSuccessMatchers(),
+        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
+                 Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                 ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
   // Create a Denied authorization response.
   SuccessResponse denied{message->headers(), config_->clientHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
+                         config_->clientHeaderOnSuccessMatchers(),
                          Response{CheckStatus::Denied,
-                                  ErrorKind::Other,
+                                  Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},

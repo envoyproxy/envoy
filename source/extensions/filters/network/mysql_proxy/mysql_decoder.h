@@ -1,18 +1,12 @@
 #pragma once
-#include <cstdint>
 
-#include "envoy/common/platform.h"
-
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/common/sqlutils/sqlutils.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_command.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
-#include "extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
-#include "extensions/filters/network/mysql_proxy/mysql_session.h"
+#include "source/extensions/common/sqlutils/sqlutils.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_command.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec_switch_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,20 +52,10 @@ protected:
 
 using DecoderPtr = std::unique_ptr<Decoder>;
 
-class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
+class DecoderFactory {
 public:
-  DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
-
-  // MySQLProxy::Decoder
-  void onData(Buffer::Instance& data) override;
-  MySQLSession& getSession() override { return session_; }
-
-private:
-  bool decode(Buffer::Instance& data);
-  void parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len);
-
-  DecoderCallbacks& callbacks_;
-  MySQLSession session_;
+  virtual ~DecoderFactory() = default;
+  virtual DecoderPtr create(DecoderCallbacks& callbacks) PURE;
 };
 
 } // namespace MySQLProxy

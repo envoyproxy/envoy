@@ -1,7 +1,7 @@
 #include "mocks.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,10 +23,16 @@ MockApi::~MockApi() = default;
 Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name) {
   return Event::DispatcherPtr{allocateDispatcher_(name, time_system_)};
 }
+
+Event::DispatcherPtr
+MockApi::allocateDispatcher(const std::string& name,
+                            const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
+  return Event::DispatcherPtr{allocateDispatcher_(name, scaled_timer_factory, {}, time_system_)};
+}
 Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
                                                  Buffer::WatermarkFactoryPtr&& watermark_factory) {
   return Event::DispatcherPtr{
-      allocateDispatcher_(name, std::move(watermark_factory), time_system_)};
+      allocateDispatcher_(name, {}, std::move(watermark_factory), time_system_)};
 }
 
 MockOsSysCalls::MockOsSysCalls() {

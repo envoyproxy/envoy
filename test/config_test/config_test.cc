@@ -6,13 +6,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "server/config_validation/server.h"
-#include "server/configuration_impl.h"
-#include "server/options_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/server/config_validation/server.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/instance.h"
@@ -45,14 +44,20 @@ OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
                                               src.localAddressIpVersion());
 }
 
+static std::vector<absl::string_view> unsuported_win32_configs = {
+#if defined(WIN32) && !defined(SO_ORIGINAL_DST)
+    "configs_original-dst-cluster_proxy_config.yaml"
+#endif
+};
+
 class ScopedRuntimeInjector {
 public:
   ScopedRuntimeInjector(Runtime::Loader& runtime) {
     Runtime::LoaderSingleton::initialize(&runtime);
-  }
+  } // namespace
 
   ~ScopedRuntimeInjector() { Runtime::LoaderSingleton::clear(); }
-};
+}; // namespace ConfigTest
 
 } // namespace
 
@@ -79,6 +84,14 @@ public:
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+
+    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
+    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
+    // This should allow the existing configuration examples to continue working despite the feature
+    // being disabled by default.
+    ON_CALL(*snapshot_,
+            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
+        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
@@ -86,15 +99,15 @@ public:
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
-    Server::Configuration::InitialImpl initial_config(bootstrap);
+    Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
         server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
         server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
-        server_.grpcContext(), server_.accessLogManager(), server_.singletonManager(),
-        time_system_);
+        server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
+        server_.singletonManager(), server_.options());
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -150,7 +163,8 @@ public:
   Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
                                                 false};
   Random::RandomGeneratorImpl random_;
-  Runtime::SnapshotConstSharedPtr snapshot_{std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
+  std::shared_ptr<Runtime::MockSnapshot> snapshot_{
+      std::make_shared<NiceMock<Runtime::MockSnapshot>>()};
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<Filesystem::MockInstance> file_system_;
@@ -158,8 +172,24 @@ public:
 
 void testMerge() {
   Api::ApiPtr api = Api::createApiForTest();
-
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
+  const std::string overlay = R"EOF(
+        {
+          admin: {
+            "address": {
+              "socket_address": {
+                "address": "1.2.3.4",
+                "port_value": 5678
+              }
+            }
+          },
+          static_resources: {
+            clusters: [
+              {
+                name: 'foo'
+              }
+            ]
+          }
+        })EOF";
   OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -172,15 +202,28 @@ uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
   Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
+#ifndef ENVOY_ENABLE_QUIC
+    if (filename.find("http3") != std::string::npos) {
+      ENVOY_LOG_MISC(info, "Skipping HTTP/3 config {}.\n", filename);
+      num_tested++;
+      continue;
+    }
+#endif
+
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
-    OptionsImpl options(
-        Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
-    ConfigTest test1(options);
-    envoy::config::bootstrap::v3::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
-                                              ProtobufMessage::getStrictValidationVisitor(), *api);
-    ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-    ConfigTest test2(asConfigYaml(options, *api));
+    if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
+                     [filename](const absl::string_view& s) {
+                       return filename.find(std::string(s)) != std::string::npos;
+                     }) == unsuported_win32_configs.end()) {
+      OptionsImpl options(
+          Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
+      ConfigTest test1(options);
+      envoy::config::bootstrap::v3::Bootstrap bootstrap;
+      Server::InstanceUtil::loadBootstrapConfig(
+          bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
+      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
+      ConfigTest test2(asConfigYaml(options, *api));
+    }
     num_tested++;
   }
   return num_tested;

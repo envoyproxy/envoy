@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
     deps = [
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
@@ -31,16 +31,14 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":ratelimit_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
-        "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3:pkg_cc_proto",
     ],
 )

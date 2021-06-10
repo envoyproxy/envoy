@@ -4,10 +4,10 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/version/version.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -29,21 +29,24 @@ class TcpGrpcAccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrat
 public:
   TcpGrpcAccessLogIntegrationTest()
       : BaseIntegrationTest(ipVersion(), ConfigHelper::tcpProxyConfig()) {
-    enable_half_close_ = true;
+    enableHalfClose(true);
   }
 
   void createUpstreams() override {
     BaseIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.renameListener("tcp_proxy");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
-      accesslog_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*accesslog_cluster);
     });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -123,10 +126,12 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, TcpGrpcAccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));

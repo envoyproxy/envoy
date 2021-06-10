@@ -2,8 +2,8 @@
 
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +20,8 @@ public:
     member_update_cb_helper_.runCallbacks(priority(), added, removed);
   }
 
-  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
     return member_update_cb_helper_.add(callback);
   }
 

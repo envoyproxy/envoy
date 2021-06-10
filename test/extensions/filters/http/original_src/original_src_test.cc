@@ -1,10 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/http/original_src/original_src.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
@@ -16,7 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::SaveArg;
 using testing::StrictMock;
 
@@ -51,7 +49,8 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.stream_info_.downstream_remote_address_ = Network::Utility::resolveUrl(address);
+    callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(
+        Network::Utility::resolveUrl(address));
   }
 
 protected:
@@ -92,11 +91,11 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  EXPECT_CALL(socket,
-              setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
+  EXPECT_EQ(*socket.addressProvider().localAddress(),
+            *callbacks_.stream_info_.downstream_address_provider_->remoteAddress());
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
@@ -127,10 +126,10 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   NiceMock<Network::MockConnectionSocket> socket;
   const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
 
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
+  EXPECT_EQ(*socket.addressProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
@@ -201,8 +200,8 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_remote_address_ =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+      Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, true);
 
   // No new expectations => no side effects from calling these.
@@ -218,8 +217,8 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_remote_address_ =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+  callbacks.stream_info_.downstream_address_provider_->setRemoteAddress(
+      Network::Utility::parseInternetAddress("1.2.3.4"));
   filter->decodeHeaders(headers_, false);
 
   // No new expectations => no side effects from calling these.

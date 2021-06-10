@@ -1,9 +1,12 @@
+#pragma once
+
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"
@@ -70,6 +73,7 @@ public:
   MockResponseDecoder response_decoder_;
   RequestEncoder* request_encoder_;
   MockStreamCallbacks client_stream_callbacks_;
+  Random::MockRandomGenerator random_;
 };
 
 // Holds mock and environment placeholders for an HTTP/2 server codec. Sets up expectations for
@@ -80,6 +84,7 @@ public:
 
   ::testing::NiceMock<Network::MockConnection> server_connection_;
   MockServerConnectionCallbacks server_callbacks_;
+  Random::MockRandomGenerator random_;
   MockRequestDecoder request_decoder_;
   MockStreamCallbacks server_stream_callbacks_;
 };

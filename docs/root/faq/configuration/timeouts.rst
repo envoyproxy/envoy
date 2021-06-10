@@ -19,7 +19,7 @@ Connection timeouts
 
 Connection timeouts apply to the entire HTTP connection and all streams the connection carries.
 
-* The HTTP protocol :ref:`idle timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
+* The HTTP protocol :ref:`idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`
   is defined in a generic message used by both the HTTP connection manager as well as upstream
   cluster HTTP connections. The idle timeout is the time at which a downstream or upstream
   connection will be terminated if there are no active streams. The default idle timeout if not
@@ -28,8 +28,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
   field in the HTTP connection manager configuration. To modify the idle timeout for upstream
   connections use the
-  :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field
-  in the cluster configuration.
+  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 
@@ -61,12 +60,12 @@ context request/stream is interchangeable.
   is the amount of time that the connection manager will allow a stream to exist with no upstream
   or downstream activity. The default stream idle timeout is *5 minutes*. This timeout is strongly
   recommended for all requests (not just streaming requests/responses) as it additionally defends
-  against an HTTP/2 peer that does not open stream window once an entire response has been buffered
+  against a peer that does not open the stream window once an entire response has been buffered
   to be sent to a downstream client.
-* The HTTP protocol :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` 
-  is defined in a generic message used by the HTTP connection manager. The max stream duration is the 
-  maximum time that a stream's lifetime will span. You can use this functionality when you want to reset 
-  HTTP request/response streams periodically. You can't use :ref:`request_timeout 
+* The HTTP protocol :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
+  is defined in a generic message used by the HTTP connection manager. The max stream duration is the
+  maximum time that a stream's lifetime will span. You can use this functionality when you want to reset
+  HTTP request/response streams periodically. You can't use :ref:`request_timeout
   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.request_timeout>`
   in this situation because this timer will be disarmed if a response header is received on the request/response streams.
   This timeout is available on both upstream and downstream connections.
@@ -101,12 +100,26 @@ stream timeouts already introduced above.
   :ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`
   for individual routes as well as setting both limits and a fixed time offset on grpc-timeout headers.
 
+Scaled timeouts
+^^^^^^^^^^^^^^^
+
+In situations where envoy is under high load, Envoy can dynamically configure timeouts using scaled timeouts.
+Envoy supports scaled timeouts through the :ref:`Overload Manager <envoy_v3_api_msg_config.overload.v3.OverloadManager>`, configured
+in envoy :ref:`bootstrap configuration <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.overload_manager>`.
+Using a :ref:`reduce timeouts <config_overload_manager_reducing_timeouts>` overload action,
+the Overload Manager can be configured to monitor :ref:`resources <envoy_v3_api_msg_config.overload.v3.ResourceMonitor>`
+and scale timeouts accordingly. For example, a common use case may be to monitor the Envoy :ref:`heap size <envoy_v3_api_msg_extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig>`
+and set the scaled TimerType to :ref:`HTTP_DOWNSTREAM_CONNECTION_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_IDLE>`.
+The overload manager will scale down the :ref:`idle timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>` once the :ref:`scaling_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold>` has been met
+and will set the timeout to the :ref:`min timeout <envoy_v3_api_field_config.overload.v3.ScaleTimersOverloadActionConfig.ScaleTimer.min_timeout>` once the :ref:`scaling_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold>` is met.
+The full list of supported timers that can be scaled is available in the overload manager :ref:`docs <envoy_v3_api_enum_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType>`.
+
 TCP
 ---
 
 * The cluster :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>` specifies the amount
-  of time Envoy will wait for an upstream TCP connection to be established. This timeout has no
-  default, but is required in the configuration.
+  of time Envoy will wait for an upstream TCP connection to be established. If this value is not set,
+  a default value of 5 seconds will be used.
 
   .. attention::
 

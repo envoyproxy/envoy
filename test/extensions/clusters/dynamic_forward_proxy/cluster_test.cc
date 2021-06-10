@@ -2,16 +2,16 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
@@ -42,7 +42,7 @@ public:
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _, _));
     }
@@ -59,7 +59,7 @@ public:
 
     ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(&downstream_headers_));
 
-    cluster_->prioritySet().addMemberUpdateCb(
+    member_update_cb_ = cluster_->prioritySet().addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added,
                const Upstream::HostVector& hosts_removed) -> void {
           onMemberUpdateCb(hosts_added, hosts_removed);
@@ -70,7 +70,11 @@ public:
     for (const auto& host : host_map_) {
       existing_hosts.emplace(host.first, host.second);
     }
-    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hosts()).WillOnce(Return(existing_hosts));
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, iterateHostMap(_)).WillOnce(Invoke([&](auto cb) {
+      for (const auto& host : host_map_) {
+        cb(host.first, host.second);
+      }
+    }));
     if (!existing_hosts.empty()) {
       EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
     }
@@ -108,7 +112,7 @@ public:
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -119,6 +123,7 @@ public:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
+  Server::MockOptions options_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   std::shared_ptr<Cluster> cluster_;
@@ -131,6 +136,7 @@ public:
   absl::flat_hash_map<std::string,
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
+  Envoy::Common::CallbackHandlePtr member_update_cb_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name
@@ -154,14 +160,12 @@ TEST_F(ClusterTest, BasicFlow) {
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
 
-  // LB will not resolve host1 until it has been updated.
+  // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
-  refreshLb();
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
@@ -174,13 +178,10 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_CALL(*host_map_["host1"], touch());
   EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
 
-  // Remove the host, LB will still resolve until it is refreshed.
+  // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   update_callbacks_->onDnsHostRemove("host1");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("2.3.4.5:0", lb_->chooseHost(setHostAndReturnContext("host1"))->address()->asString());
-  refreshLb();
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1")));
 }
 
@@ -207,7 +208,8 @@ protected:
         Upstream::parseClusterFromV3Yaml(yaml_config, avoid_boosting);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
         cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
-        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_);
+        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_,
+        options_);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
@@ -215,7 +217,7 @@ protected:
   }
 
 private:
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestUtil::TestStore stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -229,6 +231,7 @@ private:
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  Server::MockOptions options_;
 };
 
 // Verify that using 'sni' causes a failure.

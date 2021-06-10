@@ -8,7 +8,7 @@ External authorization (``ext_authz``) filter
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 The External Authorization sandbox demonstrates Envoy's :ref:`ext_authz filter <config_http_filters_ext_authz>`
 capability to delegate authorization of incoming requests through Envoy to an external services.
@@ -137,7 +137,7 @@ as the authorization server. To run this example:
     $ docker-compose pull
     $ # Tearing down the currently running setup
     $ docker-compose down
-    $ FRONT_ENVOY_YAML=config/opa-service/v2.yaml docker-compose up --build -d
+    $ FRONT_ENVOY_YAML=config/opa-service/v3.yaml docker-compose up --build -d
 
 And sending a request to the upstream service (via the Front Envoy) gives:
 

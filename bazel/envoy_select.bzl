@@ -25,43 +25,65 @@ def envoy_select_google_grpc(xs, repository = ""):
         "//conditions:default": xs,
     })
 
-# Selects the given values if hot restart is enabled in the current build.
-def envoy_select_hot_restart(xs, repository = ""):
+# Selects the given values if http3 is enabled in the current build.
+def envoy_select_enable_http3(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_hot_restart_or_apple": [],
+        repository + "//bazel:disable_http3": [],
         "//conditions:default": xs,
     })
 
-# Selects the given values depending on the WASM runtimes enabled in the current build.
-def envoy_select_wasm(xs):
+# Selects the given values if hot restart is enabled in the current build.
+def envoy_select_hot_restart(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_hot_restart": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values depending on the Wasm runtimes enabled in the current build,
+# and the ability to build tests using Proxy-Wasm C++ SDK on the current platform.
+def envoy_select_wasm_cpp_tests(xs):
+    return select({
+        "@envoy//bazel:darwin_arm64": [],
+        "@envoy//bazel:linux_aarch64": [],
+        "@envoy//bazel:wasm_none": [],
+        "//conditions:default": xs,
+    })
+
+# Selects the given values depending on the Wasm runtimes enabled in the current build,
+# and the ability to build tests using Proxy-Wasm Rust SDK on the current platform.
+def envoy_select_wasm_rust_tests(xs):
     return select({
         "@envoy//bazel:wasm_none": [],
         "//conditions:default": xs,
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8(xs):
     return select({
+        "@envoy//bazel:wasm_wamr": [],
         "@envoy//bazel:wasm_wasmtime": [],
         "@envoy//bazel:wasm_wavm": [],
         "@envoy//bazel:wasm_none": [],
         "//conditions:default": xs,
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
+def envoy_select_wasm_wamr(xs):
+    return select({
+        "@envoy//bazel:wasm_wamr": xs,
+        "//conditions:default": [],
+    })
+
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wavm(xs):
     return select({
         "@envoy//bazel:wasm_wavm": xs,
         "//conditions:default": [],
     })
 
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wasmtime(xs):
     return select({
         "@envoy//bazel:wasm_wasmtime": xs,
-        "//conditions:default": [],
-    })
-
-# Select the given values if use legacy codecs in test is on in the current build.
-def envoy_select_new_codecs_in_integration_tests(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_new_codecs_in_integration_tests": xs,
         "//conditions:default": [],
     })

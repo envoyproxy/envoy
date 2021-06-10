@@ -5,11 +5,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/logical_host.h"
-
-#include "extensions/clusters/well_known_names.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/logical_host.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,28 +50,25 @@ private:
   };
 
   using HostInfoMap = absl::flat_hash_map<std::string, HostInfo>;
-  using HostInfoMapSharedPtr = std::shared_ptr<const HostInfoMap>;
 
   struct LoadBalancer : public Upstream::LoadBalancer {
-    LoadBalancer(const HostInfoMapSharedPtr& host_map) : host_map_(host_map) {}
+    LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
-    // Prefetching not implemented.
+    // Preconnecting not implemented.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }
 
-    const HostInfoMapSharedPtr host_map_;
+    const Cluster& cluster_;
   };
 
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancerFactory
-    Upstream::LoadBalancerPtr create() override {
-      return std::make_unique<LoadBalancer>(cluster_.getCurrentHostMap());
-    }
+    Upstream::LoadBalancerPtr create() override { return std::make_unique<LoadBalancer>(cluster_); }
 
     Cluster& cluster_;
   };
@@ -90,19 +85,15 @@ private:
     Cluster& cluster_;
   };
 
-  HostInfoMapSharedPtr getCurrentHostMap() {
-    absl::ReaderMutexLock lock(&host_map_lock_);
-    return host_map_;
-  }
-
   void
-  addOrUpdateWorker(const std::string& host,
-                    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                    std::shared_ptr<HostInfoMap>& new_host_map,
-                    std::unique_ptr<Upstream::HostVector>& hosts_added);
-  void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
-                        const Upstream::HostVector& hosts_added,
-                        const Upstream::HostVector& hosts_removed);
+  addOrUpdateHost(absl::string_view host,
+                  const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                  std::unique_ptr<Upstream::HostVector>& hosts_added)
+      ABSL_LOCKS_EXCLUDED(host_map_lock_);
+
+  void updatePriorityState(const Upstream::HostVector& hosts_added,
+                           const Upstream::HostVector& hosts_removed)
+      ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
@@ -112,8 +103,8 @@ private:
   const envoy::config::endpoint::v3::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
 
-  absl::Mutex host_map_lock_;
-  HostInfoMapSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);
+  mutable absl::Mutex host_map_lock_;
+  HostInfoMap host_map_ ABSL_GUARDED_BY(host_map_lock_);
 
   friend class ClusterFactory;
   friend class ClusterTest;
@@ -122,9 +113,7 @@ private:
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig> {
 public:
-  ClusterFactory()
-      : ConfigurableClusterFactoryBase(
-            Extensions::Clusters::ClusterTypes::get().DynamicForwardProxy) {}
+  ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.dynamic_forward_proxy") {}
 
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>

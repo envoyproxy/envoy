@@ -10,6 +10,19 @@ namespace {
 
 class HttpSubscriptionImplTest : public testing::Test, public HttpSubscriptionTestHarness {};
 
+// Validate that we start the retry timer when there is no cluster.
+TEST_F(HttpSubscriptionImplTest, NoCluster) {
+  ON_CALL(cm_, getThreadLocalCluster("eds_cluster")).WillByDefault(Return(nullptr));
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
+  EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  version_ = "";
+  cluster_names_ = {"cluster0", "cluster1"};
+  subscription_->start({"cluster0", "cluster1"});
+}
+
 // Validate that the client can recover from a remote fetch failure.
 TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
   startSubscription({"cluster0", "cluster1"});

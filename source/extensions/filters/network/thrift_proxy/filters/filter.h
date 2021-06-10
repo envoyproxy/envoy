@@ -8,11 +8,11 @@
 #include "envoy/network/connection.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "extensions/filters/network/thrift_proxy/decoder_events.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/thrift.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder_events.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,6 +42,11 @@ public:
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
    */
   virtual const Network::Connection* connection() const PURE;
+
+  /**
+   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
@@ -98,6 +103,17 @@ public:
    * @return StreamInfo for logging purposes.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * @return Response decoder metadata created by the connection manager.
+   */
+  virtual MessageMetadataSharedPtr responseMetadata() PURE;
+
+  /**
+   * @return Signal indicating whether or not the response decoder encountered a successful/void
+   * reply.
+   */
+  virtual bool responseSuccess() PURE;
 };
 
 /**
@@ -123,6 +139,12 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * @return True if payload passthrough is supported. Called by the connection manager once after
+   * messageBegin.
+   */
+  virtual bool passthroughSupported() const PURE;
 };
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;

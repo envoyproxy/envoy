@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -5,11 +7,10 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "server/configuration_impl.h"
-#include "server/listener_manager_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
@@ -181,7 +182,7 @@ protected:
       local_address_ =
           Network::Utility::parseInternetAddress(destination_address, destination_port);
     }
-    ON_CALL(*socket_, localAddress()).WillByDefault(ReturnRef(local_address_));
+    socket_->address_provider_->setLocalAddress(local_address_);
 
     ON_CALL(*socket_, requestedServerName()).WillByDefault(Return(absl::string_view(server_name)));
     ON_CALL(*socket_, detectedTransportProtocol())
@@ -194,7 +195,7 @@ protected:
     } else {
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
-    ON_CALL(*socket_, remoteAddress()).WillByDefault(ReturnRef(remote_address_));
+    socket_->address_provider_->setRemoteAddress(remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -272,10 +273,10 @@ protected:
   }
 
   ABSL_MUST_USE_RESULT
-  auto disableInplaceUpdateForThisTest() {
+  auto enableTlsInspectorInjectionForThisTest() {
     auto scoped_runtime = std::make_unique<TestScopedRuntime>();
     Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
+        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
     return scoped_runtime;
   }
 
@@ -296,6 +297,7 @@ protected:
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
+  NiceMock<testing::MockFunction<void()>> callback_;
 };
 
 } // namespace Server

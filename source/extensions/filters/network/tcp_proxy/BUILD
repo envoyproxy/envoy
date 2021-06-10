@@ -15,11 +15,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "robust_to_untrusted_downstream",
     # This is core Envoy config.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",

@@ -6,10 +6,10 @@
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/http/utility.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
 using testing::Invoke;
@@ -39,26 +39,38 @@ MockIdleTimeEnabledClusterInfo::~MockIdleTimeEnabledClusterInfo() = default;
 MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
-      stats_(ClusterInfoImpl::generateStats(stats_store_)),
+      stat_names_(stats_store_.symbolTable()),
+      cluster_load_report_stat_names_(stats_store_.symbolTable()),
+      cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
+      cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
+      cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
+      stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
-      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
+      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_,
+                                                                  cluster_load_report_stat_names_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
-          ClusterInfoImpl::generateRequestResponseSizeStats(request_response_size_stats_store_))),
-      timeout_budget_stats_(std::make_unique<ClusterTimeoutBudgetStats>(
-          ClusterInfoImpl::generateTimeoutBudgetStats(timeout_budget_stats_store_))),
-      circuit_breakers_stats_(
-          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
+          ClusterInfoImpl::generateRequestResponseSizeStats(
+              request_response_size_stats_store_, cluster_request_response_size_stat_names_))),
+      timeout_budget_stats_(
+          std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
+              timeout_budget_stats_store_, cluster_timeout_budget_stat_names_))),
+      circuit_breakers_stats_(ClusterInfoImpl::generateCircuitBreakersStats(
+          stats_store_, cluster_circuit_breakers_stat_names_.default_, true,
+          cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
-          circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
+          circuit_breakers_stats_, absl::nullopt, absl::nullopt)),
+      stats_scope_(stats_store_.createScope("test_scope")) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, eraseIdlePools()).WillByDefault(Return(false));
-  ON_CALL(*this, perUpstreamPrefetchRatio()).WillByDefault(Return(1.0));
+  ON_CALL(*this, perUpstreamPreconnectRatio()).WillByDefault(Return(1.0));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
   ON_CALL(*this, edsServiceName()).WillByDefault(ReturnPointee(&eds_service_name_));
   ON_CALL(*this, http1Settings()).WillByDefault(ReturnRef(http1_settings_));
   ON_CALL(*this, http2Options()).WillByDefault(ReturnRef(http2_options_));
+  ON_CALL(*this, http3Options()).WillByDefault(ReturnRef(http3_options_));
   ON_CALL(*this, commonHttpProtocolOptions())
       .WillByDefault(ReturnRef(common_http_protocol_options_));
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
@@ -97,6 +109,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(upstream_http_protocol_options_));
+  ON_CALL(*this, alternateProtocolsCacheOptions())
+      .WillByDefault(ReturnRef(alternate_protocols_cache_options_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
@@ -107,17 +121,22 @@ MockClusterInfo::MockClusterInfo()
         return *typed_metadata_;
       }));
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
-  ON_CALL(*this, upstreamHttpProtocol(_)).WillByDefault(Return(Http::Protocol::Http11));
+  ON_CALL(*this, upstreamHttpProtocol(_))
+      .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
 
 Http::Http1::CodecStats& MockClusterInfo::http1CodecStats() const {
-  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, statsScope());
+  return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *stats_scope_);
 }
 
 Http::Http2::CodecStats& MockClusterInfo::http2CodecStats() const {
-  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, statsScope());
+  return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_scope_);
+}
+
+Http::Http3::CodecStats& MockClusterInfo::http3CodecStats() const {
+  return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
 } // namespace Upstream

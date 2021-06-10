@@ -1,14 +1,14 @@
-#include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
 
 #include "envoy/http/async_client.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -149,15 +149,8 @@ void AuthenticatorImpl::startVerify() {
 
   ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
   if (!jwt_->iss_.empty()) {
-    // Check if token extracted from the location contains the issuer specified by config.
-    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-      doneWithStatus(Status::JwtUnknownIssuer);
-      return;
-    }
-  } else {
-    // If provider is not specified, in allow_missing_or_failed or allow_missing case,
-    // the issuer specified in "iss" payload is required in order to lookup provider.
-    if (!provider_) {
+    // Check if `iss` is allowed.
+    if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
       doneWithStatus(Status::JwtUnknownIssuer);
       return;
     }
@@ -166,15 +159,24 @@ void AuthenticatorImpl::startVerify() {
   // Check the issuer is configured or not.
   jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
                          : jwks_cache_.findByIssuer(jwt_->iss_);
-  // isIssuerSpecified() check already make sure the issuer is in the cache.
-  ASSERT(jwks_data_ != nullptr);
+  // When `provider` is valid, findByProvider should never return nullptr.
+  // Only when `allow_missing` or `allow_failed` is used, `provider` is invalid,
+  // and this authenticator is checking tokens from all providers. In this case,
+  // Jwt `iss` field is used to find the first provider with the issuer.
+  // If not found, use the first provider without issuer specified.
+  // If still no found, fail the request with UnknownIssuer error.
+  if (!jwks_data_) {
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
+  }
 
   // Default is 60 seconds
   uint64_t clock_skew_seconds = ::google::jwt_verify::kClockSkewInSecond;
   if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
     clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
-  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew_seconds);
+  const uint64_t unix_timestamp = DateUtil::nowToSeconds(timeSource());
+  status = jwt_->verifyTimeConstraint(unix_timestamp, clock_skew_seconds);
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -219,6 +221,7 @@ void AuthenticatorImpl::startVerify() {
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  jwks_cache_.stats().jwks_fetch_success_.inc();
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -227,7 +230,10 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   }
 }
 
-void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
+void AuthenticatorImpl::onJwksError(Failure) {
+  jwks_cache_.stats().jwks_fetch_failed_.inc();
+  doneWithStatus(Status::JwksFetchFail);
+}
 
 void AuthenticatorImpl::onDestroy() {
   if (fetcher_) {

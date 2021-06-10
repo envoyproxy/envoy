@@ -7,11 +7,11 @@
 #include "envoy/stats/stats.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
-#include "extensions/filters/network/mongo_proxy/proxy.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
@@ -102,9 +102,10 @@ public:
 
     fault_config_ = std::make_shared<Filters::Common::Fault::FaultDelayConfig>(fault);
 
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("mongo.fault.fixed_delay.percent",
-                               Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
+    EXPECT_CALL(
+        runtime_.snapshot_,
+        featureEnabled("mongo.fault.fixed_delay.percent",
+                       testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
@@ -626,8 +627,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
@@ -650,8 +651,8 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 }
 
 } // namespace MongoProxy

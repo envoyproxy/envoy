@@ -17,7 +17,7 @@ enum class Status {
 
   // We either haven't set up the Fatal Action manager, or we unregistered it
   // as the server terminated.
-  ActionManangerUnset,
+  ActionManagerUnset,
 
   // Another thread beat us to running the Fatal Actions.
   RunningOnAnotherThread,

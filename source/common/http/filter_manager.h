@@ -1,31 +1,100 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
+#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/network/socket.h"
+#include "envoy/protobuf/message_validator.h"
+#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/local_reply/local_reply.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/local_reply/local_reply.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
 
 class FilterManager;
 
+class SkipAction : public Matcher::ActionBase<
+                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
+
+struct ActiveStreamFilterBase;
+
+using MatchDataUpdateFunc = std::function<void(Matching::HttpMatchingDataImpl&)>;
+/**
+ * Manages the shared match state between one or two filters.
+ * The need for this class comes from the fact that a single instantiated filter can be wrapped by
+ * two different ActiveStreamFilters, one for encoding and one for decoding. Certain match actions
+ * should be made visible to both wrappers (e.g. the skip action), while other actions should be
+ * sent to the underlying filter exactly once.
+ */
+class FilterMatchState {
+public:
+  FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
+                   Matching::HttpMatchingDataImplSharedPtr matching_data)
+      : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
+        match_tree_evaluated_(false), skip_filter_(false) {}
+
+  void evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func);
+
+  StreamFilterBase* filter_{};
+
+  bool skipFilter() const { return skip_filter_; }
+
+private:
+  Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
+  Matching::HttpMatchingDataImplSharedPtr matching_data_;
+  bool match_tree_evaluated_ : 1;
+  bool skip_filter_ : 1;
+};
+
+using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
+
+class SkipActionFactory : public Matcher::ActionFactory {
+public:
+  std::string name() const override { return "skip"; }
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
+                                                 Server::Configuration::FactoryContext&) override {
+    return []() { return std::make_unique<SkipAction>(); };
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
+  }
+};
+
 /**
  * Base class wrapper for both stream encoder and decoder filters.
+ *
+ * This class is responsible for performing matching and updating match data when a match tree is
+ * configured for the associated filter. When not using a match tree, only minimal overhead (i.e.
+ * memory overhead of unused fields) should apply.
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter)
+  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter,
+                         FilterMatchStateSharedPtr match_state)
       : parent_(parent), iteration_state_(IterationState::Continue),
-        iterate_from_current_filter_(false), headers_continued_(false),
-        continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter),
-        decode_headers_called_(false), encode_headers_called_(false) {}
+        filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
+        headers_continued_(false), continue_headers_continued_(false), end_stream_(false),
+        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -45,8 +114,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
 
   void commonContinue();
   virtual bool canContinue() PURE;
-  virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
-  virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
+  virtual Buffer::InstancePtr createBuffer() PURE;
+  virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
   virtual bool has100Continueheaders() PURE;
   virtual void do100ContinueHeaders() PURE;
@@ -58,12 +127,15 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
 
+  virtual void onMatchCallback(const Matcher::Action& action) PURE;
+
   // Http::StreamFilterCallbacks
   const Network::Connection* connection() override;
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
   Router::RouteConstSharedPtr route() override;
   Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
+  void setRoute(Router::RouteConstSharedPtr route) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
   void clearRouteCache() override;
   uint64_t streamId() const override;
@@ -71,6 +143,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Span& activeSpan() override;
   Tracing::Config& tracingConfig() override;
   const ScopeTrackedObject& scope() override;
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -94,6 +167,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     }
     return saved_response_metadata_.get();
   }
+  bool skipFilter() const { return filter_match_state_ && filter_match_state_->skipFilter(); }
+  void maybeEvaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
+    if (filter_match_state_) {
+      filter_match_state_->evaluateMatchTreeWithNewData(update_func);
+    }
+  }
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -112,6 +191,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   };
   FilterManager& parent_;
   IterationState iteration_state_;
+
+  FilterMatchStateSharedPtr filter_match_state_;
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
@@ -124,6 +205,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   const bool dual_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
+
+  friend FilterMatchState;
 };
 
 /**
@@ -133,13 +216,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            FilterMatchStateSharedPtr match_state, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override;
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override { return false; }
   void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
@@ -156,6 +239,9 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
+  void onMatchCallback(const Matcher::Action& action) override {
+    handle_->onMatchCallback(std::move(action));
+  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -172,10 +258,13 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
+  ResponseHeaderMapOptRef continueHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
+  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
+  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -189,6 +278,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
+  Buffer::BufferMemoryAccountSharedPtr account() const override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -219,13 +309,13 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter), handle_(filter) {}
+                            FilterMatchStateSharedPtr match_state, bool dual_filter)
+      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
 
   // ActiveStreamFilterBase
   bool canContinue() override { return true; }
-  Buffer::WatermarkBufferPtr createBuffer() override;
-  Buffer::WatermarkBufferPtr& bufferedData() override;
+  Buffer::InstancePtr createBuffer() override;
+  Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has100Continueheaders() override;
   void do100ContinueHeaders() override;
@@ -233,6 +323,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
+  void onMatchCallback(const Matcher::Action& action) override { handle_->onMatchCallback(action); }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {
@@ -425,6 +516,11 @@ public:
   virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
+   * Sets the current route.
+   */
+  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
+
+  /**
    * Clears the cached route.
    */
   virtual void clearRouteCache() PURE;
@@ -477,6 +573,64 @@ public:
    * Returns the tracked scope to use for this stream.
    */
   virtual const ScopeTrackedObject& scope() PURE;
+
+  /**
+   * Returns whether internal redirects with request bodies is enabled.
+   */
+  virtual bool enableInternalRedirectsWithBody() const PURE;
+};
+
+/**
+ * This class allows the remote address to be overridden for HTTP stream info. This is used for
+ * XFF handling. This is required to avoid providing stream info with a non-const address provider.
+ * Private inheritance from SocketAddressProvider is used to make sure users get the address
+ * provider via the normal getter.
+ */
+class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                       private Network::SocketAddressProvider {
+public:
+  using StreamInfoImpl::StreamInfoImpl;
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    // TODO(rgs1): we should assert overridden_downstream_remote_address_ is nullptr,
+    // but we are currently relaxing this as a workaround to:
+    //
+    // https://github.com/envoyproxy/envoy/pull/14432#issuecomment-758167614
+    overridden_downstream_remote_address_ = downstream_remote_address;
+  }
+
+  // StreamInfo::StreamInfo
+  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+
+  // Network::SocketAddressProvider
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddress();
+  }
+  bool localAddressRestored() const override {
+    return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
+  }
+  const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+    return overridden_downstream_remote_address_ != nullptr
+               ? overridden_downstream_remote_address_
+               : StreamInfoImpl::downstreamAddressProvider().remoteAddress();
+  }
+  const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directRemoteAddress();
+  }
+
+  void dumpState(std::ostream& os, int indent_level) const override {
+    StreamInfoImpl::dumpState(os, indent_level);
+
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+       << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
+       << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
+  }
+
+private:
+  Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
 };
 
 /**
@@ -488,16 +642,18 @@ class FilterManager : public ScopeTrackedObject,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id, bool proxy_100_continue,
+                const Network::Connection& connection, uint64_t stream_id,
+                Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
                 uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
                 const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
                 TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
                 StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
-        connection_(connection), stream_id_(stream_id), proxy_100_continue_(proxy_100_continue),
-        buffer_limit_(buffer_limit), filter_chain_factory_(filter_chain_factory),
-        local_reply_(local_reply),
-        stream_info_(protocol, time_source, parent_filter_state, filter_state_life_span) {}
+        connection_(connection), stream_id_(stream_id), account_(std::move(account)),
+        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
+        filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
+        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
+                     parent_filter_state, filter_state_life_span) {}
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
@@ -508,38 +664,85 @@ public:
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
 
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_OPT_REF_DETAILS(filter_manager_callbacks_.responseTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
+    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
+    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&stream_info_);
   }
 
   // Http::FilterChainFactoryCallbacks
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, false);
+    addStreamDecoderFilterWorker(filter, nullptr, false);
+    filters_.push_back(filter.get());
+  }
+  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
+                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    if (match_tree) {
+      addStreamDecoderFilterWorker(
+          filter,
+          std::make_shared<FilterMatchState>(std::move(match_tree),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
+          false);
+      return;
+    }
+
+    addStreamDecoderFilterWorker(filter, nullptr, false);
   }
   void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, false);
+    addStreamEncoderFilterWorker(filter, nullptr, false);
+    filters_.push_back(filter.get());
+  }
+  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
+                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    if (match_tree) {
+      addStreamEncoderFilterWorker(
+          filter,
+          std::make_shared<FilterMatchState>(std::move(match_tree),
+                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
+          false);
+      return;
+    }
+
+    addStreamEncoderFilterWorker(filter, nullptr, false);
   }
   void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, true);
-    addStreamEncoderFilterWorker(filter, true);
+    addStreamDecoderFilterWorker(filter, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, true);
+    StreamDecoderFilter* decoder_filter = filter.get();
+    filters_.push_back(decoder_filter);
+  }
+  void addStreamFilter(StreamFilterSharedPtr filter,
+                       Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
+    // Note that we share the match data and tree between the two filters to allow things like
+    // matching on both request and response data.
+    // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
+    // the result to both filters after the first match evaluation.
+    if (match_tree) {
+      auto matching_state = std::make_shared<FilterMatchState>(
+          std::move(match_tree), std::make_shared<Matching::HttpMatchingDataImpl>());
+      addStreamDecoderFilterWorker(filter, matching_state, true);
+      addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
+      return;
+    }
+
+    addStreamDecoderFilterWorker(filter, nullptr, true);
+    addStreamEncoderFilterWorker(filter, nullptr, true);
   }
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
   void log() {
     RequestHeaderMap* request_headers = nullptr;
     if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = &filter_manager_callbacks_.requestHeaders()->get();
+      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
     }
     ResponseHeaderMap* response_headers = nullptr;
     if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = &filter_manager_callbacks_.responseHeaders()->get();
+      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
     }
     ResponseTrailerMap* response_trailers = nullptr;
     if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = &filter_manager_callbacks_.responseTrailers()->get();
+      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
     }
 
     for (const auto& log_handler : access_log_handlers_) {
@@ -606,8 +809,10 @@ public:
   void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
   // TODO(snowp): Make private as filter chain construction is moved into FM.
-  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
-  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
+  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
+                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
+  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
+                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
 
   void disarmRequestTimeout();
 
@@ -623,7 +828,13 @@ public:
    */
   void maybeEndEncode(bool end_stream);
 
-  void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+  /**
+   * Called before local reply is made by the filter manager.
+   * @param data the data associated with the local reply.
+   */
+  void onLocalReply(StreamFilterBase::LocalReplyData& data);
+
+  void sendLocalReply(Code code, absl::string_view body,
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details);
@@ -660,11 +871,11 @@ public:
 
   void requestHeadersInitialized() {
     if (Http::Headers::get().MethodValues.Head ==
-        filter_manager_callbacks_.requestHeaders()->get().getMethodValue()) {
+        filter_manager_callbacks_.requestHeaders()->getMethodValue()) {
       state_.is_head_request_ = true;
     }
     state_.is_grpc_request_ =
-        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders()->get());
+        Grpc::Common::isGrpcRequestHeaders(filter_manager_callbacks_.requestHeaders().ref());
   }
 
   /**
@@ -694,6 +905,10 @@ public:
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
   const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
 
   // Set up the Encoder/Decoder filter chain.
   bool createFilterChain();
@@ -701,6 +916,15 @@ public:
   const Network::Connection* connection() const { return &connection_; }
 
   uint64_t streamId() const { return stream_id_; }
+  Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
+
+  Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
+
+  bool enableInternalRedirectsWithBody() const {
+    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
+  }
+
+  void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
 private:
   // Indicates which filter to start the iteration with.
@@ -766,18 +990,20 @@ private:
   Event::Dispatcher& dispatcher_;
   const Network::Connection& connection_;
   const uint64_t stream_id_;
+  Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
+  std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
   // temporarily in the filter in case the filter has stopped all while processing headers.
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
-  Buffer::WatermarkBufferPtr buffered_response_data_;
-  Buffer::WatermarkBufferPtr buffered_request_data_;
+  Buffer::InstancePtr buffered_response_data_;
+  Buffer::InstancePtr buffered_request_data_;
   uint32_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
@@ -786,7 +1012,7 @@ private:
 
   FilterChainFactory& filter_chain_factory_;
   const LocalReply::LocalReply& local_reply_;
-  StreamInfo::StreamInfoImpl stream_info_;
+  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -819,7 +1045,7 @@ private:
     State()
         : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false) {}
+          non_100_response_headers_encoded_(false), under_on_local_reply_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -837,6 +1063,8 @@ private:
     bool is_grpc_request_ : 1;
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_ : 1;
+    // True under the stack of onLocalReply, false otherwise.
+    bool under_on_local_reply_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

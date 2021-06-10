@@ -1,4 +1,4 @@
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -6,12 +6,12 @@
 #include <utility>
 #include <vector>
 
-#include "common/common/scalar_to_byte_vector.h"
-#include "common/common/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_subject_alt_names.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
 
 namespace Envoy {
 namespace Network {
@@ -24,24 +24,18 @@ void commonHashKey(const TransportSocketOptions& options, std::vector<std::uint8
   }
 
   const auto& verify_san_list = options.verifySubjectAltNameListOverride();
-  if (!verify_san_list.empty()) {
-    for (const auto& san : verify_san_list) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(san), key);
-    }
+  for (const auto& san : verify_san_list) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(san), key);
   }
 
   const auto& alpn_list = options.applicationProtocolListOverride();
-  if (!alpn_list.empty()) {
-    for (const auto& protocol : alpn_list) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
-    }
+  for (const auto& protocol : alpn_list) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
   const auto& alpn_fallback = options.applicationProtocolFallback();
-  if (!alpn_fallback.empty()) {
-    for (const auto& protocol : alpn_fallback) {
-      pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
-    }
+  for (const auto& protocol : alpn_fallback) {
+    pushScalarToByteVector(StringUtil::CaseInsensitiveHash()(protocol), key);
   }
 
   // Proxy protocol options should only be included in the hash if the upstream

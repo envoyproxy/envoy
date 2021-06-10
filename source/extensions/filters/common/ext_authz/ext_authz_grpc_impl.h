@@ -20,10 +20,9 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/typed_async_client.h"
-
-#include "extensions/filters/common/ext_authz/check_request_utils.h"
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,9 +50,8 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -63,12 +61,9 @@ public:
                  Tracing::Span& span) override;
 
 private:
-  void onTimeout();
-  void respondFailure(Filters::Common::ExtAuthz::ErrorKind kind);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers);
-
   Grpc::AsyncClient<envoy::service::auth::v3::CheckRequest, envoy::service::auth::v3::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
@@ -76,7 +71,6 @@ private:
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
-  Event::TimerPtr timeout_timer_;
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;

@@ -1,9 +1,9 @@
 #include <string>
 
-#include "common/common/macros.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/memory/stats.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
@@ -704,8 +704,7 @@ TEST_F(StatNameTest, SupportsAbslHash) {
 
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
-// 2M. Note that only SymbolTableImpl is tested for memory consumption,
-// and not FakeSymbolTableImpl.
+// 2M.
 TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {

@@ -3,12 +3,10 @@
 
 #include "envoy/common/time.h"
 
-#include "common/protobuf/utility.h"
-
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
-
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/tracing/mocks.h"
@@ -118,6 +116,16 @@ TEST_F(XRayTracerTest, BaggageNotImplemented) {
 
   // Baggage isn't supported so getBaggage should always return empty
   ASSERT_EQ("", span->getBaggage("baggage_key"));
+}
+
+TEST_F(XRayTracerTest, GetTraceId) {
+  Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
+  auto span = tracer.createNonSampledSpan();
+  span->finishSpan();
+
+  // This method is unimplemented and a noop.
+  ASSERT_EQ(span->getTraceIdAsHex(), "");
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {

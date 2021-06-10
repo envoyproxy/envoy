@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/integration/http_integration.h"
 
@@ -13,11 +13,11 @@ namespace Envoy {
 class HeaderCasingIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  HeaderCasingIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  HeaderCasingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   void initialize() override {
@@ -30,11 +30,13 @@ public:
         });
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      bootstrap.mutable_static_resources()
-          ->mutable_clusters(0)
+      ConfigHelper::HttpProtocolOptions protocol_options;
+      protocol_options.mutable_explicit_http_config()
           ->mutable_http_protocol_options()
           ->mutable_header_key_format()
           ->mutable_proper_case_words();
+      ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                       protocol_options);
     });
 
     HttpIntegrationTest::initialize();
@@ -62,7 +64,6 @@ TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
 
   EXPECT_TRUE(absl::StrContains(upstream_request, "My-Header: foo"));
   EXPECT_TRUE(absl::StrContains(upstream_request, "Host: host"));
-  EXPECT_TRUE(absl::StrContains(upstream_request, "Content-Length: 0"));
 
   // Verify that the downstream response has proper cased headers.
   auto response =

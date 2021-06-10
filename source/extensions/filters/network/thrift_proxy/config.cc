@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
 
 #include <map>
 #include <string>
@@ -8,18 +8,16 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter_config.h"
-#include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter_config.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/stats.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -121,13 +119,15 @@ ConfigImpl::ConfigImpl(
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
       transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
-      route_matcher_(new Router::RouteMatcher(config.route_config())) {
+      route_matcher_(new Router::RouteMatcher(config.route_config())),
+      payload_passthrough_(config.payload_passthrough()),
+      max_requests_per_connection_(config.max_requests_per_connection().value()) {
 
   if (config.thrift_filters().empty()) {
     ENVOY_LOG(debug, "using default router filter");
 
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
-    router.set_name(ThriftFilters::ThriftFilterNames::get().ROUTER);
+    router.set_name("envoy.filters.thrift.router");
     processFilter(router);
   } else {
     for (const auto& filter : config.thrift_filters()) {
@@ -157,7 +157,7 @@ void ConfigImpl::processFilter(
   ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(
+            MessageUtil::getJsonStringFromMessageOrError(
                 proto_config.has_typed_config()
                     ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
                     : static_cast<const Protobuf::Message&>(

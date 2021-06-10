@@ -20,14 +20,14 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/logger.h"
-#include "common/network/cidr_range.h"
-#include "common/network/filter_impl.h"
-#include "common/network/hash_policy.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/tcp_proxy/upstream.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/filter_impl.h"
+#include "source/common/network/hash_policy.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tcp_proxy/upstream.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -266,8 +266,9 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(downstreamConnection()->remoteAddress().get(),
-                                       downstreamConnection()->localAddress().get());
+      return hash_policy->generateHash(
+          downstreamConnection()->addressProvider().remoteAddress().get(),
+          downstreamConnection()->addressProvider().localAddress().get());
     }
 
     return {};
@@ -279,6 +280,10 @@ public:
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
+  }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return upstream_options_;
   }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
@@ -345,7 +350,7 @@ protected:
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
-  bool maybeTunnel(Upstream::ThreadLocalCluster& cluster, const std::string& cluster_name);
+  bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -376,6 +381,7 @@ protected:
   RouteConstSharedPtr route_;
   Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

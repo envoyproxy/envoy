@@ -1,10 +1,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/simulated_time_system.h"
@@ -220,7 +219,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.source.extensions.filters.http.cache.SimpleHttpCacheConfig");
+      "envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());

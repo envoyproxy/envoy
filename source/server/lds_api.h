@@ -12,9 +12,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/logger.h"
-#include "common/config/subscription_base.h"
-#include "common/init/target_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/target_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -27,7 +27,7 @@ class LdsApiImpl : public LdsApi,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
-             const udpa::core::v1::ResourceLocator* lds_resources_locator,
+             const xds::core::v3::ResourceLocator* lds_resources_locator,
              Upstream::ClusterManager& cm, Init::Manager& init_manager, Stats::Scope& scope,
              ListenerManager& lm, ProtobufMessage::ValidationVisitor& validation_visitor);
 

@@ -1,6 +1,6 @@
 #include <regex>
 
-#include "server/admin/prometheus_stats.h"
+#include "source/server/admin/prometheus_stats.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
@@ -91,7 +91,7 @@ protected:
     EXPECT_EQ(0, symbol_table_->numSymbols());
   }
 
-  Stats::TestSymbolTable symbol_table_;
+  Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::AllocatorImpl alloc_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;

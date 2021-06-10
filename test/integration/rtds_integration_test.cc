@@ -16,7 +16,11 @@ std::string tdsBootstrapConfig(absl::string_view api_type) {
 static_resources:
   clusters:
   - name: dummy_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: dummy_cluster
       endpoints:
@@ -27,7 +31,11 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 0
   - name: rtds_cluster
-    http2_protocol_options: {{}}
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {{}}
     load_assignment:
       cluster_name: rtds_cluster
       endpoints:
@@ -50,14 +58,19 @@ layered_runtime:
         resource_api_version: V3
         api_config_source:
           api_type: {}
+          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
-          set_node_on_first_message_only: false
+          set_node_on_first_message_only: true
   - name: some_admin_layer
     admin_layer: {{}}
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -70,7 +83,7 @@ class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public H
 public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
-            Http::CodecClient::Type::HTTP2, ipVersion(),
+            Http::CodecType::HTTP2, ipVersion(),
             tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     use_lds_ = false;
     create_xds_upstream_ = true;
@@ -83,7 +96,7 @@ public:
     // The tests infra expects the xDS server to be the second fake upstream, so
     // we need a dummy data plane cluster.
     setUpstreamCount(1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     // Register admin port.
     registerTestServerPorts({});

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include <chrono>
 
@@ -6,13 +6,12 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
 namespace Envoy {
@@ -48,11 +47,15 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
 }
 
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
-  in_flight_request_ =
-      cm_.httpAsyncClientForCluster(uri_.cluster())
-          .send(std::move(msg), *this,
-                Http::AsyncClient::RequestOptions().setTimeout(
-                    std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(msg), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(
+            std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+  } else {
+    parent_->sendUnauthorizedResponse();
+  }
 }
 
 void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
@@ -66,6 +69,7 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const auto response_code = message->headers().Status()->value().getStringView();
   if (response_code != "200") {
     ENVOY_LOG(debug, "Oauth response code: {}", response_code);
+    ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
     parent_->sendUnauthorizedResponse();
     return;
   }

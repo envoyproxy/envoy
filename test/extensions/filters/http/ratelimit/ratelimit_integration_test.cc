@@ -5,12 +5,11 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-
-#include "extensions/filters/http/ratelimit/config.h"
-#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/ratelimit/config.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -25,22 +24,27 @@ namespace {
 class RatelimitIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
-  void SetUp() override { initialize(); }
+  void SetUp() override {
+    XDS_DEPRECATED_FEATURE_TEST_SKIP;
+    initialize();
+  }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
-
+    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
+      config_helper_.enableDeprecatedV2Api();
+    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
-      ratelimit_cluster->mutable_http2_protocol_options();
+      ConfigHelper::setHttp2(*ratelimit_cluster);
 
       // enhance rate limit filter config based on the configuration of test.
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
@@ -54,7 +58,7 @@ public:
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -114,7 +118,7 @@ public:
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
 
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
@@ -125,7 +129,7 @@ public:
   }
 
   void waitForFailedUpstreamResponse(uint32_t response_code) {
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(std::to_string(response_code), response_->headers().getStatusValue());
   }
@@ -226,18 +230,26 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFilterHeadersEnabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType,
                          RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
-TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
+TEST_P(RatelimitIntegrationTest, Ok) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
+  basicFlow();
+}
 
 TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{{"x-ratelimit-limit", "1000"},
@@ -270,6 +282,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimit) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
@@ -288,6 +301,7 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
 }
 
 TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   Http::TestResponseHeaderMapImpl ratelimit_response_headers{
@@ -315,6 +329,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
 }
 
 TEST_P(RatelimitIntegrationTest, Error) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "404"}}, true);
@@ -329,6 +344,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   switch (clientType()) {
@@ -352,6 +368,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 }
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_));
   ASSERT_TRUE(fake_ratelimit_connection_->close());
@@ -363,6 +380,7 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
 }
 
 TEST_P(RatelimitIntegrationTest, FailedConnect) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Do not reset the fake upstream for the ratelimiter, but have it stop listening.
   // If we reset, the Envoy will continue to send H2 to the original rate limiter port, which may
   // be used by another test, and data sent to that port "unexpectedly" will cause problems for
@@ -375,6 +393,7 @@ TEST_P(RatelimitIntegrationTest, FailedConnect) {
 }
 
 TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   ratelimit_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
@@ -389,6 +408,7 @@ TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
 
@@ -424,6 +444,7 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
 }
 
 TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
 
@@ -461,6 +482,7 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
 
 TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
        OverLimitWithoutEnvoyRatelimitedHeader) {
+  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initiateClientConnection();
   waitForRatelimitRequest();
   sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},

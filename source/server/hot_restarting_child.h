@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/stats/stat_merger.h"
-
-#include "server/hot_restarting_base.h"
+#include "source/common/stats/stat_merger.h"
+#include "source/server/hot_restarting_base.h"
 
 namespace Envoy {
 namespace Server {
@@ -10,7 +9,7 @@ namespace Server {
 /**
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
-class HotRestartingChild : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
+class HotRestartingChild : HotRestartingBase {
 public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);

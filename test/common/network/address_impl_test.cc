@@ -5,12 +5,12 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -49,7 +49,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  SocketImpl sock(Socket::Type::Stream, addr_port);
+  SocketImpl sock(Socket::Type::Stream, addr_port, nullptr);
   EXPECT_TRUE(sock.ioHandle().isOpen()) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
@@ -71,7 +71,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    SocketImpl client_sock(Socket::Type::Stream, addr_port);
+    SocketImpl client_sock(Socket::Type::Stream, addr_port, nullptr);
 
     EXPECT_TRUE(client_sock.ioHandle().isOpen()) << addr_port->asString();
 
@@ -344,7 +344,7 @@ TEST(PipeInstanceTest, BasicPermission) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr);
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
@@ -371,7 +371,7 @@ TEST(PipeInstanceTest, PermissionFail) {
   const mode_t mode = 0777;
   PipeInstance pipe(path, mode);
   InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-  SocketImpl sock(Socket::Type::Stream, address);
+  SocketImpl sock(Socket::Type::Stream, address, nullptr);
 
   EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 
@@ -443,7 +443,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance pipe(path);
     InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
-    SocketImpl sock(Socket::Type::Stream, address);
+    SocketImpl sock(Socket::Type::Stream, address, nullptr);
 
     EXPECT_TRUE(sock.ioHandle().isOpen()) << pipe.asString();
 

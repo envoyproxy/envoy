@@ -1,14 +1,13 @@
-#include "extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
+#include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 
 #include <sstream>
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
@@ -51,9 +50,10 @@ void UpstreamProxyProtocolSocket::generateHeader() {
 }
 
 void UpstreamProxyProtocolSocket::generateHeaderV1() {
-  // Default to local addresses (used if no downstream connection exists e.g. health checks)
-  auto src_addr = callbacks_->connection().localAddress();
-  auto dst_addr = callbacks_->connection().remoteAddress();
+  // Default to local addresses. Used if no downstream connection exists or
+  // downstream address info is not set e.g. health checks
+  auto src_addr = callbacks_->connection().addressProvider().localAddress();
+  auto dst_addr = callbacks_->connection().addressProvider().remoteAddress();
 
   if (options_ && options_->proxyProtocolOptions().has_value()) {
     const auto options = options_->proxyProtocolOptions().value();

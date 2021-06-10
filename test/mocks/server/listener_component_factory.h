@@ -20,13 +20,13 @@ public:
     return DrainManagerPtr{createDrainManager_(drain_type)};
   }
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
-                         const udpa::core::v1::ResourceLocator* lds_resources_locator) override {
+                         const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return LdsApiPtr{createLdsApi_(lds_config, lds_resources_locator)};
   }
 
   MOCK_METHOD(LdsApi*, createLdsApi_,
               (const envoy::config::core::v3::ConfigSource&,
-               const udpa::core::v1::ResourceLocator*));
+               const xds::core::v3::ResourceLocator*));
   MOCK_METHOD(std::vector<Network::FilterFactoryCb>, createNetworkFilterFactoryList,
               (const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                Configuration::FilterChainFactoryContext& filter_chain_factory_context));

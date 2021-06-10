@@ -1,5 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
@@ -26,7 +28,7 @@ envoy_cc_test(
     shard_count = 4,
     deps = [
         ":test_private_key_method_provider_test_lib",
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
@@ -54,6 +56,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -148,11 +151,11 @@ envoy_cc_test_library(
     ],
     external_deps = ["ssl"],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/server:transport_socket_config_interface",
-        "//include/envoy/ssl/private_key:private_key_config_interface",
-        "//include/envoy/ssl/private_key:private_key_interface",
+        "//envoy/api:api_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//envoy/ssl/private_key:private_key_config_interface",
+        "//envoy/ssl/private_key:private_key_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
@@ -178,4 +181,48 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
     ],
+)
+
+envoy_cc_test(
+    name = "handshaker_factory_test",
+    srcs = ["handshaker_factory_test.cc"],
+    deps = [
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//source/extensions/transport_sockets/tls:ssl_handshaker_lib",
+        "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:process_context_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:registry_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "tls_throughput_benchmark",
+    srcs = ["tls_throughput_benchmark.cc"],
+    data = [
+        "//test/extensions/transport_sockets/tls/test_data:certs",
+    ],
+    external_deps = [
+        "benchmark",
+        "ssl",
+    ],
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "tls_throughput_benchmark_test",
+    benchmark_binary = "tls_throughput_benchmark",
+    # Uses raw POSIX syscalls, does not build on Windows.
+    tags = ["skip_on_windows"],
 )

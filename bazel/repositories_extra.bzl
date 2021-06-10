@@ -1,25 +1,24 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
-load("@rules_python//python:pip.bzl", "pip3_import", "pip_repositories")
-load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_raze__fetch_remote_crates")
+load("@rules_python//python:pip.bzl", "pip_install")
+load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
     py_repositories()
-    pip_repositories()
 
-    pip3_import(
+    pip_install(
         name = "config_validation_pip3",
         requirements = "@envoy//tools/config_validation:requirements.txt",
         extra_pip_args = ["--require-hashes"],
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
-    pip3_import(
+    pip_install(
         name = "configs_pip3",
         requirements = "@envoy//configs:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -37,7 +36,17 @@ def _python_deps():
         # release_date = "2019-02-23"
         # use_category = ["test"],
     )
-    pip3_import(
+    pip_install(
+        name = "docs_pip3",
+        requirements = "@envoy//tools/docs:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "deps_pip3",
+        requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "kafka_pip3",
         requirements = "@envoy//source/extensions/filters/network/kafka:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -55,7 +64,7 @@ def _python_deps():
         # release_date = "2019-02-23"
         # use_category = ["test"],
     )
-    pip3_import(
+    pip_install(
         name = "headersplit_pip3",
         requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -67,19 +76,29 @@ def _python_deps():
         # use_category = ["devtools"],
         # cpe = "cpe:2.3:a:llvm:clang:*",
     )
-    pip3_import(
+    pip_install(
         name = "protodoc_pip3",
         requirements = "@envoy//tools/protodoc:requirements.txt",
         extra_pip_args = ["--require-hashes"],
 
         # project_name = "PyYAML",
         # project_url = "https://github.com/yaml/pyyaml",
-        # version = "5.3.1",
-        # release_date = "2020-03-18"
+        # version = "5.4.1",
+        # release_date = "2021-01-20"
         # use_category = ["docs"],
         # cpe = "cpe:2.3:a:pyyaml:pyyaml:*",
     )
-    pip3_import(
+    pip_install(
+        name = "pylint_pip3",
+        requirements = "@envoy//tools/code_format:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "testing_pip3",
+        requirements = "@envoy//tools/testing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "thrift_pip3",
         requirements = "@envoy//test/extensions/filters/network/thrift_proxy:requirements.txt",
         extra_pip_args = ["--require-hashes"],
@@ -97,8 +116,25 @@ def _python_deps():
         # release_date = "2020-05-21"
         # use_category = ["test"],
     )
+    pip_install(
+        name = "fuzzing_pip3",
+        requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+
+        # project_name = "Abseil Python Common Libraries",
+        # project_url = "https://github.com/abseil/abseil-py",
+        # version = "0.11.0",
+        # release_date = "2020-10-27",
+        # use_category = ["test"],
+
+        # project_name = "Six: Python 2 and 3 Compatibility Library",
+        # project_url = "https://six.readthedocs.io/",
+        # version = "1.15.0",
+        # release_date = "2020-05-21"
+        # use_category = ["test"],
+    )
 
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra():
     _python_deps()
-    proxy_wasm_cpp_host_raze__fetch_remote_crates()
+    proxy_wasm_cpp_host_fetch_remote_crates()

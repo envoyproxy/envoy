@@ -7,11 +7,10 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/router/header_parser.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/router/header_parser.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -94,6 +93,14 @@ public:
 
   /**
    * Returns a list of matchers used for selecting the authorization response headers that
+   * should be send back to the client on a successful (i.e. non-denied) response.
+   */
+  const MatcherSharedPtr& clientHeaderOnSuccessMatchers() const {
+    return client_header_on_success_matchers_;
+  }
+
+  /**
+   * Returns a list of matchers used for selecting the authorization response headers that
    * should be send to an the upstream server.
    */
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
@@ -122,13 +129,15 @@ private:
   toRequestMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
   static MatcherSharedPtr
+  toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list);
+  static MatcherSharedPtr
   toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatcher& list);
 
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
+  const MatcherSharedPtr client_header_on_success_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
   const MatcherSharedPtr upstream_header_to_append_matchers_;
-  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;
@@ -154,9 +163,8 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, Event::Dispatcher& dispatcher,
-             const envoy::service::auth::v3::CheckRequest& request, Tracing::Span& parent_span,
-             const StreamInfo::StreamInfo& stream_info) override;
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v3::CheckRequest& request,
+             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& message) override;
@@ -166,14 +174,12 @@ public:
                                     const Http::ResponseHeaderMap* response_headers) override;
 
 private:
-  void onTimeout();
   ResponsePtr toResponse(Http::ResponseMessagePtr message);
 
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
-  Event::TimerPtr timeout_timer_;
 };
 
 } // namespace ExtAuthz

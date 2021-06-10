@@ -6,7 +6,7 @@
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 
-#include "common/event/libevent.h"
+#include "source/common/event/libevent.h"
 
 #include "event2/event.h"
 #include "event2/watch.h"
@@ -43,8 +43,6 @@ namespace Event {
 // The same mechanism implements both of these operations, so they are invoked as a group.
 // - Event::SchedulableCallback::scheduleCallbackCurrentIteration(). Each of these callbacks is
 // scheduled and invoked independently.
-// - Event::Timer::enableTimer(0) if "envoy.reloadable_features.activate_timers_next_event_loop"
-// runtime feature is disabled.
 //
 // Event::FileEvent::activate and Event::SchedulableCallback::scheduleCallbackNextIteration are
 // implemented as libevent timers with a deadline of 0. Both of these actions are moved to the work
@@ -108,10 +106,9 @@ private:
 
   static constexpr int flagsBasedOnEventType() {
     if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
-      // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
-      // This is because libevent only supports level triggering on Windows, and so the write
-      // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
-      // loop will run at most once
+      // With level events, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run
+      // forever. This is because the write event callbacks will trigger every time through the
+      // loop. Adding EVLOOP_ONCE ensures the loop will run at most once
       return EVLOOP_NONBLOCK | EVLOOP_ONCE;
     }
     return EVLOOP_NONBLOCK;

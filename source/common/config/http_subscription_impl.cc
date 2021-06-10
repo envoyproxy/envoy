@@ -1,19 +1,19 @@
-#include "common/config/http_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
 
 #include <memory>
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "google/api/annotations.pb.h"
 
@@ -43,7 +43,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
 }
 
 // Config::Subscription
-void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, const bool) {
+void HttpSubscriptionImpl::start(const absl::flat_hash_set<std::string>& resource_names) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       handleFailure(Config::ConfigUpdateFailureReason::FetchTimedout, nullptr);
@@ -53,14 +53,18 @@ void HttpSubscriptionImpl::start(const std::set<std::string>& resource_names, co
 
   Protobuf::RepeatedPtrField<std::string> resources_vector(resource_names.begin(),
                                                            resource_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
   initialize();
 }
 
 void HttpSubscriptionImpl::updateResourceInterest(
-    const std::set<std::string>& update_to_these_names) {
+    const absl::flat_hash_set<std::string>& update_to_these_names) {
   Protobuf::RepeatedPtrField<std::string> resources_vector(update_to_these_names.begin(),
                                                            update_to_these_names.end());
+  // Sort to provide stable wire ordering.
+  std::sort(resources_vector.begin(), resources_vector.end());
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
@@ -78,13 +82,15 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
 void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) {
   disableInitFetchTimeoutTimer();
   envoy::service::discovery::v3::DiscoveryResponse message;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     return;
   }
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
         DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
     callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
@@ -93,7 +99,9 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
     stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
     stats_.version_text_.set(request_.version_info());
     stats_.update_success_.inc();
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY
+  catch (const EnvoyException& e) {
     handleFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 }
