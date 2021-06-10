@@ -37,7 +37,6 @@
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Router {

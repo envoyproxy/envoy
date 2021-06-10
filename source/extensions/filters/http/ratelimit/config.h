@@ -5,7 +5,6 @@
 
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +19,7 @@ class RateLimitFilterConfig
           envoy::extensions::filters::http::ratelimit::v3::RateLimit,
           envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute> {
 public:
-  RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RateLimit) {}
+  RateLimitFilterConfig() : FactoryBase("envoy.filters.http.ratelimit") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

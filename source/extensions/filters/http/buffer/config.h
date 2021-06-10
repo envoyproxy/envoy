@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class BufferFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::buffer::v3::Buffer,
                                  envoy::extensions::filters::http::buffer::v3::BufferPerRoute> {
 public:
-  BufferFilterFactory() : FactoryBase(HttpFilterNames::get().Buffer) {}
+  BufferFilterFactory() : FactoryBase("envoy.filters.http.buffer") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

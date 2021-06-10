@@ -12,7 +12,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -152,8 +151,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().RateLimit,
-                                                *dynamic_metadata);
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ratelimit", *dynamic_metadata);
   }
 
   switch (status) {
@@ -272,7 +270,7 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
   } else {
     const auto* specific_per_route_config =
         Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            HttpFilterNames::get().RateLimit, route);
+            "envoy.filters.http.ratelimit", route);
     if (specific_per_route_config != nullptr) {
       switch (specific_per_route_config->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
