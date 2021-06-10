@@ -168,11 +168,11 @@ genrule(
     outs = ["rst.tar"],
     cmd = "cat $(location base_rst) > $@ && tar -A --file=$@ $(location examples_rst) && tar -A --file=$@ $(location extensions_security_rst) && tar -A --file=$@ $(location external_deps_rst) && tar -A --file=$@ $(location empty_protos_rst) && tar -A --file=$@ $(location api_rst)",
     tools = [
+        ":api_rst",
         ":base_rst",
+        ":empty_protos_rst",
         ":examples_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
-        ":empty_protos_rst",
-        ":api_rst",
     ],
 )
