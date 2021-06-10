@@ -207,16 +207,17 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                   (p.first->ip()->ipv6() != nullptr && address.ip()->ipv6() != nullptr));
         });
   } else {
-    std::find_if(listeners_.begin(), listeners_.end(),
-                 [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
-                                            ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                   return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                              p.second.typed_listener_) &&
-                          p.second.listener_->listener() != nullptr &&
-                          p.first->type() == Network::Address::Type::Ip &&
-                          p.first->ip()->port() == address.ip()->port() &&
-                          p.first->ip()->isAnyAddress();
-                 });
+    listener_it =
+        std::find_if(listeners_.begin(), listeners_.end(),
+                     [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
+                                                ConnectionHandlerImpl::ActiveListenerDetails>& p) {
+                       return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                                  p.second.typed_listener_) &&
+                              p.second.listener_->listener() != nullptr &&
+                              p.first->type() == Network::Address::Type::Ip &&
+                              p.first->ip()->port() == address.ip()->port() &&
+                              p.first->ip()->isAnyAddress();
+                     });
   }
   return (listener_it != listeners_.end())
              ? Network::BalancedConnectionHandlerOptRef(
