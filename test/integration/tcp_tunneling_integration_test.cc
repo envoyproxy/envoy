@@ -281,10 +281,18 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(Protocols, ProxyingConnectIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3},
-                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2,
-                              FakeHttpConnection::Type::HTTP3})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2
+#ifdef ENVOY_ENABLE_QUIC
+                              ,
+                              Http::CodecType::HTTP3
+#endif // ENVOY_ENABLE_QUIC
+                             },
+                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2
+#ifdef ENVOY_ENABLE_QUIC
+                              ,
+                              FakeHttpConnection::Type::HTTP3
+#endif // ENVOY_ENABLE_QUIC
+                             })),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
@@ -471,8 +479,12 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
 INSTANTIATE_TEST_SUITE_P(
     HttpAndIpVersions, ConnectTerminationIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                       ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                         Http::CodecType::HTTP3)),
+                       ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2
+#ifdef ENVOY_ENABLE_QUIC
+                                         ,
+                                         Http::CodecType::HTTP3
+#endif // ENVOY_ENABLE_QUIC
+                                         )),
     ConnectTerminationIntegrationTest::paramsToString);
 
 using Params = std::tuple<Network::Address::IpVersion, Http::CodecType, bool>;
@@ -1125,8 +1137,12 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                       testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                                       Http::CodecType::HTTP3),
+                       testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2
+#ifdef ENVOY_ENABLE_QUIC
+                                       ,
+                                       Http::CodecType::HTTP3
+#endif // ENVOY_ENABLE_QUIC
+                                       ),
                        testing::Values(false, true)),
     TcpTunnelingIntegrationTest::paramsToString);
 
