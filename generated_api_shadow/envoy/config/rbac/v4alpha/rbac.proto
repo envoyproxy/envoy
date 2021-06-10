@@ -104,8 +104,7 @@ message RBAC {
   Action action = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
-  // The policies are evaluated in the order of the policy name. The policy with the smallest name
-  // is evaluated first.
+  // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 }
 
