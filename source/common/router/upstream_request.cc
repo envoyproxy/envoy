@@ -107,7 +107,7 @@ UpstreamRequest::~UpstreamRequest() {
     if (response_headers_size_.has_value()) {
       req_resp_stats.upstream_rs_headers_size_.recordValue(response_headers_size_.value());
 
-      auto rs_body_size = stream_info_.bytesSent();
+      auto rs_body_size = stream_info_.bytesReceived();
       if (rs_body_size != 0) {
         req_resp_stats.upstream_rs_body_size_.recordValue(rs_body_size);
       }

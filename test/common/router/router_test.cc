@@ -127,8 +127,8 @@ public:
 
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
-        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 5ull));
-    Buffer::OwnedImpl response_data("hello");
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 7ull));
+    Buffer::OwnedImpl response_data("goodbye");
     // NOLINTNEXTLINE: Silence null pointer access warning
     response_decoder->decodeData(response_data, !with_trailers);
 
