@@ -5,16 +5,15 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/hot_restart_nop_impl.h"
-#include "server/options_impl.h"
-#include "server/process_context_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/hot_restart_nop_impl.h"
+#include "source/server/options_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/integration/utility.h"

@@ -1,11 +1,11 @@
-#include "common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
 
 #include <openssl/bio.h>
 
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_io_handle_wrapper.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"

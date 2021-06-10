@@ -1,11 +1,10 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/file_event.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fancy_logger.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/io_socket/user_space/io_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fancy_logger.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
 
@@ -738,7 +737,7 @@ TEST_F(IoHandleImplTest, Close) {
                 should_close = true;
                 break;
               } else {
-                accumulator += absl::string_view(buf_.data(), result.rc_);
+                accumulator += std::string(buf_.data(), result.rc_);
               }
             } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
               ENVOY_LOG_MISC(debug, "read returns EAGAIN");
@@ -793,7 +792,7 @@ TEST_F(IoHandleImplTest, ShutDownRaiseEvent) {
         if (events & Event::FileReadyType::Read) {
           auto result = io_handle_->recv(buf_.data(), buf_.size(), 0);
           if (result.ok()) {
-            accumulator += absl::string_view(buf_.data(), result.rc_);
+            accumulator += std::string(buf_.data(), result.rc_);
           } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
@@ -833,7 +832,7 @@ TEST_F(IoHandleImplTest, WriteScheduleWritableEvent) {
           auto slice = reservation.slice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
-            accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+            accumulator += std::string(static_cast<char*>(slice.mem_), result.rc_);
           } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
@@ -873,7 +872,7 @@ TEST_F(IoHandleImplTest, WritevScheduleWritableEvent) {
           auto slice = reservation.slice();
           auto result = handle->readv(1024, &slice, 1);
           if (result.ok()) {
-            accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+            accumulator += std::string(static_cast<char*>(slice.mem_), result.rc_);
           } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");
           } else {
@@ -917,7 +916,7 @@ TEST_F(IoHandleImplTest, ReadAfterShutdownWrite) {
             if (result.rc_ == 0) {
               should_close = true;
             } else {
-              accumulator += absl::string_view(static_cast<char*>(slice.mem_), result.rc_);
+              accumulator += std::string(static_cast<char*>(slice.mem_), result.rc_);
             }
           } else if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
             ENVOY_LOG_MISC(debug, "read returns EAGAIN");

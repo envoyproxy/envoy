@@ -6,13 +6,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
-
-#include "server/config_validation/server.h"
-#include "server/configuration_impl.h"
-#include "server/options_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/server/config_validation/server.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/integration/server.h"
 #include "test/mocks/server/instance.h"
@@ -214,7 +213,7 @@ uint32_t run(const std::string& directory) {
     ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     if (std::find_if(unsuported_win32_configs.begin(), unsuported_win32_configs.end(),
                      [filename](const absl::string_view& s) {
-                       return filename.find(s) != std::string::npos;
+                       return filename.find(std::string(s)) != std::string::npos;
                      }) == unsuported_win32_configs.end()) {
       OptionsImpl options(
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));

@@ -3,10 +3,10 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/stats/stats.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/router/reset_header_parser.h"
-#include "common/router/retry_state_impl.h"
-#include "common/upstream/resource_manager_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/reset_header_parser.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"

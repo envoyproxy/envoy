@@ -1,4 +1,4 @@
-#include "common/runtime/runtime_features.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -88,6 +88,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
+    "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.vhds_heartbeats",

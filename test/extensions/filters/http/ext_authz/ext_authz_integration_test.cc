@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/macros.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/kafka_response_parser.h"
+#include "source/extensions/filters/network/kafka/kafka_response_parser.h"
 
 #include "absl/strings/str_cat.h"
 

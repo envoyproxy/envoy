@@ -13,6 +13,15 @@ namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
 
+class MockCallbacks : public Callbacks {
+  MOCK_METHOD(void, onPoolFailure,
+              (PoolFailureReason reason, absl::string_view transport_failure_reason,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (RequestEncoder & encoder, Upstream::HostDescriptionConstSharedPtr host,
+               const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol));
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();

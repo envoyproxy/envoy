@@ -1,10 +1,9 @@
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "common/common/hex.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/hex.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -73,9 +72,9 @@ public:
   using ::Envoy::Extensions::Common::Wasm::Context::Context;
   ~TestContext() override = default;
   using ::Envoy::Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {
-    std::cerr << std::string(message) << "\n";
-    log_(static_cast<spdlog::level::level_enum>(level), message);
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {
+    std::cerr << message << "\n";
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));
     Extensions::Common::Wasm::Context::log(static_cast<spdlog::level::level_enum>(level), message);
     return proxy_wasm::WasmResult::Ok;
   }
@@ -203,7 +202,8 @@ TEST_P(WasmCommonTest, Logging) {
   EXPECT_EQ(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm);
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
-  EXPECT_TRUE(wasm_weak.lock()->initialize(code, false));
+  EXPECT_TRUE(wasm_weak.lock()->load(code, false));
+  EXPECT_TRUE(wasm_weak.lock()->initialize());
   auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher);
   thread_local_wasm.reset();
 
@@ -269,7 +269,8 @@ TEST_P(WasmCommonTest, BadSignature) {
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
 
-  EXPECT_FALSE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_FALSE(wasm->initialize());
   EXPECT_TRUE(wasm->isFailed());
 }
 
@@ -303,7 +304,8 @@ TEST_P(WasmCommonTest, Segv) {
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
                                                                cluster_manager, *dispatcher);
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   TestContext* root_context = nullptr;
   wasm->setCreateContextForTesting(
       nullptr, [&root_context](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -354,7 +356,8 @@ TEST_P(WasmCommonTest, DivByZero) {
                                                                cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -398,7 +401,8 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
                                                                cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -443,7 +447,8 @@ TEST_P(WasmCommonTest, Utilities) {
                                                                cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -516,7 +521,8 @@ TEST_P(WasmCommonTest, Stats) {
                                                                cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -564,7 +570,8 @@ TEST_P(WasmCommonTest, Foreign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -613,7 +620,8 @@ TEST_P(WasmCommonTest, OnForeign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   TestContext* test_context = nullptr;
   wasm->setCreateContextForTesting(
       nullptr, [&test_context](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -664,7 +672,8 @@ TEST_P(WasmCommonTest, WASI) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
@@ -1057,7 +1066,8 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   // expect no call because proxy_on_vm_start is restricted
   wasm->setCreateContextForTesting(
@@ -1114,7 +1124,8 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   // proxy_on_vm_start will trigger proxy_log and fd_write, but expect no call because both are
   // restricted
@@ -1177,7 +1188,8 @@ TEST_P(WasmCommonTest, AllowLog) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   // Expect proxy_log since allowed, but no call to WASI since restricted
   wasm->setCreateContextForTesting(
@@ -1235,7 +1247,8 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -1294,7 +1307,8 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   // Expect two calls to proxy_log, from proxy_on_vm_start and from proxy_on_context_create
   wasm->setCreateContextForTesting(
@@ -1353,14 +1367,15 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
 
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
   auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher);
 
   EXPECT_NE(thread_local_wasm, nullptr);
   context = std::make_unique<TestContext>(thread_local_wasm.get());
-  EXPECT_TRUE(thread_local_wasm->initialize(code, false));
+  EXPECT_TRUE(thread_local_wasm->initialize());
 
   EXPECT_TRUE(thread_local_wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(thread_local_wasm->capabilityAllowed("proxy_log"));

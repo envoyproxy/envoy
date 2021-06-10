@@ -5,7 +5,7 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/tracing/trace_driver.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {

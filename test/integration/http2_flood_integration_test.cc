@@ -5,10 +5,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"

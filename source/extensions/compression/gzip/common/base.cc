@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/common/base.h"
+#include "source/extensions/compression/gzip/common/base.h"
 
 namespace Envoy {
 namespace Zlib {

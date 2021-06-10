@@ -1,6 +1,6 @@
 #include <limits>
 
-#include "extensions/transport_sockets/tls/ocsp/asn1_utility.h"
+#include "source/extensions/transport_sockets/tls/ocsp/asn1_utility.h"
 
 #include "test/test_common/utility.h"
 

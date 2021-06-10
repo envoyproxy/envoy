@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/filters/network/ext_authz/config.h"
+#include "source/extensions/filters/network/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"

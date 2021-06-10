@@ -18,11 +18,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/non_copyable.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "server/active_listener_base.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/active_listener_base.h"
 
 #include "spdlog/spdlog.h"
 

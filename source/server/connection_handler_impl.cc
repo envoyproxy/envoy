@@ -1,16 +1,15 @@
-#include "server/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
-#include "common/common/logger.h"
-#include "common/event/deferred_task.h"
-#include "common/network/utility.h"
-
-#include "server/active_internal_listener.h"
-#include "server/active_tcp_listener.h"
+#include "source/common/common/logger.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_internal_listener.h"
+#include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
 namespace Server {

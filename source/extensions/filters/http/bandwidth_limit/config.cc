@@ -1,12 +1,11 @@
-#include "extensions/filters/http/bandwidth_limit/config.h"
+#include "source/extensions/filters/http/bandwidth_limit/config.h"
 
 #include <string>
 
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 namespace Envoy {
 namespace Extensions {

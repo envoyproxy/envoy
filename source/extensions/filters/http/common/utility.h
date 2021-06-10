@@ -1,9 +1,8 @@
 #pragma once
 
-#include "common/common/macros.h"
-
-#include "extensions/common/utility.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/common/utility.h"
+#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -54,7 +53,6 @@ private:
             {"envoy.grpc_http1_bridge", HttpFilters::HttpFilterNames::get().GrpcHttp1Bridge},
             {"envoy.grpc_json_transcoder", HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder},
             {"envoy.grpc_web", HttpFilters::HttpFilterNames::get().GrpcWeb},
-            {"envoy.gzip", HttpFilters::HttpFilterNames::get().EnvoyGzip},
             {"envoy.health_check", HttpFilters::HttpFilterNames::get().HealthCheck},
             {"envoy.http_dynamic_filter", HttpFilters::HttpFilterNames::get().Dynamo},
             {"envoy.ip_tagging", HttpFilters::HttpFilterNames::get().IpTagging},

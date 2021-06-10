@@ -1,11 +1,9 @@
-#include "server/active_stream_socket.h"
+#include "source/server/active_stream_socket.h"
 
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
-#include "common/stats/timespan_impl.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/stats/timespan_impl.h"
 
 namespace Envoy {
 namespace Server {
