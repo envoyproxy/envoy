@@ -130,7 +130,7 @@ Example filter configuration using descriptors:
 .. literalinclude:: _include/local-rate-limit-with-descriptors.yaml
    :language: yaml
    :lines: 15-75
-   :caption: :download:`local-rate-limit-with-descriptors.yaml < _include/local-rate-limit-with-descriptors.yaml>`
+   :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
 follow. If requests come from a downstream service cluster "foo" for "/foo/bar"
