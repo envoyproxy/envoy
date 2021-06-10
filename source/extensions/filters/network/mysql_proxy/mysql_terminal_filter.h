@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
@@ -7,12 +9,12 @@
 #include "envoy/network/filter.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "mysql_codec_clogin_resp.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
-#include <bits/stdint-uintn.h>
+
+#include "mysql_codec_clogin_resp.h"
 
 namespace Envoy {
 namespace Extensions {

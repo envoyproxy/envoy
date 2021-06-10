@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/mysql_proxy/mysql_terminal_filter.h"
 
+#include <memory>
+
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -10,7 +12,6 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
-#include "route.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -18,15 +19,16 @@
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_greeting.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_message.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_session.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_utils.h"
-#include "source/extensions/filters/network/mysql_proxy/mysql_message.h"
-#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
 #include "source/extensions/filters/network/well_known_names.h"
-#include <memory>
+
+#include "route.h"
 
 namespace Envoy {
 namespace Extensions {
