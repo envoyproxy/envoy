@@ -11,22 +11,22 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
-#include "extensions/filters/network/redis_proxy/feature/hotkey/cache/cache_factory.h"
+#include "extensions/filters/network/redis_proxy/hotkey/cache/cache_factory.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 
 class HotKeyCounter {
   friend class HotKeyCounterTest;
 
 public:
-  HotKeyCounter(const envoy::extensions::filters::network::redis_proxy::v3::
-                    RedisProxy_FeatureConfig_HotKey::CacheType& hotkey_cache_type,
-                const uint8_t& cache_capacity);
+  HotKeyCounter(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey::CacheType&
+          hotkey_cache_type,
+      const uint8_t& cache_capacity);
   ~HotKeyCounter() = default;
 
   const std::string name() { return name_; }
@@ -67,8 +67,7 @@ struct HotKeyCollectorStats {
 class HotKeyCollector {
 public:
   HotKeyCollector(
-      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey&
-          config,
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey& config,
       Event::Dispatcher& dispatcher, const std::string& prefix, Stats::Scope& scope);
   ~HotKeyCollector();
 
@@ -97,7 +96,7 @@ private:
   absl::flat_hash_map<std::string, HotKeyCounterSharedPtr> active_counters_;
   absl::flat_hash_map<std::string, HotKeyCounterSharedPtr> draining_counters_;
   Thread::MutexBasicLockable counters_mutex_;
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey::CacheType
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey::CacheType
       hotkey_cache_type_;
   uint32_t hotkey_cache_capacity_;
   uint64_t collect_dispatch_interval_ms_;
@@ -110,7 +109,6 @@ private:
 using HotKeyCollectorSharedPtr = std::shared_ptr<HotKeyCollector>;
 
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

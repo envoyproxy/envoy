@@ -12,13 +12,10 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "hotkey_impl_test",
-    srcs = ["hotkey_impl_test.cc"],
+    name = "cache_factory_test",
+    srcs = ["cache_factory_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey:hotkey_lib",
-        "//test/extensions/filters/network/common/redis:redis_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:utility_lib",
+        "//source/extensions/filters/network/redis_proxy/hotkey/cache:cache_factory_lib",
     ],
 )

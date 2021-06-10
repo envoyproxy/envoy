@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/feature/hotkey/cache/lfucache/lfu_cache.h"
+#include "extensions/filters/network/redis_proxy/hotkey/cache/lfucache/lfu_cache.h"
 
 #include "absl/time/clock.h"
 #include "gtest/gtest.h"
@@ -7,7 +7,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 namespace Cache {
 namespace LFUCache {
@@ -382,7 +381,6 @@ TEST(LFUCacheTest, Attenuate) {
 } // namespace LFUCache
 } // namespace Cache
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

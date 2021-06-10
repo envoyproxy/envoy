@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/feature/hotkey/cache/cache.h"
+#include "extensions/filters/network/redis_proxy/hotkey/cache/cache.h"
 
 #include "absl/base/attributes.h"
 
@@ -13,7 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 namespace Cache {
 namespace LFUCache {
@@ -89,7 +88,6 @@ using LFUCacheSharedPtr = std::shared_ptr<LFUCache>;
 } // namespace LFUCache
 } // namespace Cache
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

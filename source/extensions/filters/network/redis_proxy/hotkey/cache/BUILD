@@ -17,7 +17,7 @@ envoy_cc_library(
     name = "cache_factory_lib",
     hdrs = ["cache_factory.h"],
     deps = [
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache/lfucache:lfu_cache_lib",
+        "//source/extensions/filters/network/redis_proxy/hotkey/cache/lfucache:lfu_cache_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

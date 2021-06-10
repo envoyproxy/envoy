@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/feature/hotkey/hotkey_impl.h"
+#include "extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
@@ -9,7 +9,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 
 namespace {
@@ -21,9 +20,10 @@ constexpr uint64_t HOTKEY_DEFAULT_ATTENUATE_DISPATCH_INTERVAL_MS(30 * 1000);
 constexpr uint64_t HOTKEY_DEFAULT_ATTENUATE_CACHE_INTERVAL_MS(60 * 1000);
 } // namespace
 
-HotKeyCounter::HotKeyCounter(const envoy::extensions::filters::network::redis_proxy::v3::
-                                 RedisProxy_FeatureConfig_HotKey::CacheType& hotkey_cache_type,
-                             const uint8_t& hotkey_cache_capacity)
+HotKeyCounter::HotKeyCounter(
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey::CacheType&
+        hotkey_cache_type,
+    const uint8_t& hotkey_cache_capacity)
     : hotkey_cache_(Cache::CacheFactory::createCache(hotkey_cache_type, hotkey_cache_capacity)),
       name_(fmt::format("{}_HotKeyCounter", static_cast<void*>(this))) {}
 
@@ -35,8 +35,7 @@ void HotKeyCounter::incr(const std::string& key) {
 }
 
 HotKeyCollector::HotKeyCollector(
-    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey&
-        config,
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey& config,
     Event::Dispatcher& dispatcher, const std::string& prefix, Stats::Scope& scope)
     : dispatcher_(dispatcher), hotkey_cache_type_(config.cache_type()),
       hotkey_cache_capacity_(
@@ -47,7 +46,7 @@ HotKeyCollector::HotKeyCollector(
           config, attenuate_dispatch_interval, HOTKEY_DEFAULT_ATTENUATE_DISPATCH_INTERVAL_MS)),
       attenuate_cache_interval_ms_(PROTOBUF_GET_MS_OR_DEFAULT(
           config, attenuate_cache_interval, HOTKEY_DEFAULT_ATTENUATE_CACHE_INTERVAL_MS)),
-      prefix_(prefix + ".hotkey"), scope_(scope),
+      prefix_(prefix + "hotkey"), scope_(scope),
       hotkey_collector_stats_(generateHotKeyCollectorStats(prefix_, scope_)) {
   hotkey_cache_ = Cache::CacheFactory::createCache(hotkey_cache_type_, hotkey_cache_capacity_);
 }
@@ -186,7 +185,6 @@ HotKeyCollectorStats HotKeyCollector::generateHotKeyCollectorStats(const std::st
 }
 
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

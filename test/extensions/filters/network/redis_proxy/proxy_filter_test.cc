@@ -115,23 +115,6 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
 
-TEST_F(RedisProxyFilterConfigTest, FeatureConfigDefaultSet) {
-  const std::string yaml_string = R"EOF(
-  prefix_routes:
-    catch_all_route:
-      cluster: fake_cluster
-  stat_prefix: foo
-  settings:
-    op_timeout: 0.01s
-  feature_config: {}
-  )EOF";
-
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
-      parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, dispatcher_);
-  EXPECT_TRUE(bool(config.feature_config_));
-}
-
 class RedisProxyFilterTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
   static constexpr const char* DefaultConfig = R"EOF(
@@ -165,7 +148,7 @@ public:
   ~RedisProxyFilterTest() override {
     filter_.reset();
     for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
-      if (gauge->name().compare("redis.foo.feature.hotkey.collector.draining_counter") == 0) {
+      if (gauge->name().compare("redis.foo.hotkey.collector.draining_counter") == 0) {
         continue;
       }
       EXPECT_EQ(0U, gauge->value());
@@ -186,7 +169,7 @@ public:
   NiceMock<Network::MockDrainDecision> drain_decision_;
   NiceMock<Runtime::MockLoader> runtime_;
   ProxyFilterConfigSharedPtr config_;
-  Feature::HotKey::HotKeyCollectorSharedPtr hk_collector_;
+  HotKey::HotKeyCollectorSharedPtr hk_collector_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Api::MockApi> api_;
@@ -573,28 +556,27 @@ TEST_F(RedisProxyFilterWithAuthAclTest, AuthAclPasswordIncorrect) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-const std::string feature_hotkey_min_config = R"EOF(
+const std::string hotkey_min_config = R"EOF(
 prefix_routes:
   catch_all_route:
       cluster: fake_cluster
 stat_prefix: foo
 settings:
   op_timeout: 0.01s
-feature_config:
-  hotkey:
-    cache_type: LFU
-    cache_capacity: 1
-    collect_dispatch_interval: 0.5s
-    attenuate_dispatch_interval: 0.5s
-    attenuate_cache_interval: 0s
+hotkey:
+  cache_type: LFU
+  cache_capacity: 1
+  collect_dispatch_interval: 0.5s
+  attenuate_dispatch_interval: 0.5s
+  attenuate_cache_interval: 0s
 )EOF";
 
-class RedisProxyFilterWithFeatureHotkeyTest : public RedisProxyFilterTest {
+class RedisProxyFilterWithHotkeyTest : public RedisProxyFilterTest {
 public:
-  RedisProxyFilterWithFeatureHotkeyTest() : RedisProxyFilterTest(feature_hotkey_min_config) {}
+  RedisProxyFilterWithHotkeyTest() : RedisProxyFilterTest(hotkey_min_config) {}
 };
 
-TEST_F(RedisProxyFilterWithFeatureHotkeyTest, HotkeyWhenEnabled) {
+TEST_F(RedisProxyFilterWithHotkeyTest, HotkeyWhenEnabled) {
   InSequence s;
 
   Buffer::OwnedImpl fake_data;

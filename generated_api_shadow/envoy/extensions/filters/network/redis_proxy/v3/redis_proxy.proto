@@ -210,68 +210,50 @@ message RedisProxy {
     repeated string commands = 4;
   }
 
-  // FeatureConfig defines the configuration of all extra features.
-  message FeatureConfig {
-    // HotKey defines the configuration of hotkey feature.
-    // [#next-free-field: 6]
-    message HotKey {
-      enum CacheType {
-        // default.
-        // Use LFU cache. Least Frequently Used eviction mode.
-        LFU = 0;
-      }
-
-      // Configure Cache Type.
-      CacheType cache_type = 1 [(validate.rules).enum = {defined_only: true}];
-
-      // Configure Cache Capacity. This changes the number of hot keys that can be counted at most.
-      // min: 1
-      // max: 255
-      // default: 32
-      google.protobuf.UInt32Value cache_capacity = 2 [(validate.rules).uint32 = {lte: 255 gte: 1}];
-
-      // Configure the dispatch interval for the collection operation.
-      // min: 0.5s
-      // max: 3600s
-      // default: 5s
-      google.protobuf.Duration collect_dispatch_interval = 3 [(validate.rules).duration = {
-        lte {seconds: 3600}
-        gte {nanos: 500000000}
-      }];
-
-      // Configure the dispatch interval for the attenuation operation.
-      // min: 0.5s
-      // max: 3600s
-      // default: 30s
-      google.protobuf.Duration attenuate_dispatch_interval = 4 [(validate.rules).duration = {
-        lte {seconds: 3600}
-        gte {nanos: 500000000}
-      }];
-
-      // Configure the minimum duration of cache for attenuation operations.
-      // min: 0s
-      // max: 3600s
-      // default: 60s
-      google.protobuf.Duration attenuate_cache_interval = 5 [(validate.rules).duration = {
-        lte {seconds: 3600}
-        gte {}
-      }];
+  // HotKey defines the configuration of hotkey feature.
+  // [#next-free-field: 6]
+  message HotKey {
+    enum CacheType {
+      // default.
+      // Use LFU cache. Least Frequently Used eviction mode.
+      LFU = 0;
     }
 
-    // Enable hotkey feature.
-    //
-    // Example:
-    //
-    // .. code-block:: yaml
-    //
-    //    hotkey:
-    //      cache_type: LFU
-    //      cache_capacity: 32
-    //      collect_dispatch_interval: 5s
-    //      attenuate_dispatch_interval: 30s
-    //      attenuate_cache_interval: 60s
-    //
-    HotKey hotkey = 1;
+    // Configure Cache Type.
+    CacheType cache_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+    // Configure Cache Capacity. This changes the number of hot keys that can be counted at most.
+    // min: 1
+    // max: 255
+    // default: 32
+    google.protobuf.UInt32Value cache_capacity = 2 [(validate.rules).uint32 = {lte: 255 gte: 1}];
+
+    // Configure the dispatch interval for the collection operation.
+    // min: 0.5s
+    // max: 3600s
+    // default: 5s
+    google.protobuf.Duration collect_dispatch_interval = 3 [(validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {nanos: 500000000}
+    }];
+
+    // Configure the dispatch interval for the attenuation operation.
+    // min: 0.5s
+    // max: 3600s
+    // default: 30s
+    google.protobuf.Duration attenuate_dispatch_interval = 4 [(validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {nanos: 500000000}
+    }];
+
+    // Configure the minimum duration of cache for attenuation operations.
+    // min: 0s
+    // max: 3600s
+    // default: 60s
+    google.protobuf.Duration attenuate_cache_interval = 5 [(validate.rules).duration = {
+      lte {seconds: 3600}
+      gte {}
+    }];
   }
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_redis_proxy_stats>`.
@@ -364,16 +346,20 @@ message RedisProxy {
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
 
-  // Enable some extra features.
+  // Enable hotkey feature.
   //
   // Example:
   //
   // .. code-block:: yaml
   //
-  //    feature_config:
-  //      hotkey: {}
+  //    hotkey:
+  //      cache_type: LFU
+  //      cache_capacity: 32
+  //      collect_dispatch_interval: 5s
+  //      attenuate_dispatch_interval: 30s
+  //      attenuate_cache_interval: 60s
   //
-  FeatureConfig feature_config = 9;
+  HotKey hotkey = 9;
 
   string hidden_envoy_deprecated_cluster = 2 [
     deprecated = true,

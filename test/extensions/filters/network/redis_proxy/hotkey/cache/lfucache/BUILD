@@ -12,13 +12,10 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "feature_test",
-    srcs = ["feature_test.cc"],
+    name = "lfu_cache_impl_test",
+    srcs = ["lfu_cache_impl_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
-        "//source/extensions/filters/network/redis_proxy/feature:feature_lib",
-        "//test/extensions/filters/network/common/redis:redis_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/test_common:utility_lib",
+        "//source/extensions/filters/network/redis_proxy/hotkey/cache/lfucache:lfu_cache_lib",
     ],
 )

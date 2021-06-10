@@ -26,11 +26,13 @@ ProxyFilterConfig::ProxyFilterConfig(
       downstream_auth_username_(
           Config::DataSource::read(config.downstream_auth_username(), true, api)),
       downstream_auth_password_(
-          Config::DataSource::read(config.downstream_auth_password(), true, api)),
-      feature_config_((config.has_feature_config())
-                          ? std::make_shared<Feature::FeatureConfig>(
-                                config.feature_config(), dispatcher, stat_prefix_, scope)
-                          : nullptr) {}
+          Config::DataSource::read(config.downstream_auth_password(), true, api)) {
+  if (config.has_hotkey()) {
+    hk_collector_ =
+        std::make_shared<HotKey::HotKeyCollector>(config.hotkey(), dispatcher, stat_prefix_, scope);
+    hk_collector_->run();
+  }
+}
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {
@@ -47,11 +49,9 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
   connection_allowed_ =
       config_->downstream_auth_username_.empty() && config_->downstream_auth_password_.empty();
 
-  if (config->feature_config_) {
-    hk_collector_ = config->feature_config_->hotkeyCollector();
-    if (hk_collector_) {
-      hk_counter_ = hk_collector_->createHotKeyCounter();
-    }
+  hk_collector_ = config->hk_collector_;
+  if (hk_collector_) {
+    hk_counter_ = hk_collector_->createHotKeyCounter();
   }
 }
 

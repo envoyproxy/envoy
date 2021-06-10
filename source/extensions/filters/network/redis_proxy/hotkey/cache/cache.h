@@ -8,7 +8,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 namespace Cache {
 namespace LFUCache {
@@ -38,7 +37,6 @@ using CacheSharedPtr = std::shared_ptr<Cache>;
 
 } // namespace Cache
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

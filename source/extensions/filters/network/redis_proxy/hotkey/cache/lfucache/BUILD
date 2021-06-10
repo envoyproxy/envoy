@@ -14,6 +14,6 @@ envoy_cc_library(
     hdrs = ["lfu_cache.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/extensions/filters/network/redis_proxy/feature/hotkey/cache:cache_interface",
+        "//source/extensions/filters/network/redis_proxy/hotkey/cache:cache_interface",
     ],
 )

@@ -15,7 +15,7 @@
 
 #include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/feature/feature.h"
+#include "extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,7 +60,7 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   const std::string downstream_auth_password_;
-  const Feature::FeatureConfigSharedPtr feature_config_;
+  HotKey::HotKeyCollectorSharedPtr hk_collector_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -133,8 +133,8 @@ private:
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
-  Feature::HotKey::HotKeyCollectorSharedPtr hk_collector_;
-  Feature::HotKey::HotKeyCounterSharedPtr hk_counter_;
+  HotKey::HotKeyCollectorSharedPtr hk_collector_;
+  HotKey::HotKeyCounterSharedPtr hk_counter_;
   ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};

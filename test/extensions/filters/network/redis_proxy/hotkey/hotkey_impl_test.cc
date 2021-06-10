@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/feature/hotkey/hotkey_impl.h"
+#include "extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
@@ -10,8 +10,11 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
+
+constexpr envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey::CacheType
+    hotkey_cache_type = envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey::
+        CacheType::RedisProxy_HotKey_CacheType_LFU;
 
 class HotKeyCounterTest : public testing::Test {
 public:
@@ -24,19 +27,13 @@ public:
 };
 
 TEST_F(HotKeyCounterTest, Name) {
-  HotKeyCounterSharedPtr hk_counter =
-      std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
-                                          RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
-                                      1);
+  HotKeyCounterSharedPtr hk_counter = std::make_shared<HotKeyCounter>(hotkey_cache_type, 1);
   EXPECT_EQ(hk_counter->name(),
             fmt::format("{}_HotKeyCounter", static_cast<void*>(hk_counter.get())));
 }
 
 TEST_F(HotKeyCounterTest, GetHotKeys) {
-  HotKeyCounterSharedPtr hk_counter =
-      std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
-                                          RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
-                                      1);
+  HotKeyCounterSharedPtr hk_counter = std::make_shared<HotKeyCounter>(hotkey_cache_type, 1);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
@@ -49,10 +46,7 @@ TEST_F(HotKeyCounterTest, GetHotKeys) {
 }
 
 TEST_F(HotKeyCounterTest, Reset) {
-  HotKeyCounterSharedPtr hk_counter =
-      std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
-                                          RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
-                                      1);
+  HotKeyCounterSharedPtr hk_counter = std::make_shared<HotKeyCounter>(hotkey_cache_type, 1);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
@@ -70,10 +64,7 @@ TEST_F(HotKeyCounterTest, Reset) {
 }
 
 TEST_F(HotKeyCounterTest, Incr) {
-  HotKeyCounterSharedPtr hk_counter =
-      std::make_shared<HotKeyCounter>(envoy::extensions::filters::network::redis_proxy::v3::
-                                          RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
-                                      2);
+  HotKeyCounterSharedPtr hk_counter = std::make_shared<HotKeyCounter>(hotkey_cache_type, 2);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
 
@@ -104,8 +95,7 @@ TEST(HotKeyCollectorTest, CreateHotKeyCounter) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
-      hotkey_config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey hotkey_config;
 
   HotKeyCollectorSharedPtr test_default_hk_collector =
       std::make_shared<HotKeyCollector>(hotkey_config, *dispatcher, "", store);
@@ -114,8 +104,7 @@ TEST(HotKeyCollectorTest, CreateHotKeyCounter) {
   EXPECT_EQ(true, bool(test_default_hk_collector));
   EXPECT_EQ(true, bool(test_default_hk_counter_1));
 
-  hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
-                                   RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
+  hotkey_config.set_cache_type(hotkey_cache_type);
   hotkey_config.mutable_cache_capacity()->set_value(1);
   hotkey_config.mutable_collect_dispatch_interval()->set_nanos(500000000);
   HotKeyCollectorSharedPtr test_hk_collector =
@@ -157,10 +146,8 @@ TEST(HotKeyCollectorTest, DestroyHotKeyCounter) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
-      hotkey_config;
-  hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
-                                   RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey hotkey_config;
+  hotkey_config.set_cache_type(hotkey_cache_type);
   hotkey_config.mutable_cache_capacity()->set_value(1);
   hotkey_config.mutable_collect_dispatch_interval()->set_nanos(500000000);
   HotKeyCollectorSharedPtr test_hk_collector =
@@ -201,10 +188,8 @@ TEST(HotKeyCollectorTest, Run) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
-      hotkey_config;
-  hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
-                                   RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey hotkey_config;
+  hotkey_config.set_cache_type(hotkey_cache_type);
   hotkey_config.mutable_cache_capacity()->set_value(1);
   hotkey_config.mutable_collect_dispatch_interval()->set_nanos(500000000);
   hotkey_config.mutable_attenuate_dispatch_interval()->set_nanos(500000000);
@@ -269,10 +254,8 @@ TEST(HotKeyCollectorTest, GetHotKeys) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
-      hotkey_config;
-  hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
-                                   RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey hotkey_config;
+  hotkey_config.set_cache_type(hotkey_cache_type);
   hotkey_config.mutable_cache_capacity()->set_value(3);
   hotkey_config.mutable_collect_dispatch_interval()->set_nanos(500000000);
   HotKeyCollectorSharedPtr test_hk_collector =
@@ -312,10 +295,8 @@ TEST(HotKeyCollectorTest, GetHotKeyHeats) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy_FeatureConfig_HotKey
-      hotkey_config;
-  hotkey_config.set_cache_type(envoy::extensions::filters::network::redis_proxy::v3::
-                                   RedisProxy_FeatureConfig_HotKey_CacheType_LFU);
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::HotKey hotkey_config;
+  hotkey_config.set_cache_type(hotkey_cache_type);
   hotkey_config.mutable_cache_capacity()->set_value(3);
   hotkey_config.mutable_collect_dispatch_interval()->set_nanos(500000000);
   HotKeyCollectorSharedPtr test_hk_collector =
@@ -354,7 +335,6 @@ TEST(HotKeyCollectorTest, GetHotKeyHeats) {
 }
 
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

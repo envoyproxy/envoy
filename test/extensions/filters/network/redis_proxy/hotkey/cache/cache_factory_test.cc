@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/feature/hotkey/cache/cache_factory.h"
+#include "extensions/filters/network/redis_proxy/hotkey/cache/cache_factory.h"
 
 #include "absl/time/clock.h"
 #include "gtest/gtest.h"
@@ -7,7 +7,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-namespace Feature {
 namespace HotKey {
 namespace Cache {
 
@@ -33,8 +32,8 @@ TEST(CacheTest, CacheImplTest) {
 
 TEST(CacheFactoryTest, CreateCacheByCacheTypeLFU) {
   CacheSharedPtr lfu =
-      CacheFactory::createCache(envoy::extensions::filters::network::redis_proxy::v3::
-                                    RedisProxy_FeatureConfig_HotKey_CacheType_LFU,
+      CacheFactory::createCache(envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::
+                                    HotKey::CacheType::RedisProxy_HotKey_CacheType_LFU,
                                 1, 1);
   std::string test_key_1("test_key_1"), test_key_2("test_key_2");
   absl::flat_hash_map<std::string, uint32_t> cache;
@@ -69,7 +68,6 @@ TEST(CacheFactoryTest, CreateCacheByCacheTypeLFU) {
 
 } // namespace Cache
 } // namespace HotKey
-} // namespace Feature
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
