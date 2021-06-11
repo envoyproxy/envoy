@@ -173,7 +173,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            empty_stat_name,
                                            false};
-    httpContext().codeStats().chargeResponseStat(info);
+    httpContext().codeStats().chargeResponseStat(info, false);
     if (config_->enableXEnvoyRateLimitedHeader()) {
       if (response_headers_to_add_ == nullptr) {
         response_headers_to_add_ = Http::ResponseHeaderMapImpl::create();
