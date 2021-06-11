@@ -30,7 +30,7 @@ namespace Server {
 class ActiveStreamListenerBase;
 
 /**
- * Wrapper for an active accepted socket owned by the active listener.
+ * Wrapper for an active accepted socket owned by the active tcp listener.
  */
 struct ActiveStreamSocket : public Network::ListenerFilterManager,
                             public Network::ListenerFilterCallbacks,
