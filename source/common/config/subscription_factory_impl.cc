@@ -63,7 +63,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               local_info_,
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, sotwGrpcMethod(type_url, transport_api_version), transport_api_version,
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
@@ -75,7 +75,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, deltaGrpcMethod(type_url, transport_api_version), transport_api_version,
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               local_info_),
@@ -135,7 +135,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           std::make_shared<Config::NewGrpcMuxImpl>(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
-                  ->create(),
+                  ->createUncachedRawAsyncClient(),
               dispatcher_, deltaGrpcMethod(type_url, envoy::config::core::v3::ApiVersion::V3),
               envoy::config::core::v3::ApiVersion::V3, api_.randomGenerator(), scope,
               Utility::parseRateLimitSettings(api_config_source), local_info_),

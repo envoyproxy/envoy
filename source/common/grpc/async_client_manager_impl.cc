@@ -73,7 +73,7 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
 #endif
 }
 
-RawAsyncClientPtr AsyncClientFactoryImpl::create() {
+RawAsyncClientPtr AsyncClientFactoryImpl::createUncachedRawAsyncClient() {
   return std::make_unique<AsyncClientImpl>(cm_, config_, time_source_);
 }
 
@@ -115,7 +115,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   }
 }
 
-RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
+RawAsyncClientPtr GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
@@ -149,7 +149,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   if (client != nullptr) {
     return client;
   }
-  client = factoryForGrpcService(config, scope, skip_cluster_check)->create();
+  client = factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();
   raw_async_client_cache_->setCache(config, client);
   return client;
 }

@@ -20,9 +20,9 @@ public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                          const envoy::config::core::v3::GrpcService& config,
                          bool skip_cluster_check, TimeSource& time_source);
+  RawAsyncClientPtr createUncachedRawAsyncClient() override;
 
 private:
-  RawAsyncClientPtr create() override;
   Upstream::ClusterManager& cm_;
   const envoy::config::core::v3::GrpcService config_;
   TimeSource& time_source_;
@@ -36,7 +36,7 @@ public:
                                const StatNames& stat_names);
 
 private:
-  RawAsyncClientPtr create() override;
+  RawAsyncClientPtr createUncachedRawAsyncClient() override;
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;

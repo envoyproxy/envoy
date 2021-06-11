@@ -15,14 +15,16 @@ class AsyncClientFactory {
 public:
   virtual ~AsyncClientFactory() = default;
 
-  virtual RawAsyncClientPtr create() PURE;
-
-private:
   /**
    * Create a gRPC::RawAsyncClient.
+   * Prefer AsyncClientManager::getOrCreateRawAsyncClient() to creating uncached raw async client
+   * from factory. Only call this method when the raw async client is expected to be owned
+   * exclusively.
    * @return RawAsyncClientPtr async client.
    */
+  virtual RawAsyncClientPtr createUncachedRawAsyncClient() PURE;
 
+private:
   friend class AsyncClientFactoryImpl;
 };
 
@@ -36,7 +38,8 @@ public:
   virtual ~AsyncClientManager() = default;
 
   /**
-   * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across different filter instances. 
+   * Create a Grpc::RawAsyncClient. The async client is cached thread locally and shared across
+   * different filter instances.
    * @param grpc_service envoy::config::core::v3::GrpcService configuration.
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
