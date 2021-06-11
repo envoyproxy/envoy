@@ -25,7 +25,7 @@ TEST(DubboProxyRouterFilterConfigTest, RouterV2Alpha1Filter) {
   DubboFilters::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(router_config, "stats", context);
   DubboFilters::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addFilter(_));
   cb(filter_callback);
 }
 
@@ -35,7 +35,7 @@ TEST(DubboProxyRouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   DubboFilters::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   DubboFilters::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addFilter(_));
   cb(filter_callback);
 }
 
