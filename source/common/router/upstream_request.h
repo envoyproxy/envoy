@@ -127,6 +127,9 @@ private:
     return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
            downstream_metadata_map_vector_.empty();
   }
+  void addResponseHeadersSize(uint64_t size) {
+    response_headers_size_ = response_headers_size_.value_or(0) + size;
+  }
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -141,6 +144,9 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
+  // This is wrapped in an optional, since we want to avoid computing zero size headers when in
+  // reality we just didn't get a response back.
+  absl::optional<uint64_t> response_headers_size_{};
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
