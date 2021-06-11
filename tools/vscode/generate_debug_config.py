@@ -88,6 +88,17 @@ def lldb_config(target, binary, workspace, execroot, arguments):
         "request": "launch"
     }
 
+def args_of_config(debugger_type, config):
+    if debugger_type == "lldb":
+        return config.get("args", "")
+    else:
+        return config.get("arguments", "")
+
+def set_args(debugger_type, config, args):
+   if debugger_type == "lldb":
+        config["args"] = args
+   else:
+        config["arguments"] = args
 
 def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type):
     launch = get_launch_json(workspace)
@@ -100,7 +111,11 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
     configurations = launch.get("configurations", [])
     for config in configurations:
         if config.get("name", None) == new_config["name"]:
+            old_args = args_of_config(debugger_type, config)
             config.clear()
+	    # preserve old args only when no arguments set at commmand line, and old args is not empty
+            if len(old_args) != 0 and len(arguments) == 0:
+                set_args(debugger_type, new_config, old_args)
             config.update(new_config)
             break
     else:
