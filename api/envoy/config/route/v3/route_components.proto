@@ -202,7 +202,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 19]
+// [#next-free-field: 20]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -300,6 +300,11 @@ message Route {
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+
+  // [#not-implemented-hide:]
+  // Additional clusters which are not referenced directly by a RouteAction
+  // cluster_specifier, but may be selected by a cluster_specifier_plugin.
+  repeated string additional_clusters = 19;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
@@ -563,7 +568,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -839,6 +844,10 @@ message RouteAction {
     // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
+
+    // [#not-implemented-hide:]
+    // Configuration for a plugin to which cluster selection is delegated.
+    core.v3.TypedExtensionConfig cluster_specifier_plugin = 37;
   }
 
   // The HTTP status code to use when configured cluster is not found.
