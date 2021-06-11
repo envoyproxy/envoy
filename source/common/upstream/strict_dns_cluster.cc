@@ -15,7 +15,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.dispatcher().timeSource()),
-      load_assignment_{cluster.load_assignment()}, local_info_(factory_context.localInfo()),
+      load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),

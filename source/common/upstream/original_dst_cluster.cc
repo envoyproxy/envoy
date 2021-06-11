@@ -120,7 +120,7 @@ OriginalDstCluster::OriginalDstCluster(
                            : false),
       host_map_(std::make_shared<HostMap>()) {
   if (config.has_load_assignment()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
