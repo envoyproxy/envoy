@@ -286,7 +286,6 @@ void EnvoyQuicClientStream::OnClose() {
     // This is called in the scope of a watermark buffer updater. Clear the
     // buffer accounting afterwards so that the updater doesn't override the
     // result.
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

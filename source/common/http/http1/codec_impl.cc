@@ -177,6 +177,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     if (status && *status == 100) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
       chunk_encoding_ = false;
+    } else if (status && *status == 304 && connection_.noChunkedEncodingHeaderFor304()) {
+      // For 304 response, since it should never have a body, we should not need to chunk_encode at
+      // all.
+      chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
       // response to a HEAD request.
@@ -463,10 +467,12 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.require_strict_1xx_and_204_response_headers")),
       send_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
-      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
-                               [&]() -> void { this->onBelowLowWatermark(); },
-                               [&]() -> void { this->onAboveHighWatermark(); },
-                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      dispatching_(false), no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
+                               "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
+      output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
@@ -858,7 +864,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
      << DUMP_MEMBER(require_strict_1xx_and_204_headers_)
      << DUMP_MEMBER(send_strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
-     << DUMP_MEMBER(buffered_body_.length());
+     << DUMP_MEMBER(no_chunked_encoding_header_for_304_) << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
   os << DUMP_MEMBER(header_parsing_state_);

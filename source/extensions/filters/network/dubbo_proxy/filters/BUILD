@@ -43,11 +43,3 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
-
-envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
-    ],
-)
