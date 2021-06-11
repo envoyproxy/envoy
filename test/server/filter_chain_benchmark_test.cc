@@ -218,6 +218,7 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   initialize(state);
   NiceMock<Server::Configuration::MockDrainableFactoryContext> factory_context;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
         init_manager_};
