@@ -241,16 +241,6 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     admin_address_ = server.admin().socket().addressProvider().localAddress();
     server_ = &server;
     stat_store_ = &stat_store;
-    // Use the tls slots to save dispatchers. The slot must be destroyed before server shutdown.
-    ThreadLocal::SlotPtr dispatcher_tls = tls.allocateSlot();
-
-    dispatcher_tls->set(
-        [this](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-          Thread::LockGuard guard(dispatcher_mutex_);
-          registered_dispatchers_.push_back(dispatcher);
-          return nullptr;
-        });
-
     serverReady();
     server.run();
   }

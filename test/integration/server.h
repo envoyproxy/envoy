@@ -505,12 +505,6 @@ public:
   void useAdminInterfaceToQuit(bool use) { use_admin_interface_to_quit_ = use; }
   bool useAdminInterfaceToQuit() { return use_admin_interface_to_quit_; }
 
-  absl::optional<std::reference_wrapper<Event::Dispatcher>> getWorkerDispatcher(uint32_t index) {
-    Thread::LockGuard guard(dispatcher_mutex_);
-    ASSERT(index < registered_dispatchers_.size());
-    return registered_dispatchers_[index];
-  }
-
 protected:
   IntegrationTestServer(Event::TestTimeSystem& time_system, Api::Api& api,
                         const std::string& config_path)
@@ -532,10 +526,6 @@ protected:
   // server may not have been run yet, but all server access methods (server(), statStore(),
   // adminAddress()) will be available.
   void serverReady();
-
-  Thread::MutexBasicLockable dispatcher_mutex_;
-  // Assume 128 is greater than concurrency.
-  std::vector<absl::optional<std::reference_wrapper<Event::Dispatcher>>> registered_dispatchers_;
 
 private:
   /**

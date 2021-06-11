@@ -239,6 +239,7 @@ public:
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
+
   // Network::ClientConnection
   void connect() override;
 

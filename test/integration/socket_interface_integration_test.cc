@@ -90,6 +90,7 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
 }
 
 // Test that connecting to internal address will crash.
+// TODO(lambdai): Add internal connection implementation to enable the connection creation.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -100,8 +101,6 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "false"}});
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),
@@ -109,7 +108,7 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
 }
 
 // Test that recv from internal address will crash.
-// TODO(lambdai): Add UDP internal listener implementation to enable the io path.
+// TODO(lambdai): Add internal socket implementation to enable the io path.
 TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 

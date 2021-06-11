@@ -1,52 +1,3 @@
-#include <chrono>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
-
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/config/core/v3/address.pb.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/network/listener.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/server/listener_manager.h"
-#include "envoy/stream_info/filter_state.h"
-
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/common/macros.h"
-#include "source/common/config/metadata.h"
-#include "source/common/init/manager_impl.h"
-#include "source/common/network/address_impl.h"
-#include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/utility.h"
-#include "source/common/protobuf/protobuf.h"
-#include "source/server/configuration_impl.h"
-#include "source/server/listener_manager_impl.h"
-
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/server/drain_manager.h"
-#include "test/mocks/server/guard_dog.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/server/listener_component_factory.h"
-#include "test/mocks/server/worker.h"
-#include "test/mocks/server/worker_factory.h"
-#include "test/server/utility.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/network_utility.h"
-#include "test/test_common/registry.h"
-#include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/utility.h"
-
-#include "absl/strings/escaping.h"
-#include "absl/strings/match.h"
-
-// Above from listener_manager_impl_test.cc
-
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
@@ -155,8 +106,6 @@ public:
       Network::UdpListenerWorkerRouterPtr listener_worker_router_;
     };
 
-    struct InternalListenerConfigImpl : public Network::InternalListenerConfig {};
-
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override {
       return inline_filter_chain_manager_ == nullptr ? parent_.manager_
@@ -179,13 +128,6 @@ public:
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
-    Network::InternalListenerConfigOptRef internalListenerConfig() override {
-      if (internal_listener_config_ == nullptr) {
-        return Network::InternalListenerConfigOptRef();
-      } else {
-        return *internal_listener_config_;
-      }
-    }
     envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
@@ -213,7 +155,6 @@ public:
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
-    std::unique_ptr<InternalListenerConfigImpl> internal_listener_config_;
     Network::ConnectionBalancerSharedPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
     const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
@@ -313,22 +254,6 @@ public:
     return listeners_.back().get();
   }
 
-  TestListener* addInternalListener(
-      uint64_t tag, const std::string& name,
-      std::chrono::milliseconds listener_filters_timeout = std::chrono::milliseconds(15000),
-      bool continue_on_listener_filters_timeout = false,
-      std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
-          nullptr) {
-    listeners_.emplace_back(std::make_unique<TestListener>(
-        *this, tag, /*bind_to_port*/ false, /*hand_off_restored_destination_connections*/ false,
-        name, Network::Socket::Type::Stream, listener_filters_timeout,
-        continue_on_listener_filters_timeout, socket_factory_, access_log_,
-        overridden_filter_chain_manager, ENVOY_TCP_BACKLOG_SIZE, nullptr));
-    listeners_.back()->internal_listener_config_ =
-        std::make_unique<TestListener::InternalListenerConfigImpl>();
-    return listeners_.back().get();
-  }
-
   void validateOriginalDst(Network::TcpListenerCallbacks** listener_callbacks,
                            TestListener* test_listener, Network::MockListener* listener) {
     Network::Address::InstanceConstSharedPtr normal_address(
@@ -373,7 +298,7 @@ public:
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
-  std::unique_ptr<ConnectionHandlerImpl> handler_;
+  Network::ConnectionHandlerPtr handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
   const std::shared_ptr<Network::MockFilterChain> filter_chain_;
@@ -1440,67 +1365,6 @@ TEST_F(ConnectionHandlerTest, TcpBacklogCustom) {
         return nullptr;
       }));
   handler_->addListener(absl::nullopt, *test_listener);
-}
-
-TEST_F(ConnectionHandlerTest, DisableInternalListener) {
-  InSequence s;
-  Network::Address::InstanceConstSharedPtr local_address{
-      new Network::Address::EnvoyInternalInstance("server_internal_address")};
-
-  TestListener* internal_listener =
-      addInternalListener(1, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
-  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener);
-  auto internal_listener_cb = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb.has_value());
-
-  handler_->disableListeners();
-  auto internal_listener_cb_disabled = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb_disabled.has_value());
-  ASSERT_EQ(&internal_listener_cb_disabled.value().get(), &internal_listener_cb.value().get());
-
-  handler_->enableListeners();
-  auto internal_listener_cb_enabled = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb_enabled.has_value());
-  ASSERT_EQ(&internal_listener_cb_enabled.value().get(), &internal_listener_cb.value().get());
-}
-
-TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
-  InSequence s;
-  uint64_t old_listener_tag = 1;
-  uint64_t new_listener_tag = 2;
-  Network::Address::InstanceConstSharedPtr local_address{
-      new Network::Address::EnvoyInternalInstance("server_internal_address")};
-
-  TestListener* internal_listener = addInternalListener(
-      old_listener_tag, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
-  EXPECT_CALL(*socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
-  handler_->addListener(absl::nullopt, *internal_listener);
-
-  ASSERT_NE(internal_listener, nullptr);
-
-  auto overridden_filter_chain_manager =
-      std::make_shared<NiceMock<Network::MockFilterChainManager>>();
-  TestListener* new_test_listener =
-      addInternalListener(new_listener_tag, "test_internal_listener", std::chrono::milliseconds(),
-                          false, overridden_filter_chain_manager);
-
-  handler_->addListener(old_listener_tag, *new_test_listener);
-
-  Network::MockConnectionSocket* connection = new NiceMock<Network::MockConnectionSocket>();
-
-  auto internal_listener_cb = handler_->findByAddress(local_address);
-
-  EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
-  EXPECT_CALL(*overridden_filter_chain_manager, findFilterChain(_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
-  internal_listener_cb.value().get().onAccept(Network::ConnectionSocketPtr{connection});
-  EXPECT_EQ(0UL, handler_->numConnections());
-
-  testing::MockFunction<void()> completion;
-  handler_->removeFilterChains(old_listener_tag, {}, completion.AsStdFunction());
-  EXPECT_CALL(completion, Call());
-  dispatcher_.clearDeferredDeleteList();
 }
 
 } // namespace

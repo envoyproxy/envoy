@@ -1009,15 +1009,6 @@ TEST_F(IoHandleImplTest, Connect) {
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).rc_);
 }
 
-TEST_F(IoHandleImplTest, ConnectToClosedIoHandle) {
-  auto address_is_ignored =
-      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
-  io_handle_peer_->close();
-  auto result = io_handle_->connect(address_is_ignored);
-  EXPECT_EQ(-1, result.rc_);
-  EXPECT_EQ(SOCKET_ERROR_INVAL, result.errno_);
-}
-
 TEST_F(IoHandleImplTest, ActivateEvent) {
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(

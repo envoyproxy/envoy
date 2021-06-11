@@ -274,16 +274,10 @@ Network::IoHandlePtr IoHandleImpl::accept(struct sockaddr*, socklen_t*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
-  if (peer_handle_ != nullptr) {
-    // Buffered Io handle should always be considered as connected unless the server peer cannot be
-    // found. Use write or read to determine if peer is closed.
-    return {0, 0};
-  } else {
-    ENVOY_LOG(debug, "user namespace handle {} connect to {} the closed peer.",
-              static_cast<void*>(this), address->asStringView());
-    return Api::SysCallIntResult{-1, SOCKET_ERROR_INVAL};
-  }
+Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
+  // Buffered Io handle should always be considered as connected.
+  // Use write or read to determine if peer is closed.
+  return {0, 0};
 }
 
 Api::SysCallIntResult IoHandleImpl::setOption(int, int, const void*, socklen_t) {

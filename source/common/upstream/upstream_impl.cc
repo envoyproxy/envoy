@@ -336,9 +336,7 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   } else {
     connection_options = options;
   }
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
-    ASSERT(!address->envoyInternalAddress());
-  }
+  ASSERT(!address->envoyInternalAddress());
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       socket_factory.createTransportSocket(std::move(transport_socket_options)),

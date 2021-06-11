@@ -21,7 +21,6 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -275,8 +274,7 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  if (socket_->addressType() == Address::Type::Pipe ||
-      socket_->addressType() == Address::Type::EnvoyInternal) {
+  if (socket_->addressType() == Address::Type::Pipe) {
     return;
   }
 
@@ -659,16 +657,9 @@ void ConnectionImpl::onWriteReady() {
 
   if (connecting_) {
     int error;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
-        socket_->addressProvider().remoteAddress()->type() ==
-            Network::Address::Type::EnvoyInternal) {
-      // Connected!
-      error = 0;
-    } else {
-      socklen_t error_size = sizeof(error);
-      RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
-                     "");
-    }
+    socklen_t error_size = sizeof(error);
+    RELEASE_ASSERT(socket_->getSocketOption(SOL_SOCKET, SO_ERROR, &error, &error_size).rc_ == 0,
+                   "");
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -869,12 +860,8 @@ void ClientConnectionImpl::connect() {
                  socket_->addressProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
   if (result.rc_ == 0) {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address") &&
-        socket_->addressProvider().remoteAddress()->type() !=
-            Network::Address::Type::EnvoyInternal) {
-      // write will become ready.
-      ASSERT(connecting_);
-    }
+    // write will become ready.
+    ASSERT(connecting_);
   } else {
     ASSERT(SOCKET_FAILURE(result.rc_));
 #ifdef WIN32

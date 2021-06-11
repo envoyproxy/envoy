@@ -13,7 +13,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
     deps = [
-        ":io_handle_impl_lib",
     ],
 )
 

@@ -23,15 +23,7 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
       address_provider_(std::make_shared<SocketAddressSetterImpl>(local_address, remote_address)) {
 
   if (address_provider_->localAddress() != nullptr) {
-    // The remote address should have the exact local address type.
-    ASSERT(address_provider_->remoteAddress() == nullptr ||
-           address_provider_->remoteAddress()->type() == address_provider_->localAddress()->type());
     addr_type_ = address_provider_->localAddress()->type();
-    return;
-  }
-
-  if (address_provider_->remoteAddress() != nullptr) {
-    addr_type_ = address_provider_->remoteAddress()->type();
     return;
   }
 
