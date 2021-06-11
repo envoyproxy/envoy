@@ -41,6 +41,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -250,24 +251,13 @@ uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
                                       const Stats::ParentHistogram& histogram) {
   // Note: we need to read the sample count from the main thread, to avoid data races.
   uint64_t sample_count = 0;
-  Thread::MutexBasicLockable mu;
-  Thread::CondVar cv;
-  bool work_finished{false};
+  absl::Notification notification;
 
   main_dispatcher.post([&] {
-    {
-      Thread::LockGuard lock(mu);
-      ASSERT(!work_finished);
-      sample_count = histogram.cumulativeStatistics().sampleCount();
-      work_finished = true;
-    }
-    cv.notifyOne();
+    sample_count = histogram.cumulativeStatistics().sampleCount();
+    notification.Notify();
   });
-
-  Thread::LockGuard lock(mu);
-  while (!work_finished) {
-    cv.wait(mu);
-  }
+  notification.WaitForNotification();
 
   return sample_count;
 }
