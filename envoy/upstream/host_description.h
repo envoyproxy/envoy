@@ -121,7 +121,8 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * @return a optional list of addresses which the host resolved to.
+   * @return a optional list of additional addresses which the host resolved to. These addresses
+   *         may be used to create upstream connections if the primary address is unreachable.
    */
   virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
 
