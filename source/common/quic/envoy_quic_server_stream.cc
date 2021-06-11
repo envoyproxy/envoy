@@ -295,7 +295,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

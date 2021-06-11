@@ -87,6 +87,8 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateC
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
+ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
+
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }

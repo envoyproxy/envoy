@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 
 #include "source/common/http/message_impl.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"

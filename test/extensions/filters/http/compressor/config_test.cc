@@ -15,15 +15,6 @@ using testing::NiceMock;
 
 const ::test::mock_compressor_library::Unregistered _mock_compressor_library_dummy;
 
-TEST(CompressorFilterFactoryTests, MissingCompressorLibraryConfig) {
-  const envoy::extensions::filters::http::compressor::v3::Compressor proto_config;
-  CompressorFilterFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-                            EnvoyException,
-                            "Compressor filter doesn't have compressor_library defined");
-}
-
 TEST(CompressorFilterFactoryTests, UnregisteredCompressorLibraryConfig) {
   const std::string yaml_string = R"EOF(
   compressor_library:

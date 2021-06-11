@@ -39,7 +39,7 @@ def get_slo_hours():
 # Return true if the PR has a waiting tag, false otherwise.
 def is_waiting(labels):
     for label in labels:
-        if label.name == 'waiting':
+        if label.name == 'waiting' or label.name == 'waiting:any':
             return True
     return False
 
