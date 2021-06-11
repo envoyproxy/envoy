@@ -273,8 +273,8 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginGradualStrategy) {
 
   EXPECT_CALL(cb_before_drain, Call(_));
   EXPECT_CALL(cb_after_drain, Call(_)).WillOnce(Invoke([](std::chrono::milliseconds delay) {
-    // Validate that cbs after the drain sequence has started are called with a random value
-    // between 0 (immidiate) and the max drain window.
+    // Validate that callbacks after the drain sequence has started are called with a random value
+    // between 0 (immediate) and the max drain window.
     EXPECT_THAT(delay.count(), Ge(0));
     EXPECT_THAT(delay.count(), Le(1000));
   }));
