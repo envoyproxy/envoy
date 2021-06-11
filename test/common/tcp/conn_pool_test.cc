@@ -1128,7 +1128,9 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_->test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that connections that are closed due to idle timeout causes the idle callback to be fired.
 TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
+  initialize();
   testing::MockFunction<void(bool)> idle_callback;
   conn_pool_->addIdleCallback(idle_callback.AsStdFunction(),
                               Envoy::ConnectionPool::Instance::DrainPool::No);

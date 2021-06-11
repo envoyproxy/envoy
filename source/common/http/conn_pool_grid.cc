@@ -215,23 +215,37 @@ ConnectivityGrid::~ConnectivityGrid() {
 
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
   // Pools are created by newStream, which should not be called during draining.
-  ASSERT(idle_callbacks_.empty());
+  ASSERT(drains_needed_ == 0);
   // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
-  if (pools_.size() == 2 || !idle_callbacks_.empty()) {
+  if (pools_.size() == 2 || drains_needed_ != 0) {
     return absl::nullopt;
   }
 
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
+  ConnectivityGrid::PoolIterator pool;
   if (pools_.empty()) {
     pools_.push_back(Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_,
                                              options_, transport_socket_options_, state_,
                                              time_source_));
-    return pools_.begin();
+    pool = pools_.begin();
+  } else {
+    pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
+                                                             priority_, options_,
+                                                             transport_socket_options_, state_));
+    pool = std::next(pools_.begin());
   }
-  pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
-                                                           priority_, options_,
-                                                           transport_socket_options_, state_));
-  return std::next(pools_.begin());
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+    (*pool)->addIdleCallback(
+        [this](bool is_drained) {
+          if (!is_drained) {
+            onIdleReceived();
+          }
+        },
+        DrainPool::No);
+  }
+
+  return pool;
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
@@ -272,24 +286,28 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb, DrainPool drain) {
   // complete.
   idle_callbacks_.emplace_back(cb);
 
-  if (idle_callbacks_.size() != 1) {
-    return;
-  }
+  if (drain == DrainPool::Yes) {
+    if (drains_needed_ > 0) {
+      // A drain callback has already been set, and only needs to happen once.
+      return;
+    }
 
-  // If this is the first time a idle callback has been added, track the
-  // number of pools which need to be drained in order to pass drain-completion
-  // up to the callers. Note that no new pools can be created from this point on
-  // as createNextPool fast-fails if idle callbacks are present.
-  drains_needed_ = pools_.size();
-  for (auto& pool : pools_) {
-    pool->addIdleCallback(
-        [this](bool is_drained) -> void {
-          if (is_drained) {
-            onDrainReceived();
-          }
-        },
-        // TODO(ggreenway): `drain` here is probably wrong
-        drain);
+    // If this is the first time an idle callback has been added, track the
+    // number of pools which need to be drained in order to pass drain-completion
+    // up to the callers. Note that no new pools can be created from this point on
+    // as createNextPool fast-fails if `drains_needed_` is non-zero.
+    drains_needed_ = pools_.size();
+    for (auto& pool : pools_) {
+      pool->addIdleCallback(
+          [this](bool is_drained) -> void {
+            if (is_drained) {
+              onDrainReceived();
+            }
+          },
+          DrainPool::Yes);
+    }
+  } else {
+    // Idle (not drained) callbacks are setup when the pool is constructed in createNextPool.
   }
 }
 
@@ -323,22 +341,33 @@ void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken
 
 void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
 
+void ConnectivityGrid::onIdleReceived() {
+  // Don't do any work under the stack of ~ConnectivityGrid()
+  if (destroying_) {
+    return;
+  }
+
+  // The idle state can come and go, so each time one of the pools becomes idle, check them all.
+  // TODO(ggreenway): is `!hasActiveConnections()` the same as idle?
+  if (!hasActiveConnections()) {
+    for (auto& callback : idle_callbacks_) {
+      callback(false);
+    }
+  }
+}
+
 void ConnectivityGrid::onDrainReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()
   if (destroying_) {
     return;
   }
 
-  // If not all the pools have drained, keep waiting.
-  ASSERT(drains_needed_ != 0);
-  if (--drains_needed_ != 0) {
-    return;
-  }
-
-  // All the pools have drained. Notify drain subscribers.
-  for (auto& callback : idle_callbacks_) {
-    // TOOD(ggreenway): should this be renamed back to drain_callbacks_? Should this ever be false?
-    callback(true);
+  ASSERT(drains_needed_ > 0);
+  if (--drains_needed_ == 0) {
+    // All the pools have drained. Notify drain subscribers.
+    for (auto& callback : idle_callbacks_) {
+      callback(true);
+    }
   }
 }
 

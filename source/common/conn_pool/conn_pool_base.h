@@ -330,9 +330,6 @@ private:
   // Whether the connection pool is currently in a draining state
   bool is_draining_{false};
 
-  // Whether the pool has seen at least one client
-  bool has_seen_clients_{false};
-
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
 };

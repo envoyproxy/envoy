@@ -71,7 +71,9 @@ void OriginalConnPoolImpl::closeConnections() {
 void OriginalConnPoolImpl::addIdleCallback(IdleCb cb, DrainPool drain) {
   idle_callbacks_.push_back(cb);
   is_draining_ = (drain == DrainPool::Yes) || is_draining_;
-  checkForIdle();
+  if (is_draining_) {
+    checkForIdle();
+  }
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -84,8 +86,8 @@ void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
 }
 
 void OriginalConnPoolImpl::checkForIdle() {
-  if (has_seen_clients_ && pending_requests_.empty() && busy_conns_.empty() &&
-      pending_conns_.empty() && (is_draining_ || ready_conns_.empty())) {
+  if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
+      (is_draining_ || ready_conns_.empty())) {
     if (is_draining_) {
       ENVOY_LOG(debug, "in draining state");
       while (!ready_conns_.empty()) {
@@ -107,7 +109,6 @@ void OriginalConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable*
 OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
-  has_seen_clients_ = true;
   if (!ready_conns_.empty()) {
     ready_conns_.front()->moveBetweenLists(ready_conns_, busy_conns_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_conns_.front()->conn_);

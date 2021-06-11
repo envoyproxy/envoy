@@ -168,8 +168,12 @@ public:
 private:
   friend class ConnectivityGridForTest;
 
+  // Called by each pool as it idles. The grid is responsible for calling
+  // idle_callbacks_ once all pools have idled.
+  void onIdleReceived();
+
   // Called by each pool as it drains. The grid is responsible for calling
-  // drained_callbacks_ once all pools have drained.
+  // idle_callbacks_ once all pools have drained.
   void onDrainReceived();
 
   // Returns true if HTTP/3 should be attempted because there is an alternate protocol
@@ -198,6 +202,7 @@ private:
   // set to the number of pools when the first drain callbacks are added, and
   // decremented as various pools drain.
   uint32_t drains_needed_ = 0;
+
   // Tracks the callbacks to be called on drain completion.
   std::list<Instance::IdleCb> idle_callbacks_;
 

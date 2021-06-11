@@ -166,7 +166,6 @@ protected:
 
   bool upstream_ready_enabled_{false};
   bool is_draining_{false};
-  bool has_seen_clients_{false};
 };
 
 } // namespace Tcp

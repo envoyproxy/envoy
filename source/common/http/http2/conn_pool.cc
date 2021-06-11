@@ -10,6 +10,7 @@
 
 namespace Envoy {
 namespace Http {
+
 namespace Http2 {
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent)
     : MultiplexedActiveClientBase(

@@ -946,6 +946,9 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   InSequence s;
   ReadyWatcher drained;
 
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
+
   conn_pool_->addIdleCallback(
       [&](bool is_drained) -> void {
         if (is_drained) {
@@ -954,8 +957,6 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
       },
       ConnectionPool::Instance::DrainPool::Yes);
 
-  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
-  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 

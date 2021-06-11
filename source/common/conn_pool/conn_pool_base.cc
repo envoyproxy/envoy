@@ -229,7 +229,6 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
-  has_seen_clients_ = true;
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
          connectingCapacity(connecting_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
@@ -330,7 +329,9 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainPool drain) {
   idle_callbacks_.push_back(cb);
   is_draining_ = (drain == Instance::DrainPool::Yes) || is_draining_;
-  checkForIdle();
+  if (is_draining_) {
+    checkForIdle();
+  }
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
@@ -377,8 +378,8 @@ void ConnPoolImplBase::checkForIdle() {
     closeIdleConnectionsForDrainingPool();
   }
 
-  if (has_seen_clients_ && pending_streams_.empty() && ready_clients_.empty() &&
-      busy_clients_.empty() && connecting_clients_.empty()) {
+  if (pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
+      connecting_clients_.empty()) {
     ENVOY_LOG(debug, "invoking drained callbacks - is_draining_={}", is_draining_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb(is_draining_);

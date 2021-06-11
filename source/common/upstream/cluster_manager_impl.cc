@@ -1463,24 +1463,33 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.conn_pool_delete_when_idle")) {
           pool->addIdleCallback(
-              [&container, &pool_map = parent_.host_http_conn_pool_map_, host, priority,
-               hash_key](bool drained) {
+              [this, host, priority, hash_key](bool drained) {
                 if (drained) {
                   // Don't process this callback if we're drained
                   return;
                 }
 
-                ENVOY_LOG(debug, "Drained after idle pool timeout, erasing pool");
-                bool is_erased = container.pools_->erasePool(priority, hash_key);
-                ASSERT(is_erased);
-                // We want to clean up after ourselves if the host isn't particularly active (i.e.
-                // we hit our configured timeout on the last pool and don't have any other pools for
-                // that host).
-                if (container.pools_->size() == 0) {
-                  ENVOY_LOG(debug,
-                            "Pool container empty for host after idle timeout, erasing host entry");
-                  pool_map.erase(
-                      host); // NOTE: `container` is erased after this point in the lambda.
+                if (parent_.destroying_) {
+                  // If the Cluster is being destroyed, this pool will be cleaned up by that
+                  // process.
+                  return;
+                }
+
+                ConnPoolsContainer* container = parent_.getHttpConnPoolsContainer(host, false);
+                if (container != nullptr) {
+                  ENVOY_LOG(debug, "Erasing idle pool for host {}", host);
+                  container->pools_->erasePool(priority, hash_key);
+
+                  // We want to clean up after ourselves if the host isn't particularly active (i.e.
+                  // we hit our configured timeout on the last pool and don't have any other pools
+                  // for that host).
+                  if (container->pools_->size() == 0) {
+                    ENVOY_LOG(
+                        debug,
+                        "Pool container empty for host after idle timeout, erasing host entry");
+                    parent_.host_http_conn_pool_map_.erase(
+                        host); // NOTE: `container` is erased after this point in the lambda.
+                  }
                 }
               },
               ConnectionPool::Instance::DrainPool::No);
@@ -1534,7 +1543,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
   auto pool_iter = container.pools_.find(hash_key);
   if (pool_iter == container.pools_.end()) {
-    auto [pool_iter, inserted] = container.pools_.emplace(
+    bool inserted;
+    std::tie(pool_iter, inserted) = container.pools_.emplace(
         hash_key,
         parent_.parent_.factory_.allocateTcpConnPool(
             parent_.thread_local_dispatcher_, host, priority,
@@ -1544,24 +1554,35 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ASSERT(inserted);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
       pool_iter->second->addIdleCallback(
-          [&container, &pool_map = parent_.host_tcp_conn_pool_map_,
-           &dispatcher = parent_.thread_local_dispatcher_, host, hash_key](bool drained) {
+          [this, host, hash_key](bool drained) {
             if (drained) {
               // We want to defer to the callback that is actually doing the draining
               return;
             }
-            ENVOY_LOG(debug, "Idle pool timeout, erasing pool");
-            auto erase_iter = container.pools_.find(hash_key);
-            if (erase_iter != container.pools_.end()) {
-              dispatcher.deferredDelete(std::move(erase_iter->second));
-              container.pools_.erase(erase_iter);
+
+            if (parent_.destroying_) {
+              // If the Cluster is being destroyed, this pool will be cleaned up by that process.
+              return;
             }
 
-            // We want to clean up after ourselves if the host isn't particularly active (i.e. we
-            // hit our configured timeout on the last pool and don't have any other pools for that
-            // host).
-            if (container.pools_.empty()) {
-              pool_map.erase(host); // NOTE: `container` is erased after this point in the lambda.
+            auto it = parent_.host_tcp_conn_pool_map_.find(host);
+            if (it != parent_.host_tcp_conn_pool_map_.end()) {
+              TcpConnPoolsContainer& container = it->second;
+
+              ENVOY_LOG(debug, "Idle pool timeout, erasing pool");
+              auto erase_iter = container.pools_.find(hash_key);
+              if (erase_iter != container.pools_.end()) {
+                parent_.thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+                container.pools_.erase(erase_iter);
+              }
+
+              // We want to clean up after ourselves if the host isn't particularly active (i.e. we
+              // hit our configured timeout on the last pool and don't have any other pools for that
+              // host).
+              if (container.pools_.empty()) {
+                parent_.host_tcp_conn_pool_map_.erase(
+                    host); // NOTE: `container` is erased after this point in the lambda.
+              }
             }
           },
           ConnectionPool::Instance::DrainPool::No);
