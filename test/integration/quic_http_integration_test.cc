@@ -275,6 +275,13 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
+  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
+  } else if (GetParam().second == QuicVersionType::GquicTls) {
+    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  } else {
+    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
