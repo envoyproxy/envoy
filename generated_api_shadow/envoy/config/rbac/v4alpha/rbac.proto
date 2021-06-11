@@ -140,7 +140,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v3.Permission";
 
@@ -176,6 +176,9 @@ message Permission {
 
     // A CIDR block that describes the destination IP.
     core.v4alpha.CidrRange destination_ip = 5;
+
+    // A CIDR block that describes the upstream IP, where applicable to the cluster.
+    core.v4alpha.CidrRange upstream_ip = 11;
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];

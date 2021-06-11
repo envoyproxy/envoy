@@ -21,6 +21,9 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
+  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamIp:
+    return std::make_shared<const IPMatcher>(permission.upstream_ip(),
+                                             IPMatcher::Type::UpstreamRemote);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
@@ -145,6 +148,12 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     break;
   case DownstreamRemote:
     ip = info.downstreamAddressProvider().remoteAddress();
+    break;
+  case UpstreamRemote:
+    if (!info.upstreamHost()) {
+      return false;
+    }
+    ip = info.upstreamHost()->address();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
