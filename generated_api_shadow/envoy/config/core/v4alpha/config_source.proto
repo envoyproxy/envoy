@@ -147,6 +147,14 @@ message RateLimitSettings {
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used.
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
+
+  // Initial retry delay in Milli Second. If not set, a
+  // default value of 500 will be used.
+  google.protobuf.UInt32Value retry_initial_delay_ms = 3;
+
+  // Maximum retry delay in Milli Second. If not set, a
+  // default value of 30000 will be used.
+  google.protobuf.UInt32Value retry_max_delay_ms = 4;
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters

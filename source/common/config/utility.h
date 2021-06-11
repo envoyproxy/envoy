@@ -53,10 +53,15 @@ struct RateLimitSettings {
   static const uint32_t DefaultMaxTokens = 100;
   // Default Fill Rate.
   static constexpr double DefaultFillRate = 10;
-
+  // Default Retry Initial Delay.
+  static constexpr uint32_t DefaultRetryInitialDelayMs = 500;
+  // Default Retry Max Delay. Do not cross more than 30s.
+  static constexpr uint32_t DefaultRetryMaxDelayMs = 30000;
   uint32_t max_tokens_{DefaultMaxTokens};
   double fill_rate_{DefaultFillRate};
   bool enabled_{false};
+  uint32_t retry_initial_delay_ms_{DefaultRetryInitialDelayMs};
+  uint32_t retry_max_delay_ms_{DefaultRetryMaxDelayMs};
 };
 
 using ApiType = ConstSingleton<ApiTypeValues>;

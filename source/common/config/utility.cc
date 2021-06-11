@@ -217,6 +217,14 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
     rate_limit_settings.fill_rate_ =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), fill_rate,
                                         Envoy::Config::RateLimitSettings::DefaultFillRate);
+
+    rate_limit_settings.retry_initial_delay_ms =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), retry_initial_delay_ms,
+                                        Envoy::Config::RateLimitSettings::DefaultRetryInitialDelayMs);
+    
+    rate_limit_settings.retry_max_delay_ms =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(api_config_source.rate_limit_settings(), retry_max_delay_ms,
+                                        Envoy::Config::RateLimitSettings::DefaultRetryMaxDelayMs);
   }
   return rate_limit_settings;
 }
