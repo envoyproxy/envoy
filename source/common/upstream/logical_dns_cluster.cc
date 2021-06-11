@@ -10,7 +10,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/network/address.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/fmt.h"
