@@ -12,7 +12,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/statusor.h"
-#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Network {
