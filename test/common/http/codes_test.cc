@@ -41,7 +41,7 @@ public:
         global_store_, cluster_scope_, prefix,    code,    internal_request,
         vhost_name,    vcluster_name,  from_zone, to_zone, canary};
 
-    code_stats_.chargeResponseStat(info);
+    code_stats_.chargeResponseStat(info, false);
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;

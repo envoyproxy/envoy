@@ -606,16 +606,19 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false),
-      random_(random_generator) {
+      random_(random_generator),
+      last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
+        PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));
     keepalive_timeout_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), timeout));
     keepalive_interval_jitter_percent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         http2_options.connection_keepalive(), interval_jitter, 15.0);
 
-    keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    if (keepalive_interval_.count() > 0) {
+      keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    }
     keepalive_timeout_timer_ =
         connection.dispatcher().createTimer([this]() { onKeepaliveResponseTimeout(); });
 
@@ -632,6 +635,12 @@ ConnectionImpl::~ConnectionImpl() {
 }
 
 void ConnectionImpl::sendKeepalive() {
+  ASSERT(keepalive_timeout_timer_);
+  if (keepalive_timeout_timer_->enabled()) {
+    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK {}", connection_);
+    return;
+  }
+
   // Include the current time as the payload to help with debugging.
   SystemTime now = connection_.dispatcher().timeSource().systemTime();
   uint64_t ms_since_epoch =
@@ -648,12 +657,13 @@ void ConnectionImpl::sendKeepalive() {
   }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
+
 void ConnectionImpl::onKeepaliveResponse() {
   // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
   if (keepalive_timeout_timer_ != nullptr) {
     keepalive_timeout_timer_->disableTimer();
   }
-  if (keepalive_send_timer_ != nullptr) {
+  if (keepalive_send_timer_ != nullptr && keepalive_interval_.count()) {
     uint64_t interval_ms = keepalive_interval_.count();
     const uint64_t jitter_percent_mod = keepalive_interval_jitter_percent_ * interval_ms / 100;
     if (jitter_percent_mod > 0) {
@@ -680,6 +690,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     current_slice_ = nullptr;
     current_stream_id_.reset();
   });
+  last_received_data_time_ = connection_.dispatcher().timeSource().monotonicTime();
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     current_slice_ = &slice;
     dispatching_ = true;
@@ -1562,9 +1573,19 @@ ClientConnectionImpl::ClientConnectionImpl(
                                           client_http2_options.options());
   http2_session_factory.init(session_, base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
+  idle_session_requires_ping_interval_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+      http2_options.connection_keepalive(), connection_idle_interval, 0));
 }
 
 RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
+  // If the connection has been idle long enough to trigger a ping, send one
+  // ahead of creating the stream.
+  if (idle_session_requires_ping_interval_.count() != 0 &&
+      (connection_.dispatcher().timeSource().monotonicTime() - lastReceivedDataTime() >
+       idle_session_requires_ping_interval_)) {
+    sendKeepalive();
+  }
+
   ClientStreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_, decoder));
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is

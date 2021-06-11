@@ -41,9 +41,6 @@ else
 fi
 
 SCRIPT_DIR="$(dirname "$0")"
-SRC_DIR="$(dirname "$SCRIPT_DIR")"
-ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
-CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -53,8 +50,6 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
-
-export ENVOY_SRCDIR
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
@@ -89,31 +84,20 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:empty_protos_rst
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
 
 # Edge hardening example YAML.
-mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
-cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:google_vrp_config
 
-copy_example_configs () {
-    mkdir -p "${GENERATED_RST_DIR}/start/sandboxes/_include"
-    cp -a "${SRC_DIR}"/examples/* "${GENERATED_RST_DIR}/start/sandboxes/_include"
-}
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:base_rst
 
-copy_example_configs
-
-rsync -av \
-      "${SCRIPT_DIR}"/root/ \
-      "${SCRIPT_DIR}"/conf.py \
-      "${SCRIPT_DIR}"/redirects.txt \
-      "${SCRIPT_DIR}"/_ext \
-      "${GENERATED_RST_DIR}"
-
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:redirects
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:examples_rst
 
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
+tar -xf bazel-bin/docs/base_rst.tar -C "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/docs/examples_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/empty_protos_rst.tar -C "${GENERATED_RST_DIR}"
 tar -xf bazel-bin/tools/docs/api_rst.tar -C "${GENERATED_RST_DIR}"
-cp -a bazel-bin/docs/envoy-redirects.txt "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/docs/google_vrp_config.tar -C "${GENERATED_RST_DIR}"
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

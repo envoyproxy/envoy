@@ -19,7 +19,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -119,7 +118,7 @@ Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
 
 absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
   const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
-      HttpFilterNames::get().AwsLambda, decoder_callbacks_->route());
+      "envoy.filters.http.aws_lambda", decoder_callbacks_->route());
   if (!settings) {
     return absl::nullopt;
   }

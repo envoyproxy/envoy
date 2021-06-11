@@ -47,6 +47,21 @@ filegroup(
     ),
 )
 
+filegroup(
+    name = "base_rst_files",
+    srcs = glob(
+        [
+            "conf.py",
+            "_ext/*",
+        ],
+    ),
+)
+
+filegroup(
+    name = "root_rst_files",
+    srcs = glob(["root/**/*"]),
+)
+
 genrule(
     name = "v2_redirects",
     outs = ["v2_redirects.txt"],
@@ -61,5 +76,34 @@ genrule(
     tools = [
         ":redirects.txt",
         ":v2_redirects",
+    ],
+)
+
+genrule(
+    name = "google_vrp_config",
+    outs = ["google_vrp_config.tar"],
+    cmd = "tar cfh $@ --transform='s/configs/configuration\\/best_practices/' $(location //configs:google-vrp/envoy-edge.yaml)",
+    tools = [
+        "//configs:google-vrp/envoy-edge.yaml",
+    ],
+)
+
+genrule(
+    name = "base_rst",
+    outs = ["base_rst.tar"],
+    cmd = "tar cfh $@ --transform='s/docs\\///' $(locations base_rst_files) && tar -rh --file=$@ --transform='s/docs\\/root\\///' $(locations root_rst_files) && tar -r --file=$@ -C $$(dirname $(location redirects)) $$(basename $(location redirects))",
+    tools = [
+        ":base_rst_files",
+        ":redirects",
+        ":root_rst_files",
+    ],
+)
+
+genrule(
+    name = "examples_rst",
+    outs = ["examples_rst.tar"],
+    cmd = "tar cfh $@ --transform='s/examples/start\\/sandboxes\\/_include/' $(locations //examples:files)",
+    tools = [
+        "//examples:files",
     ],
 )
