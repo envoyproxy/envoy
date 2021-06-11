@@ -45,7 +45,7 @@ EXTENSION_SECURITY_POSTURES = (
 EXTENSION_CATEGORIES = (
     "envoy.access_loggers", "envoy.bootstrap", "envoy.clusters", "envoy.compression.compressor",
     "envoy.compression.decompressor", "envoy.filters.http", "envoy.filters.http.cache",
-    "envoy.filters.listener", "envoy.filters.network", "envoy.filters.udp_listener",
+    "envoy.filters.listener", "envoy.filters.network", "envoy.filters.udp_listener", "envoy.formatter",
     "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
     "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
     "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
