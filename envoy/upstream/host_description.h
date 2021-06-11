@@ -121,7 +121,7 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * @return the address used to connect to the host.
+   * @return a optional list of addresses which the host resolved to.
    */
   virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
 
