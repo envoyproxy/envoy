@@ -168,9 +168,6 @@ private:
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
 
-  // The trailers received.
-  Http::RequestTrailerMap* request_trailers_ = nullptr;
-
   // The processing mode. May be locally overridden by any response,
   // So every instance of the filter has a copy.
   envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;

@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "absl/strings/str_format.h"
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
@@ -13,17 +15,16 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/network/filter.h"
 
-#include "common/grpc/common.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/http/header_map_impl.h"
 
-#include "extensions/filters/http/ext_proc/attr_utils.h"
-#include "absl/strings/str_format.h"
+#include "source/extensions/filters/http/ext_proc/attr_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -180,6 +181,12 @@ Value ExprValueUtil::optionalStringValue(const absl::optional<std::string>& str)
   return ExprValueUtil::nullValue();
 }
 
+Value ExprValueUtil::uint64Value(uint64_t n) {
+  Value val;
+  val.set_uint64_value(n);
+  return val;
+}
+
 const Value ExprValueUtil::nullValue() {
   Value v1;
   Value v;
@@ -323,7 +330,7 @@ absl::optional<Value> AttrUtils::requestSet(absl::string_view path) {
     if (headers != nullptr && headers->ContentLength() != nullptr) {
       int64_t length;
       if (absl::SimpleAtoi(headers->ContentLength()->value().getStringView(), &length)) {
-        return ExprValueUtil::int64Value(length);
+        return ExprValueUtil::uint64Value(length);
       }
     } else {
       return ExprValueUtil::uint64Value(info_.bytesReceived());

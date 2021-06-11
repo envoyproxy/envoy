@@ -1,8 +1,8 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "envoy/http/header_map.h"
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
-#include "extensions/filters/http/ext_proc/attr_utils.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/attr_utils.h"
 
 #include "absl/strings/str_format.h"
 
@@ -77,12 +77,12 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.setHeaders(&headers);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::buildHttpHeaders(headers, *headers_req->mutable_headers());
+  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
 
   auto attr_utils =
       AttrUtils(decoder_callbacks_->streamInfo(), config_->requestAttributesSpecified(),
                 *headers_req->mutable_attributes());
-  attr_utils.setResponseHeaders(headers);
+  // todo(eas): set headers in attr_utils
   attr_utils.build();
 
   ENVOY_LOG(debug, "done in initRequestAttributes");
@@ -94,13 +94,6 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   return FilterHeadersStatus::StopIteration;
-}
-FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
-  ENVOY_LOG(trace, "decodeTrailers");
-  ENVOY_BUG(request_state_ == FilterState::Idle, "Invalid filter state on request path");
-
-  request_trailers_ = &trailers;
-  return FilterTrailersStatus::Continue;
 }
 
 FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_stream) {

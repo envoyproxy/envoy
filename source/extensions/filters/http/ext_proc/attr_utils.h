@@ -11,13 +11,13 @@
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "absl/strings/string_view.h"
 #include "google/api/expr/v1alpha1/value.pb.h"
 #include "google/protobuf/any.pb.h"
 
-#include "include/envoy/stream_info/_virtual_includes/stream_info_interface/envoy/stream_info/stream_info.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {
