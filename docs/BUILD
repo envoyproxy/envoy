@@ -73,7 +73,7 @@ genrule(
     name = "redirects",
     outs = ["envoy-redirects.txt"],
     cmd = """
-    cat $(location //docs:redirects.txt) > $@ \\
+    cat $(location :redirects.txt) > $@ \\
     && cat $(location :v2_redirects) >> $@
     """,
     tools = [
