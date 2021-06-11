@@ -1276,6 +1276,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
+    size = "large",
     srcs = [
         "tcp_tunneling_integration_test.cc",
     ],

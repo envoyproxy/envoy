@@ -11,6 +11,15 @@
 namespace Envoy {
 namespace {
 
+#ifdef ENVOY_ENABLE_QUIC
+#define HTTP_CODEC_VERSION Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3
+#define FAKE_HTTP_CODEC_VERSION                                                                    \
+  FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2, FakeHttpConnection::Type::HTTP3
+#else // ENVOY_ENABLE_QUIC
+#define HTTP_CODEC_VERSION Http::CodecType::HTTP1, Http::CodecType::HTTP2
+#define FAKE_HTTP_CODEC_VERSION FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2
+#endif // ENVOY_ENABLE_QUIC
+
 using ConnectTerminationParams = std::tuple<Network::Address::IpVersion, Http::CodecClient::Type>;
 
 // Terminating CONNECT and sending raw TCP upstream.
@@ -289,18 +298,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(Protocols, ProxyingConnectIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2
-#ifdef ENVOY_ENABLE_QUIC
-                              ,
-                              Http::CodecType::HTTP3
-#endif // ENVOY_ENABLE_QUIC
-                             },
-                             {FakeHttpConnection::Type::HTTP1, FakeHttpConnection::Type::HTTP2
-#ifdef ENVOY_ENABLE_QUIC
-                              ,
-                              FakeHttpConnection::Type::HTTP3
-#endif // ENVOY_ENABLE_QUIC
-                             })),
+                             {HTTP_CODEC_VERSION}, {FAKE_HTTP_CODEC_VERSION})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
@@ -487,12 +485,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
 INSTANTIATE_TEST_SUITE_P(
     HttpAndIpVersions, ConnectTerminationIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                       ::testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2
-#ifdef ENVOY_ENABLE_QUIC
-                                         ,
-                                         Http::CodecType::HTTP3
-#endif // ENVOY_ENABLE_QUIC
-                                         )),
+                       ::testing::Values(HTTP_CODEC_VERSION)),
     ConnectTerminationIntegrationTest::paramsToString);
 
 using Params = std::tuple<Network::Address::IpVersion, Http::CodecType, bool>;
@@ -1149,13 +1142,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamDisconnectBeforeResponseReceived) {
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     ::testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                       testing::Values(Http::CodecType::HTTP1, Http::CodecType::HTTP2
-#ifdef ENVOY_ENABLE_QUIC
-                                       ,
-                                       Http::CodecType::HTTP3
-#endif // ENVOY_ENABLE_QUIC
-                                       ),
-                       testing::Values(false, true)),
+                       testing::Values(HTTP_CODEC_VERSION), testing::Values(false, true)),
     TcpTunnelingIntegrationTest::paramsToString);
 
 } // namespace
