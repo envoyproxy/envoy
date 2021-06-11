@@ -110,7 +110,8 @@ public:
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
-        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
+        persistent_info.crypto_stream_factory_);
     return session;
   }
 
@@ -383,6 +384,15 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
+                                  : "listener.[__1]_0.http3.downstream.rx.";
+  std::string error_code = GetParam().second == QuicVersionType::Iquic
+                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
+                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {

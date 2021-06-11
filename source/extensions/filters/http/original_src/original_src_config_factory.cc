@@ -6,7 +6,6 @@
 
 #include "source/extensions/filters/http/original_src/config.h"
 #include "source/extensions/filters/http/original_src/original_src.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

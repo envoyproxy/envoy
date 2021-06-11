@@ -21,7 +21,6 @@ envoy_cc_library(
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/common/wasm:wasm_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",
     ],
 )
@@ -36,7 +35,6 @@ envoy_cc_extension(
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",
     ],

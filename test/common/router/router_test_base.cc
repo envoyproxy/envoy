@@ -9,13 +9,14 @@ using ::testing::AnyNumber;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                               bool suppress_grpc_request_failure_code_stats,
                                Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(pool_.add("test"), local_info_, stats_store_, cm_, runtime_, random_,
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-              false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
-              router_context_),
+              false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
+              test_time_.timeSystem(), http_context_, router_context_),
       router_(config_) {
   router_.setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");

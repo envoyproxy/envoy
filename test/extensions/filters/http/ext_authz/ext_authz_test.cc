@@ -17,7 +17,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -1488,7 +1487,7 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
   // Initialize the virtual host's per filter config.
   FilterConfigPerRoute auth_per_vhost(settingsvhost);
   ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+          perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_vhost));
 
   // Place something in the context extensions on the route.
@@ -1497,8 +1496,7 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -1528,8 +1526,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 
   prepareCheck();
 
-  ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -1560,8 +1557,7 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
@@ -2007,7 +2003,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
-        EXPECT_EQ(ns, HttpFilterNames::get().ExtAuthorization);
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));
 
@@ -2055,7 +2051,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
-        EXPECT_EQ(ns, HttpFilterNames::get().ExtAuthorization);
+        EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));
 
@@ -2139,8 +2135,7 @@ TEST_P(HttpFilterTestParam, NoCluster) {
       "value_route";
   // Initialize the route's per filter config.
   FilterConfigPerRoute auth_per_route(settingsroute);
-  ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   prepareCheck();
@@ -2166,8 +2161,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
   FilterConfigPerRoute auth_per_route(settings);
 
-  ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().ExtAuthorization))
+  ON_CALL(filter_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.ext_authz"))
       .WillByDefault(Return(&auth_per_route));
 
   auto test_disable_request_body_buffering = [&](bool bypass) {
