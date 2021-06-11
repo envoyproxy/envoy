@@ -289,6 +289,7 @@ public:
    */
   static AssertionResult waitUntilHistogramHasSamples(
       Stats::Store& store, const std::string& name, Event::TestTimeSystem& time_system,
+      Event::Dispatcher& main_dispatcher,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**

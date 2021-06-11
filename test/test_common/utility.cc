@@ -225,12 +225,34 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
 AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
                                                           const std::string& name,
                                                           Event::TestTimeSystem& time_system,
+                                                          Event::Dispatcher& main_dispatcher,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (true) {
     auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
     if (histo) {
-      if (histo->cumulativeStatistics().sampleCount()) {
+      // Note: we need to read the sample count from the main thread, to avoid data races.
+      uint64_t sample_count = 0;
+      Thread::MutexBasicLockable mu;
+      Thread::CondVar cv;
+      bool work_finished{false};
+
+      main_dispatcher.post([&] {
+        {
+          Thread::LockGuard lock(mu);
+          ASSERT(!work_finished);
+          sample_count = histo->cumulativeStatistics().sampleCount();
+          work_finished = true;
+        }
+        cv.notifyOne();
+      });
+
+      Thread::LockGuard lock(mu);
+      while (!work_finished) {
+        cv.wait(mu);
+      }
+
+      if (sample_count) {
         break;
       }
     }
