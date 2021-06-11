@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,7 @@ class DynamicForwardProxyFilterFactory
           envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig,
           envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig> {
 public:
-  DynamicForwardProxyFilterFactory() : FactoryBase(HttpFilterNames::get().DynamicForwardProxy) {}
+  DynamicForwardProxyFilterFactory() : FactoryBase("envoy.filters.http.dynamic_forward_proxy") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

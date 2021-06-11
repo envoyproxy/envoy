@@ -29,3 +29,4 @@ Extensions
   http/header_formatters
   http/original_ip_detection
   stat_sinks/stat_sinks
+  quic/quic_extensions

@@ -252,10 +252,8 @@ message KeepaliveSettings {
       "envoy.config.core.v3.KeepaliveSettings";
 
   // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
-  google.protobuf.Duration interval = 1 [(validate.rules).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  // If this is zero, interval PINGs will not be sent.
+  google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
   // time period, the connection will be aborted.
@@ -268,6 +266,14 @@ message KeepaliveSettings {
   // A value of zero means there will be no jitter.
   // The default value is 15%.
   type.v3.Percent interval_jitter = 3;
+
+  // If the connection has been idle for this duration, send a HTTP/2 ping ahead
+  // of new stream creation, to quickly detect dead connections.
+  // If this is zero, this type of PING will not be sent.
+  // If an interval ping is outstanding, a second ping will not be sent as the
+  // interval ping will determine if the connection is dead.
+  google.protobuf.Duration connection_idle_interval = 4
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
 // [#next-free-field: 16]

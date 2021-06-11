@@ -40,7 +40,6 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/squash:squash_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/squash/v3:pkg_cc_proto",

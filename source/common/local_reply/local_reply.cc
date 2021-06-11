@@ -22,8 +22,9 @@ public:
       : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
         content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
-  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api)
-      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, api)),
+  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
+                Server::Configuration::CommonFactoryContext& context)
+      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context)),
         content_type_(
             !config.content_type().empty() ? config.content_type()
             : config.format_case() ==
@@ -66,8 +67,7 @@ public:
     }
 
     if (config.has_body_format_override()) {
-      body_formatter_ =
-          std::make_unique<BodyFormatter>(config.body_format_override(), context.api());
+      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override(), context);
     }
 
     header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
@@ -120,7 +120,7 @@ public:
           config,
       Server::Configuration::FactoryContext& context)
       : body_formatter_(config.has_body_format()
-                            ? std::make_unique<BodyFormatter>(config.body_format(), context.api())
+                            ? std::make_unique<BodyFormatter>(config.body_format(), context)
                             : std::make_unique<BodyFormatter>()) {
     for (const auto& mapper : config.mappers()) {
       mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));

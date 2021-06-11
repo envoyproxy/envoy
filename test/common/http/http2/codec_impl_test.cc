@@ -80,12 +80,18 @@ public:
 
   struct ConnectionWrapper {
     Http::Status dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+      connection_ = &connection;
       Http::Status status = Http::okStatus();
       buffer_.add(data);
+      return dispatchBufferedData();
+    }
+
+    Http::Status dispatchBufferedData() {
+      Http::Status status = Http::okStatus();
       if (!dispatching_) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
-          status = connection.dispatch(buffer_);
+          status = connection_->dispatch(buffer_);
           if (!status.ok()) {
             // Exit early if we hit an error status.
             return status;
@@ -98,6 +104,7 @@ public:
 
     bool dispatching_{};
     Buffer::OwnedImpl buffer_;
+    ConnectionImpl* connection_{};
   };
 
   enum SettingsTupleIndex {
@@ -923,8 +930,8 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
   client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_); /* */
-  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
   initialize();
@@ -934,11 +941,11 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
   EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  send_timer->callback_();
+  send_timer->invokeCallback();
 
   // Test that a timeout closes the connection.
   EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
-  timeout_timer->callback_();
+  timeout_timer->invokeCallback();
 }
 
 // Validate that jitter is added as expected based on configuration.
@@ -947,7 +954,7 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
   /*auto timeout_timer = */ new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
 
   constexpr std::chrono::milliseconds min_expected(1000);
   constexpr std::chrono::milliseconds max_expected(1099); // 1000ms + 10%
@@ -955,20 +962,58 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   std::chrono::milliseconds max_observed(0);
   EXPECT_CALL(*send_timer, enableTimer(_, _))
       .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
+        send_timer->enabled_ = true;
         EXPECT_GE(ms, std::chrono::milliseconds(1000));
         EXPECT_LE(ms, std::chrono::milliseconds(1100));
         max_observed = std::max(max_observed, ms);
         min_observed = std::min(min_observed, ms);
       }));
   initialize();
+  ASSERT_TRUE(send_timer->enabled());
 
+  // Don't allow synchronous dispatch, it results in receiving the ping under
+  // the stack of sending it.
   for (uint64_t i = 0; i < 250; i++) {
+    client_wrapper_.dispatching_ = true;
+
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
-    send_timer->callback_();
+    ASSERT_TRUE(send_timer->enabled());
+    send_timer->invokeCallback();
+
+    client_wrapper_.dispatching_ = false;
+    client_wrapper_.dispatchBufferedData().IgnoreError();
+    client_wrapper_.dispatching_ = true;
   }
 
   EXPECT_EQ(min_observed.count(), min_expected.count());
   EXPECT_EQ(max_observed.count(), max_expected.count());
+}
+
+TEST_P(Http2CodecImplTest, IdlePing) {
+  client_http2_options_.mutable_connection_keepalive()
+      ->mutable_connection_idle_interval()
+      ->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+
+  initialize();
+
+  // Given the initial stream is close to connection establishment, no ping is
+  // sent.
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  // Advance time past 1s. This time the ping should be sent, and the timeout
+  // alarm enabled.
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  client_connection_.dispatcher_.time_system_.advanceTimeAsyncImpl(std::chrono::seconds(2));
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, true).ok());
 }
 
 TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
@@ -1213,7 +1258,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -1445,7 +1490,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -1482,7 +1527,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -1516,7 +1561,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -1549,7 +1594,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -1663,7 +1708,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   // client stream windows should have 5535 bytes left and the next frame should overflow it.
   // nghttp2 sends 1 DATA frame for the remainder of the client window and it should make
   // outbound frame queue 1 away from overflow.
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl large_body(std::string(6 * 1024, '1'));
   response_encoder_->encodeData(large_body, true);
@@ -2719,8 +2764,8 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
   server_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
   server_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new Event::MockTimer(&server_connection_.dispatcher_); /* */
-  auto send_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
 
@@ -2754,7 +2799,7 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
 
   // Trigger sending a PING, which should overflow the outbound frame queue and cause
   // client to be disconnected
-  send_timer->callback_();
+  send_timer->invokeCallback();
 
   EXPECT_TRUE(violation_callback->enabled_);
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));

@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace Csrf {
 class CsrfFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::csrf::v3::CsrfPolicy> {
 public:
-  CsrfFilterFactory() : FactoryBase(HttpFilterNames::get().Csrf) {}
+  CsrfFilterFactory() : FactoryBase("envoy.filters.http.csrf") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

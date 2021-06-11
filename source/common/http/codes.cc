@@ -72,11 +72,14 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
+                                       bool exclude_http_code_stats) const {
   const Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
-  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  if (!exclude_http_code_stats) {
+    chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  }
 
   const Stats::StatName rq_group = upstreamRqGroup(code);
   const Stats::StatName rq_code = upstreamRqStatName(code);
