@@ -41,7 +41,6 @@ envoy_cc_extension(
     deps = [
         ":client_lib",
         ":ext_proc",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
     ],

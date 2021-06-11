@@ -17,8 +17,8 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { prefix: "/path/with/bandwidth/limit" }
-                route: { cluster: service_protected_by_bandwidth_limit }
+              - match: {prefix: "/path/with/bandwidth/limit"}
+                route: {cluster: service_protected_by_bandwidth_limit}
                 typed_per_filter_config:
                   envoy.filters.http.bandwidth_limit:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
@@ -26,8 +26,8 @@ static_resources:
                     enable_mode: REQUEST_AND_RESPONSE
                     limit_kbps: 500
                     fill_interval: 0.1s
-              - match: { prefix: "/" }
-                route: { cluster: web_service }
+              - match: {prefix: "/"}
+                route: {cluster: web_service}
           http_filters:
           - name: envoy.filters.http.bandwidth_limit
             typed_config:

@@ -11,7 +11,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_impl.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,7 +43,7 @@ void BufferFilter::initConfig() {
   settings_ = config_->settings();
 
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<BufferFilterSettings>(
-      HttpFilterNames::get().Buffer, callbacks_->route());
+      "envoy.filters.http.buffer", callbacks_->route());
   settings_ = route_local ? route_local : settings_;
 }
 
