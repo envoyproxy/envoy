@@ -85,7 +85,7 @@ Now, use ``curl`` to make a request for the compressed statistics:
     content-encoding: br
 
 .. seealso::
-   :ref:`Gzip API <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
+   :ref:`Brotli API <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
       API and configuration reference for Envoy's brotli compression.
 
    :ref:`Compression configuration <config_http_filters_compressor>`
