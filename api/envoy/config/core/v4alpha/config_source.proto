@@ -146,7 +146,7 @@ message RateLimitSettings {
   // per second will be used.
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 
-  // Backoff strategy will give the ability to initialize initial delay and max delay for backoff
+  // Backoff strategy will give the ability to initialize initial delay and max delay for backoff.
   BackoffStrategy backoff_strategy = 3;
 }
 
