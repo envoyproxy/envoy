@@ -29,6 +29,8 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 
 static constexpr double defaultAggression = 1.0;
 static constexpr double defaultSuccessRateThreshold = 95.0;
+static constexpr uint32_t defaultRpsThreshold = 0;
+static constexpr double defaultMaxRejectionProbability = 80.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Runtime::Loader& runtime,
@@ -43,6 +45,13 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       sr_threshold_(proto_config.has_sr_threshold() ? std::make_unique<Runtime::Percentage>(
                                                           proto_config.sr_threshold(), runtime)
                                                     : nullptr),
+      rps_threshold_(proto_config.has_rps_threshold()
+                         ? std::make_unique<Runtime::UInt32>(proto_config.rps_threshold(), runtime)
+                         : nullptr),
+      max_rejection_probability_(proto_config.has_max_rejection_probability()
+                                     ? std::make_unique<Runtime::Percentage>(
+                                           proto_config.max_rejection_probability(), runtime)
+                                     : nullptr),
       response_evaluator_(std::move(response_evaluator)) {}
 
 double AdmissionControlFilterConfig::aggression() const {
@@ -54,6 +63,16 @@ double AdmissionControlFilterConfig::successRateThreshold() const {
   return std::min<double>(pct, 100.0) / 100.0;
 }
 
+uint32_t AdmissionControlFilterConfig::rpsThreshold() const {
+  return rps_threshold_ ? rps_threshold_->value() : defaultRpsThreshold;
+}
+
+double AdmissionControlFilterConfig::maxRejectionProbability() const {
+  const double ret = max_rejection_probability_ ? max_rejection_probability_->value()
+                                                : defaultMaxRejectionProbability;
+  return ret / 100.0;
+}
+
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
     : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)),
@@ -63,6 +82,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     // We must forego recording the success/failure of this request during encoding.
     record_request_ = false;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (config_->getController().averageRps() < config_->rpsThreshold()) {
+    ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue");
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -146,6 +170,7 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
   if (aggression != 1.0) {
     probability = std::pow(probability, 1.0 / aggression);
   }
+  probability = std::min<double>(probability, config_->maxRejectionProbability());
 
   // Choosing an accuracy of 4 significant figures for the probability.
   static constexpr uint64_t accuracy = 1e4;

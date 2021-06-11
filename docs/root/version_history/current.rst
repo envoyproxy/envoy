@@ -15,6 +15,7 @@ Minor Behavior Changes
 
 * access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
 * access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
+* admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` whose default value is 80%, which means that the upper limit of the default rejection probability of the filter is changed from 100% to 80%.
 * aws_request_signing: requests are now buffered by default to compute signatures which include the
   payload hash, making the filter compatible with most AWS services. Previously, requests were
   never buffered, which only produced correct signatures for requests without a body, or for
@@ -71,6 +72,7 @@ Removed Config or Runtime
 New Features
 ------------
 
+* admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.rps_threshold>` option that when average RPS of the sampling window is below this threshold, the filter will not throttle requests. Added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` option to set an upper limit on the probability of rejection.
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
 * bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains. And by setting the configuration *resolvers* we can specify the external DNS servers to be used for external DNS query.
 * cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option *no_default_search_domain* as true the DNS resolver will not use the default search domains.
