@@ -25,11 +25,13 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
@@ -122,6 +124,44 @@ protected:
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    return secret;
+  }
+
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    ProtobufWkt::Struct val;
+    (*val.mutable_fields())["private_key_file"].set_string_value(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
+    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
+
+    // check the key type and set the mode accordingly
+    std::string mode;
+    std::string private_key = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    if (pkey == nullptr) {
+      throw EnvoyException("Failed to read private key from disk.");
+    }
+    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
+      mode = "rsa";
+    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
+      mode = "ecdsa";
+    }
+    (*val.mutable_fields())["mode"].set_string_value(mode);
+
+    secret.set_name(server_cert_rsa_);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::temporaryPath("root/current/servercert.pem"));
+    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
+    auto* watched_directory = tls_certificate->mutable_watched_directory();
+    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
     return secret;
   }
 
@@ -469,6 +509,34 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
               test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES128-GCM-SHA256"))
                   ->value());
   }
+}
+
+// Validate that a basic SDS updates work with a private key provider.
+TEST_P(SdsDynamicDownstreamIntegrationTest, BasicPrivateKeyProvider) {
+  v3_resource_api_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
+  };
+  initialize();
+
+  waitForSdsUpdateStats(1);
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  waitForSdsUpdateStats(1);
+  cleanupUpstreamAndDownstream();
 }
 
 // A test that SDS server send a bad secret for a static listener,
