@@ -53,6 +53,7 @@ public:
     ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
+    HttpTestUtility::addDefaultHeaders(headers_);
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
@@ -75,6 +76,7 @@ public:
         }));
   }
 
+  TestRequestHeaderMapImpl headers_{};
   RequestMessagePtr message_{new RequestMessageImpl()};
   Stats::MockIsolatedStatsStore stats_store_;
   MockAsyncClientCallbacks callbacks_;
@@ -1488,10 +1490,8 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
 }
 
 TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
-  TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
-  stream->sendHeaders(headers, false);
+  stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -1506,10 +1506,8 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
 }
 
 TEST_F(AsyncClientImplTest, RdsGettersTest) {
-  TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
-  stream->sendHeaders(headers, false);
+  stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
@@ -1522,7 +1520,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   const auto& route_config = route_entry->virtualHost().routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
-  EXPECT_EQ(nullptr, route_config.route(headers, stream_info_, 0));
+  EXPECT_EQ(nullptr, route_config.route(headers_, stream_info_, 0));
   auto cluster_info = filter_callbacks->clusterInfo();
   ASSERT_NE(nullptr, cluster_info);
   EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
@@ -1530,8 +1528,6 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
 }
 
 TEST_F(AsyncClientImplTest, DumpState) {
-  TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       static_cast<Http::AsyncStreamImpl*>(stream);

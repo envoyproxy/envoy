@@ -703,6 +703,11 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
 }
 
 TEST_P(ProtocolIntegrationTest, Retry) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
+  });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -744,6 +749,22 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_NE(nullptr,
             test_server_->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(),
                                                ".dropped_headers_with_underscores")));
+
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
+
+  auto find_histo_sample_count = [&](const std::string& name) -> uint64_t {
+    for (auto& histogram : test_server_->histograms()) {
+      if (histogram->name() == name) {
+        const auto& stats = histogram->cumulativeStatistics();
+        return stats.sampleCount();
+      }
+    }
+    return 0;
+  };
+
+  EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rq_headers_size"), 2);
+  EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rs_headers_size"), 2);
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -2643,6 +2664,28 @@ TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
   ASSERT_TRUE(codec_client_->connected());
   EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_THAT(response->body(), HasSubstr("missing required header: :status"));
+}
+
+TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/found"}, {":scheme", "http"}, {":authority", "foo.com"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0, 0,
+                                                TestUtility::DefaultTimeout);
+  EXPECT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_headers_size");
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
 }
 
 } // namespace Envoy

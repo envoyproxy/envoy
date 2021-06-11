@@ -34,8 +34,6 @@
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
-#include "source/extensions/filters/listener/well_known_names.h"
-
 namespace Envoy {
 namespace Server {
 namespace {

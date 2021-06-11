@@ -69,6 +69,78 @@ public:
   RouterTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
+
+  void testRequestResponseSize(bool with_trailers) {
+    NiceMock<Http::MockRequestEncoder> encoder;
+    Http::ResponseDecoder* response_decoder = nullptr;
+
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+        .WillOnce(Invoke(
+            [&](Http::ResponseDecoder& decoder,
+                Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+              response_decoder = &decoder;
+              callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                    upstream_stream_info_, Http::Protocol::Http10);
+              return nullptr;
+            }));
+
+    cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+        absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+    envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
+    cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
+        .mutable_typed_config()
+        ->PackFrom(generic_config);
+    callbacks_.route_->route_entry_.connect_config_ =
+        absl::make_optional<RouteEntry::ConnectConfig>();
+
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+
+    Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
+    headers.setMethod("POST");
+
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 74ull));
+    router_.decodeHeaders(headers, false);
+
+    EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 5ull));
+    Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+              router_.decodeData(*body_data, !with_trailers));
+
+    if (with_trailers) {
+      Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
+      router_.decodeTrailers(trailers);
+    }
+
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
+    Http::ResponseHeaderMapPtr response_headers(
+        new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+    // NOLINTNEXTLINE: Silence null pointer access warning
+    response_decoder->decodeHeaders(std::move(response_headers), false);
+
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 7ull));
+    Buffer::OwnedImpl response_data("goodbye");
+    // NOLINTNEXTLINE: Silence null pointer access warning
+    response_decoder->decodeData(response_data, !with_trailers);
+
+    if (with_trailers) {
+      Http::ResponseTrailerMapPtr response_trailers(
+          new Http::TestResponseTrailerMapImpl{{"some-trailer", "13"}});
+      // NOLINTNEXTLINE: Silence null pointer access warning
+      response_decoder->decodeTrailers(std::move(response_trailers));
+    }
+
+    router_.onDestroy();
+  }
 };
 
 TEST_F(RouterTest, UpdateServerNameFilterState) {
@@ -2148,6 +2220,24 @@ TEST_F(RouterTest, HedgedPerTryTimeoutResetsOnBadHeaders) {
 TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   enableHedgeOnPerTryTimeout();
 
+  // Verify cluster request/response sizes are accounted for all requests/responses.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 73ull))
+      .Times(3);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 0ull))
+      .Times(3);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull))
+      .Times(2);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_body_size"), 0ull))
+      .Times(2);
+
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder1 = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -2183,6 +2273,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   router_.retry_state_->expectHeadersRetry();
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
   NiceMock<Http::MockRequestEncoder> encoder2;
@@ -2246,6 +2337,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder3->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
@@ -5968,5 +6060,13 @@ TEST_F(RouterTest, PostHttpUpstream) {
 
   router_.onDestroy();
 }
+
+// Test that request/response header/body sizes are properly recorded.
+TEST_F(RouterTest, RequestResponseSize) { testRequestResponseSize(false); }
+
+// Test that request/response header/body sizes are properly recorded
+// when there are trailers in both the request/response.
+TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponseSize(true); }
+
 } // namespace Router
 } // namespace Envoy
