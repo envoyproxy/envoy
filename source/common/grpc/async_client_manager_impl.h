@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
@@ -34,9 +32,10 @@ public:
                                Stats::Scope& scope,
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
                                const StatNames& stat_names);
-
-private:
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
+  
+private:
+
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
