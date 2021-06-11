@@ -185,8 +185,8 @@ void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
   virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
 
   auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
-  RELEASE_ASSERT(success, "Failed to add suffix to the dns_filter trie. "
-                          "Suffix exists and overwrite is false");
+  RELEASE_ASSERT(
+      success, "Unable to overwrite existing suffix in dns_filter trie");
 }
 
 bool DnsFilterEnvoyConfig::loadServerConfig(
