@@ -293,6 +293,15 @@ public:
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Read a histogram's sample count from the main thread.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @return uint64_t the sample count.
+   */
+  static uint64_t readSampleCount(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram);
+
+  /**
    * Find a readout in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.

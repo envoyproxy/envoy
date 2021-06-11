@@ -756,30 +756,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   auto find_histo_sample_count = [&](const std::string& name) -> uint64_t {
     for (auto& histogram : test_server_->histograms()) {
       if (histogram->name() == name) {
-        const auto& stats = histogram->cumulativeStatistics();
-
-        // Note: we need to read the sample count from the main thread, to avoid data races.
-        uint64_t sample_count = 0;
-        Thread::MutexBasicLockable mu;
-        Thread::CondVar cv;
-        bool work_finished{false};
-
-        test_server_->server().dispatcher().post([&] {
-          {
-            Thread::LockGuard lock(mu);
-            ASSERT(!work_finished);
-            sample_count = stats.sampleCount();
-            work_finished = true;
-          }
-          cv.notifyOne();
-        });
-
-        Thread::LockGuard lock(mu);
-        while (!work_finished) {
-          cv.wait(mu);
-        }
-
-        return sample_count;
+        return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
       }
     }
     return 0;

@@ -231,27 +231,7 @@ AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
   while (true) {
     auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
     if (histo) {
-      // Note: we need to read the sample count from the main thread, to avoid data races.
-      uint64_t sample_count = 0;
-      Thread::MutexBasicLockable mu;
-      Thread::CondVar cv;
-      bool work_finished{false};
-
-      main_dispatcher.post([&] {
-        {
-          Thread::LockGuard lock(mu);
-          ASSERT(!work_finished);
-          sample_count = histo->cumulativeStatistics().sampleCount();
-          work_finished = true;
-        }
-        cv.notifyOne();
-      });
-
-      Thread::LockGuard lock(mu);
-      while (!work_finished) {
-        cv.wait(mu);
-      }
-
+      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
       if (sample_count) {
         break;
       }
@@ -264,6 +244,32 @@ AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
     }
   }
   return AssertionSuccess();
+}
+
+uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
+                                      const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  uint64_t sample_count = 0;
+  Thread::MutexBasicLockable mu;
+  Thread::CondVar cv;
+  bool work_finished{false};
+
+  main_dispatcher.post([&] {
+    {
+      Thread::LockGuard lock(mu);
+      ASSERT(!work_finished);
+      sample_count = histogram.cumulativeStatistics().sampleCount();
+      work_finished = true;
+    }
+    cv.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu);
+  while (!work_finished) {
+    cv.wait(mu);
+  }
+
+  return sample_count;
 }
 
 std::list<Network::DnsResponse>
