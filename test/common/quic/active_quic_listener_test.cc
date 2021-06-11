@@ -43,6 +43,8 @@
 #include "source/common/quic/platform/envoy_quic_clock.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/udp_gso_batch_writer.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -271,6 +273,14 @@ protected:
       default_value: true
       runtime_key: quic.enabled
     packets_to_read_to_connection_count_ratio: 50
+    crypto_stream_config:
+      name: "envoy.quic.crypto_stream.server.quiche"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.crypto_stream.v3.CryptoServerStreamConfig
+    proof_source_config:
+      name: "envoy.quic.proof_source.filter_chain"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
@@ -328,12 +338,14 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
+  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
+  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
   EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
                               0, 1, *dispatcher_, connection_handler_, listen_socket_,
                               listener_config_, quic_config_, options, false,
                               ActiveQuicListenerFactoryPeer::runtimeEnabled(
                                   static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              quic_stat_names_, 32u),
+                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
                           Network::CreateListenerException, "Failed to apply socket options.");
 }
 

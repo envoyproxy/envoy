@@ -44,10 +44,11 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
   Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
+  quic::QuicConfig quic_config;
+  setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
   quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      dispatcher, transport_socket_factory, time_source, source_address,
+      dispatcher, transport_socket_factory, time_source, source_address, quic_config,
       host->cluster().perConnectionBufferLimitBytes());
-  setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
 }
 
 // Make sure all connections are torn down before quic_info_ is deleted.

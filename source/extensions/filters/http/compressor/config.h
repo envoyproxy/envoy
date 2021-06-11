@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace Compressor {
 class CompressorFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::compressor::v3::Compressor> {
 public:
-  CompressorFilterFactory() : FactoryBase(HttpFilterNames::get().Compressor) {}
+  CompressorFilterFactory() : FactoryBase("envoy.filters.http.compressor") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

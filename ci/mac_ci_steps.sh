@@ -32,6 +32,12 @@ BAZEL_BUILD_OPTIONS=(
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
+NCPU=$(sysctl -n hw.ncpu)
+if [[ $NCPU -gt 0 ]]; then
+    echo "limiting build to $NCPU jobs, based on CPU count"
+    BAZEL_BUILD_OPTIONS+=("--jobs=$NCPU")
+fi
+
 # Build envoy and run tests as separate steps so that failure output
 # is somewhat more deterministic (rather than interleaving the build
 # and test steps).

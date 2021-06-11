@@ -2,7 +2,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

@@ -2,7 +2,6 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_split.h"
 #include "jwt_verify_lib/status.h"
@@ -67,7 +66,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const Verifier* verifier = nullptr;
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
-          HttpFilterNames::get().JwtAuthn, decoder_callbacks_->route());
+          "envoy.filters.http.jwt_authn", decoder_callbacks_->route());
   if (per_route_config != nullptr) {
     std::string error_msg;
     std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
@@ -100,7 +99,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 void Filter::setPayload(const ProtobufWkt::Struct& payload) {
-  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
+  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn", payload);
 }
 
 void Filter::onComplete(const Status& status) {

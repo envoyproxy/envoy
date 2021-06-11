@@ -466,6 +466,13 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(
+        TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_, timeout));
+  }
+
   Stats::CounterSharedPtr counter(const std::string& name) override {
     // When using the thread local store, only counters() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
@@ -481,6 +488,10 @@ public:
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
+    return statStore().histograms();
+  }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;

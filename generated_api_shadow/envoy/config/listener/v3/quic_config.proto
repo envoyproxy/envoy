@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.listener.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 
 import "google/protobuf/duration.proto";
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -48,4 +49,14 @@ message QuicProtocolOptions {
   // bound by 6000, regardless of this field or how many connections there are.
   google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
       [(validate.rules).uint32 = {gte: 1}];
+
+  // Configure which implementation of `quic::QuicCryptoClientStreamBase` to be used for this listener.
+  // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.crypto_stream.v3.CryptoServerStreamConfig>` will be used.
+  // [#extension-category: envoy.quic.server.crypto_stream]
+  core.v3.TypedExtensionConfig crypto_stream_config = 6;
+
+  // Configure which implementation of `quic::ProofSource` to be used for this listener.
+  // If not specified the :ref:`default one configured by <envoy_v3_api_msg_extensions.quic.proof_source.v3.ProofSourceConfig>` will be used.
+  // [#extension-category: envoy.quic.proof_source]
+  core.v3.TypedExtensionConfig proof_source_config = 7;
 }
