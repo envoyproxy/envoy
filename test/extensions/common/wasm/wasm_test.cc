@@ -702,8 +702,6 @@ TEST_P(WasmCommonTest, VmCache) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
   ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
   EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
@@ -733,6 +731,9 @@ TEST_P(WasmCommonTest, VmCache) {
   }
   EXPECT_FALSE(code.empty());
   vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
   WasmHandleSharedPtr wasm_handle;
   createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
              remote_data_provider,
@@ -811,8 +812,6 @@ TEST_P(WasmCommonTest, RemoteCode) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
   std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
@@ -831,6 +830,9 @@ TEST_P(WasmCommonTest, RemoteCode) {
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(
       5);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
   WasmHandleSharedPtr wasm_handle;
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
@@ -924,8 +926,6 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       absl::StrCat("envoy.wasm.runtime.", GetParam());
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
   std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
@@ -950,6 +950,9 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       ->mutable_retry_policy()
       ->mutable_num_retries()
       ->set_value(num_retries);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
   WasmHandleSharedPtr wasm_handle;
   NiceMock<Http::MockAsyncClient> client;
   NiceMock<Http::MockAsyncClientRequest> request(&client);
