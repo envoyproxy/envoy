@@ -68,36 +68,10 @@ BAZEL_BUILD_OPTIONS+=(
     "--strategy=protodoc=sandboxed,local"
     "--action_env=ENVOY_BLOB_SHA")
 
-# Generate RST for the lists of trusted/untrusted extensions in
-# intro/arch_overview/security docs.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:extensions_security_rst
-
-# Generate RST for external dependency docs in intro/arch_overview/security.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:external_deps_rst
-
-# Fill in boiler plate for extensions that have google.protobuf.Empty as their
-# config. We only have v2 support here for version history anchors, which don't point at any empty
-# configs.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:empty_protos_rst
-
-# Generate RST for api
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
-
-# Edge hardening example YAML.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:google_vrp_config
-
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:base_rst
-
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:examples_rst
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
 
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
-tar -xf bazel-bin/docs/base_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/docs/examples_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/empty_protos_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/api_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/docs/google_vrp_config.tar -C "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/docs/rst.tar -C "${GENERATED_RST_DIR}"
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment
