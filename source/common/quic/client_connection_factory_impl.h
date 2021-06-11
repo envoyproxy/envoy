@@ -21,7 +21,7 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
                          Network::TransportSocketFactory& transport_socket_factory,
                          TimeSource& time_source,
                          Network::Address::InstanceConstSharedPtr server_addr,
-                         uint32_t buffer_limit);
+                         const quic::QuicConfig& quic_config, uint32_t buffer_limit);
 
   // Returns the most recent crypto config from transport_socket_factory_;
   std::shared_ptr<quic::QuicCryptoClientConfig> cryptoConfig();
@@ -41,7 +41,6 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // If client context changes, client config will be updated as well.
   std::shared_ptr<quic::QuicCryptoClientConfig> client_config_;
   const quic::ParsedQuicVersionVector supported_versions_{quic::CurrentSupportedVersions()};
-  // TODO(alyssawilk) actually set this up properly.
   quic::QuicConfig quic_config_;
   // The cluster buffer limits.
   const uint32_t buffer_limit_;
