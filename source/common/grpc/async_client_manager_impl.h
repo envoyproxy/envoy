@@ -33,9 +33,8 @@ public:
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
                                const StatNames& stat_names);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
- 
-private:
 
+private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
