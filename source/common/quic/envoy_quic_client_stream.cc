@@ -318,7 +318,7 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
   bool close_connection_upon_invalid_header;
-  if (should_close_connection != absl::nullopt) {
+  if (should_close_connection.has_value()) {
     close_connection_upon_invalid_header = should_close_connection.value();
   } else {
     close_connection_upon_invalid_header =
