@@ -33,7 +33,7 @@ public:
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
                                const StatNames& stat_names);
   RawAsyncClientPtr createUncachedRawAsyncClient() override;
-  
+ 
 private:
 
   ThreadLocal::Instance& tls_;
