@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
+import "envoy/config/core/v4alpha/backoff.proto;
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -145,13 +146,8 @@ message RateLimitSettings {
   // per second will be used.
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 
-  // Initial retry delay in Milli Second. If not set, a
-  // default value of 500 will be used.
-  google.protobuf.UInt32Value retry_initial_delay_ms = 3;
-
-  // Maximum retry delay in Milli Second. If not set, a
-  // default value of 30000 will be used.
-  google.protobuf.UInt32Value retry_max_delay_ms = 4;
+  // Backoff strategy will give the ability to initialize initial delay and max delay for backoff
+  BackoffStrategy backoff_strategy = 3;
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters

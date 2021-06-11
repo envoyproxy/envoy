@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3;
 
+import "envoy/config/core/v3/backoff.proto;
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -140,6 +141,9 @@ message RateLimitSettings {
   // Rate at which tokens will be filled per second. If not set, a default fill rate of 10 tokens
   // per second will be used.
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
+
+  // Backoff strategy will give the ability to initialize initial delay and max delay for backoff
+  BackoffStrategy backoff_strategy = 3;
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
