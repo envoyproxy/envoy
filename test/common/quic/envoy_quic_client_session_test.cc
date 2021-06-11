@@ -207,6 +207,45 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
+TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
+  // We always allow for reading packets, even if there's no stream.
+  EXPECT_EQ(0, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  NiceMock<Http::MockResponseDecoder> response_decoder;
+  NiceMock<Http::MockStreamCallbacks> stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+
+  quic::QuicHeaderList headers;
+  headers.OnHeaderBlockStart();
+  headers.OnHeader(":status", "200");
+  headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+  // Response headers should be propagated to decoder.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ("200", decoded_headers->getStatusValue());
+      }));
+  stream.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
+  // With one stream, still read 16 packets.
+  EXPECT_EQ(1, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ("200", decoded_headers->getStatusValue());
+      }));
+  stream2.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
+  // With 2 streams, read 32 packets.
+  EXPECT_EQ(2, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(32, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
