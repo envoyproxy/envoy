@@ -143,11 +143,10 @@ public:
   explicit HttpRequestCookiesDataInput(const std::string& cookie_name)
       : cookie_name_(cookie_name) {}
 
-  Matcher::DataInputGetResult get(const HttpMatchingData& /*data*/) override;
+  Matcher::DataInputGetResult get(const HttpMatchingData& data) const override;
 
 private:
   const std::string cookie_name_;
-  std::string result_storage_;
 };
 
 class HttpRequestCookiesDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {

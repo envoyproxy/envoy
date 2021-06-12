@@ -2,7 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Http {
 namespace Matching {
 
-Matcher::DataInputGetResult HttpRequestCookiesDataInput::get(const HttpMatchingData& data) {
+Matcher::DataInputGetResult HttpRequestCookiesDataInput::get(const HttpMatchingData& data) const {
   const auto maybe_headers = data.requestHeaders();
 
   if (!maybe_headers) {
@@ -22,8 +22,7 @@ Matcher::DataInputGetResult HttpRequestCookiesDataInput::get(const HttpMatchingD
   if (ret.size() == 0) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
-  result_storage_ = absl::StrJoin(ret, ",");
-  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, result_storage_};
+  return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::StrJoin(ret, ",")};
 }
 
 REGISTER_FACTORY(HttpRequestHeadersDataInputFactory, Matcher::DataInputFactory<HttpMatchingData>);
