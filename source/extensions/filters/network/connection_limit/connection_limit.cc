@@ -40,13 +40,8 @@ bool Config::incrementConnectionWithinLimit() {
 void Config::incrementConnection() { connections_++; }
 
 void Config::decrementConnection() {
-  auto conns = connections_.load(std::memory_order_relaxed);
-  do {
-    ASSERT(conns > 0);
-
-    // Loop while the weak CAS fails trying to update the conns value.
-  } while (!connections_.compare_exchange_weak(conns, conns - 1, std::memory_order_release,
-                                               std::memory_order_relaxed));
+  ASSERT(connections_ > 0);
+  connections_--;
 }
 
 void Filter::resetTimerState() {
