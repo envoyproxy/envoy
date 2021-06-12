@@ -28,10 +28,8 @@ public:
   absl::optional<const MatcherStats> stats() const { return stats_; }
 
 private:
-  MatcherStats generateStats(absl::string_view prefix, Stats::Scope& scope);
-
   const Network::LcTrie::LcTrie<bool> trie_;
-  absl::optional<MatcherStats> stats_;
+  MatcherStats stats_;
 };
 
 } // namespace IP

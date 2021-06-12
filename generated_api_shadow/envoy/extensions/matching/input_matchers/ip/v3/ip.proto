@@ -26,6 +26,13 @@ message Ip {
   // Match if the IP belongs to any of these CIDR ranges.
   repeated config.core.v3.CidrRange cidr_ranges = 1 [(validate.rules).repeated = {min_items: 1}];
 
-  // If specified, emits statistics using this prefix.
-  string stat_prefix = 2;
+  // The human readable prefix to use when emitting statistics for the IP input
+  // matcher.
+  //
+  // .. csv-table::
+  //    :header: Name, Type, Description
+  //    :widths: 1, 1, 2
+  //
+  //    ip_parsing_failed, Counter, Total number of IP addresses the matcher was unable to parse
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
 }
