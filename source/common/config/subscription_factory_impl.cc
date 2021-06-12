@@ -1,17 +1,18 @@
-#include "common/config/subscription_factory_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
 
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/config/filesystem_subscription_impl.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/grpc_subscription_impl.h"
-#include "common/config/http_subscription_impl.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/type_to_endpoint.h"
-#include "common/config/utility.h"
-#include "common/config/xds_resource.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/grpc_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/type_to_endpoint.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -25,8 +26,8 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
-    Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder) {
+    Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    const SubscriptionOptions& options) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
@@ -68,7 +69,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
-          /*is_aggregated*/ false);
+          /*is_aggregated*/ false, options);
     case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
@@ -79,7 +80,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
               local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), false);
+          Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -88,7 +89,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
         cm_.adsMux(), callbacks, resource_decoder, stats, type_url, dispatcher_,
-        Utility::configSourceInitialFetchTimeout(config), true);
+        Utility::configSourceInitialFetchTimeout(config), true, options);
   }
   default:
     throw EnvoyException(
@@ -99,7 +100,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
-    const envoy::config::core::v3::ConfigSource& /*config*/, absl::string_view /*type_url*/,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
   std::unique_ptr<Subscription> result;
@@ -112,9 +113,48 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     return std::make_unique<Config::FilesystemCollectionSubscriptionImpl>(
         dispatcher_, path, callbacks, resource_decoder, stats, validation_visitor_, api_);
   }
+  case xds::core::v3::ResourceLocator::XDSTP: {
+    if (resource_type != collection_locator.resource_type()) {
+      throw EnvoyException(
+          fmt::format("xdstp:// type does not match {} in {}", resource_type,
+                      Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
+    }
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
+    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                            api_config_source);
+
+    SubscriptionOptions options;
+    // All Envoy collections currently are xDS resource graph roots and require node context
+    // parameters.
+    options.add_xdstp_node_context_params_ = true;
+    switch (api_config_source.api_type()) {
+    case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
+      const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
+      return std::make_unique<GrpcCollectionSubscriptionImpl>(
+          collection_locator,
+          std::make_shared<Config::NewGrpcMuxImpl>(
+              Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                             api_config_source, scope, true)
+                  ->create(),
+              dispatcher_, deltaGrpcMethod(type_url, envoy::config::core::v3::ApiVersion::V3),
+              envoy::config::core::v3::ApiVersion::V3, api_.randomGenerator(), scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_),
+          callbacks, resource_decoder, stats, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config), false, options);
+    }
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+      return std::make_unique<GrpcCollectionSubscriptionImpl>(
+          collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
+          Utility::configSourceInitialFetchTimeout(config), false, options);
+    }
+    default:
+      throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
+                                       api_config_source.DebugString()));
+    }
+  }
   default:
-    throw EnvoyException(fmt::format("Unsupported collection resource locator: {}",
-                                     XdsResourceIdentifier::encodeUrl(collection_locator)));
+    // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

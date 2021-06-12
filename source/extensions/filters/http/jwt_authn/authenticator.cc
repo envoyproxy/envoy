@@ -1,14 +1,14 @@
-#include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
 
 #include "envoy/http/async_client.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
@@ -175,7 +175,8 @@ void AuthenticatorImpl::startVerify() {
   if (jwks_data_->getJwtProvider().clock_skew_seconds() > 0) {
     clock_skew_seconds = jwks_data_->getJwtProvider().clock_skew_seconds();
   }
-  status = jwt_->verifyTimeConstraint(absl::ToUnixSeconds(absl::Now()), clock_skew_seconds);
+  const uint64_t unix_timestamp = DateUtil::nowToSeconds(timeSource());
+  status = jwt_->verifyTimeConstraint(unix_timestamp, clock_skew_seconds);
   if (status != Status::Ok) {
     doneWithStatus(status);
     return;
@@ -220,6 +221,7 @@ void AuthenticatorImpl::startVerify() {
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  jwks_cache_.stats().jwks_fetch_success_.inc();
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -228,7 +230,10 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   }
 }
 
-void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
+void AuthenticatorImpl::onJwksError(Failure) {
+  jwks_cache_.stats().jwks_fetch_failed_.inc();
+  doneWithStatus(Status::JwksFetchFail);
+}
 
 void AuthenticatorImpl::onDestroy() {
   if (fetcher_) {

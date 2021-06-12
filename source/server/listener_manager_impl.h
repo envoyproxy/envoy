@@ -18,10 +18,14 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "server/filter_chain_factory_context_callback.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/lds_api.h"
-#include "server/listener_impl.h"
+#include "source/server/filter_chain_factory_context_callback.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/lds_api.h"
+#include "source/server/listener_impl.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_stat_names.h"
+#endif
 
 namespace Envoy {
 namespace Server {
@@ -202,6 +206,10 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+#endif
+
   Instance& server_;
   ListenerComponentFactory& factory_;
 
@@ -284,6 +292,9 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  void setNewOrDrainingSocketFactory(const std::string& name,
+                                     const envoy::config::core::v3::Address& proto_address,
+                                     ListenerImpl& listener, bool reuse_port);
   Network::ListenSocketFactorySharedPtr
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
@@ -313,17 +324,15 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(server_.stats().symbolTable());
+#endif
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-
-  ListenerFilterChainFactoryBuilder(
-      ProtobufMessage::ValidationVisitor& validator,
-      ListenerComponentFactory& listener_component_factory,
-      Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
   Network::DrainableFilterChainSharedPtr
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -334,6 +343,7 @@ private:
       const envoy::config::listener::v3::FilterChain& filter_chain,
       Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const;
 
+  ListenerImpl& listener_;
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;

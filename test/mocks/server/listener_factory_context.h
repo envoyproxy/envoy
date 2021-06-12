@@ -3,7 +3,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "admin.h"
 #include "drain_manager.h"
@@ -27,6 +27,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(bool, healthCheckFailed, ());
   MOCK_METHOD(Init::Manager&, initManager, ());

@@ -1,11 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/oauth.h"
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -79,12 +78,20 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   mock_response->body().add(json);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_.push_back(&cb);
-            return &request_;
-          }));
+      .WillRepeatedly(Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                                 const Http::AsyncClient::RequestOptions&)
+                                 -> Http::AsyncClient::Request* {
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post,
+                  message->headers().Method()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.FormUrlEncoded,
+                  message->headers().ContentType()->value().getStringView());
+        EXPECT_TRUE(
+            !message->headers().get(Http::CustomHeaders::get().Accept).empty() &&
+            message->headers().get(Http::CustomHeaders::get().Accept)[0]->value().getStringView() ==
+                Http::Headers::get().ContentTypeValues.Json);
+        callbacks_.push_back(&cb);
+        return &request_;
+      }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");

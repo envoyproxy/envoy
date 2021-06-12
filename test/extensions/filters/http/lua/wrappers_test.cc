@@ -1,10 +1,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/http/lua/wrappers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -296,6 +295,25 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
   EXPECT_CALL(printer_, testPrint(downstream_direct_remote->asString()));
+  start("callMe");
+  wrapper.reset();
+}
+
+TEST_F(LuaStreamInfoWrapperTest, ReturnRequestedServerName) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(object:requestedServerName())
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  stream_info.requested_server_name_ = "some.sni.io";
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("some.sni.io"));
   start("callMe");
   wrapper.reset();
 }

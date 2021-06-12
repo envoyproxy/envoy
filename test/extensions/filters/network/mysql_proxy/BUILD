@@ -18,7 +18,7 @@ envoy_extension_cc_test_library(
     hdrs = ["mysql_test_utils.h"],
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
-        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
     ],
 )
 
@@ -30,7 +30,55 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.mysql_proxy",
     deps = [
         ":mysql_test_utils_lib",
-        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mysql_greet_tests",
+    srcs = [
+        "mysql_greet_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mysql_auth_switch_resp_tests",
+    srcs = [
+        "mysql_auth_switch_resp_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mysql_clogin_tests",
+    srcs = [
+        "mysql_clogin_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mysql_clogin_resp_tests",
+    srcs = [
+        "mysql_clogin_resp_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
     ],
 )
 
@@ -60,7 +108,7 @@ envoy_extension_cc_test(
         ":mysql_test_utils_lib",
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/mysql_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
+        "//source/extensions/filters/network/mysql_proxy:filter_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
     ],
@@ -77,8 +125,8 @@ envoy_extension_cc_test(
     deps = [
         ":mysql_test_utils_lib",
         "//source/common/tcp_proxy",
+        "//source/extensions/filters/network/mysql_proxy:codec_lib",
         "//source/extensions/filters/network/mysql_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
     ],

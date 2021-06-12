@@ -1,4 +1,4 @@
-#include "common/router/config_utility.h"
+#include "source/common/router/config_utility.h"
 
 #include <string>
 #include <vector>
@@ -7,8 +7,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Router {
@@ -33,12 +33,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
     }
 
     envoy::type::matcher::v3::StringMatcher matcher_config;
-    if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
-                                                   : false) {
-      matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
-    } else {
-      matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    }
+    matcher_config.set_exact(config.hidden_envoy_deprecated_value());
     return Matchers::StringMatcherImpl(matcher_config);
   }
   }
@@ -118,8 +113,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
 }
 
 std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                                   Api::Api& api) {
-  static const ssize_t MaxBodySize = 4096;
+                                                   Api::Api& api, uint32_t max_body_size_bytes) {
   if (!route.has_direct_response() || !route.direct_response().has_body()) {
     return EMPTY_STRING;
   }
@@ -133,17 +127,17 @@ std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v
     if (size < 0) {
       throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
     }
-    if (size > MaxBodySize) {
+    if (static_cast<uint64_t>(size) > max_body_size_bytes) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, MaxBodySize));
+                                       filename, size, max_body_size_bytes));
     }
     return api.fileSystem().fileReadToEnd(filename);
   }
   const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
                                                             : body.inline_bytes());
-  if (inline_body.length() > MaxBodySize) {
+  if (inline_body.length() > max_body_size_bytes) {
     throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), MaxBodySize));
+                                     inline_body.length(), max_body_size_bytes));
   }
   return inline_body;
 }

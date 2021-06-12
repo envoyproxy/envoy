@@ -2,11 +2,10 @@
 
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

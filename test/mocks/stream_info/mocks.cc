@@ -1,6 +1,6 @@
 #include "test/mocks/stream_info/mocks.h"
 
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,8 +31,9 @@ MockStreamInfo::MockStreamInfo()
     response_code_details_ = std::string(details);
   }));
   ON_CALL(*this, setConnectionTerminationDetails(_))
-      .WillByDefault(
-          Invoke([this](absl::string_view details) { connection_termination_details_ = details; }));
+      .WillByDefault(Invoke([this](absl::string_view details) {
+        connection_termination_details_ = std::string(details);
+      }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -103,7 +104,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
-  ON_CALL(Const(*this), filterState()).WillByDefault(ReturnRef(*filter_state_));
+  ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
+    return *filter_state_;
+  }));
   ON_CALL(*this, upstreamFilterState()).WillByDefault(ReturnRef(upstream_filter_state_));
   ON_CALL(*this, setUpstreamFilterState(_))
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
@@ -124,6 +127,11 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {
     connection_id_ = id;
   }));
+  ON_CALL(*this, setFilterChainName(_))
+      .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
+        filter_chain_name_ = std::string(filter_chain_name);
+      }));
+  ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

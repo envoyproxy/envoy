@@ -2,10 +2,10 @@
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/stats/histogram_impl.h"
-#include "common/version/version.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -21,12 +21,11 @@ namespace {
 class MetricsServiceIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                       public HttpIntegrationTest {
 public:
-  MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  MetricsServiceIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
@@ -150,7 +149,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {

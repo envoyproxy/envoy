@@ -2,14 +2,12 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/api/api_impl.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/context_impl.h"
-#include "common/singleton/manager_impl.h"
-
-#include "server/config_validation/cluster_manager.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/server/config_validation/cluster_manager.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -20,6 +18,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -33,6 +32,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
+  Server::MockOptions options;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Random::MockRandomGenerator> random;
@@ -51,7 +51,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   ValidationClusterManagerFactory factory(
       admin, runtime, stats_store, tls, dns_resolver, ssl_context_manager, dispatcher, local_info,
       secret_manager, validation_context, *api, http_context, grpc_context, router_context,
-      log_manager, singleton_manager);
+      log_manager, singleton_manager, options);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);

@@ -1,5 +1,5 @@
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 
 #include "test/test_common/environment.h"
 
@@ -11,6 +11,9 @@ namespace Network {
 namespace {
 
 // Only do the integration tests in supported platforms.
+// This test requires external internet connectivity and as a result it might
+// not work under in environments that limit the external connectivity.
+// As such it is tagged with `requires-network` and is not executed in CI.
 #if defined(TCP_INFO) || defined(SIO_TCP_INFO)
 TEST(IoSocketHandleImplIntegration, LastRoundTripIntegrationTest) {
   struct sockaddr_in server;

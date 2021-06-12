@@ -8,7 +8,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/grpc/stat_names.h"
+#include "source/common/grpc/stat_names.h"
 
 namespace Envoy {
 namespace Grpc {

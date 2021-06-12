@@ -1,12 +1,15 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http2/codec_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http2/codec_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -30,11 +33,14 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
+using testing::EndsWith;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Http {
@@ -74,12 +80,18 @@ public:
 
   struct ConnectionWrapper {
     Http::Status dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
+      connection_ = &connection;
       Http::Status status = Http::okStatus();
       buffer_.add(data);
+      return dispatchBufferedData();
+    }
+
+    Http::Status dispatchBufferedData() {
+      Http::Status status = Http::okStatus();
       if (!dispatching_) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
-          status = connection.dispatch(buffer_);
+          status = connection_->dispatch(buffer_);
           if (!status.ok()) {
             // Exit early if we hit an error status.
             return status;
@@ -92,6 +104,7 @@ public:
 
     bool dispatching_{};
     Buffer::OwnedImpl buffer_;
+    ConnectionImpl* connection_{};
   };
 
   enum SettingsTupleIndex {
@@ -302,11 +315,11 @@ protected:
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
 
     // See the limit formula in the
-    // `Envoy::Http::Http2::ServerConnectionImpl::checkInboundFrameLimits()' method.
+    // `Envoy::Http::Http2::ProtocolConstraints::checkInboundFrameLimits()' method.
     constexpr uint32_t max_allowed =
-        1 + 2 * (CommonUtility::OptionsLimits::
-                     DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT +
-                 1);
+        5 + 2 * (1 + CommonUtility::OptionsLimits::
+                             DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
+                         1);
     for (uint32_t i = 0; i < max_allowed + 1; ++i) {
       EXPECT_EQ(0, nghttp2_submit_window_update(client_->session(), NGHTTP2_FLAG_NONE, 1, 1));
     }
@@ -347,6 +360,24 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   response_encoder_->encodeHeaders(response_headers, true);
+}
+
+TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
+  initialize();
+  EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  EXPECT_CALL(client_callbacks_, onGoAway(Http::GoAwayErrorCode::Other));
+
+  // We have to dynamic cast because protocolErrorForTest() is intentionally not on the
+  // Connection API.
+  ServerConnectionImpl* raw_server = dynamic_cast<ServerConnectionImpl*>(server_.get());
+  ASSERT(raw_server != nullptr);
+  EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
 }
 
 // 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
@@ -473,7 +504,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFinAllowed) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
   EXPECT_TRUE(status.ok());
@@ -545,7 +576,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
   EXPECT_TRUE(status.ok());
@@ -608,7 +639,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   response_encoder_->encodeHeaders(response_headers, false);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
@@ -899,8 +930,8 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
   client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new Event::MockTimer(&client_connection_.dispatcher_); /* */
-  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
   initialize();
@@ -910,11 +941,11 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
   EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  send_timer->callback_();
+  send_timer->invokeCallback();
 
   // Test that a timeout closes the connection.
   EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
-  timeout_timer->callback_();
+  timeout_timer->invokeCallback();
 }
 
 // Validate that jitter is added as expected based on configuration.
@@ -923,7 +954,7 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
   client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
   /*auto timeout_timer = */ new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  auto send_timer = new Event::MockTimer(&client_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
 
   constexpr std::chrono::milliseconds min_expected(1000);
   constexpr std::chrono::milliseconds max_expected(1099); // 1000ms + 10%
@@ -931,20 +962,240 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   std::chrono::milliseconds max_observed(0);
   EXPECT_CALL(*send_timer, enableTimer(_, _))
       .WillRepeatedly(Invoke([&](const std::chrono::milliseconds& ms, const ScopeTrackedObject*) {
+        send_timer->enabled_ = true;
         EXPECT_GE(ms, std::chrono::milliseconds(1000));
         EXPECT_LE(ms, std::chrono::milliseconds(1100));
         max_observed = std::max(max_observed, ms);
         min_observed = std::min(min_observed, ms);
       }));
   initialize();
+  ASSERT_TRUE(send_timer->enabled());
 
+  // Don't allow synchronous dispatch, it results in receiving the ping under
+  // the stack of sending it.
   for (uint64_t i = 0; i < 250; i++) {
+    client_wrapper_.dispatching_ = true;
+
     EXPECT_CALL(random_, random()).WillOnce(Return(i));
-    send_timer->callback_();
+    ASSERT_TRUE(send_timer->enabled());
+    send_timer->invokeCallback();
+
+    client_wrapper_.dispatching_ = false;
+    client_wrapper_.dispatchBufferedData().IgnoreError();
+    client_wrapper_.dispatching_ = true;
   }
 
   EXPECT_EQ(min_observed.count(), min_expected.count());
   EXPECT_EQ(max_observed.count(), max_expected.count());
+}
+
+TEST_P(Http2CodecImplTest, IdlePing) {
+  client_http2_options_.mutable_connection_keepalive()
+      ->mutable_connection_idle_interval()
+      ->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_seconds(1);
+  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(10);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
+
+  initialize();
+
+  // Given the initial stream is close to connection establishment, no ping is
+  // sent.
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  // Advance time past 1s. This time the ping should be sent, and the timeout
+  // alarm enabled.
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder_);
+  client_connection_.dispatcher_.time_system_.advanceTimeAsyncImpl(std::chrono::seconds(2));
+  EXPECT_CALL(*timeout_timer, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder2->encodeHeaders(request_headers, true).ok());
+}
+
+TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
+  initialize();
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  Stats::TestUtil::MemoryTest memory_test;
+  server_->dumpState(ostream, 1);
+
+  EXPECT_EQ(memory_test.consumedBytes(), 0);
+  // Check the entire dump to ensure correct formating.
+  // This test might be a little brittle because of this, and hence in the other
+  // dump tests we focus on the particular substring of interest.
+  EXPECT_THAT(ostream.contents(), StartsWith("  Http2::ConnectionImpl"));
+  EXPECT_THAT(
+      ostream.contents(),
+      HasSubstr(
+          "max_headers_kb_: 60, max_headers_count_: 100, "
+          "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
+          "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
+          "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
+          "pending_deferred_reset_: 0\n"
+          "  &protocol_constraints_: \n"
+          "    ProtocolConstraints"));
+  EXPECT_THAT(
+      ostream.contents(),
+      EndsWith("outbound_frames_: 0, max_outbound_frames_: 10000, "
+               "outbound_control_frames_: 0, max_outbound_control_frames_: 1000, "
+               "consecutive_inbound_frames_with_empty_payload_: 0, "
+               "max_consecutive_inbound_frames_with_empty_payload_: 1, opened_streams_: 0, "
+               "inbound_priority_frames_: 0, max_inbound_priority_frames_per_stream_: 100, "
+               "inbound_window_update_frames_: 0, outbound_data_frames_: 0, "
+               "max_inbound_window_update_frames_per_data_frame_sent_: 10\n"
+               "  Number of active streams: 0, current_stream_id_: null Dumping 0 Active Streams:\n"
+               "  current_slice_: null\n"));
+}
+
+TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
+  initialize();
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  // Dump server
+  {
+    std::array<char, 2048> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    // Check no memory allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    server_->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+    // Check contents for active stream, trailers to encode and header map.
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr(
+            "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
+            "  stream: \n"
+            "    ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(),
+                HasSubstr("pending_trailers_to_encode_:     null\n"
+                          "    absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
+                          "      ':scheme', 'http'\n"
+                          "      ':method', 'GET'\n"
+                          "      ':authority', 'host'\n"
+                          "      ':path', '/'\n"
+                          "  current_slice_: null"));
+  }
+
+  // Dump client
+  {
+    std::array<char, 2048> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    // Check no memory allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    client_->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+
+    // Check contents for active stream, trailers to encode and header map.
+    EXPECT_THAT(
+        ostream.contents(),
+        HasSubstr(
+            "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
+            "  stream: \n"
+            "    ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(),
+                HasSubstr("pending_trailers_to_encode_:     null\n"
+                          "    absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n"
+                          "      ':status', '200'\n"
+                          "  current_slice_: null"));
+  }
+}
+
+TEST_P(Http2CodecImplTest, ShouldDumpCurrentSliceWithoutAllocatingMemory) {
+  initialize();
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  // Send headers
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Send data payload, dump buffer as decoding data
+  EXPECT_CALL(request_decoder_, decodeData(_, false)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+    // dumpState here while we had a current slice of data. No Memory should be
+    // allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    server_->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+  }));
+  Buffer::OwnedImpl hello("hello envoy");
+  request_encoder_->encodeData(hello, false);
+
+  // Check contents for the current slice information
+  {
+    EXPECT_THAT(
+        ostream.contents(),
+        EndsWith(
+            "current slice length: 20 contents: \"\\0\\0\\v\\0\\0\\0\\0\\0\x1hello envoy\"\n"));
+  }
+}
+
+TEST_P(Http2CodecImplTest, ClientConnectionShouldDumpCorrespondingRequestWithoutAllocatingMemory) {
+  initialize();
+  // Replace the request_encoder to use the UpstreamToDownstream
+  // as it would if we weren't using as many mocks.
+  Router::MockUpstreamToDownstream upstream_to_downstream;
+  request_encoder_ = &client_->newStream(upstream_to_downstream);
+
+  std::array<char, 2048> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+  MockStreamCallbacks callbacks;
+  request_encoder_->getStream().addCallbacks(callbacks);
+
+  // Send headers
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  // Prepare for state dump.
+  EXPECT_CALL(upstream_to_downstream, dumpState(_, _));
+
+  EXPECT_CALL(upstream_to_downstream, decodeHeaders(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    // dumpState here while decodingHeaders in the client. This means we're
+    // working on a particular stream, whose corresponding request, we'll dump.
+    // No Memory should be allocated.
+    Stats::TestUtil::MemoryTest memory_test;
+    client_->dumpState(ostream, 1);
+    EXPECT_EQ(memory_test.consumedBytes(), 0);
+  }));
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // Check contents for the corresponding downstream request.
+  EXPECT_THAT(
+      ostream.contents(),
+      HasSubstr("Number of active streams: 2, current_stream_id_: 1 Dumping current stream:\n"
+                "  stream: \n"
+                "    ConnectionImpl::StreamImpl"));
+  EXPECT_THAT(ostream.contents(),
+              HasSubstr("Dumping corresponding downstream request for upstream stream 1:\n"));
 }
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
@@ -1007,7 +1258,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   response_encoder_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   response_encoder_->encodeData(body, true);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -1072,7 +1323,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // Now that the flow control window is full, further data causes the send buffer to back up.
   Buffer::OwnedImpl more_long_data(std::string(initial_stream_window, 'a'));
   request_encoder_->encodeData(more_long_data, false);
-  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
@@ -1081,7 +1332,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl last_byte("!");
   request_encoder_->encodeData(last_byte, false);
-  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(initial_stream_window + 1, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(initial_stream_window + 1,
             TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
 
@@ -1126,7 +1377,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
   server_->getStream(1)->readDisable(false);
-  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_.length());
+  EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
   // initial window minus the last 1 byte flush from the client to server.
@@ -1213,7 +1464,7 @@ TEST_P(Http2CodecImplFlowControlTest, FlowControlPendingRecvData) {
   // the recv buffer can be overrun by a client which negotiates a larger
   // SETTINGS_MAX_FRAME_SIZE but there's no current easy way to tweak that in
   // envoy (without sending raw HTTP/2 frames) so we lower the buffer limit instead.
-  server_->getStream(1)->setWriteBufferWatermarks(10, 20);
+  server_->getStream(1)->setWriteBufferWatermarks(20);
 
   EXPECT_CALL(request_decoder_, decodeData(_, false));
   Buffer::OwnedImpl data(std::string(40, 'a'));
@@ -1239,7 +1490,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -1276,7 +1527,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -1310,7 +1561,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -1343,7 +1594,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
@@ -1457,7 +1708,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   // client stream windows should have 5535 bytes left and the next frame should overflow it.
   // nghttp2 sends 1 DATA frame for the remainder of the client window and it should make
   // outbound frame queue 1 away from overflow.
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl large_body(std::string(6 * 1024, '1'));
   response_encoder_->encodeData(large_body, true);
@@ -1970,15 +2221,14 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
 }
 
 TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
-  // Raising the limit past this triggers some unexpected nghttp2 error.
-  // Further debugging required to increase past ~96 KiB.
-  max_request_headers_kb_ = 96;
+  max_request_headers_kb_ = 8192;
+  max_request_headers_count_ = 150;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  std::string long_string = std::string(1024, 'q');
-  for (int i = 0; i < 95; i++) {
+  std::string long_string = std::string(63 * 1024, 'q');
+  for (int i = 0; i < 129; i++) {
     request_headers.addCopy(std::to_string(i), long_string);
   }
 
@@ -2514,8 +2764,8 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
   server_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
                                                                                      1000 * 1000);
   server_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new Event::MockTimer(&server_connection_.dispatcher_); /* */
-  auto send_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+  auto timeout_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto send_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
 
@@ -2549,7 +2799,7 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
 
   // Trigger sending a PING, which should overflow the outbound frame queue and cause
   // client to be disconnected
-  send_timer->callback_();
+  send_timer->invokeCallback();
 
   EXPECT_TRUE(violation_callback->enabled_);
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));

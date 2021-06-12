@@ -6,7 +6,6 @@ import "envoy/config/rbac/v3/rbac.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.rbac.v3";
 option java_outer_classname = "RbacProto";
@@ -24,12 +23,18 @@ message RBAC {
 
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
+  // If present and empty, DENY.
   config.rbac.v3.RBAC rules = 1;
 
   // Shadow rules are not enforced by the filter (i.e., returning a 403)
   // but will emit stats and logs and can be used for rule testing.
   // If absent, no shadow RBAC policy will be applied.
   config.rbac.v3.RBAC shadow_rules = 2;
+
+  // If specified, shadow rules will emit stats with the given prefix.
+  // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
+  // shadow rules.
+  string shadow_rules_stat_prefix = 3;
 }
 
 message RBACPerRoute {

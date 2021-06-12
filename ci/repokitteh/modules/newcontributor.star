@@ -4,7 +4,7 @@ Hi @%s, welcome and thank you for your contribution.
 
 We will try to review your Pull Request as quickly as possible.
 
-In the meantime, please take a look at the [contribution guidelines](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md) if you have not done so already.
+In the meantime, please take a look at the [contribution guidelines](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md) if you have not done so already.
 
 """
 

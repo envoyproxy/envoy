@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/local_ratelimit:local_ratelimit_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "@envoy_api//envoy/extensions/filters/http/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -30,5 +31,15 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "local_ratelimit_integration_test",
+    srcs = ["local_ratelimit_integration_test.cc"],
+    extension_name = "envoy.filters.http.local_ratelimit",
+    deps = [
+        "//source/extensions/filters/http/local_ratelimit:config",
+        "//test/integration:http_protocol_integration_lib",
     ],
 )

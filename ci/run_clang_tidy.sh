@@ -26,7 +26,8 @@ echo "Generating compilation database..."
 
 # bazel build need to be run to setup virtual includes, generating files which are consumed
 # by clang-tidy
-"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers
+read -ra COMP_DB_TARGETS <<< "$COMP_DB_TARGETS"
+"${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --include_headers "${COMP_DB_TARGETS[@]}"
 
 # Do not run clang-tidy against win32 impl
 # TODO(scw00): We should run clang-tidy against win32 impl once we have clang-cl support for Windows
@@ -43,11 +44,6 @@ function exclude_macos_impl() {
 # Do not run incremental clang-tidy on check_format testdata files.
 function exclude_check_format_testdata() {
   grep -v tools/testdata/check_format/
-}
-
-# Do not run clang-tidy on envoy_headersplit testdata files.
-function exclude_headersplit_testdata() {
-  grep -v tools/envoy_headersplit/
 }
 
 # Do not run clang-tidy against Chromium URL import, this needs to largely
@@ -87,7 +83,7 @@ function exclude_wasm_examples() {
 }
 
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_headersplit_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
+  exclude_check_format_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {

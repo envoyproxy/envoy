@@ -1,6 +1,5 @@
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/rocketmq_proxy/topic_route.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/topic_route.h"
 
 #include "absl/container/node_hash_map.h"
 #include "gtest/gtest.h"
@@ -64,7 +63,7 @@ TEST(TopicRouteDataTest, Serialization) {
   }
   ProtobufWkt::Struct doc;
   EXPECT_NO_THROW(topic_route_data.encode(doc));
-  MessageUtil::getJsonStringFromMessage(doc);
+  MessageUtil::getJsonStringFromMessageOrDie(doc);
 }
 
 } // namespace RocketmqProxy

@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.compressor.v4alpha;
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -82,10 +81,11 @@ message Compressor {
       "remove_accept_encoding_header", "runtime_enabled";
 
   // A compressor library to use for compression. Currently only
-  // :ref:`envoy.compression.gzip.compressor<envoy_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+  // :ref:`envoy.compression.gzip.compressor<envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
   // is included in Envoy.
-  // This field is ignored if used in the context of the gzip http-filter, but is mandatory otherwise.
-  config.core.v4alpha.TypedExtensionConfig compressor_library = 6;
+  // [#extension-category: envoy.compression.compressor]
+  config.core.v4alpha.TypedExtensionConfig compressor_library = 6
+      [(validate.rules).message = {required: true}];
 
   // Configuration for request compression. Compression is disabled by default if left empty.
   RequestDirectionConfig request_direction_config = 7;

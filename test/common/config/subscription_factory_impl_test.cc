@@ -8,8 +8,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/subscription_factory_impl.h"
-#include "common/config/xds_resource.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/xds_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -46,19 +46,21 @@ public:
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
         config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
-        resource_decoder_);
+        resource_decoder_, {});
   }
 
-  SubscriptionPtr collectionSubscriptionFromUrl(const std::string& xds_url) {
+  SubscriptionPtr
+  collectionSubscriptionFromUrl(const std::string& xds_url,
+                                const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, {}, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
+        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment", stats_store_,
         callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;
-  Random::MockRandomGenerator random_;
+  NiceMock<Random::MockRandomGenerator> random_;
   MockSubscriptionCallbacks callbacks_;
   MockOpaqueResourceDecoder resource_decoder_;
   Http::MockAsyncClientRequest http_request_;
@@ -215,14 +217,15 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   // Unix paths start with /, Windows with c:/.
   const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
-  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path))->start({});
+  collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path), {})->start({});
 }
 
-TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile){
-    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah")->start({}),
-                              EnvoyException,
-                              "envoy::api::v2::Path must refer to an existing path in the system: "
-                              "'/blahblah' does not exist")}
+TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
+  EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
+                            EnvoyException,
+                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "'/blahblah' does not exist");
+}
 
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
@@ -328,6 +331,66 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
 
+TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionBadType) {
+  EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("xdstp:///foo", {})->start({}),
+                            EnvoyException,
+                            "xdstp:// type does not match "
+                            "envoy.config.endpoint.v3.ClusterLoadAssignment in xdstp:///foo");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedApiType) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_REGEX(
+      collectionSubscriptionFromUrl(
+          "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
+          ->start({}),
+      EnvoyException, "Unknown xdstp:// transport API type in api_type: GRPC");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcCollectionAggregatedSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
+                                config)
+      ->start({});
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcCollectionDeltaSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
+                                config)
+      ->start({});
+}
+
 // Use of the V2 transport fails by default.
 TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   envoy::config::core::v3::ConfigSource config;
@@ -345,7 +408,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
                               config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_),
+                              callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
@@ -367,7 +430,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
                               config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_),
+                              callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }

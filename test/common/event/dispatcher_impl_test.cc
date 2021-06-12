@@ -1,14 +1,17 @@
 #include <functional>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/thread/thread.h"
 
-#include "common/api/api_impl.h"
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/lock_guard.h"
-#include "common/event/deferred_task.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/timer_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/watch_dog.h"
@@ -21,8 +24,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::ByMove;
 using testing::InSequence;
+using testing::MockFunction;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Event {
@@ -229,6 +235,15 @@ class TestDeferredDeletable : public DeferredDeletable {
 public:
   TestDeferredDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
   ~TestDeferredDeletable() override { on_destroy_(); }
+
+private:
+  std::function<void()> on_destroy_;
+};
+
+class TestDispatcherThreadDeletable : public DispatcherThreadDeletable {
+public:
+  TestDispatcherThreadDeletable(std::function<void()> on_destroy) : on_destroy_(on_destroy) {}
+  ~TestDispatcherThreadDeletable() override { on_destroy_(); }
 
 private:
   std::function<void()> on_destroy_;
@@ -476,6 +491,100 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
   }
 }
 
+TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
+  dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
+      [this, id = api_->threadFactory().currentThreadId()]() {
+        ASSERT(id != api_->threadFactory().currentThreadId());
+        {
+          Thread::LockGuard lock(mu_);
+          ASSERT(!work_finished_);
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      }));
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
+TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
+  Api::ApiPtr api_(Api::createApiForTest());
+  DispatcherPtr dispatcher(api_->allocateDispatcher("test_thread"));
+  std::vector<std::unique_ptr<ReadyWatcher>> watchers;
+  watchers.reserve(3);
+  for (int i = 0; i < 3; ++i) {
+    watchers.push_back(std::make_unique<ReadyWatcher>());
+  }
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[0]->ready(); }));
+  EXPECT_CALL(*watchers[0], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[1]->ready(); }));
+  dispatcher->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[2]->ready(); }));
+  EXPECT_CALL(*watchers[1], ready());
+  EXPECT_CALL(*watchers[2], ready());
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+}
+
+class DispatcherShutdownTest : public testing::Test {
+protected:
+  DispatcherShutdownTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  Api::ApiPtr api_;
+  DispatcherPtr dispatcher_;
+};
+
+TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
+  ReadyWatcher watcher;
+
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  EXPECT_CALL(watcher, ready());
+  dispatcher_->shutdown();
+}
+
+TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  ReadyWatcher post_watcher;
+
+  {
+    InSequence s;
+
+    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
+        [&deferred_watcher]() { deferred_watcher.ready(); }));
+    dispatcher_->post([&post_watcher]() { post_watcher.ready(); });
+    dispatcher_->deleteInDispatcherThread(
+        std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+    EXPECT_CALL(watcher, ready());
+    dispatcher_->shutdown();
+
+    ::testing::Mock::VerifyAndClearExpectations(&watcher);
+    EXPECT_CALL(deferred_watcher, ready());
+    dispatcher_.reset();
+  }
+}
+
+TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
+  ReadyWatcher watcher;
+  ReadyWatcher deferred_watcher;
+  dispatcher_->deferredDelete(
+      std::make_unique<TestDeferredDeletable>([&deferred_watcher]() { deferred_watcher.ready(); }));
+  dispatcher_->deleteInDispatcherThread(
+      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+  {
+    InSequence s;
+    EXPECT_CALL(deferred_watcher, ready());
+    EXPECT_CALL(watcher, ready());
+    dispatcher_.reset();
+  }
+}
+
 TEST_F(DispatcherImplTest, Timer) {
   timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(0)); });
   timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(50)); });
@@ -484,7 +593,7 @@ TEST_F(DispatcherImplTest, Timer) {
 
 TEST_F(DispatcherImplTest, TimerWithScope) {
   TimerPtr timer;
-  MockScopedTrackedObject scope;
+  MockScopeTrackedObject scope;
   dispatcher_->post([this, &timer, &scope]() {
     {
       // Expect a call to dumpState. The timer will call onFatalError during
@@ -533,9 +642,91 @@ TEST_F(DispatcherImplTest, IsThreadSafe) {
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
 
+TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check ostream still empty.
+  EXPECT_EQ(ostream.contents(), "");
+}
+
+TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
+  std::array<char, 1024> buffer;
+  OutputBufferStream ostream{buffer.data(), buffer.size()};
+
+  // Call on FatalError to trigger dumps of tracked objects.
+  dispatcher_->post([this, &ostream]() {
+    Thread::LockGuard lock(mu_);
+
+    // Add several tracked objects to the dispatcher
+    MessageTrackedObject first{"first"};
+    ScopeTrackerScopeState first_state{&first, *dispatcher_};
+    MessageTrackedObject second{"second"};
+    ScopeTrackerScopeState second_state{&second, *dispatcher_};
+    MessageTrackedObject third{"third"};
+    ScopeTrackerScopeState third_state{&third, *dispatcher_};
+
+    static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+
+  // Check the dump includes and registered objects in a FILO order.
+  EXPECT_EQ(ostream.contents(), "thirdsecondfirst");
+}
+
+TEST_F(DispatcherImplTest, TracksIfTrackedObjectStackEmpty) {
+  // Post on the dispatcher thread.
+  dispatcher_->post([this]() {
+    Thread::LockGuard lock(mu_);
+
+    // Initially should be empty
+    ASSERT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
+
+    // Add Tracked Object
+    {
+      MessageTrackedObject first{"first"};
+      ScopeTrackerScopeState first_state{&first, *dispatcher_};
+
+      EXPECT_FALSE(dispatcher_->trackedObjectStackIsEmpty());
+    }
+
+    // Should be empty now
+    EXPECT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
+
+    work_finished_ = true;
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++times_ran_; }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    ++times_ran_;
+  }
   bool isAsyncSignalSafe() const override { return true; }
   int getNumTimesRan() { return times_ran_; }
 
@@ -637,19 +828,14 @@ TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
-class TimerImplTest : public testing::TestWithParam<bool> {
+class TimerImplTest : public testing::Test {
 protected:
   TimerImplTest() {
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.activate_timers_next_event_loop",
-          activateTimersNextEventLoop() ? "true" : "false"}});
     // Hook into event loop prepare and check events.
     evwatch_prepare_new(&libevent_base_, onWatcherReady, &prepare_watcher_);
     evwatch_check_new(&libevent_base_, onCheck, this);
   }
   ~TimerImplTest() override { ASSERT(check_callbacks_.empty()); }
-
-  bool activateTimersNextEventLoop() { return GetParam(); }
 
   // Run a callback inside the event loop. The libevent monotonic time used for timer registration
   // is frozen while within this callback, so timers enabled within this callback end up with the
@@ -727,9 +913,7 @@ private:
   bool in_event_loop_{};
 };
 
-INSTANTIATE_TEST_SUITE_P(DelayActivation, TimerImplTest, testing::Bool());
-
-TEST_P(TimerImplTest, TimerEnabledDisabled) {
+TEST_F(TimerImplTest, TimerEnabledDisabled) {
   InSequence s;
 
   Event::TimerPtr timer = dispatcher_->createTimer([] {});
@@ -746,7 +930,7 @@ TEST_P(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_FALSE(timer->enabled());
 }
 
-TEST_P(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
+TEST_F(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -774,26 +958,18 @@ TEST_P(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
   });
 }
 
-TEST_P(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
+TEST_F(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
   ReadyWatcher watcher2;
   Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
 
-  if (activateTimersNextEventLoop()) {
-    // Expect watcher1 to trigger first because timer1's deadline was moved forward.
-    InSequence s;
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher1, ready());
-    EXPECT_CALL(watcher2, ready());
-  } else {
-    // Timers execute in the wrong order.
-    InSequence s;
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher1, ready());
-  }
+  // Expect watcher1 to trigger first because timer1's deadline was moved forward.
+  InSequence s;
+  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(2));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -804,7 +980,7 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
   });
 }
 
-TEST_P(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
+TEST_F(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -826,7 +1002,7 @@ TEST_P(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
   });
 }
 
-TEST_P(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
+TEST_F(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -845,7 +1021,7 @@ TEST_P(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
   });
 }
 
-TEST_P(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
+TEST_F(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -868,7 +1044,7 @@ TEST_P(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
 }
 
 // Timers scheduled at different times execute in order.
-TEST_P(TimerImplTest, TimerOrdering) {
+TEST_F(TimerImplTest, TimerOrdering) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -880,17 +1056,10 @@ TEST_P(TimerImplTest, TimerOrdering) {
 
   // Expect watcher calls to happen in order since timers have different times.
   InSequence s;
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher1, ready());
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher3, ready());
-  } else {
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher1, ready());
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher3, ready());
-  }
+  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
 
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
@@ -907,7 +1076,7 @@ TEST_P(TimerImplTest, TimerOrdering) {
 }
 
 // Alarms that are scheduled to execute and are cancelled do not trigger.
-TEST_P(TimerImplTest, TimerOrderAndDisableAlarm) {
+TEST_F(TimerImplTest, TimerOrderAndDisableAlarm) {
   ReadyWatcher watcher3;
   Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
 
@@ -941,7 +1110,7 @@ TEST_P(TimerImplTest, TimerOrderAndDisableAlarm) {
 
 // Change the registration time for a timer that is already activated by disabling and re-enabling
 // the timer. Verify that execution is delayed.
-TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
+TEST_F(TimerImplTest, TimerOrderDisableAndReschedule) {
   ReadyWatcher watcher4;
   Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
 
@@ -963,29 +1132,17 @@ TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
   // timer1 is expected to run first and reschedule timers 2 and 3. timer4 should fire before
   // timer2 and timer3 since timer4's registration is unaffected.
   InSequence s;
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher1, ready());
-    EXPECT_CALL(watcher4, ready());
-    // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
-    // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
-    // timers could execute in different loop iterations.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
-      advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-    }));
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher3, ready());
-  } else {
-    EXPECT_CALL(prepare_watcher_, ready());
-    EXPECT_CALL(watcher1, ready());
-    EXPECT_CALL(watcher4, ready());
-    EXPECT_CALL(watcher2, ready());
-    // Sleep in prepare cb to avoid flakiness if epoll_wait returns before the timer timeout.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
-      advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-    }));
-    EXPECT_CALL(watcher3, ready());
-  }
+  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(watcher4, ready());
+  // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
+  // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
+  // timers could execute in different loop iterations.
+  EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+    advanceLibeventTimeNextIteration(absl::Milliseconds(10));
+  }));
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1004,7 +1161,7 @@ TEST_P(TimerImplTest, TimerOrderDisableAndReschedule) {
 
 // Change the registration time for a timer that is already activated by re-enabling the timer
 // without calling disableTimer first.
-TEST_P(TimerImplTest, TimerOrderAndReschedule) {
+TEST_F(TimerImplTest, TimerOrderAndReschedule) {
   ReadyWatcher watcher4;
   Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
 
@@ -1027,25 +1184,15 @@ TEST_P(TimerImplTest, TimerOrderAndReschedule) {
   InSequence s;
   EXPECT_CALL(prepare_watcher_, ready());
   EXPECT_CALL(watcher1, ready());
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(watcher4, ready());
-    // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
-    // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
-    // timers could execute in different loop iterations.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
-      advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-    }));
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher3, ready());
-  } else {
-    EXPECT_CALL(watcher2, ready());
-    EXPECT_CALL(watcher4, ready());
-    // Sleep in prepare cb to avoid flakiness if epoll_wait returns before the timer timeout.
-    EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
-      advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-    }));
-    EXPECT_CALL(watcher3, ready());
-  }
+  EXPECT_CALL(watcher4, ready());
+  // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
+  // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
+  // timers could execute in different loop iterations.
+  EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+    advanceLibeventTimeNextIteration(absl::Milliseconds(10));
+  }));
+  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(watcher3, ready());
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1062,7 +1209,7 @@ TEST_P(TimerImplTest, TimerOrderAndReschedule) {
   });
 }
 
-TEST_P(TimerImplTest, TimerChaining) {
+TEST_F(TimerImplTest, TimerChaining) {
   ReadyWatcher watcher1;
   Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
 
@@ -1093,17 +1240,11 @@ TEST_P(TimerImplTest, TimerChaining) {
   InSequence s;
   EXPECT_CALL(prepare_watcher_, ready());
   EXPECT_CALL(watcher4, ready());
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(prepare_watcher_, ready());
-  }
+  EXPECT_CALL(prepare_watcher_, ready());
   EXPECT_CALL(watcher3, ready());
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(prepare_watcher_, ready());
-  }
+  EXPECT_CALL(prepare_watcher_, ready());
   EXPECT_CALL(watcher2, ready());
-  if (activateTimersNextEventLoop()) {
-    EXPECT_CALL(prepare_watcher_, ready());
-  }
+  EXPECT_CALL(prepare_watcher_, ready());
   EXPECT_CALL(watcher1, ready());
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 
@@ -1113,7 +1254,7 @@ TEST_P(TimerImplTest, TimerChaining) {
   EXPECT_FALSE(timer4->enabled());
 }
 
-TEST_P(TimerImplTest, TimerChainDisable) {
+TEST_F(TimerImplTest, TimerChainDisable) {
   ReadyWatcher watcher;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
@@ -1144,7 +1285,7 @@ TEST_P(TimerImplTest, TimerChainDisable) {
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
-TEST_P(TimerImplTest, TimerChainDelete) {
+TEST_F(TimerImplTest, TimerChainDelete) {
   ReadyWatcher watcher;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
@@ -1185,13 +1326,6 @@ public:
     while (timer.enabled()) {
       time_system.advanceTimeAndRun(std::chrono::microseconds(1), dispatcher,
                                     Dispatcher::RunType::NonBlock);
-#ifdef WIN32
-      // The event loop runs for a single iteration in NonBlock mode on Windows. A few iterations
-      // are required to ensure that next iteration callbacks have a chance to run before time
-      // advances once again.
-      dispatcher.run(Dispatcher::RunType::NonBlock);
-      dispatcher.run(Dispatcher::RunType::NonBlock);
-#endif
     }
     return time_system.monotonicTime() - start;
   }
@@ -1268,6 +1402,48 @@ TEST_F(TimerUtilsTest, TimerValueConversion) {
 
   // Some arbitrary tests for good measure.
   checkConversion(std::chrono::milliseconds(600014), 600, 14000);
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreatesScaledTimerManager) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithMinimum) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTimer_(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), _));
+  dispatcher->createScaledTimer(ScaledTimerMinimum(ScaledMinimum(UnitFloat(0.8f))), []() {});
+}
+
+TEST(DispatcherWithScaledTimerFactoryTest, CreateScaledTimerWithTimerType) {
+  Api::ApiPtr api = Api::createApiForTest();
+  MockFunction<ScaledRangeTimerManagerFactory> scaled_timer_manager_factory;
+
+  MockScaledRangeTimerManager* manager = new MockScaledRangeTimerManager();
+  EXPECT_CALL(scaled_timer_manager_factory, Call)
+      .WillOnce(Return(ByMove(ScaledRangeTimerManagerPtr(manager))));
+
+  DispatcherPtr dispatcher =
+      api->allocateDispatcher("test_thread", scaled_timer_manager_factory.AsStdFunction());
+
+  EXPECT_CALL(*manager, createTypedTimer_(ScaledTimerType::UnscaledRealTimerForTest, _));
+  dispatcher->createScaledTimer(ScaledTimerType::UnscaledRealTimerForTest, []() {});
 }
 
 class DispatcherWithWatchdogTest : public testing::Test {

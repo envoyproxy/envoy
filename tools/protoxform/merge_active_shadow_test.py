@@ -3,26 +3,27 @@ import unittest
 import merge_active_shadow
 
 from tools.api_proto_plugin import type_context as api_type_context
+from tools.protoxform import utils
 
 from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
 
 class MergeActiveShadowTest(unittest.TestCase):
-  # Dummy type context for tests that don't care about this.
-  def fakeTypeContext(self):
-    fake_source_code_info = descriptor_pb2.SourceCodeInfo()
-    source_code_info = api_type_context.SourceCodeInfo('fake', fake_source_code_info)
-    return api_type_context.TypeContext(source_code_info, 'fake_package')
+    # Dummy type context for tests that don't care about this.
+    def fake_type_context(self):
+        fake_source_code_info = descriptor_pb2.SourceCodeInfo()
+        source_code_info = api_type_context.SourceCodeInfo('fake', fake_source_code_info)
+        return api_type_context.TypeContext(source_code_info, 'fake_package')
 
-  # Poor man's text proto equivalence. Tensorflow has better tools for this,
-  # i.e. assertProto2Equal.
-  def assertTextProtoEq(self, lhs, rhs):
-    self.assertMultiLineEqual(lhs.strip(), rhs.strip())
+    # Poor man's text proto equivalence. Tensorflow has better tools for this,
+    # i.e. assertProto2Equal.
+    def assert_text_proto_eq(self, lhs, rhs):
+        self.assertMultiLineEqual(lhs.strip(), rhs.strip())
 
-  def testAdjustReservedRange(self):
-    """AdjustReservedRange removes specified skip_reserved_numbers."""
-    desc_pb_text = """
+    def testadjust_reserved_range(self):
+        """adjust_reserved_range removes specified skip_reserved_numbers."""
+        desc_pb_text = """
 reserved_range {
   start: 41
   end: 41
@@ -40,11 +41,11 @@ reserved_range {
   end: 51
 }
     """
-    desc = descriptor_pb2.DescriptorProto()
-    text_format.Merge(desc_pb_text, desc)
-    target = descriptor_pb2.DescriptorProto()
-    merge_active_shadow.AdjustReservedRange(target, desc.reserved_range, [42, 43])
-    target_pb_text = """
+        desc = descriptor_pb2.DescriptorProto()
+        text_format.Merge(desc_pb_text, desc)
+        target = descriptor_pb2.DescriptorProto()
+        merge_active_shadow.adjust_reserved_range(target, desc.reserved_range, [42, 43])
+        target_pb_text = """
 reserved_range {
   start: 41
   end: 41
@@ -54,11 +55,11 @@ reserved_range {
   end: 51
 }
     """
-    self.assertTextProtoEq(target_pb_text, str(target))
+        self.assert_text_proto_eq(target_pb_text, str(target))
 
-  def testMergeActiveShadowEnum(self):
-    """MergeActiveShadowEnum recovers shadow values."""
-    active_pb_text = """
+    def testmerge_active_shadow_enum(self):
+        """merge_active_shadow_enum recovers shadow values."""
+        active_pb_text = """
 value {
   number: 1
   name: "foo"
@@ -77,9 +78,9 @@ reserved_range {
   end: 3
 }
     """
-    active_proto = descriptor_pb2.EnumDescriptorProto()
-    text_format.Merge(active_pb_text, active_proto)
-    shadow_pb_text = """
+        active_proto = descriptor_pb2.EnumDescriptorProto()
+        text_format.Merge(active_pb_text, active_proto)
+        shadow_pb_text = """
 value {
   number: 1
   name: "foo"
@@ -101,11 +102,13 @@ value {
   name: "hidden_envoy_deprecated_huh"
 }
     """
-    shadow_proto = descriptor_pb2.EnumDescriptorProto()
-    text_format.Merge(shadow_pb_text, shadow_proto)
-    target_proto = descriptor_pb2.EnumDescriptorProto()
-    merge_active_shadow.MergeActiveShadowEnum(active_proto, shadow_proto, target_proto)
-    target_pb_text = """
+        shadow_proto = descriptor_pb2.EnumDescriptorProto()
+        text_format.Merge(shadow_pb_text, shadow_proto)
+        target_proto = descriptor_pb2.EnumDescriptorProto()
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_enum(
+            active_proto, shadow_proto, target_proto, target_proto_dependencies)
+        target_pb_text = """
 value {
   name: "foo"
   number: 1
@@ -123,11 +126,11 @@ value {
   number: 2
 }
     """
-    self.assertTextProtoEq(target_pb_text, str(target_proto))
+        self.assert_text_proto_eq(target_pb_text, str(target_proto))
 
-  def testMergeActiveShadowMessageComments(self):
-    """MergeActiveShadowMessage preserves comment field correspondence."""
-    active_pb_text = """
+    def testmerge_active_shadow_message_comments(self):
+        """merge_active_shadow_message preserves comment field correspondence."""
+        active_pb_text = """
 field {
   number: 9
   name: "oneof_1_0"
@@ -177,9 +180,9 @@ oneof_decl {
   name: "oneof_3"
 }
     """
-    active_proto = descriptor_pb2.DescriptorProto()
-    text_format.Merge(active_pb_text, active_proto)
-    active_source_code_info_text = """
+        active_proto = descriptor_pb2.DescriptorProto()
+        text_format.Merge(active_pb_text, active_proto)
+        active_source_code_info_text = """
 location {
   path: [4, 1, 2, 4]
   leading_comments: "field_4"
@@ -217,9 +220,9 @@ location {
   leading_comments: "ignore_1"
 }
 """
-    active_source_code_info = descriptor_pb2.SourceCodeInfo()
-    text_format.Merge(active_source_code_info_text, active_source_code_info)
-    shadow_pb_text = """
+        active_source_code_info = descriptor_pb2.SourceCodeInfo()
+        text_format.Merge(active_source_code_info_text, active_source_code_info)
+        shadow_pb_text = """
 field {
   number: 10
   name: "hidden_envoy_deprecated_missing_oneof_field_0"
@@ -251,14 +254,16 @@ oneof_decl {
   name: "oneof_3"
 }
 """
-    shadow_proto = descriptor_pb2.DescriptorProto()
-    text_format.Merge(shadow_pb_text, shadow_proto)
-    target_proto = descriptor_pb2.DescriptorProto()
-    source_code_info = api_type_context.SourceCodeInfo('fake', active_source_code_info)
-    fake_type_context = api_type_context.TypeContext(source_code_info, 'fake_package')
-    merge_active_shadow.MergeActiveShadowMessage(fake_type_context.ExtendMessage(1, "foo", False),
-                                                 active_proto, shadow_proto, target_proto)
-    target_pb_text = """
+        shadow_proto = descriptor_pb2.DescriptorProto()
+        text_format.Merge(shadow_pb_text, shadow_proto)
+        target_proto = descriptor_pb2.DescriptorProto()
+        source_code_info = api_type_context.SourceCodeInfo('fake', active_source_code_info)
+        fake_type_context = api_type_context.TypeContext(source_code_info, 'fake_package')
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_message(
+            fake_type_context.extend_message(1, "foo", False), active_proto, shadow_proto,
+            target_proto, target_proto_dependencies)
+        target_pb_text = """
 field {
   name: "oneof_1_0"
   number: 9
@@ -323,7 +328,7 @@ oneof_decl {
   name: "some_removed_oneof"
 }
     """
-    target_source_code_info_text = """
+        target_source_code_info_text = """
 location {
   path: 4
   path: 1
@@ -385,14 +390,14 @@ location {
   leading_comments: "ignore_1"
 }
 """
-    self.maxDiff = None
-    self.assertTextProtoEq(target_pb_text, str(target_proto))
-    self.assertTextProtoEq(target_source_code_info_text,
-                           str(fake_type_context.source_code_info.proto))
+        self.maxDiff = None
+        self.assert_text_proto_eq(target_pb_text, str(target_proto))
+        self.assert_text_proto_eq(
+            target_source_code_info_text, str(fake_type_context.source_code_info.proto))
 
-  def testMergeActiveShadowMessage(self):
-    """MergeActiveShadowMessage recovers shadow fields with oneofs."""
-    active_pb_text = """
+    def testmerge_active_shadow_message(self):
+        """merge_active_shadow_message recovers shadow fields with oneofs."""
+        active_pb_text = """
 field {
   number: 1
   name: "foo"
@@ -425,9 +430,9 @@ oneof_decl {
   name: "some_oneof"
 }
     """
-    active_proto = descriptor_pb2.DescriptorProto()
-    text_format.Merge(active_pb_text, active_proto)
-    shadow_pb_text = """
+        active_proto = descriptor_pb2.DescriptorProto()
+        text_format.Merge(active_pb_text, active_proto)
+        shadow_pb_text = """
 field {
   number: 1
   name: "foo"
@@ -441,20 +446,31 @@ field {
   name: "baz"
 }
 field {
-  number: 2
+  number: 5
   name: "hidden_envoy_deprecated_wow"
+  options {
+    deprecated: true
+    [validate.rules] {
+      string {
+        max_bytes: 1024
+      }
+    }
+    [envoy.annotations.disallowed_by_default]: true
+  }
   oneof_index: 0
 }
 oneof_decl {
   name: "some_oneof"
 }
     """
-    shadow_proto = descriptor_pb2.DescriptorProto()
-    text_format.Merge(shadow_pb_text, shadow_proto)
-    target_proto = descriptor_pb2.DescriptorProto()
-    merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
-    target_pb_text = """
+        shadow_proto = descriptor_pb2.DescriptorProto()
+        text_format.Merge(shadow_pb_text, shadow_proto)
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
+        target_pb_text = """
 field {
   name: "foo"
   number: 1
@@ -466,7 +482,16 @@ field {
 }
 field {
   name: "hidden_envoy_deprecated_wow"
-  number: 2
+  number: 5
+  options {
+    deprecated: true
+    [validate.rules] {
+      string {
+        max_bytes: 1024
+      }
+    }
+    [envoy.annotations.disallowed_by_default]: true
+  }
   oneof_index: 2
 }
 field {
@@ -486,68 +511,80 @@ oneof_decl {
 oneof_decl {
   name: "some_oneof"
 }
+reserved_range {
+  start: 2
+  end: 3
+}
     """
-    self.assertTextProtoEq(target_pb_text, str(target_proto))
+        self.assert_text_proto_eq(target_pb_text, str(target_proto))
+        self.assertEqual(target_proto_dependencies[0], 'envoy/annotations/deprecation.proto')
 
-  def testMergeActiveShadowMessageNoShadowMessage(self):
-    """MergeActiveShadowMessage doesn't require a shadow message for new nested active messages."""
-    active_proto = descriptor_pb2.DescriptorProto()
-    shadow_proto = descriptor_pb2.DescriptorProto()
-    active_proto.nested_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
-    self.assertEqual(target_proto.nested_type[0].name, 'foo')
+    def testmerge_active_shadow_message_no_shadow_message(self):
+        """merge_active_shadow_message doesn't require a shadow message for new nested active messages."""
+        active_proto = descriptor_pb2.DescriptorProto()
+        shadow_proto = descriptor_pb2.DescriptorProto()
+        active_proto.nested_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
+        self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
-  def testMergeActiveShadowMessageNoShadowEnum(self):
-    """MergeActiveShadowMessage doesn't require a shadow enum for new nested active enums."""
-    active_proto = descriptor_pb2.DescriptorProto()
-    shadow_proto = descriptor_pb2.DescriptorProto()
-    active_proto.enum_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
-    self.assertEqual(target_proto.enum_type[0].name, 'foo')
+    def testmerge_active_shadow_message_no_shadow_enum(self):
+        """merge_active_shadow_message doesn't require a shadow enum for new nested active enums."""
+        active_proto = descriptor_pb2.DescriptorProto()
+        shadow_proto = descriptor_pb2.DescriptorProto()
+        active_proto.enum_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
+        self.assertEqual(target_proto.enum_type[0].name, 'foo')
 
-  def testMergeActiveShadowMessageMissing(self):
-    """MergeActiveShadowMessage recovers missing messages from shadow."""
-    active_proto = descriptor_pb2.DescriptorProto()
-    shadow_proto = descriptor_pb2.DescriptorProto()
-    shadow_proto.nested_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    merge_active_shadow.MergeActiveShadowMessage(self.fakeTypeContext(), active_proto, shadow_proto,
-                                                 target_proto)
-    self.assertEqual(target_proto.nested_type[0].name, 'foo')
+    def testmerge_active_shadow_message_missing(self):
+        """merge_active_shadow_message recovers missing messages from shadow."""
+        active_proto = descriptor_pb2.DescriptorProto()
+        shadow_proto = descriptor_pb2.DescriptorProto()
+        shadow_proto.nested_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto_dependencies = []
+        merge_active_shadow.merge_active_shadow_message(
+            self.fake_type_context(), active_proto, shadow_proto, target_proto,
+            target_proto_dependencies)
+        self.assertEqual(target_proto.nested_type[0].name, 'foo')
 
-  def testMergeActiveShadowFileMissing(self):
-    """MergeActiveShadowFile recovers missing messages from shadow."""
-    active_proto = descriptor_pb2.FileDescriptorProto()
-    shadow_proto = descriptor_pb2.FileDescriptorProto()
-    shadow_proto.message_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
-    self.assertEqual(target_proto.message_type[0].name, 'foo')
+    def testmerge_active_shadow_file_missing(self):
+        """merge_active_shadow_file recovers missing messages from shadow."""
+        active_proto = descriptor_pb2.FileDescriptorProto()
+        shadow_proto = descriptor_pb2.FileDescriptorProto()
+        shadow_proto.message_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto = merge_active_shadow.merge_active_shadow_file(active_proto, shadow_proto)
+        self.assertEqual(target_proto.message_type[0].name, 'foo')
 
-  def testMergeActiveShadowFileNoShadowMessage(self):
-    """MergeActiveShadowFile doesn't require a shadow message for new active messages."""
-    active_proto = descriptor_pb2.FileDescriptorProto()
-    shadow_proto = descriptor_pb2.FileDescriptorProto()
-    active_proto.message_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
-    self.assertEqual(target_proto.message_type[0].name, 'foo')
+    def testmerge_active_shadow_file_no_shadow_message(self):
+        """merge_active_shadow_file doesn't require a shadow message for new active messages."""
+        active_proto = descriptor_pb2.FileDescriptorProto()
+        shadow_proto = descriptor_pb2.FileDescriptorProto()
+        active_proto.message_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto = merge_active_shadow.merge_active_shadow_file(active_proto, shadow_proto)
+        self.assertEqual(target_proto.message_type[0].name, 'foo')
 
-  def testMergeActiveShadowFileNoShadowEnum(self):
-    """MergeActiveShadowFile doesn't require a shadow enum for new active enums."""
-    active_proto = descriptor_pb2.FileDescriptorProto()
-    shadow_proto = descriptor_pb2.FileDescriptorProto()
-    active_proto.enum_type.add().name = 'foo'
-    target_proto = descriptor_pb2.DescriptorProto()
-    target_proto = merge_active_shadow.MergeActiveShadowFile(active_proto, shadow_proto)
-    self.assertEqual(target_proto.enum_type[0].name, 'foo')
+    def testmerge_active_shadow_file_no_shadow_enum(self):
+        """merge_active_shadow_file doesn't require a shadow enum for new active enums."""
+        active_proto = descriptor_pb2.FileDescriptorProto()
+        shadow_proto = descriptor_pb2.FileDescriptorProto()
+        active_proto.enum_type.add().name = 'foo'
+        target_proto = descriptor_pb2.DescriptorProto()
+        target_proto = merge_active_shadow.merge_active_shadow_file(active_proto, shadow_proto)
+        self.assertEqual(target_proto.enum_type[0].name, 'foo')
 
 
 # TODO(htuch): add some test for recursion.
 
 if __name__ == '__main__':
-  unittest.main()
+    utils.load_protos(merge_active_shadow.PROTO_PACKAGES)
+    unittest.main()

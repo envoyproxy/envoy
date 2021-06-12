@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
@@ -13,18 +14,17 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/matchers.h"
-#include "common/config/datasource.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/rest_api_fetcher.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/oauth2/oauth.h"
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/datasource.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/rest_api_fetcher.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -48,37 +48,35 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : api_(api), client_secret_provider_(std::move(client_secret_provider)),
-        token_secret_provider_(std::move(token_secret_provider)) {
-    readAndWatchSecret(client_secret_, *client_secret_provider_);
-    readAndWatchSecret(token_secret_, *token_secret_provider_);
-  }
+      : update_callback_client_(readAndWatchSecret(client_secret_, client_secret_provider, api)),
+        update_callback_token_(readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
 
   const std::string& clientSecret() const override { return client_secret_; }
 
   const std::string& tokenSecret() const override { return token_secret_; }
 
 private:
-  void readAndWatchSecret(std::string& value,
-                          Secret::GenericSecretConfigProvider& secret_provider) {
-    const auto* secret = secret_provider.secret();
+  Envoy::Common::CallbackHandlePtr
+  readAndWatchSecret(std::string& value,
+                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
+    const auto* secret = secret_provider->secret();
     if (secret != nullptr) {
-      value = Config::DataSource::read(secret->secret(), true, api_);
+      value = Config::DataSource::read(secret->secret(), true, api);
     }
 
-    secret_provider.addUpdateCallback([&secret_provider, this, &value]() {
-      const auto* secret = secret_provider.secret();
+    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
+      const auto* secret = secret_provider->secret();
       if (secret != nullptr) {
-        value = Config::DataSource::read(secret->secret(), true, api_);
+        value = Config::DataSource::read(secret->secret(), true, api);
       }
     });
   }
+
   std::string client_secret_;
   std::string token_secret_;
-  Api::Api& api_;
 
-  Secret::GenericSecretConfigProviderSharedPtr client_secret_provider_;
-  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider_;
+  Envoy::Common::CallbackHandlePtr update_callback_client_;
+  Envoy::Common::CallbackHandlePtr update_callback_token_;
 };
 
 /**
@@ -123,6 +121,8 @@ public:
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
+  const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
+  const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -135,6 +135,8 @@ private:
   const Matchers::PathMatcher signout_path_;
   std::shared_ptr<SecretReader> secret_reader_;
   FilterStats stats_;
+  const std::string encoded_auth_scopes_;
+  const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
 };

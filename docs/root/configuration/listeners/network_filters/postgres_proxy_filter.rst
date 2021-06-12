@@ -1,12 +1,12 @@
 .. _config_network_filters_postgres_proxy:
 
 Postgres proxy
-================
+==============
 
 The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
 (upstream). The decoded information is used to produce Postgres level statistics like sessions,
 statements or transactions executed, among others. The Postgres proxy filter parses SQL queries carried in ``Query`` and ``Parse`` messages.
-When SQL query has been parsed successfully, the :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is created, 
+When SQL query has been parsed successfully, the :ref:`metadata <config_network_filters_postgres_proxy_dynamic_metadata>` is created,
 which may be used by other filters like :ref:`RBAC <config_network_filters_rbac>`.
 When the Postgres filter detects that a session is encrypted, the messages are ignored and no decoding takes
 place. More information:
@@ -15,13 +15,13 @@ place. More information:
 
 .. attention::
 
-   The `postgres_proxy` filter is experimental and is currently under active development.
+   The ``postgres_proxy`` filter is experimental and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 
 
 .. warning::
 
-   The `postgreql_proxy` filter was tested only with
+   The ``postgreql_proxy`` filter was tested only with
    `Postgres frontend/backend protocol version 3.0`_, which was introduced in
    Postgres 7.4. Earlier versions are thus not supported. Testing is limited
    anyway to not EOL-ed versions.
@@ -72,7 +72,8 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   messages_frontend, Counter, Number of frontend messages detected by the filter
   messages_unknown, Counter, Number of times the filter successfully decoded a message but did not know what to do with it
   sessions, Counter, Total number of successful logins
-  sessions_encrypted, Counter, Number of times the filter detected encrypted sessions
+  sessions_encrypted, Counter, Number of times the filter detected and passed upstream encrypted sessions
+  sessions_terminated_ssl, Counter, Number of times the filter terminated SSL sessions
   sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
   statements, Counter, Total number of SQL statements
   statements_delete, Counter, Number of DELETE statements

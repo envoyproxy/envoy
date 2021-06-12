@@ -1,13 +1,12 @@
 #include <chrono>
 
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/libevent.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "server/config_validation/api.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/server/config_validation/api.h"
 
 #include "test/mocks/common.h"
 #include "test/test_common/environment.h"
@@ -49,14 +48,26 @@ TEST_P(ConfigValidation, CreateConnection) {
   SUCCEED();
 }
 
+TEST_P(ConfigValidation, CreateScaledTimer) {
+  EXPECT_NE(dispatcher_->createScaledTimer(Event::ScaledTimerType::UnscaledRealTimerForTest, [] {}),
+            nullptr);
+  EXPECT_NE(dispatcher_->createScaledTimer(
+                Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat(0.5f))), [] {}),
+            nullptr);
+  SUCCEED();
+}
+
 // Make sure that creating DnsResolver does not cause crash and each call to create
 // DNS resolver returns the same shared_ptr.
 TEST_F(ConfigValidation, SharedDnsResolver) {
   std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
 
-  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(resolvers, false);
+  Network::DnsResolverSharedPtr dns1 =
+      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
   long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(resolvers, false);
+  Network::DnsResolverSharedPtr dns2 =
+      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
 
   EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.

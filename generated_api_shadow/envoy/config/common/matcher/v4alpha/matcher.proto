@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // As an on_no_match might result in another matching tree being evaluated, this process
 // might repeat several times until the final OnMatch (or no match) is decided.
 //
-// This API is a work in progress.
+// [#alpha:]
 message Matcher {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.matcher.v3.Matcher";
@@ -66,6 +66,7 @@ message Matcher {
             "envoy.config.common.matcher.v3.Matcher.MatcherList.Predicate.SinglePredicate";
 
         // Protocol-specific specification of input field to match on.
+        // [#extension-category: envoy.matching.common_inputs]
         core.v4alpha.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {
@@ -75,6 +76,7 @@ message Matcher {
           type.matcher.v4alpha.StringMatcher value_match = 2;
 
           // Extension for custom matching logic.
+          // [#extension-category: envoy.matching.input_matchers]
           core.v4alpha.TypedExtensionConfig custom_match = 3;
         }
       }
@@ -98,6 +100,9 @@ message Matcher {
 
         // A list of predicates to be AND-ed together.
         PredicateList and_matcher = 3;
+
+        // The invert of a predicate
+        Predicate not_matcher = 4;
       }
     }
 

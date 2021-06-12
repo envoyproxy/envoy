@@ -1,16 +1,15 @@
-#include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
+#include "source/extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.h"
 #include "envoy/extensions/filters/http/grpc_stats/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/grpc/context_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +52,7 @@ private:
     static uint64_t hash(const ViewTuple& key) { return absl::Hash<ViewTuple>()(key); }
 
   public:
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
 
     uint64_t operator()(const OwningKey& key) const { return hash(key); }
     uint64_t operator()(const ViewKey& key) const {
@@ -62,7 +61,7 @@ private:
   };
 
   struct MapEq {
-    using is_transparent = void;
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
     bool operator()(const OwningKey& left, const OwningKey& right) const { return left == right; }
     bool operator()(const OwningKey& left, const ViewKey& right) const {
       return left == std::make_tuple(right.service_, right.method_);
@@ -106,7 +105,7 @@ struct Config {
         // set.
         //
         // This will flip to false after one release.
-        const bool runtime_feature_default = true;
+        const bool runtime_feature_default = false;
 
         const char* runtime_key = "envoy.deprecated_features.grpc_stats_filter_enable_"
                                   "stats_for_all_methods_by_default";
@@ -246,7 +245,7 @@ public:
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
-          HttpFilterNames::get().GrpcStats, std::move(state),
+          "envoy.filters.http.grpc_stats", std::move(state),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }

@@ -16,7 +16,7 @@ MockDnsCacheResourceManager::MockDnsCacheResourceManager() {
 MockDnsCacheResourceManager::~MockDnsCacheResourceManager() = default;
 
 MockDnsCache::MockDnsCache() {
-  ON_CALL(*this, canCreateDnsRequest_(_)).WillByDefault(Return(nullptr));
+  ON_CALL(*this, canCreateDnsRequest_()).WillByDefault(Return(nullptr));
 }
 MockDnsCache::~MockDnsCache() = default;
 

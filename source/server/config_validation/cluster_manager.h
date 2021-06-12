@@ -3,10 +3,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/context_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -26,11 +27,12 @@ public:
       const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
       ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager)
+      AccessLog::AccessLogManager& log_manager, Singleton::Manager& singleton_manager,
+      const Server::Options& options)
       : ProdClusterManagerFactory(admin, runtime, stats, tls, dns_resolver, ssl_context_manager,
                                   main_thread_dispatcher, local_info, secret_manager,
                                   validation_context, api, http_context, grpc_context,
-                                  router_context, log_manager, singleton_manager),
+                                  router_context, log_manager, singleton_manager, options),
         grpc_context_(grpc_context), router_context_(router_context) {}
 
   ClusterManagerPtr
@@ -39,6 +41,7 @@ public:
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                      const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
 
 private:

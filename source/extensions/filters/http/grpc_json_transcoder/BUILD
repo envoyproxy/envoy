@@ -25,11 +25,13 @@ envoy_cc_library(
     deps = [
         ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:filter_interface",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
+        "@com_google_googleapis//google/api:http_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
     ],
 )
@@ -59,10 +61,8 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "unknown",
     deps = [
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",

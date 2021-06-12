@@ -1,7 +1,10 @@
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
-#include "common/common/assert.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/x509v3.h"
@@ -10,6 +13,63 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+#if BORINGSSL_API_VERSION < 10
+static constexpr absl::string_view SSL_ERROR_NONE_MESSAGE = "NONE";
+static constexpr absl::string_view SSL_ERROR_SSL_MESSAGE = "SSL";
+static constexpr absl::string_view SSL_ERROR_WANT_READ_MESSAGE = "WANT_READ";
+static constexpr absl::string_view SSL_ERROR_WANT_WRITE_MESSAGE = "WANT_WRITE";
+static constexpr absl::string_view SSL_ERROR_WANT_X509_LOOPUP_MESSAGE = "WANT_X509_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_SYSCALL_MESSAGE = "SYSCALL";
+static constexpr absl::string_view SSL_ERROR_ZERO_RETURN_MESSAGE = "ZERO_RETURN";
+static constexpr absl::string_view SSL_ERROR_WANT_CONNECT_MESSAGE = "WANT_CONNECT";
+static constexpr absl::string_view SSL_ERROR_WANT_ACCEPT_MESSAGE = "WANT_ACCEPT";
+static constexpr absl::string_view SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE =
+    "WANT_CHANNEL_ID_LOOKUP";
+static constexpr absl::string_view SSL_ERROR_PENDING_SESSION_MESSAGE = "PENDING_SESSION";
+static constexpr absl::string_view SSL_ERROR_PENDING_CERTIFICATE_MESSAGE = "PENDING_CERTIFICATE";
+static constexpr absl::string_view SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE =
+    "WANT_PRIVATE_KEY_OPERATION";
+static constexpr absl::string_view SSL_ERROR_PENDING_TICKET_MESSAGE = "PENDING_TICKET";
+static constexpr absl::string_view SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE = "EARLY_DATA_REJECTED";
+static constexpr absl::string_view SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE =
+    "WANT_CERTIFICATE_VERIFY";
+static constexpr absl::string_view SSL_ERROR_HANDOFF_MESSAGE = "HANDOFF";
+static constexpr absl::string_view SSL_ERROR_HANDBACK_MESSAGE = "HANDBACK";
+#endif
+static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
+
+Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
+                                                              TimeSource& time_source) {
+  Envoy::Ssl::CertificateDetailsPtr certificate_details =
+      std::make_unique<envoy::admin::v3::CertificateDetails>();
+  certificate_details->set_path(path);
+  certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
+  certificate_details->set_days_until_expiration(
+      Utility::getDaysUntilExpiration(cert, time_source));
+
+  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
+  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
+
+  for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_dns(dns_san);
+  }
+  for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_uri(uri_san);
+  }
+  for (auto& ip_san : Utility::getSubjectAltNames(*cert, GEN_IPADD)) {
+    envoy::admin::v3::SubjectAlternateName& subject_alt_name =
+        *certificate_details->add_subject_alt_names();
+    subject_alt_name.set_ip_address(ip_san);
+  }
+  return certificate_details;
+}
 
 namespace {
 
@@ -111,19 +171,24 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
     break;
   }
+  case GEN_EMAIL: {
+    ASN1_STRING* str = general_name->d.rfc822Name;
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    break;
+  }
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
       sockaddr_in sin;
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
-      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
       Network::Address::Ipv4Instance addr(&sin);
       san = addr.ip()->addressAsString();
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
-      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
       Network::Address::Ipv6Instance addr(sin6);
       san = addr.ip()->addressAsString();
     }
@@ -212,6 +277,58 @@ absl::optional<std::string> Utility::getLastCryptoError() {
   }
 
   return absl::nullopt;
+}
+
+absl::string_view Utility::getErrorDescription(int err) {
+#if BORINGSSL_API_VERSION < 10
+  // TODO(davidben): Remove this and the corresponding SSL_ERROR_*_MESSAGE constants when the FIPS
+  // build is updated to a later version.
+  switch (err) {
+  case SSL_ERROR_NONE:
+    return SSL_ERROR_NONE_MESSAGE;
+  case SSL_ERROR_SSL:
+    return SSL_ERROR_SSL_MESSAGE;
+  case SSL_ERROR_WANT_READ:
+    return SSL_ERROR_WANT_READ_MESSAGE;
+  case SSL_ERROR_WANT_WRITE:
+    return SSL_ERROR_WANT_WRITE_MESSAGE;
+  case SSL_ERROR_WANT_X509_LOOKUP:
+    return SSL_ERROR_WANT_X509_LOOPUP_MESSAGE;
+  case SSL_ERROR_SYSCALL:
+    return SSL_ERROR_SYSCALL_MESSAGE;
+  case SSL_ERROR_ZERO_RETURN:
+    return SSL_ERROR_ZERO_RETURN_MESSAGE;
+  case SSL_ERROR_WANT_CONNECT:
+    return SSL_ERROR_WANT_CONNECT_MESSAGE;
+  case SSL_ERROR_WANT_ACCEPT:
+    return SSL_ERROR_WANT_ACCEPT_MESSAGE;
+  case SSL_ERROR_WANT_CHANNEL_ID_LOOKUP:
+    return SSL_ERROR_WANT_CHANNEL_ID_LOOKUP_MESSAGE;
+  case SSL_ERROR_PENDING_SESSION:
+    return SSL_ERROR_PENDING_SESSION_MESSAGE;
+  case SSL_ERROR_PENDING_CERTIFICATE:
+    return SSL_ERROR_PENDING_CERTIFICATE_MESSAGE;
+  case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+    return SSL_ERROR_WANT_PRIVATE_KEY_OPERATION_MESSAGE;
+  case SSL_ERROR_PENDING_TICKET:
+    return SSL_ERROR_PENDING_TICKET_MESSAGE;
+  case SSL_ERROR_EARLY_DATA_REJECTED:
+    return SSL_ERROR_EARLY_DATA_REJECTED_MESSAGE;
+  case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
+    return SSL_ERROR_WANT_CERTIFICATE_VERIFY_MESSAGE;
+  case SSL_ERROR_HANDOFF:
+    return SSL_ERROR_HANDOFF_MESSAGE;
+  case SSL_ERROR_HANDBACK:
+    return SSL_ERROR_HANDBACK_MESSAGE;
+  }
+#else
+  const char* description = SSL_error_description(err);
+  if (description) {
+    return description;
+  }
+#endif
+  ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
+  return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 
 } // namespace Tls

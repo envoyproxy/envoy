@@ -4,16 +4,15 @@
 
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 
-#include "common/upstream/health_checker_base_impl.h"
-
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/redis_proxy/config.h"
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,7 @@ class RedisHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
   RedisHealthChecker(
       const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
-      const envoy::config::health_checker::redis::v2::Redis& redis_config,
+      const envoy::extensions::health_checkers::redis::v3::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);

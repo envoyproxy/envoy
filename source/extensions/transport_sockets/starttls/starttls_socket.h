@@ -1,13 +1,13 @@
+#pragma once
+
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,8 +16,7 @@ namespace StartTls {
 
 class StartTlsSocket : public Network::TransportSocket, Logger::Loggable<Logger::Id::filter> {
 public:
-  StartTlsSocket(const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig&,
-                 Network::TransportSocketPtr raw_socket, // RawBufferSocket
+  StartTlsSocket(Network::TransportSocketPtr raw_socket, // RawBufferSocket
                  Network::TransportSocketPtr tls_socket, // TlsSocket
                  const Network::TransportSocketOptionsSharedPtr&)
       : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
@@ -27,7 +26,7 @@ public:
     callbacks_ = &callbacks;
   }
 
-  std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
+  std::string protocol() const override { return "starttls"; }
 
   absl::string_view failureReason() const override { return active_socket_->failureReason(); }
 
@@ -64,17 +63,15 @@ private:
   bool using_tls_{false};
 };
 
-class ServerStartTlsSocketFactory : public Network::TransportSocketFactory,
-                                    Logger::Loggable<Logger::Id::config> {
+class StartTlsSocketFactory : public Network::TransportSocketFactory,
+                              Logger::Loggable<Logger::Id::config> {
 public:
-  ~ServerStartTlsSocketFactory() override = default;
+  ~StartTlsSocketFactory() override = default;
 
-  ServerStartTlsSocketFactory(
-      const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig& config,
-      Network::TransportSocketFactoryPtr raw_socket_factory,
-      Network::TransportSocketFactoryPtr tls_socket_factory)
+  StartTlsSocketFactory(Network::TransportSocketFactoryPtr raw_socket_factory,
+                        Network::TransportSocketFactoryPtr tls_socket_factory)
       : raw_socket_factory_(std::move(raw_socket_factory)),
-        tls_socket_factory_(std::move(tls_socket_factory)), config_(config) {}
+        tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
@@ -84,7 +81,6 @@ public:
 private:
   Network::TransportSocketFactoryPtr raw_socket_factory_;
   Network::TransportSocketFactoryPtr tls_socket_factory_;
-  envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config_;
 };
 
 } // namespace StartTls

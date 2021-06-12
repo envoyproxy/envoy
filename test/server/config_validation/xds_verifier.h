@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -6,7 +8,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "test/server/config_validation/xds_fuzz.pb.h"
 

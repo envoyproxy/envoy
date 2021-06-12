@@ -1,14 +1,15 @@
+#pragma once
+
 #include <cstdio>
 
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/message_impl.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -32,8 +33,8 @@ namespace Wasm {
 
 #define MOCK_CONTEXT_LOG_                                                                          \
   using Context::log;                                                                              \
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {                 \
-    log_(static_cast<spdlog::level::level_enum>(level), message);                                  \
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {                  \
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));                \
     return proxy_wasm::WasmResult::Ok;                                                             \
   }                                                                                                \
   MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message))
@@ -56,28 +57,33 @@ public:
   // NOLINTNEXTLINE(readability-identifier-naming)
   void SetUp() override { clearCodeCacheForTesting(); }
 
-  void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root,
-                 std::string root_id = "", std::string vm_configuration = "",
-                 bool fail_open = false, std::string plugin_configuration = "") {
-    envoy::extensions::wasm::v3::VmConfig vm_config;
-    vm_config.set_vm_id("vm_id");
-    vm_config.set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-    ProtobufWkt::StringValue vm_configuration_string;
-    vm_configuration_string.set_value(vm_configuration);
-    vm_config.mutable_configuration()->PackFrom(vm_configuration_string);
-    vm_config.mutable_code()->mutable_local()->set_inline_bytes(code);
+  void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root) {
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
     scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("wasm."));
-    auto name = "plugin_name";
-    auto vm_id = "";
+
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_root_id() = root_id_;
+    *plugin_config.mutable_name() = "plugin_name";
+    plugin_config.set_fail_open(fail_open_);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration_);
+    *plugin_config.mutable_vm_config()->mutable_environment_variables() = envs_;
+
+    auto vm_config = plugin_config.mutable_vm_config();
+    vm_config->set_vm_id("vm_id");
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
+    ProtobufWkt::StringValue vm_configuration_string;
+    vm_configuration_string.set_value(vm_configuration_);
+    vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
+    vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name, root_id, vm_id, runtime, plugin_configuration, fail_open,
-        envoy::config::core::v3::TrafficDirection::INBOUND, local_info_, &listener_metadata_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
+        &listener_metadata_);
+    plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
-        vm_config, plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api,
-        lifecycle_notifier_, remote_data_provider_,
-        [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
+        plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
+        remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     if (wasm_) {
       plugin_handle_ = getOrCreateThreadLocalPlugin(
           wasm_, plugin_, dispatcher_,
@@ -111,6 +117,25 @@ public:
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
+
+  void setRootId(std::string root_id) { root_id_ = root_id; }
+  void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
+  void setPluginConfiguration(std::string plugin_configuration) {
+    plugin_configuration_ = plugin_configuration;
+  }
+  void setFailOpen(bool fail_open) { fail_open_ = fail_open; }
+  void setAllowedCapabilities(proxy_wasm::AllowedCapabilitiesMap allowed_capabilities) {
+    allowed_capabilities_ = allowed_capabilities;
+  }
+  void setEnvs(envoy::extensions::wasm::v3::EnvironmentVariables envs) { envs_ = envs; }
+
+private:
+  std::string root_id_ = "";
+  std::string vm_configuration_ = "";
+  bool fail_open_ = false;
+  std::string plugin_configuration_ = "";
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
+  envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {

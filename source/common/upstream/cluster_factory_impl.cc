@@ -1,14 +1,14 @@
-#include "common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/server/options.h"
 
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/upstream/health_checker_impl.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -30,25 +30,26 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
     const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
     Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+    const Server::Options& options) {
   std::string cluster_type;
 
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
     case envoy::config::cluster::v3::Cluster::STATIC:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().Static;
+      cluster_type = "envoy.cluster.static";
       break;
     case envoy::config::cluster::v3::Cluster::STRICT_DNS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().StrictDns;
+      cluster_type = "envoy.cluster.strict_dns";
       break;
     case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().LogicalDns;
+      cluster_type = "envoy.cluster.logical_dns";
       break;
     case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().OriginalDst;
+      cluster_type = "envoy.cluster.original_dst";
       break;
     case envoy::config::cluster::v3::Cluster::EDS:
-      cluster_type = Extensions::Clusters::ClusterTypes::get().Eds;
+      cluster_type = "envoy.cluster.eds";
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -74,7 +75,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
   ClusterFactoryContextImpl context(
       cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
       dispatcher, log_manager, local_info, admin, singleton_manager,
-      std::move(outlier_event_logger), added_via_api, validation_visitor, api);
+      std::move(outlier_event_logger), added_via_api, validation_visitor, api, options);
   return factory->create(cluster, context);
 }
 
@@ -87,15 +88,32 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  if (!cluster.dns_resolvers().empty()) {
-    const auto& resolver_addrs = cluster.dns_resolvers();
+  if ((cluster.has_dns_resolution_config() &&
+       !cluster.dns_resolution_config().resolvers().empty()) ||
+      !cluster.dns_resolvers().empty()) {
+    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    resolvers.reserve(resolver_addrs.size());
-    for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> resolver_addrs;
+    if (cluster.has_dns_resolution_config()) {
+      dns_resolver_options.CopyFrom(cluster.dns_resolution_config().dns_resolver_options());
+      resolver_addrs.CopyFrom(cluster.dns_resolution_config().resolvers());
+    } else {
+      /* if `cluster.dns_resolution_config` is not set. */
+      // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+      // compatible utilize cluster.use_tcp_for_dns_lookups().
+      dns_resolver_options.set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
+      // Field repeated Address `dns_resolvers` will be deprecated in future. To be backward
+      // compatible utilize cluster.dns_resolvers().
+      resolver_addrs.CopyFrom(cluster.dns_resolvers());
     }
-    const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
-    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups);
+
+    if (!resolver_addrs.empty()) {
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+    return context.dispatcher().createDnsResolver(resolvers, dns_resolver_options);
   }
 
   return context.dnsResolver();
@@ -108,7 +126,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
       context.localInfo(), context.dispatcher(), context.stats(), context.singletonManager(),
-      context.tls(), context.messageValidationVisitor(), context.api());
+      context.tls(), context.messageValidationVisitor(), context.api(), context.options());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
       createClusterImpl(cluster, context, factory_context, std::move(stats_scope));

@@ -1,7 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "extensions/retry/host/omit_canary_hosts/config.h"
+#include "source/extensions/retry/host/omit_canary_hosts/config.h"
 
 #include "test/mocks/upstream/host.h"
 
@@ -43,7 +43,8 @@ TEST(OmitCanaryHostsRetryPredicateTest, EmptyConfig) {
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
-  EXPECT_TRUE(dynamic_cast<envoy::config::retry::omit_canary_hosts::v2::OmitCanaryHostsPredicate*>(
+  EXPECT_TRUE(dynamic_cast<
+              envoy::extensions::retry::host::omit_canary_hosts::v3::OmitCanaryHostsPredicate*>(
       config.get()));
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -10,9 +11,9 @@
 #include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -137,7 +138,7 @@ private:
         : health_checker_(health_checker), host_(host) {}
 
     // Upstream::HealthCheckHostMonitor
-    void setUnhealthy() override;
+    void setUnhealthy(UnhealthyType type) override;
 
     std::weak_ptr<HealthCheckerImplBase> health_checker_;
     std::weak_ptr<Host> host_;
@@ -154,7 +155,8 @@ private:
                                                std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
-  void setUnhealthyCrossThread(const HostSharedPtr& host);
+  void setUnhealthyCrossThread(const HostSharedPtr& host,
+                               HealthCheckHostMonitor::UnhealthyType type);
   static std::shared_ptr<const Network::TransportSocketOptionsImpl>
   initTransportSocketOptions(const envoy::config::core::v3::HealthCheck& config);
   static MetadataConstSharedPtr
@@ -175,13 +177,15 @@ private:
   absl::node_hash_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
   const MetadataConstSharedPtr transport_socket_match_metadata_;
+  const Common::CallbackHandlePtr member_update_cb_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
   HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, TimeSource& time_source,
                              const std::string& file_name)
-      : time_source_(time_source), file_(log_manager.createAccessLog(file_name)) {}
+      : time_source_(time_source), file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
+                                       Filesystem::DestinationType::File, file_name})) {}
 
   void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,

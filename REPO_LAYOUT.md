@@ -89,6 +89,8 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     `Envoy::Extensions::ListenerFilters` namespace.
   * [filters/network/](/source/extensions/filters/network): L4 network filters which use the
     `Envoy::Extensions::NetworkFilters` namespace.
+  * [formatters](/source/extensions/formatters): Access log formatters which use the
+    `Envoy::Extensions::Formatters` namespace.
   * [grpc_credentials/](/source/extensions/grpc_credentials): Custom gRPC credentials which use the
     `Envoy::Extensions::GrpcCredentials` namespace.
   * [health_checker/](/source/extensions/health_checker): Custom health checkers which use the

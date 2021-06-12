@@ -1,4 +1,4 @@
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -9,18 +9,18 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/tag_producer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -153,6 +153,13 @@ void Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& pr
 void Utility::checkApiConfigSourceSubscriptionBackingCluster(
     const Upstream::ClusterManager::ClusterSet& primary_clusters,
     const envoy::config::core::v3::ApiConfigSource& api_config_source) {
+  // We don't need to check backing sources for ADS sources, the backing cluster must be verified in
+  // the ads_config.
+  if (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+      api_config_source.api_type() ==
+          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+    return;
+  }
   Utility::checkApiConfigSourceNames(api_config_source);
 
   const bool is_grpc =

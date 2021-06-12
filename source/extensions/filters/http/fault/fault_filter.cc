@@ -1,4 +1,4 @@
-#include "extensions/filters/http/fault/fault_filter.h"
+#include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -12,17 +12,15 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +49,8 @@ FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::
           fault, max_active_faults_runtime, RuntimeKeys::get().MaxActiveFaultsKey)),
       response_rate_limit_percent_runtime_(
           PROTOBUF_GET_STRING_OR_DEFAULT(fault, response_rate_limit_percent_runtime,
-                                         RuntimeKeys::get().ResponseRateLimitPercentKey)) {
+                                         RuntimeKeys::get().ResponseRateLimitPercentKey)),
+      disable_downstream_cluster_stats_(fault.disable_downstream_cluster_stats()) {
   if (fault.has_abort()) {
     request_abort_config_ =
         std::make_unique<Filters::Common::Fault::FaultAbortConfig>(fault.abort());
@@ -89,8 +88,10 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
 void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
-  Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
-      .inc();
+  if (!settings_.disableDownstreamClusterStats()) {
+    Stats::Utility::counterFromStatNames(scope_, {stats_prefix_, downstream_cluster, stat_name})
+        .inc();
+  }
 }
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
@@ -110,14 +111,9 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // faults. In other words, runtime is supported only when faults are
   // configured at the filter level.
   fault_settings_ = config_->settings();
-  if (decoder_callbacks_->route() && decoder_callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
-    const auto* route_entry = decoder_callbacks_->route()->routeEntry();
-
-    const auto* per_route_settings =
-        route_entry->mostSpecificPerFilterConfigTyped<FaultSettings>(name);
-    fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
-  }
+  const auto* per_route_settings = Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
+      "envoy.filters.http.fault", decoder_callbacks_->route());
+  fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
 
   if (!matchesTargetUpstreamCluster()) {
     return Http::FilterHeadersStatus::Continue;
@@ -134,7 +130,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   if (headers.EnvoyDownstreamServiceCluster()) {
     downstream_cluster_ = std::string(headers.getEnvoyDownstreamServiceClusterValue());
-    if (!downstream_cluster_.empty()) {
+    if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
           downstream_cluster_, config_->scope().symbolTable());
     }
@@ -208,15 +204,18 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
 
   config_->stats().response_rl_injected_.inc();
 
-  response_limiter_ = std::make_unique<StreamRateLimiter>(
+  response_limiter_ = std::make_unique<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter>(
       rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
-      [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
-      decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
+      [this] { encoder_callbacks_->continueEncoding(); },
+      [](uint64_t) {
+        // write stats callback.
+      },
+      config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
 }
 
 bool FaultFilter::faultOverflow() {
@@ -263,7 +262,7 @@ bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) 
 }
 
 bool FaultFilter::isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers) {
-  if (fault_settings_->responseRateLimit() == nullptr) {
+  if (!isResponseRateLimitConfigured()) {
     return false;
   }
 
@@ -366,7 +365,7 @@ FaultFilter::abortGrpcStatus(const Http::RequestHeaderMap& request_headers) {
 
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
-  if (!downstream_cluster_.empty()) {
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
     config_->incDelays(downstream_cluster_storage_->statName());
   }
 
@@ -375,7 +374,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
-  if (!downstream_cluster_.empty()) {
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
     config_->incAborts(downstream_cluster_storage_->statName());
   }
 
@@ -434,6 +433,10 @@ void FaultFilter::onDestroy() {
   }
 }
 
+bool FaultFilter::isResponseRateLimitConfigured() {
+  return fault_settings_->responseRateLimit() != nullptr;
+}
+
 void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_headers) {
   resetTimerState();
 
@@ -445,6 +448,16 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   if (http_status.has_value()) {
     abortWithStatus(http_status.value(), grpc_status);
   } else {
+    // Should not continue to count as an active fault after the delay has elapsed if no other type
+    // of fault is active. As the delay timer is always done at this point and followed abort faults
+    // have been checked earlier, here we just check if there's a response rate limit configured.
+    ASSERT(fault_active_);
+    ASSERT(delay_timer_ == nullptr);
+    if (!isResponseRateLimitConfigured()) {
+      config_->stats().active_faults_.dec();
+      fault_active_ = false;
+    }
+
     // Continue request processing.
     decoder_callbacks_->continueDecoding();
   }
@@ -502,102 +515,11 @@ Http::FilterDataStatus FaultFilter::encodeData(Buffer::Instance& data, bool end_
 
 Http::FilterTrailersStatus FaultFilter::encodeTrailers(Http::ResponseTrailerMap&) {
   if (response_limiter_ != nullptr) {
-    return response_limiter_->onTrailers();
+    return response_limiter_->onTrailers() ? Http::FilterTrailersStatus::StopIteration
+                                           : Http::FilterTrailersStatus::Continue;
   }
 
   return Http::FilterTrailersStatus::Continue;
-}
-
-StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                                     std::function<void()> pause_data_cb,
-                                     std::function<void()> resume_data_cb,
-                                     std::function<void(Buffer::Instance&, bool)> write_data_cb,
-                                     std::function<void()> continue_cb, TimeSource& time_source,
-                                     Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope)
-    : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
-      bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
-      continue_cb_(continue_cb), scope_(scope),
-      // The token bucket is configured with a max token count of the number of ticks per second,
-      // and refills at the same rate, so that we have a per second limit which refills gradually in
-      // ~63ms intervals.
-      token_bucket_(SecondDivisor, time_source, SecondDivisor),
-      token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
-      buffer_(resume_data_cb, pause_data_cb,
-              []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }) {
-  ASSERT(bytes_per_time_slice_ > 0);
-  ASSERT(max_buffered_data > 0);
-  buffer_.setWatermarks(max_buffered_data);
-}
-
-void StreamRateLimiter::onTokenTimer() {
-  ENVOY_LOG(trace, "limiter: timer wakeup: buffered={}", buffer_.length());
-  Buffer::OwnedImpl data_to_write;
-
-  if (!saw_data_) {
-    // The first time we see any data on this stream (via writeData()), reset the number of tokens
-    // to 1. This will ensure that we start pacing the data at the desired rate (and don't send a
-    // full 1s of data right away which might not introduce enough delay for a stream that doesn't
-    // have enough data to span more than 1s of rate allowance). Once we reset, we will subsequently
-    // allow for bursting within the second to account for our data provider being bursty.
-    token_bucket_.reset(1);
-    saw_data_ = true;
-  }
-
-  // Compute the number of tokens needed (rounded up), try to obtain that many tickets, and then
-  // figure out how many bytes to write given the number of tokens we actually got.
-  const uint64_t tokens_needed =
-      (buffer_.length() + bytes_per_time_slice_ - 1) / bytes_per_time_slice_;
-  const uint64_t tokens_obtained = token_bucket_.consume(tokens_needed, true);
-  const uint64_t bytes_to_write =
-      std::min(tokens_obtained * bytes_per_time_slice_, buffer_.length());
-  ENVOY_LOG(trace, "limiter: tokens_needed={} tokens_obtained={} to_write={}", tokens_needed,
-            tokens_obtained, bytes_to_write);
-
-  // Move the data to write into the output buffer with as little copying as possible.
-  // NOTE: This might be moving zero bytes, but that should work fine.
-  data_to_write.move(buffer_, bytes_to_write);
-
-  // If the buffer still contains data in it, we couldn't get enough tokens, so schedule the next
-  // token available time.
-  if (buffer_.length() > 0) {
-    const std::chrono::milliseconds ms = token_bucket_.nextTokenAvailable();
-    if (ms.count() > 0) {
-      ENVOY_LOG(trace, "limiter: scheduling wakeup for {}ms", ms.count());
-      token_timer_->enableTimer(ms, &scope_);
-    }
-  }
-
-  // Write the data out, indicating end stream if we saw end stream, there is no further data to
-  // send, and there are no trailers.
-  write_data_cb_(data_to_write, saw_end_stream_ && buffer_.length() == 0 && !saw_trailers_);
-
-  // If there is no more data to send and we saw trailers, we need to continue iteration to release
-  // the trailers to further filters.
-  if (buffer_.length() == 0 && saw_trailers_) {
-    continue_cb_();
-  }
-}
-
-void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_stream) {
-  ENVOY_LOG(trace, "limiter: incoming data length={} buffered={}", incoming_buffer.length(),
-            buffer_.length());
-  buffer_.move(incoming_buffer);
-  saw_end_stream_ = end_stream;
-  if (!token_timer_->enabled()) {
-    // TODO(mattklein123): In an optimal world we would be able to continue iteration with the data
-    // we want in the buffer, but have a way to clear end_stream in case we can't send it all.
-    // The filter API does not currently support that and it will not be a trivial change to add.
-    // Instead we cheat here by scheduling the token timer to run immediately after the stack is
-    // unwound, at which point we can directly called encode/decodeData.
-    token_timer_->enableTimer(std::chrono::milliseconds(0), &scope_);
-  }
-}
-
-Http::FilterTrailersStatus StreamRateLimiter::onTrailers() {
-  saw_end_stream_ = true;
-  saw_trailers_ = true;
-  return buffer_.length() > 0 ? Http::FilterTrailersStatus::StopIteration
-                              : Http::FilterTrailersStatus::Continue;
 }
 
 } // namespace Fault

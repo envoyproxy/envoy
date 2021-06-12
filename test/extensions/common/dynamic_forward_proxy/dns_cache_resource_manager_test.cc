@@ -1,9 +1,8 @@
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-#include "extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -67,6 +66,9 @@ TEST_F(DnsCacheResourceManagerTest, CheckDnsResource) {
   pending_requests.dec();
   EXPECT_EQ(2, pending_requests.count());
   EXPECT_TRUE(pending_requests.canCreate());
+
+  EXPECT_EQ(0, resource_manager_->stats().rq_pending_open_.value());
+  EXPECT_EQ(0, resource_manager_->stats().rq_pending_remaining_.value());
 
   cleanup();
 }

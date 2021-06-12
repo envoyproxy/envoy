@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.v2;
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
@@ -11,12 +12,16 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 enum SomeEnum {
-  DEFAULT = 0 [deprecated = true];
+  DEFAULT = 0 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
   FOO = 1;
-  BAR = 2 [deprecated = true];
+  BAR = 2 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
   BAZ = 3 [(udpa.annotations.enum_value_migrate).rename = "WOW"];
+  OLD = 4 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.6"];
+  DEP = 5 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
+  VERY_OLD = 6 [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.5"];
 }
 
+// [#next-free-field: 7]
 message Sample {
   enum DeprecateEnum {
     option deprecated = true;
@@ -33,7 +38,17 @@ message Sample {
 
   repeated Entry entries = 1;
 
-  string will_deprecated = 2 [deprecated = true];
+  string will_deprecated = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
 
   string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
+
+  string old_deprecated = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.6"];
+
+  string new_deprecated = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
+
+  string very_old_deprecated = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.5"];
 }

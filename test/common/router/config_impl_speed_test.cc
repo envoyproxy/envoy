@@ -1,12 +1,11 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route.pb.validate.h"
 
-#include "common/common/assert.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
@@ -88,16 +87,13 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
  */
 static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierCase match_type) {
   // Setup router for benchmarking.
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.preserve_query_string_in_path_redirects", "false"}});
   Api::ApiPtr api = Api::createApiForTest();
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
 
   // Create router config.
-  ConfigImpl config(genRouteConfig(state, match_type), factory_context,
+  ConfigImpl config(genRouteConfig(state, match_type), OptionalHttpFilters(), factory_context,
                     ProtobufMessage::getNullValidationVisitor(), true);
 
   for (auto _ : state) { // NOLINT

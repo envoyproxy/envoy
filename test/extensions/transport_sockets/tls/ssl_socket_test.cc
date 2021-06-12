@@ -7,20 +7,19 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
@@ -316,7 +315,6 @@ void testUtil(const TestUtilOptions& options) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -400,7 +398,7 @@ void testUtil(const TestUtilOptions& options) {
       if (!options.expectedPeerCert().empty()) {
         std::string urlencoded = absl::StrReplaceAll(
             options.expectedPeerCert(),
-            {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+            {{"\r", ""}, {"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(urlencoded, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
@@ -408,7 +406,7 @@ void testUtil(const TestUtilOptions& options) {
       if (!options.expectedPeerCertChain().empty()) {
         std::string cert_chain = absl::StrReplaceAll(
             options.expectedPeerCertChain(),
-            {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+            {{"\r", ""}, {"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
         EXPECT_EQ(cert_chain, server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
@@ -604,10 +602,9 @@ private:
   std::string expected_transport_failure_reason_contains_;
 };
 
-const std::string testUtilV2(const TestUtilOptionsV2& options) {
+void testUtilV2(const TestUtilOptionsV2& options) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
-  std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in SslSocket anymore.
   ASSERT(options.listener().filter_chains().size() == 1);
@@ -629,7 +626,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(options.version()), nullptr, true);
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -723,14 +719,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_FALSE(server_ssl_requested_server_name.has_value());
       }
 
-      SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
-      EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
-      uint8_t* session_data;
-      size_t session_len;
-      int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
-      ASSERT(rc == 1);
-      new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
-      OPENSSL_free(session_data);
+      const uint16_t tls_version = SSL_version(client_ssl_socket);
+      if (SSL3_VERSION <= tls_version && tls_version <= TLS1_2_VERSION) {
+        // Prior to TLS 1.3, one should be able to resume the session. With TLS
+        // 1.3, tickets come after the handshake and the SSL_SESSION on the
+        // client is a dummy object.
+        SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
+        EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
+      }
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher->exit();
@@ -781,8 +777,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
   }
-
-  return new_session;
 }
 
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
@@ -898,27 +892,22 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   // From test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem.
   server_cert->mutable_certificate_chain()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(
-          TestEnvironment::substitute(
-              "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"),
-          true, false));
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem")));
 
   // From test/extensions/transport_sockets/tls/test_data/san_dns_key.pem.
-  server_cert->mutable_private_key()->set_inline_bytes(TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"),
-      true, false));
+  server_cert->mutable_private_key()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem")));
 
   // From test/extensions/transport_sockets/tls/test_data/ca_certificates.pem.
   filter_chain->mutable_hidden_envoy_deprecated_tls_context()
       ->mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
-      ->set_inline_bytes(TestEnvironment::readFileToStringForTest(
-          TestEnvironment::substitute(
-              "{{ test_rundir "
-              "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"),
-          true, false));
+      ->set_inline_bytes(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir "
+          "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -926,16 +915,13 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
 
   // From test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem.
   client_cert->mutable_certificate_chain()->set_inline_bytes(
-      TestEnvironment::readFileToStringForTest(
-          TestEnvironment::substitute(
-              "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"),
-          true, false));
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem")));
 
   // From test/extensions/transport_sockets/tls/test_data/san_uri_key.pem.
-  client_cert->mutable_private_key()->set_inline_bytes(TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"),
-      true, false));
+  client_cert->mutable_private_key()->set_inline_bytes(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem")));
 
   TestUtilOptionsV2 test_options(listener, client_ctx, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1239,10 +1225,9 @@ TEST_P(SslSocketTest, GetPeerCert) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"),
-      true, false);
+  std::string expected_peer_cert =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
@@ -1278,10 +1263,9 @@ TEST_P(SslSocketTest, GetPeerCertAcceptUntrusted) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
-          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"),
-      true, false);
+  std::string expected_peer_cert =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
@@ -1364,11 +1348,10 @@ TEST_P(SslSocketTest, GetPeerCertChain) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, GetParam());
-  std::string expected_peer_cert_chain = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
+  std::string expected_peer_cert_chain =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"),
-      true, false);
+          "}}/test/extensions/transport_sockets/tls/test_data/no_san_chain.pem"));
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerCertChain(expected_peer_cert_chain));
 }
@@ -1907,11 +1890,10 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/password_protected_key.pem"));
-  client_cert->mutable_password()->set_inline_string(TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute(
+  client_cert->mutable_password()->set_inline_string(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
           "{{ test_rundir "
-          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"),
-      true, false));
+          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt")));
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -2436,7 +2418,6 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -2493,7 +2474,6 @@ TEST_P(SslSocketTest, HalfClose) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -2576,7 +2556,6 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -2665,7 +2644,6 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
   std::shared_ptr<Network::MockReadFilter> server_read_filter(new Network::MockReadFilter());
@@ -2770,7 +2748,6 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -2868,7 +2845,6 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   auto socket2 = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
-  Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener1 =
       dispatcher->createListener(socket1, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -3008,7 +2984,6 @@ void testSupportForStatelessSessionResumption(const std::string& server_ctx_yaml
   auto tcp_socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(ip_version), nullptr, true);
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
-  Network::MockConnectionHandler connection_handler;
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
       dispatcher->createListener(tcp_socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
@@ -3452,7 +3427,6 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   auto socket2 = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
   Network::ListenerPtr listener2 =
@@ -3569,7 +3543,6 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   NiceMock<Network::MockTcpListenerCallbacks> callbacks;
-  Network::MockConnectionHandler connection_handler;
   Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   Network::ListenerPtr listener =
@@ -3832,7 +3805,6 @@ TEST_P(SslSocketTest, SslError) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
   Network::MockTcpListenerCallbacks callbacks;
-  Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener =
       dispatcher_->createListener(socket, callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
 
@@ -4887,13 +4859,9 @@ protected:
     for (uint32_t i = 0; i < num_writes; i++) {
       Buffer::OwnedImpl data(std::string(write_size, 'a'));
 
-      // Incredibly contrived way of making sure that the write buffer has an empty chain in it.
       if (reserve_write_space) {
-        Buffer::RawSlice iovecs[2];
-        EXPECT_EQ(2UL, data.reserve(16384, iovecs, 2));
-        iovecs[0].len_ = 0;
-        iovecs[1].len_ = 0;
-        data.commit(iovecs, 2);
+        data.appendSliceForTest(absl::string_view());
+        ASSERT_EQ(0, data.describeSlicesForTest().back().data);
       }
 
       client_connection_->write(data, false);
@@ -4975,7 +4943,6 @@ protected:
   Stats::TestUtil::TestStore client_stats_store_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockTcpListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
   const std::string server_ctx_yaml_ = R"EOF(
   common_tls_context:
     tls_certificates:

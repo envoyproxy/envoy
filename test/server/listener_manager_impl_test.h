@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/admin/v3/config_dump.pb.h"
@@ -5,11 +7,10 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "server/configuration_impl.h"
-#include "server/listener_manager_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
@@ -269,14 +270,6 @@ protected:
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  ABSL_MUST_USE_RESULT
-  auto disableInplaceUpdateForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.listener_in_place_filterchain_update", "false"}});
-    return scoped_runtime;
   }
 
   ABSL_MUST_USE_RESULT

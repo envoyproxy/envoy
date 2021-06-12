@@ -8,12 +8,13 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/field_matcher.h"
-#include "common/matcher/list_matcher.h"
-#include "common/matcher/value_input_matcher.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/list_matcher.h"
+#include "source/common/matcher/validation_visitor.h"
+#include "source/common/matcher/value_input_matcher.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -61,8 +62,11 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
  */
 template <class DataType> class MatchTreeFactory {
 public:
-  MatchTreeFactory(ProtobufMessage::ValidationVisitor& validation_visitor)
-      : validation_visitor_(validation_visitor) {}
+  MatchTreeFactory(const std::string& stats_prefix,
+                   Server::Configuration::FactoryContext& factory_context,
+                   MatchTreeValidationVisitor<DataType>& validation_visitor)
+      : stats_prefix_(stats_prefix), factory_context_(factory_context),
+        validation_visitor_(validation_visitor) {}
 
   MatchTreeSharedPtr<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
     switch (config.matcher_type_case()) {
@@ -114,6 +118,10 @@ private:
 
       return std::make_unique<AllFieldMatcher<DataType>>(std::move(sub_matchers));
     }
+    case (envoy::config::common::matcher::v3::Matcher::MatcherList::Predicate::kNotMatcher): {
+      return std::make_unique<NotFieldMatcher<DataType>>(
+          createFieldMatcher(field_predicate.not_matcher()));
+    }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -148,19 +156,48 @@ private:
     } else if (on_match.has_action()) {
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          on_match.action().typed_config(), validation_visitor_, factory);
-      return OnMatch<DataType>{factory.createActionFactoryCb(*message), {}};
+          on_match.action().typed_config(), factory_context_.messageValidationVisitor(), factory);
+      return OnMatch<DataType>{
+          factory.createActionFactoryCb(*message, stats_prefix_, factory_context_), {}};
     }
 
     return absl::nullopt;
   }
 
+  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+  class CommonProtocolInputWrapper : public DataInput<DataType> {
+  public:
+    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+        : common_protocol_input_(std::move(common_protocol_input)) {}
+
+    DataInputGetResult get(const DataType&) const override {
+      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                common_protocol_input_->get()};
+    }
+
+  private:
+    const CommonProtocolInputPtr common_protocol_input_;
+  };
+
   DataInputPtr<DataType>
   createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
-    auto& factory = Config::Utility::getAndCheckFactory<DataInputFactory<DataType>>(config);
+    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+    if (factory != nullptr) {
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          config.typed_config(), factory_context_.messageValidationVisitor(), *factory);
+      auto data_input = factory->createDataInput(*message, factory_context_);
+      validation_visitor_.validateDataInput(*data_input, config.typed_config().type_url());
+      return data_input;
+    }
+
+    // If the provided config doesn't match a typed input, assume that this is one of the common
+    // inputs.
+    auto& common_input_factory =
+        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), validation_visitor_, factory);
-    return factory.createDataInput(*message);
+        config.typed_config(), factory_context_.messageValidationVisitor(), common_input_factory);
+    return std::make_unique<CommonProtocolInputWrapper>(
+        common_input_factory.createCommonProtocolInput(*message, factory_context_));
   }
 
   InputMatcherPtr createInputMatcher(
@@ -175,15 +212,18 @@ private:
       auto& factory =
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          predicate.custom_match().typed_config(), validation_visitor_, factory);
-      return factory.createInputMatcher(*message);
+          predicate.custom_match().typed_config(), factory_context_.messageValidationVisitor(),
+          factory);
+      return factory.createInputMatcher(*message, factory_context_);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const std::string stats_prefix_;
+  Server::Configuration::FactoryContext& factory_context_;
+  MatchTreeValidationVisitor<DataType>& validation_visitor_;
 };
 } // namespace Matcher
 } // namespace Envoy

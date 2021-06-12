@@ -19,21 +19,21 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/cleanup.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/http/utility.h"
-#include "common/router/config_impl.h"
-#include "common/router/context_impl.h"
-#include "common/router/upstream_request.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_request.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -113,9 +113,13 @@ public:
                                       const std::chrono::milliseconds timeout);
 
   /**
-   * Set the :scheme header based on whether the underline transport is secure.
+   * Set the :scheme header using the best information available. In order this is
+   * - existing scheme header if valid
+   * - x-forwarded-proto header if valid
+   * - security of downstream connection
    */
-  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool use_secure_transport);
+  static void setUpstreamScheme(Http::RequestHeaderMap& headers, bool downstream_secure,
+                                bool upstream_secure);
 
   /**
    * Determine whether a request should be shadowed.
@@ -164,7 +168,7 @@ public:
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
                bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               bool respect_expected_rq_timeout,
+               bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
@@ -172,9 +176,10 @@ public:
         stats_(router_context.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
-        respect_expected_rq_timeout_(respect_expected_rq_timeout), http_context_(http_context),
-        zone_name_(local_info_.zoneStatName()), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {
+        respect_expected_rq_timeout_(respect_expected_rq_timeout),
+        suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
+        http_context_(http_context), zone_name_(local_info_.zoneStatName()),
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -186,12 +191,13 @@ public:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config)
-      : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
-                     context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
-                     PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     config.respect_expected_rq_timeout(), config.strict_check_headers(),
-                     context.api().timeSource(), context.httpContext(), context.routerContext()) {
+      : FilterConfig(
+            stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
+            context.runtime(), context.api().randomGenerator(), std::move(shadow_writer),
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
+            config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
+            config.suppress_grpc_request_failure_code_stats(), config.strict_check_headers(),
+            context.api().timeSource(), context.httpContext(), context.routerContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -212,6 +218,7 @@ public:
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
   const bool respect_expected_rq_timeout_;
+  const bool suppress_grpc_request_failure_code_stats_;
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
@@ -279,7 +286,8 @@ public:
       : config_(config), final_upstream_request_(nullptr),
         downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
         downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false),
+        request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -376,7 +384,8 @@ public:
   }
 
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
-    return callbacks_->getUpstreamSocketOptions();
+    return (upstream_options_ != nullptr) ? upstream_options_
+                                          : callbacks_->getUpstreamSocketOptions();
   }
 
   Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
@@ -490,7 +499,8 @@ private:
   void sendNoHealthyUpstreamResponse();
   bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
-                                                const Http::HeaderEntry& internal_redirect);
+                                                const Http::HeaderEntry& internal_redirect,
+                                                uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
@@ -534,10 +544,13 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  bool request_buffer_overflowed_ : 1;
+  bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::Socket::OptionsSharedPtr upstream_options_;
 };
 
 class ProdFilter : public Filter {

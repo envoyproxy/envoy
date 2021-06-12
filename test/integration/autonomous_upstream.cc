@@ -94,7 +94,8 @@ void AutonomousStream::sendResponse() {
 
 AutonomousHttpConnection::AutonomousHttpConnection(AutonomousUpstream& autonomous_upstream,
                                                    SharedConnectionWrapper& shared_connection,
-                                                   Type type, AutonomousUpstream& upstream)
+                                                   Http::CodecType type,
+                                                   AutonomousUpstream& upstream)
     : FakeHttpConnection(autonomous_upstream, shared_connection, type, upstream.timeSystem(),
                          Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
                          envoy::config::core::v3::HttpProtocolOptions::ALLOW),
@@ -119,8 +120,7 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection));
   AutonomousHttpConnectionPtr http_connection(
       new AutonomousHttpConnection(*this, *shared_connections_.back(), http_type_, *this));
-  testing::AssertionResult result = http_connection->initialize();
-  RELEASE_ASSERT(result, result.message());
+  http_connection->initialize();
   http_connections_.push_back(std::move(http_connection));
   return true;
 }

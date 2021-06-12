@@ -1,15 +1,13 @@
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/basic_resource_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/listen_socket_impl.h"
-
-#include "server/connection_handler_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -71,10 +69,8 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
-  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-    return absl::nullopt;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override {
+    return Network::UdpListenerConfigOptRef();
   }
   ResourceLimit& openConnections() override { return open_connections_; }
   envoy::config::core::v3::TrafficDirection direction() const override {

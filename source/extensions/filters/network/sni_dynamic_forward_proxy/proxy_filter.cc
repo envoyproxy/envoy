@@ -1,11 +1,11 @@
-#include "extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/assert.h"
-#include "common/tcp_proxy/tcp_proxy.h"
+#include "source/common/common/assert.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +33,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     return Network::FilterStatus::Continue;
   }
 
-  circuit_breaker_ = config_->cache().canCreateDnsRequest(absl::nullopt);
+  circuit_breaker_ = config_->cache().canCreateDnsRequest();
 
   if (circuit_breaker_ == nullptr) {
     ENVOY_CONN_LOG(debug, "pending request overflow", read_callbacks_->connection());
@@ -73,7 +73,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete() {
+void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
   ENVOY_CONN_LOG(debug, "load DNS cache complete, continuing", read_callbacks_->connection());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();

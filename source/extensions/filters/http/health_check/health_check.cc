@@ -1,4 +1,4 @@
-#include "extensions/filters/http/health_check/health_check.h"
+#include "source/extensions/filters/http/health_check/health_check.h"
 
 #include <chrono>
 #include <string>
@@ -7,13 +7,13 @@
 #include "envoy/event/timer.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -104,7 +104,11 @@ Http::FilterHeadersStatus HealthCheckFilter::encodeHeaders(Http::ResponseHeaderM
     }
 
     headers.setEnvoyUpstreamHealthCheckedCluster(context_.localInfo().clusterName());
-  } else if (context_.healthCheckFailed()) {
+  }
+
+  if (context_.healthCheckFailed() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster")) {
     headers.setReferenceEnvoyImmediateHealthCheckFail(
         Http::Headers::get().EnvoyImmediateHealthCheckFailValues.True);
   }

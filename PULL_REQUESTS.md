@@ -111,3 +111,11 @@ PR description.
 If you mark existing APIs or code as deprecated, when the next release is cut, the
 deprecation script will create and assign an issue to you for
 cleaning up the deprecated code path.
+
+### <a name="api"></a>API Changes
+
+If this PR changes anything in the [api tree](https://github.com/envoyproxy/envoy/tree/main/api),
+please read the [API Review
+Checklist](https://github.com/envoyproxy/envoy/tree/main/api/review_checklist.md)
+and make sure that your changes have addressed all of the considerations listed there.
+Any relevant considerations should be documented under "API Considerations" in the PR description.

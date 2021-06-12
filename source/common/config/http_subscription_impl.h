@@ -6,8 +6,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/http/rest_api_fetcher.h"
+#include "source/common/config/api_version.h"
+#include "source/common/http/rest_api_fetcher.h"
 
 namespace Envoy {
 namespace Config {
@@ -34,10 +34,10 @@ public:
                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::Subscription
-  void start(const std::set<std::string>& resource_names,
-             const bool use_namespace_matching = false) override;
-  void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
-  void requestOnDemandUpdate(const std::set<std::string>&) override {
+  void start(const absl::flat_hash_set<std::string>& resource_names) override;
+  void
+  updateResourceInterest(const absl::flat_hash_set<std::string>& update_to_these_names) override;
+  void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 

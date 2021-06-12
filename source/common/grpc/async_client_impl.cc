@@ -1,13 +1,13 @@
-#include "common/grpc/async_client_impl.h"
+#include "source/common/grpc/async_client_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -210,6 +210,7 @@ void AsyncStreamImpl::cleanup() {
   // This will destroy us, but only do so if we are actually in a list. This does not happen in
   // the immediate failure case.
   if (LinkedObject<AsyncStreamImpl>::inserted()) {
+    ASSERT(dispatcher_->isThreadSafe());
     dispatcher_->deferredDelete(
         LinkedObject<AsyncStreamImpl>::removeFromList(parent_.active_streams_));
   }

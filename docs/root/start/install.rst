@@ -57,38 +57,16 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
    To add the nightly repository instead, replace the word ``stable`` with ``nightly``,
    when adding the ``apt`` repository.
 
-Install Envoy on CentOS Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on RPM-based distros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/centos/>`_
+You can `install Envoy on Centos/Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
 
    $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/centos/tetrate-getenvoy.repo
-   $ sudo yum install getenvoy-envoy
-
-.. tip::
-
-   You can enable/disable ``nightly`` using ``yum-config-manager``:
-
-   .. code-block:: console
-
-      $ sudo yum-config-manager --enable tetrate-getenvoy-nightly
-      $ sudo yum-config-manager --disable tetrate-getenvoy-nightly
-
-Install Envoy on Redhat Enterprise Linux (RHEL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can
-`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rhel/>`_
-using `Get Envoy <https://www.getenvoy.io/>`__.
-
-.. code-block:: console
-
-   $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rhel/tetrate-getenvoy.repo
+   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rpm/tetrate-getenvoy.repo
    $ sudo yum install getenvoy-envoy
 
 .. tip::
@@ -119,14 +97,26 @@ You can install Envoy on Mac OSX using the official brew repositories, or from
 
       .. code-block:: console
 
-	 $ brew tap tetratelabs/getenvoy
-	 $ brew install envoy
+         $ brew tap tetratelabs/getenvoy
+         $ brew install envoy
 
       .. tip::
 
-	 You can install the ``nightly`` version from
-	 `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
-	 the install command.
+         You can install the ``nightly`` version from
+         `Get Envoy <https://www.getenvoy.io/>`__ by adding the ``--HEAD`` flag to
+         the install command.
+
+.. _start_install_windows:
+
+Install Envoy on Windows
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can run Envoy using the official Windows Docker image.
+
+.. substitution-code-block:: console
+
+   $ docker pull envoyproxy/|envoy_windows_docker_image|
+   $ docker run --rm envoyproxy/|envoy_windows_docker_image| --version
 
 .. _start_install_docker:
 
@@ -144,20 +134,27 @@ The following commands will pull and show the Envoy version of current images.
 
       .. substitution-code-block:: console
 
-	 $ docker pull envoyproxy/|envoy_docker_image|
-	 $ docker run --rm envoyproxy/|envoy_docker_image| --version
+         $ docker pull envoyproxy/|envoy_docker_image|
+         $ docker run --rm envoyproxy/|envoy_docker_image| --version
+
+   .. tab:: Envoy (distroless)
+
+      .. substitution-code-block:: console
+
+         $ docker pull envoyproxy/|envoy_distroless_docker_image|
+         $ docker run --rm envoyproxy/|envoy_distroless_docker_image| --version
 
    .. tab:: Get Envoy
 
       .. code-block:: console
 
-	 $ docker pull getenvoy/envoy:stable
-	 $ docker run --rm getenvoy/envoy:stable --version
+         $ docker pull getenvoy/envoy:stable
+         $ docker run --rm getenvoy/envoy:stable --version
 
       .. tip::
 
-	 To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
-	 replace the word ``stable`` with ``nightly`` in the above commands.
+         To use the ``nightly`` version from `Get Envoy <https://www.getenvoy.io/>`__
+         replace the word ``stable`` with ``nightly`` in the above commands.
 
 .. _install_binaries:
 
@@ -166,21 +163,99 @@ Pre-built Envoy Docker images
 
 The following table shows the available Docker images
 
-.. csv-table::
-   :widths: 30 38 8 8 8 8
+.. list-table::
+   :widths: auto
    :header-rows: 2
    :stub-columns: 1
-   :file: _include/dockerhub-images.csv
+
+   * -
+     -
+     - stable
+     - stable
+     - main
+     - main
+   * - Docker image
+     - Description
+     - amd64
+     - arm64
+     - amd64
+     - arm64
+   * - `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-distroless <https://hub.docker.com/r/envoyproxy/envoy-distroless/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
+   * - `envoyproxy/envoy-alpine <https://hub.docker.com/r/envoyproxy/envoy-alpine/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
+   * - `envoyproxy/envoy-windows <https://hub.docker.com/r/envoyproxy/envoy-windows/tags/>`_
+     - Release binary with symbols stripped on top of a Windows Server 1809 base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+     -
+   * - `envoyproxy/envoy-debug <https://hub.docker.com/r/envoyproxy/envoy-debug/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     - |DOCKER_IMAGE_TAG_NAME|
+     - |DOCKER_IMAGE_TAG_NAME|
+     -
+     -
+   * - `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_
+     - Release binary with symbols stripped on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-distroless-dev <https://hub.docker.com/r/envoyproxy/envoy-distroless-dev/tags/>`_
+     - Release binary with symbols stripped on top of a distroless base.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_
+     - Release binary with symbols stripped on top of a **glibc** alpine base.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-debug-dev/tags/>`_
+     - Release binary with debug symbols on top of an Ubuntu Bionic base.
+     -
+     -
+     - latest
+     - latest
+   * - `envoyproxy/envoy-windows-dev <https://hub.docker.com/r/envoyproxy/envoy-windows-dev/tags/>`_
+     - Release binary with symbols stripped on top of a Windows Server 1809 base. Includes build tools.
+     -
+     -
+     - latest
+     -
+   * - `envoyproxy/envoy-build-ubuntu <https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags/>`_
+     - Build image which includes tools for building multi-arch Envoy and containers.
+     -
+     -
+     - See Docker Hub
+     - See Docker Hub
 
 .. note::
 
    In the above repositories, we tag a *vX.Y-latest* image for each security/stable release line.
 
    In the above *dev* repositories, the *latest* tag points to a container including the last
-   Envoy build on master that passed tests.
+   Envoy build on main that passed tests.
 
-   The Envoy project considers master to be release candidate quality at all times, and many
-   organizations track and deploy master in production. We encourage you to do the same so that
+   The Envoy project considers main to be release candidate quality at all times, and many
+   organizations track and deploy main in production. We encourage you to do the same so that
    issues can be reported as early as possible in the development process.
 
    The ``envoy-build-ubuntu`` image does not contain a working Envoy server, but can be used for

@@ -37,14 +37,12 @@ envoy_cc_extension(
     external_deps = [
         "abseil_node_hash_set",
     ],
-    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":tsi_handshaker",
         ":tsi_socket",
-        "//include/envoy/registry",
-        "//include/envoy/server:transport_socket_config_interface",
+        "//envoy/registry",
+        "//envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
@@ -73,7 +71,7 @@ envoy_cc_library(
     ],
     deps = [
         ":grpc_tsi_wrapper",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
     ],
 )
@@ -90,9 +88,10 @@ envoy_cc_library(
         ":noop_transport_socket_callbacks_lib",
         ":tsi_frame_protector",
         ":tsi_handshaker",
-        "//include/envoy/network:io_handle_interface",
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:io_handle_interface",
+        "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:cleanup_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
@@ -105,7 +104,7 @@ envoy_cc_library(
     name = "noop_transport_socket_callbacks_lib",
     hdrs = ["noop_transport_socket_callbacks.h"],
     deps = [
-        "//include/envoy/network:io_handle_interface",
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:io_handle_interface",
+        "//envoy/network:transport_socket_interface",
     ],
 )

@@ -1,13 +1,12 @@
-#include "server/admin/runtime_handler.h"
+#include "source/server/admin/runtime_handler.h"
 
 #include <string>
 #include <vector>
 
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "server/admin/utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -74,7 +73,7 @@ Http::Code RuntimeHandler::handlerRuntime(absl::string_view url,
   (*fields)["layers"] = ValueUtil::listValue(layer_names);
   (*fields)["entries"] = ValueUtil::structValue(layer_entries);
 
-  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
+  response.add(MessageUtil::getJsonStringFromMessageOrDie(runtime, true, true));
   return Http::Code::OK;
 }
 
@@ -99,9 +98,9 @@ Http::Code RuntimeHandler::handlerRuntimeModify(absl::string_view url, Http::Res
   }
   absl::node_hash_map<std::string, std::string> overrides;
   overrides.insert(params.begin(), params.end());
-  try {
-    server_.runtime().mergeValues(overrides);
-  } catch (const EnvoyException& e) {
+  TRY_ASSERT_MAIN_THREAD { server_.runtime().mergeValues(overrides); }
+  END_TRY
+  catch (const EnvoyException& e) {
     response.add(e.what());
     return Http::Code::ServiceUnavailable;
   }

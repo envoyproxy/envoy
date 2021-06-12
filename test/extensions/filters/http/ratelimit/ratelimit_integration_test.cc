@@ -5,12 +5,11 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-
-#include "extensions/filters/http/ratelimit/config.h"
-#include "extensions/filters/http/ratelimit/ratelimit_headers.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/extensions/filters/http/ratelimit/config.h"
+#include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/extensions/filters/common/ratelimit/utils.h"
@@ -25,7 +24,7 @@ namespace {
 class RatelimitIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void SetUp() override {
     XDS_DEPRECATED_FEATURE_TEST_SKIP;
@@ -34,7 +33,7 @@ public:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
@@ -59,7 +58,7 @@ public:
       envoy::config::listener::v3::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.filters.http.ratelimit");
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
+      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ratelimit_filter));
     });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -119,7 +118,7 @@ public:
 
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
 
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
@@ -130,7 +129,7 @@ public:
   }
 
   void waitForFailedUpstreamResponse(uint32_t response_code) {
-    response_->waitForEndStream();
+    ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(std::to_string(response_code), response_->headers().getStatusValue());
   }
@@ -231,14 +230,18 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFilterHeadersEnabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType,
                          RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
   XDS_DEPRECATED_FEATURE_TEST_SKIP;

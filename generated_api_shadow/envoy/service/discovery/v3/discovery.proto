@@ -8,7 +8,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -58,7 +57,7 @@ message DiscoveryRequest {
   // delta, where it is populated only for new explicit ACKs).
   string response_nonce = 5;
 
-  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_service.discovery.v3.DiscoveryResponse>`
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
   // failed to update configuration. The *message* field in *error_details* provides the Envoy
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
@@ -105,7 +104,6 @@ message DiscoveryResponse {
   // required for non-stream based xDS implementations.
   string nonce = 5;
 
-  // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 6;
 }
@@ -197,13 +195,13 @@ message DeltaDiscoveryRequest {
   // Otherwise (unlike in DiscoveryRequest) response_nonce must be omitted.
   string response_nonce = 6;
 
-  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_service.discovery.v3.DiscoveryResponse>`
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`
   // failed to update configuration. The *message* field in *error_details*
   // provides the Envoy internal exception related to the failure.
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -228,6 +226,10 @@ message DeltaDiscoveryResponse {
   // The nonce provides a way for DeltaDiscoveryRequests to uniquely
   // reference a DeltaDiscoveryResponse when (N)ACKing. The nonce is required.
   string nonce = 5;
+
+  // [#not-implemented-hide:]
+  // The control plane instance that sent the response.
+  config.core.v3.ControlPlane control_plane = 7;
 }
 
 // [#next-free-field: 8]

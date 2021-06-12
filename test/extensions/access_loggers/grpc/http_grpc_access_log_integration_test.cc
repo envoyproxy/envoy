@@ -3,10 +3,10 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/codec.h"
-#include "common/grpc/common.h"
-#include "common/version/version.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/grpc/common.h"
+#include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -22,11 +22,11 @@ namespace {
 class AccessLogIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
-  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  AccessLogIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initialize() override {
@@ -107,8 +107,7 @@ public:
     }
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(request_msg);
     Config::VersionUtil::scrubHiddenEnvoyDeprecated(expected_request_msg);
-    EXPECT_TRUE(TestUtility::protoEqual(request_msg, expected_request_msg,
-                                        /*ignore_repeated_field_ordering=*/false));
+    EXPECT_THAT(request_msg, ProtoEq(expected_request_msg));
     return AssertionSuccess();
   }
 
@@ -126,7 +125,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, AccessLogIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
@@ -150,9 +150,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -173,9 +174,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:
@@ -221,9 +223,10 @@ http_logs:
         no_route_found: true
     protocol_version: HTTP11
     request:
+      scheme: http
       authority: host
       path: /notfound
-      request_headers_bytes: 122
+      request_headers_bytes: 118
       request_method: GET
     response:
       response_code:

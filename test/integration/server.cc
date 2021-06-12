@@ -5,16 +5,15 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/random_generator.h"
-#include "common/common/thread.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/network/utility.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/hot_restart_nop_impl.h"
-#include "server/options_impl.h"
-#include "server/process_context_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/hot_restart_nop_impl.h"
+#include "source/server/options_impl.h"
+#include "source/server/process_context_impl.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/integration/utility.h"
@@ -85,6 +84,20 @@ void IntegrationTestServer::waitUntilListenersReady() {
   ENVOY_LOG(info, "listener wait complete");
 }
 
+void IntegrationTestServer::setDynamicContextParam(absl::string_view resource_type_url,
+                                                   absl::string_view key, absl::string_view value) {
+  server().dispatcher().post([this, resource_type_url, key, value]() {
+    server().localInfo().contextProvider().setDynamicContextParam(resource_type_url, key, value);
+  });
+}
+
+void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_type_url,
+                                                     absl::string_view key) {
+  server().dispatcher().post([this, resource_type_url, key]() {
+    server().localInfo().contextProvider().unsetDynamicContextParam(resource_type_url, key);
+  });
+}
+
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization, ProcessObjectOptRef process_object,
@@ -103,8 +116,8 @@ void IntegrationTestServer::start(
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
   // before workers starting or after server start. Any needed synchronization must occur in the
-  // routines. These steps are executed at this point in the code to allow server initialization to
-  // be dependent on them (e.g. control plane peers).
+  // routines. These steps are executed at this point in the code to allow server initialization
+  // to be dependent on them (e.g. control plane peers).
   if (on_server_init_function != nullptr) {
     on_server_init_function();
   }
@@ -241,7 +254,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
     if (admin_address != nullptr) {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1);
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();

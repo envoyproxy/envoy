@@ -1,10 +1,10 @@
-#include "common/api/api_impl.h"
+#include "source/common/api/api_impl.h"
 
 #include <chrono>
 #include <string>
 
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -19,6 +19,13 @@ Impl::Impl(Thread::ThreadFactory& thread_factory, Stats::Store& store,
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name) {
   return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, watermark_factory_);
+}
+
+Event::DispatcherPtr
+Impl::allocateDispatcher(const std::string& name,
+                         const Event::ScaledRangeTimerManagerFactory& scaled_timer_factory) {
+  return std::make_unique<Event::DispatcherImpl>(name, *this, time_system_, scaled_timer_factory,
+                                                 watermark_factory_);
 }
 
 Event::DispatcherPtr Impl::allocateDispatcher(const std::string& name,

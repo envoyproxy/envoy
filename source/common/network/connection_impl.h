@@ -9,10 +9,10 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/event/libevent.h"
-#include "common/network/connection_impl_base.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -45,9 +45,7 @@ public:
  * Implementation of Network::Connection, Network::FilterManagerConnection and
  * Envoy::ScopeTrackedObject.
  */
-class ConnectionImpl : public ConnectionImplBase,
-                       public TransportSocketCallbacks,
-                       public ScopeTrackedObject {
+class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
@@ -122,6 +120,7 @@ public:
   // Reconsider how to make fairness happen.
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
+  TransportSocketPtr& transportSocket() { return transport_socket_; }
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }

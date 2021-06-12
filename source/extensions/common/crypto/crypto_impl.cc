@@ -1,4 +1,4 @@
-#include "extensions/common/crypto/crypto_impl.h"
+#include "source/extensions/common/crypto/crypto_impl.h"
 
 namespace Envoy {
 namespace Common {

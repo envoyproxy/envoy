@@ -5,12 +5,11 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -20,7 +19,6 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -64,6 +62,8 @@ public:
 
   int numInits() const { return num_inits_; }
 
+  int numClears() const { return num_clears_; }
+
 private:
   void mockAddEntry(const std::string& key) {
     if (!message_.fields().contains(key)) {
@@ -94,7 +94,13 @@ private:
 
   void initMessage() override { ++num_inits_; }
 
+  void clearMessage() override {
+    message_.Clear();
+    num_clears_++;
+  }
+
   int num_inits_ = 0;
+  int num_clears_ = 0;
 };
 
 class GrpcAccessLogTest : public testing::Test {
@@ -161,12 +167,15 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
   logger_->log(mockHttpEntry());
   EXPECT_EQ(1, logger_->numInits());
+  // Messages should be cleared after each flush.
+  EXPECT_EQ(1, logger_->numClears());
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
 
   // Log a TCP entry.
   expectFlushedLogEntriesCount(stream, MOCK_TCP_LOG_FIELD_NAME, 1);
   logger_->log(ProtobufWkt::Empty());
+  EXPECT_EQ(2, logger_->numClears());
   // TCP logging doesn't change the logs_written counter.
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
@@ -183,6 +192,7 @@ TEST_F(GrpcAccessLogTest, BasicFlow) {
   logger_->log(mockHttpEntry());
   // Message should be initialized again.
   EXPECT_EQ(2, logger_->numInits());
+  EXPECT_EQ(3, logger_->numClears());
   EXPECT_EQ(0,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
   EXPECT_EQ(2,
@@ -202,6 +212,8 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
   EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(0);
   logger_->log(mockHttpEntry());
+  // No entry was logged so no clear expected.
+  EXPECT_EQ(0, logger_->numClears());
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
   EXPECT_EQ(0,
@@ -212,6 +224,8 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(0);
   logger_->log(mockHttpEntry());
   EXPECT_EQ(1, logger_->numInits());
+  // Still no entry was logged so no clear expected.
+  EXPECT_EQ(0, logger_->numClears());
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
   EXPECT_EQ(1,
@@ -224,45 +238,11 @@ TEST_F(GrpcAccessLogTest, WatermarksOverrun) {
   EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
   EXPECT_CALL(stream, sendMessageRaw_(_, _));
   logger_->log(mockHttpEntry());
+  // Now both entries were logged separately so we expect 2 clears.
+  EXPECT_EQ(2, logger_->numClears());
   EXPECT_EQ(2,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
   EXPECT_EQ(1,
-            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
-}
-
-// Test legacy behavior of unbounded access logs.
-TEST_F(GrpcAccessLogTest, WatermarksLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.disallow_unbounded_access_logs", "false"}});
-
-  initLogger(FlushInterval, 1);
-
-  // Start a stream for the first log.
-  MockAccessLogStream stream;
-  AccessLogCallbacks* callbacks;
-  expectStreamStart(stream, &callbacks);
-
-  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark())
-      .Times(AnyNumber())
-      .WillRepeatedly(Return(true));
-
-  // Fail to flush, so the log stays buffered up.
-  EXPECT_CALL(stream, sendMessageRaw_(_, false)).Times(0);
-  logger_->log(mockHttpEntry());
-  // Message should still be initialized.
-  EXPECT_EQ(1, logger_->numInits());
-  EXPECT_EQ(1,
-            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
-  EXPECT_EQ(0,
-            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
-
-  // As with the above test, try to log more. The log will not be dropped.
-  EXPECT_CALL(stream, sendMessageRaw_(_, _)).Times(0);
-  logger_->log(mockHttpEntry());
-  EXPECT_EQ(2,
-            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
-  EXPECT_EQ(0,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_dropped")->value());
 }
 
@@ -296,6 +276,8 @@ TEST_F(GrpcAccessLogTest, Batching) {
   logger_->log(mockHttpEntry());
   logger_->log(mockHttpEntry());
   EXPECT_EQ(1, logger_->numInits());
+  // The entries were batched and logged together so we expect a single clear.
+  EXPECT_EQ(1, logger_->numClears());
 
   // Logging an entry that's bigger than the buffer size should trigger another flush.
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
@@ -303,6 +285,7 @@ TEST_F(GrpcAccessLogTest, Batching) {
   const std::string big_key(max_buffer_size, 'a');
   big_entry.mutable_fields()->insert({big_key, ProtobufWkt::Value()});
   logger_->log(std::move(big_entry));
+  EXPECT_EQ(2, logger_->numClears());
 }
 
 // Test that log entries are flushed periodically.
@@ -342,7 +325,7 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Grpc::RawAsyncClientPtr&& client,
+               envoy::config::core::v3::ApiVersion, Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
@@ -383,31 +366,36 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
 
   expectClientCreation();
-  MockGrpcAccessLoggerImpl::SharedPtr logger1 =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope);
+  MockGrpcAccessLoggerImpl::SharedPtr logger1 = logger_cache_.getOrCreateLogger(
+      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope);
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::TCP, scope));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   config.set_log_name("log-1");
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
+                                            Common::GrpcAccessLoggerType::HTTP, scope));
 }
 
 } // namespace

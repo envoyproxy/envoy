@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Load Report]
 
 // These are stats Envoy reports to the management server at a frequency defined by
-// :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
+// :ref:`LoadStatsResponse.load_reporting_interval<envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.load_reporting_interval>`.
 // Stats per upstream region/zone and optionally per subzone.
 // [#next-free-field: 9]
 message UpstreamLocalityStats {
@@ -52,7 +52,7 @@ message UpstreamLocalityStats {
 
   // Endpoint granularity stats information for this locality. This information
   // is populated if the Server requests it by setting
-  // :ref:`LoadStatsResponse.report_endpoint_granularity<envoy_api_field_service.load_stats.v3.LoadStatsResponse.report_endpoint_granularity>`.
+  // :ref:`LoadStatsResponse.report_endpoint_granularity<envoy_v3_api_field_service.load_stats.v3.LoadStatsResponse.report_endpoint_granularity>`.
   repeated UpstreamEndpointStats upstream_endpoint_stats = 7;
 
   // [#not-implemented-hide:] The priority of the endpoint group these metrics
@@ -118,7 +118,7 @@ message EndpointLoadMetricStats {
 }
 
 // Per cluster load stats. Envoy reports these stats a management server in a
-// :ref:`LoadStatsRequest<envoy_api_msg_service.load_stats.v3.LoadStatsRequest>`
+// :ref:`LoadStatsRequest<envoy_v3_api_msg_service.load_stats.v3.LoadStatsRequest>`
 // Next ID: 7
 // [#next-free-field: 7]
 message ClusterStats {

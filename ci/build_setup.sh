@@ -97,15 +97,16 @@ BAZEL_BUILD_OPTIONS=(
   "--show_task_finish"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
+  "--noshow_progress"
+  "--noshow_loading_progress"
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
-  "--define" "wasm=disabled"
-	"--flaky_test_attempts=2"
-	"--test_env=HEAPCHECK=")
+  "--flaky_test_attempts=2"
+  "--test_env=HEAPCHECK=")
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

@@ -5,9 +5,8 @@
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
 #include "envoy/network/connection.h"
 
-#include "common/network/transport_socket_options_impl.h"
-
-#include "extensions/transport_sockets/starttls/starttls_socket.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
@@ -26,7 +25,6 @@ public:
 };
 
 TEST(StartTlsTest, BasicSwitch) {
-  const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
   Network::TransportSocketOptionsSharedPtr options =
       std::make_shared<Network::TransportSocketOptionsImpl>();
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
@@ -34,13 +32,12 @@ TEST(StartTlsTest, BasicSwitch) {
   Network::MockTransportSocket* ssl_socket = new Network::MockTransportSocket;
   Buffer::OwnedImpl buf;
 
-  std::unique_ptr<StartTlsSocket> socket =
-      std::make_unique<StartTlsSocket>(config, Network::TransportSocketPtr(raw_socket),
-                                       Network::TransportSocketPtr(ssl_socket), options);
+  std::unique_ptr<StartTlsSocket> socket = std::make_unique<StartTlsSocket>(
+      Network::TransportSocketPtr(raw_socket), Network::TransportSocketPtr(ssl_socket), options);
   socket->setTransportSocketCallbacks(transport_callbacks);
 
   // StartTls socket is initial clear-text state. All calls should be forwarded to raw socket.
-  ASSERT_THAT(socket->protocol(), TransportProtocolNames::get().StartTls);
+  ASSERT_THAT(socket->protocol(), "starttls");
   EXPECT_CALL(*raw_socket, onConnected());
   EXPECT_CALL(*ssl_socket, onConnected()).Times(0);
   socket->onConnected();
@@ -83,7 +80,7 @@ TEST(StartTlsTest, BasicSwitch) {
 
   // Now calls to all methods should be forwarded to ssl_socket.
   // raw_socket has been destructed when switch to tls happened.
-  ASSERT_THAT(socket->protocol(), TransportProtocolNames::get().StartTls);
+  ASSERT_THAT(socket->protocol(), "starttls");
   EXPECT_CALL(*ssl_socket, onConnected());
   socket->onConnected();
 
@@ -108,15 +105,13 @@ TEST(StartTlsTest, BasicSwitch) {
 
 // Factory test.
 TEST(StartTls, BasicFactoryTest) {
-  const envoy::extensions::transport_sockets::starttls::v3::StartTlsConfig config;
   NiceMock<Network::MockTransportSocketFactory>* raw_buffer_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
   NiceMock<Network::MockTransportSocketFactory>* ssl_factory =
       new NiceMock<Network::MockTransportSocketFactory>;
-  std::unique_ptr<ServerStartTlsSocketFactory> factory =
-      std::make_unique<ServerStartTlsSocketFactory>(
-          config, Network::TransportSocketFactoryPtr(raw_buffer_factory),
-          Network::TransportSocketFactoryPtr(ssl_factory));
+  std::unique_ptr<StartTlsSocketFactory> factory = std::make_unique<StartTlsSocketFactory>(
+      Network::TransportSocketFactoryPtr(raw_buffer_factory),
+      Network::TransportSocketFactoryPtr(ssl_factory));
   ASSERT_FALSE(factory->implementsSecureTransport());
   ASSERT_FALSE(factory->usesProxyProtocolOptions());
 }

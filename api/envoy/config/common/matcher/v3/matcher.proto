@@ -6,9 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.matcher.v3";
@@ -24,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // As an on_no_match might result in another matching tree being evaluated, this process
 // might repeat several times until the final OnMatch (or no match) is decided.
 //
-// This API is a work in progress.
+// [#alpha:]
 message Matcher {
   // What to do if a match is successful.
   message OnMatch {
@@ -52,6 +50,7 @@ message Matcher {
       // Predicate for a single input field.
       message SinglePredicate {
         // Protocol-specific specification of input field to match on.
+        // [#extension-category: envoy.matching.common_inputs]
         core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {
@@ -61,6 +60,7 @@ message Matcher {
           type.matcher.v3.StringMatcher value_match = 2;
 
           // Extension for custom matching logic.
+          // [#extension-category: envoy.matching.input_matchers]
           core.v3.TypedExtensionConfig custom_match = 3;
         }
       }
@@ -81,6 +81,9 @@ message Matcher {
 
         // A list of predicates to be AND-ed together.
         PredicateList and_matcher = 3;
+
+        // The invert of a predicate
+        Predicate not_matcher = 4;
       }
     }
 

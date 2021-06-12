@@ -27,21 +27,30 @@ CDN
 CDS
 CEL
 DSR
+EBADF
+ENOTCONN
+EPIPE
 HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RCVBUF
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
 WRSQ
+WASI
 ceil
+CCM
 CHACHA
 CHLO
 CHMOD
 CHLOS
 CHLOs
 CIDR
+CITT
 CLA
 CLI
 CMSG
@@ -65,6 +74,7 @@ CVE
 CX
 Cxx
 CYGWIN
+DCP
 DER
 DESC
 DFATAL
@@ -112,6 +122,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+guarddog
 GC
 GCC
 GCE
@@ -184,6 +195,7 @@ MD
 MERCHANTABILITY
 MGET
 MQ
+MSDN
 MSET
 MSVC
 MTLS
@@ -197,6 +209,7 @@ NBSP
 NDEBUG
 NEXTHDR
 NGHTTP
+NLOHMANN
 NOAUTH
 NOCHECKRESP
 NODELAY
@@ -264,6 +277,7 @@ RPC
 RSA
 RST
 RTDS
+RTOS
 RTTI
 RUNDIR
 RW
@@ -306,6 +320,7 @@ STL
 STRLEN
 STS
 SVG
+SVID
 Symbolizer
 TBD
 TCLAP
@@ -370,6 +385,7 @@ absl
 accesslog
 accessor
 accessors
+ackless
 acks
 acls
 addr
@@ -429,6 +445,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -441,6 +459,7 @@ bools
 boringssl
 borks
 broadcasted
+brotli
 buf
 buflen
 bugprone
@@ -477,7 +496,7 @@ ci
 ciphersuite
 ciphersuites
 circllhist
-CITT
+clientcert
 cloneable
 cloneability
 cmd
@@ -510,6 +529,7 @@ coverity
 cplusplus
 cpuset
 creds
+cRLSign
 crypto
 cryptographic
 cryptographically
@@ -544,6 +564,7 @@ deflater
 deletable
 deleter
 delim
+denylist
 deque
 deprecations
 dereference
@@ -590,6 +611,7 @@ enqueued
 enqueues
 enum
 enums
+environ
 epoll
 errno
 etag
@@ -701,6 +723,7 @@ inlined
 inlining
 inobservability
 inotify
+inserter
 instantiation
 instantiations
 interpretable
@@ -824,6 +847,7 @@ noncopyable
 nonresponsive
 noop
 nop
+npos
 nthreads
 ntohl
 ntop
@@ -871,6 +895,7 @@ passphrase
 passthrough
 pathname
 pausable
+pausedness
 pcall
 pcap
 pclose
@@ -882,6 +907,7 @@ pkey
 plaintext
 pluggable
 pointee
+poller
 popen
 pos
 posix
@@ -952,6 +978,7 @@ readonly
 readv
 realloc
 rebalanced
+rebalancer
 rebalancing
 rebuffer
 rebuilder
@@ -1000,6 +1027,7 @@ resolvers
 responder
 restarter
 resync
+ret
 retransmitting
 retriable
 retriggers
@@ -1064,6 +1092,7 @@ src
 ssize
 stackdriver
 stacktrace
+starttls
 startup
 stateful
 statsd
@@ -1109,6 +1138,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1144,6 +1174,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain
@@ -1214,6 +1245,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll

@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <cstdint>
 #include <string>
@@ -10,10 +10,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/ssl.h"
@@ -227,8 +225,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(
-          TransportSockets::TransportProtocolNames::get().Tls);
+      cb_->socket().setDetectedTransportProtocol("tls");
     } else {
       config_->stats().tls_not_found_.inc();
     }

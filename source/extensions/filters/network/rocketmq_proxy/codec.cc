@@ -1,13 +1,12 @@
-#include "extensions/filters/network/rocketmq_proxy/codec.h"
+#include "source/extensions/filters/network/rocketmq_proxy/codec.h"
 
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -391,7 +390,7 @@ void Encoder::encode(const RemotingCommandPtr& command, Buffer::Instance& data) 
     (*fields)["extFields"] = ext_fields_v;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(command_struct);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(command_struct);
 
   int32_t frame_length = 4;
   int32_t header_length = json.size();

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include <cstdint>
 #include <list>
@@ -9,10 +9,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 namespace Envoy {
 namespace Extensions {

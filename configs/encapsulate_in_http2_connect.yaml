@@ -4,7 +4,6 @@
 # and running `curl --x 127.0.0.1:10000 https://www.google.com`
 
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       protocol: TCP
@@ -28,20 +27,20 @@ static_resources:
           tunneling_config:
             hostname: host.com:443
   clusters:
-    - name: cluster_0
-      connect_timeout: 5s
-      # This ensures HTTP/2 CONNECT is used for establishing the tunnel.
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {}
-      load_assignment:
-        cluster_name: cluster_0
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: 127.0.0.1
-                      port_value: 10001
+  - name: cluster_0
+    connect_timeout: 5s
+    # This ensures HTTP/2 CONNECT is used for establishing the tunnel.
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001

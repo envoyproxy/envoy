@@ -1,4 +1,4 @@
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 #include <climits>
 #include <cstdint>
@@ -7,19 +7,22 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/upstream/upstream.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
@@ -48,9 +51,6 @@ const std::regex& getSystemTimeFormatNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
-
-template <class... Ts> struct StructFormatMapVisitor : Ts... { using Ts::operator()...; };
-template <class... Ts> StructFormatMapVisitor(Ts...) -> StructFormatMapVisitor<Ts...>;
 
 } // namespace
 
@@ -113,6 +113,12 @@ FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
   providers_ = SubstitutionFormatParser::parse(format);
 }
 
+FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values,
+                             const std::vector<CommandParserPtr>& command_parsers)
+    : empty_value_string_(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueString) {
+  providers_ = SubstitutionFormatParser::parse(format, command_parsers);
+}
+
 std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
                                   const Http::ResponseHeaderMap& response_headers,
                                   const Http::ResponseTrailerMap& response_trailers,
@@ -135,102 +141,178 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
                                       const Http::ResponseTrailerMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info,
                                       absl::string_view local_reply_body) const {
-  const auto output_struct = struct_formatter_.format(
+  const ProtobufWkt::Struct output_struct = struct_formatter_.format(
       request_headers, response_headers, response_trailers, stream_info, local_reply_body);
 
-  const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
+  const std::string log_line =
+      MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values,
+                                 const std::vector<CommandParserPtr>& commands)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      struct_output_format_(FormatBuilder(commands).toFormatMapValue(format_mapping)) {}
+
+StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,
+                                 bool omit_empty_values)
+    : omit_empty_values_(omit_empty_values), preserve_types_(preserve_types),
+      empty_value_(omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString),
+      struct_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
+
 StructFormatter::StructFormatMapWrapper
-StructFormatter::toFormatMap(const ProtobufWkt::Struct& struct_format) const {
+StructFormatter::FormatBuilder::toFormatMapValue(const ProtobufWkt::Struct& struct_format) const {
   auto output = std::make_unique<StructFormatMap>();
   for (const auto& pair : struct_format.fields()) {
     switch (pair.second.kind_case()) {
     case ProtobufWkt::Value::kStringValue:
-      output->emplace(pair.first, SubstitutionFormatParser::parse(pair.second.string_value()));
+      output->emplace(pair.first, toFormatStringValue(pair.second.string_value()));
       break;
+
     case ProtobufWkt::Value::kStructValue:
-      output->emplace(pair.first, toFormatMap(pair.second.struct_value()));
+      output->emplace(pair.first, toFormatMapValue(pair.second.struct_value()));
       break;
+
+    case ProtobufWkt::Value::kListValue:
+      output->emplace(pair.first, toFormatListValue(pair.second.list_value()));
+      break;
+
     default:
-      throw EnvoyException(
-          "Only string values or nested structs are supported in structured access log format.");
+      throw EnvoyException("Only string values, nested structs and list values are "
+                           "supported in structured access log format.");
     }
   }
   return {std::move(output)};
-};
+}
+
+StructFormatter::StructFormatListWrapper StructFormatter::FormatBuilder::toFormatListValue(
+    const ProtobufWkt::ListValue& list_value_format) const {
+  auto output = std::make_unique<StructFormatList>();
+  for (const auto& value : list_value_format.values()) {
+    switch (value.kind_case()) {
+    case ProtobufWkt::Value::kStringValue:
+      output->emplace_back(toFormatStringValue(value.string_value()));
+      break;
+
+    case ProtobufWkt::Value::kStructValue:
+      output->emplace_back(toFormatMapValue(value.struct_value()));
+      break;
+
+    case ProtobufWkt::Value::kListValue:
+      output->emplace_back(toFormatListValue(value.list_value()));
+      break;
+    default:
+      throw EnvoyException("Only string values, nested structs and list values are "
+                           "supported in structured access log format.");
+    }
+  }
+  return {std::move(output)};
+}
+
+std::vector<FormatterProviderPtr>
+StructFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
+  std::vector<CommandParserPtr> commands;
+  return SubstitutionFormatParser::parse(string_format, commands_.value_or(commands));
+}
+
+ProtobufWkt::Value StructFormatter::providersCallback(
+    const std::vector<FormatterProviderPtr>& providers,
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
+    absl::string_view local_reply_body) const {
+  ASSERT(!providers.empty());
+  if (providers.size() == 1) {
+    const auto& provider = providers.front();
+    if (preserve_types_) {
+      return provider->formatValue(request_headers, response_headers, response_trailers,
+                                   stream_info, local_reply_body);
+    }
+
+    if (omit_empty_values_) {
+      return ValueUtil::optionalStringValue(provider->format(
+          request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+    }
+
+    const auto str = provider->format(request_headers, response_headers, response_trailers,
+                                      stream_info, local_reply_body);
+    return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
+  }
+  // Multiple providers forces string output.
+  std::string str;
+  for (const auto& provider : providers) {
+    const auto bit = provider->format(request_headers, response_headers, response_trailers,
+                                      stream_info, local_reply_body);
+    str += bit.value_or(empty_value_);
+  }
+  return ValueUtil::stringValue(str);
+}
+
+ProtobufWkt::Value StructFormatter::structFormatMapCallback(
+    const StructFormatter::StructFormatMapWrapper& format_map,
+    const StructFormatter::StructFormatMapVisitor& visitor) const {
+  ProtobufWkt::Struct output;
+  auto* fields = output.mutable_fields();
+  for (const auto& pair : *format_map.value_) {
+    ProtobufWkt::Value value = absl::visit(visitor, pair.second);
+    if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
+      continue;
+    }
+    (*fields)[pair.first] = value;
+  }
+  return ValueUtil::structValue(output);
+}
+
+ProtobufWkt::Value StructFormatter::structFormatListCallback(
+    const StructFormatter::StructFormatListWrapper& format_list,
+    const StructFormatter::StructFormatMapVisitor& visitor) const {
+  std::vector<ProtobufWkt::Value> output;
+  for (const auto& val : *format_list.value_) {
+    ProtobufWkt::Value value = absl::visit(visitor, val);
+    if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
+      continue;
+    }
+    output.push_back(value);
+  }
+  return ValueUtil::listValue(output);
+}
 
 ProtobufWkt::Struct StructFormatter::format(const Http::RequestHeaderMap& request_headers,
                                             const Http::ResponseHeaderMap& response_headers,
                                             const Http::ResponseTrailerMap& response_trailers,
                                             const StreamInfo::StreamInfo& stream_info,
                                             absl::string_view local_reply_body) const {
-  const std::string& empty_value =
-      omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
-  const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
-      providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
-        ASSERT(!providers.empty());
-        if (providers.size() == 1) {
-          const auto& provider = providers.front();
-          if (preserve_types_) {
-            return provider->formatValue(request_headers, response_headers, response_trailers,
-                                         stream_info, local_reply_body);
-          }
-
-          if (omit_empty_values_) {
-            return ValueUtil::optionalStringValue(
-                provider->format(request_headers, response_headers, response_trailers, stream_info,
-                                 local_reply_body));
-          }
-
-          const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
-        }
-        // Multiple providers forces string output.
-        std::string str;
-        for (const auto& provider : providers) {
-          const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          str += bit.value_or(empty_value);
-        }
-        return ValueUtil::stringValue(str);
-      };
-  const std::function<ProtobufWkt::Value(const StructFormatter::StructFormatMapWrapper&)>
-      struct_format_map_callback = [&](const StructFormatter::StructFormatMapWrapper& format) {
-        ProtobufWkt::Struct output;
-        auto* fields = output.mutable_fields();
-        StructFormatMapVisitor visitor{struct_format_map_callback, providers_callback};
-        for (const auto& pair : *format.value_) {
-          ProtobufWkt::Value value = absl::visit(visitor, pair.second);
-          if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
-            continue;
-          }
-          (*fields)[pair.first] = value;
-        }
-        return ValueUtil::structValue(output);
-      };
-  return struct_format_map_callback(struct_output_format_).struct_value();
+  StructFormatMapVisitor visitor{
+      [&](const std::vector<FormatterProviderPtr>& providers) {
+        return providersCallback(providers, request_headers, response_headers, response_trailers,
+                                 stream_info, local_reply_body);
+      },
+      [&, this](const StructFormatter::StructFormatMapWrapper& format_map) {
+        return structFormatMapCallback(format_map, visitor);
+      },
+      [&, this](const StructFormatter::StructFormatListWrapper& format_list) {
+        return structFormatListCallback(format_list, visitor);
+      },
+  };
+  return structFormatMapCallback(struct_output_format_, visitor).struct_value();
 }
 
 void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
                                                   std::string& main_header,
                                                   std::string& alternative_header,
                                                   absl::optional<size_t>& max_length) {
+  // subs is used only to check if there are more than 2 tokens separated by '?'.
   std::vector<std::string> subs;
-  parseCommand(token, start, "?", main_header, subs, max_length);
-  if (subs.size() > 1) {
+  alternative_header = "";
+  parseCommand(token, start, '?', max_length, main_header, alternative_header, subs);
+  if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
         // docs/root/configuration/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
-  if (subs.size() == 1) {
-    alternative_header = subs.front();
-  } else {
-    alternative_header = "";
-  }
+
   // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
   if (std::regex_search(main_header, getNewlinePattern()) ||
       std::regex_search(alternative_header, getNewlinePattern())) {
@@ -238,25 +320,24 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   }
 }
 
-void SubstitutionFormatParser::parseCommand(const std::string& token, const size_t start,
-                                            const std::string& separator, std::string& main,
-                                            std::vector<std::string>& sub_items,
-                                            absl::optional<size_t>& max_length) {
-  // TODO(dnoe): Convert this to use string_view throughout.
-  const size_t end_request = token.find(')', start);
-  sub_items.clear();
-  if (end_request != token.length() - 1) {
+void SubstitutionFormatParser::tokenizeCommand(const std::string& command, const size_t start,
+                                               const char separator,
+                                               std::vector<absl::string_view>& tokens,
+                                               absl::optional<size_t>& max_length) {
+  const size_t end_request = command.find(')', start);
+  tokens.clear();
+  if (end_request != command.length() - 1) {
     // Closing bracket is not found.
     if (end_request == std::string::npos) {
-      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", token));
+      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", command));
     }
 
     // Closing bracket should be either last one or followed by ':' to denote limitation.
-    if (token[end_request + 1] != ':') {
-      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", token));
+    if (command[end_request + 1] != ':') {
+      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", command));
     }
 
-    const auto length_str = absl::string_view(token).substr(end_request + 2);
+    const auto length_str = absl::string_view(command).substr(end_request + 2);
     uint64_t length_value;
 
     if (!absl::SimpleAtoi(length_str, &length_value)) {
@@ -266,128 +347,163 @@ void SubstitutionFormatParser::parseCommand(const std::string& token, const size
     max_length = length_value;
   }
 
-  const std::string name_data = token.substr(start, end_request - start);
-  if (!separator.empty()) {
-    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-    if (!keys.empty()) {
-      // The main value is the first key
-      main = keys.at(0);
-      if (keys.size() > 1) {
-        // Sub items contain additional keys
-        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
-      }
-    }
-  } else {
-    main = name_data;
-  }
+  absl::string_view name_data(command);
+  name_data.remove_prefix(start);
+  name_data.remove_suffix(command.length() - end_request);
+  tokens = absl::StrSplit(name_data, separator);
 }
 
-// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
 std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
-  std::string current_token;
-  std::vector<FormatterProviderPtr> formatters;
-  static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
-  static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+  return SubstitutionFormatParser::parse(format, {});
+}
 
+FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::string& token) {
+  static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
+  static constexpr absl::string_view CLUSTER_META_TOKEN{"CLUSTER_METADATA("};
+  static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
   static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
   static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
-    if (format[pos] == '%') {
-      if (!current_token.empty()) {
-        formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
-        current_token = "";
-      }
+  if (absl::StartsWith(token, "REQ(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
 
-      std::smatch m;
-      const std::string search_space = format.substr(pos);
-      if (!std::regex_search(search_space, m, command_w_args_regex)) {
-        throw EnvoyException(
-            fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
-                        format, pos));
-      }
+    parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
 
-      const std::string match = m.str(0);
-      const std::string token = match.substr(1, match.length() - 2);
-      pos += 1;
-      const int command_end_position = pos + token.length();
+    return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "RESP(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
 
-      if (absl::StartsWith(token, "REQ(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
+    parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
 
-        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
+    return std::make_unique<ResponseHeaderFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "TRAILER(")) {
+    std::string main_header, alternative_header;
+    absl::optional<size_t> max_length;
 
-        formatters.emplace_back(FormatterProviderPtr{
-            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "RESP(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
+    parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
 
-        parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
+    return std::make_unique<ResponseTrailerFormatter>(main_header, alternative_header, max_length);
+  } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
+    return std::make_unique<LocalReplyBodyFormatter>();
+  } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = DYNAMIC_META_TOKEN.size();
 
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "TRAILER(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
+    return std::make_unique<DynamicMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, CLUSTER_META_TOKEN)) {
+    std::string filter_namespace;
+    absl::optional<size_t> max_length;
+    std::vector<std::string> path;
+    const size_t start = CLUSTER_META_TOKEN.size();
 
-        parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
+    parseCommand(token, start, ':', max_length, filter_namespace, path);
+    return std::make_unique<ClusterMetadataFormatter>(filter_namespace, path, max_length);
+  } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
+    std::string key, serialize_type;
+    absl::optional<size_t> max_length;
+    std::string path;
+    const size_t start = FILTER_STATE_TOKEN.size();
 
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
-        formatters.emplace_back(std::make_unique<LocalReplyBodyFormatter>());
-      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
-        std::string filter_namespace;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = DYNAMIC_META_TOKEN.size();
-
-        parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(
-            FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
-      } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
-        std::string key;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = FILTER_STATE_TOKEN.size();
-
-        parseCommand(token, start, ":", key, path, max_length);
-        if (key.empty()) {
-          throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
-        }
-
-        const absl::string_view serialize_type =
-            !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
-
-        if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
-          throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
-        }
-        const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
-
-        formatters.push_back(
-            std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
-      } else if (absl::StartsWith(token, "START_TIME")) {
-        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(token)});
-      } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVStartFormatter(token)});
-      } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
-        formatters.emplace_back(FormatterProviderPtr{new DownstreamPeerCertVEndFormatter(token)});
-      } else if (absl::StartsWith(token, "GRPC_STATUS")) {
-        formatters.emplace_back(FormatterProviderPtr{
-            new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
-      } else {
-        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
-      }
-      pos = command_end_position;
-    } else {
-      current_token += format[pos];
+    parseCommand(token, start, ':', max_length, key, serialize_type);
+    if (key.empty()) {
+      throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
     }
+
+    if (serialize_type.empty()) {
+      serialize_type = std::string(TYPED_SERIALIZATION);
+    }
+    if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
+      throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
+    }
+    const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
+
+    return std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string);
+  } else if (absl::StartsWith(token, "START_TIME")) {
+    return std::make_unique<StartTimeFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_START")) {
+    return std::make_unique<DownstreamPeerCertVStartFormatter>(token);
+  } else if (absl::StartsWith(token, "DOWNSTREAM_PEER_CERT_V_END")) {
+    return std::make_unique<DownstreamPeerCertVEndFormatter>(token);
+  } else if (absl::StartsWith(token, "GRPC_STATUS")) {
+    return std::make_unique<GrpcStatusFormatter>("grpc-status", "", absl::optional<size_t>());
+  } else if (absl::StartsWith(token, "REQUEST_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::RequestHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_HEADERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseHeaders);
+  } else if (absl::StartsWith(token, "RESPONSE_TRAILERS_BYTES")) {
+    return std::make_unique<HeadersByteSizeFormatter>(
+        HeadersByteSizeFormatter::HeaderType::ResponseTrailers);
   }
 
-  if (!current_token.empty()) {
+  return nullptr;
+}
+
+// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
+std::vector<FormatterProviderPtr>
+SubstitutionFormatParser::parse(const std::string& format,
+                                const std::vector<CommandParserPtr>& commands) {
+  std::string current_token;
+  std::vector<FormatterProviderPtr> formatters;
+  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
+
+  for (size_t pos = 0; pos < format.length(); ++pos) {
+    if (format[pos] != '%') {
+      current_token += format[pos];
+      continue;
+    }
+
+    if (!current_token.empty()) {
+      formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
+      current_token = "";
+    }
+
+    std::smatch m;
+    const std::string search_space = format.substr(pos);
+    if (!std::regex_search(search_space, m, command_w_args_regex)) {
+      throw EnvoyException(fmt::format(
+          "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
+    }
+
+    const std::string match = m.str(0);
+    const std::string token = match.substr(1, match.length() - 2);
+    pos += 1;
+    const size_t command_end_position = pos + token.length();
+
+    auto formatter = parseBuiltinCommand(token);
+    if (formatter) {
+      formatters.push_back(std::move(formatter));
+    } else {
+      // Check formatter extensions. These are used for anything not provided by the built-in
+      // operators, e.g.: specialized formatting, computing stats from request/response headers
+      // or from stream info, etc.
+      bool added = false;
+      for (const auto& cmd : commands) {
+        auto formatter = cmd->parse(token, pos, command_end_position);
+        if (formatter) {
+          formatters.push_back(std::move(formatter));
+          added = true;
+          break;
+        }
+      }
+
+      if (!added) {
+        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
+      }
+    }
+
+    pos = command_end_position;
+  }
+
+  if (!current_token.empty() || format.empty()) {
+    // Create a PlainStringFormatter with the final string literal. If the format string was empty,
+    // this creates a PlainStringFormatter with an empty string.
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
@@ -574,6 +690,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.lastDownstreamRxByteReceived();
         });
+  } else if (field_name == "REQUEST_TX_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.lastUpstreamTxByteSent();
+        });
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -635,8 +756,15 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           std::string upstream_cluster_name;
-          if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+          if (stream_info.upstreamClusterInfo().has_value() &&
+              stream_info.upstreamClusterInfo().value() != nullptr) {
+            if (Runtime::runtimeFeatureEnabled(
+                    "envoy.reloadable_features.use_observable_cluster_name")) {
+              upstream_cluster_name =
+                  stream_info.upstreamClusterInfo().value()->observabilityName();
+            } else {
+              upstream_cluster_name = stream_info.upstreamClusterInfo().value()->name();
+            }
           }
 
           return upstream_cluster_name.empty()
@@ -776,6 +904,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
+  } else if (field_name == "FILTER_CHAIN_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          if (!stream_info.filterChainName().empty()) {
+            return stream_info.filterChainName();
+          }
+          return absl::nullopt;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
@@ -924,6 +1060,41 @@ ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http:
   return HeaderFormatter::formatValue(response_trailers);
 }
 
+HeadersByteSizeFormatter::HeadersByteSizeFormatter(const HeaderType header_type)
+    : header_type_(header_type) {}
+
+uint64_t HeadersByteSizeFormatter::extractHeadersByteSize(
+    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
+    const Http::ResponseTrailerMap& response_trailers) const {
+  switch (header_type_) {
+  case HeaderType::RequestHeaders:
+    return request_headers.byteSize();
+  case HeaderType::ResponseHeaders:
+    return response_headers.byteSize();
+  case HeaderType::ResponseTrailers:
+    return response_trailers.byteSize();
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+absl::optional<std::string>
+HeadersByteSizeFormatter::format(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
+                                 const Http::ResponseTrailerMap& response_trailers,
+                                 const StreamInfo::StreamInfo&, absl::string_view) const {
+  return absl::StrCat(extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
+ProtobufWkt::Value
+HeadersByteSizeFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
+                                      const Http::ResponseHeaderMap& response_headers,
+                                      const Http::ResponseTrailerMap& response_trailers,
+                                      const StreamInfo::StreamInfo&, absl::string_view) const {
+  return ValueUtil::numberValue(
+      extractHeadersByteSize(request_headers, response_headers, response_trailers));
+}
+
 GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
                                          const std::string& alternative_header,
                                          absl::optional<size_t> max_length)
@@ -975,9 +1146,15 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
-  truncate(json, max_length_);
-  return json;
+  std::string str;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unquote_log_string_values") &&
+      value.kind_case() == ProtobufWkt::Value::kStringValue) {
+    str = value.string_value();
+  } else {
+    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+  }
+  truncate(str, max_length_);
+  return str;
 }
 
 ProtobufWkt::Value
@@ -1000,8 +1177,8 @@ MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& 
   return val;
 }
 
-// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
-// See: https://github.com/envoyproxy/envoy/issues/3006
+// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by
+// @htuch. See: https://github.com/envoyproxy/envoy/issues/3006
 DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
                                                    const std::vector<std::string>& path,
                                                    absl::optional<size_t> max_length)
@@ -1019,6 +1196,34 @@ ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHead
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          absl::string_view) const {
   return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
+}
+
+ClusterMetadataFormatter::ClusterMetadataFormatter(const std::string& filter_namespace,
+                                                   const std::vector<std::string>& path,
+                                                   absl::optional<size_t> max_length)
+    : MetadataFormatter(filter_namespace, path, max_length) {}
+
+absl::optional<std::string> ClusterMetadataFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    return absl::nullopt;
+  }
+  return MetadataFormatter::formatMetadata(cluster_info.value()->metadata());
+}
+
+ProtobufWkt::Value ClusterMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
+                                                         const Http::ResponseHeaderMap&,
+                                                         const Http::ResponseTrailerMap&,
+                                                         const StreamInfo::StreamInfo& stream_info,
+                                                         absl::string_view) const {
+  auto cluster_info = stream_info.upstreamClusterInfo();
+  if (!cluster_info.has_value() || cluster_info.value() == nullptr) {
+    // Let the formatter do its thing with empty metadata.
+    return MetadataFormatter::formatMetadataValue(envoy::config::core::v3::Metadata());
+  }
+  return MetadataFormatter::formatMetadataValue(cluster_info.value()->metadata());
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
@@ -1096,9 +1301,11 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  try {
-    MessageUtil::jsonConvertValue(*proto, val);
-  } catch (EnvoyException& ex) {
+  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
+  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
+  // when converting that to a structure.
+  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
+  catch (EnvoyException& ex) {
     return unspecifiedValue();
   }
   return val;

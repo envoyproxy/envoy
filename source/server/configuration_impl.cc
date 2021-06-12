@@ -1,4 +1,4 @@
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 #include <chrono>
 #include <list>
@@ -16,12 +16,14 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/runtime_utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_option_factory.h"
-#include "common/protobuf/utility.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/runtime_utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -191,10 +193,24 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options)
+                         const Options& options, Instance& server)
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
-  admin_.access_log_path_ = admin.access_log_path();
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
+                                          admin.access_log_path()};
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
+  }
+
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
   if (admin.has_address()) {
@@ -216,8 +232,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     if (layered_runtime_.layers().empty()) {
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
-  } else {
-    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
   }
   if (enable_deprecated_v2_api_) {
     auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
@@ -225,7 +239,9 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
     ProtobufWkt::Value val;
     val.set_bool_value(true);
-    (*static_layer->mutable_fields())["envoy.reloadable_features.enable_deprecated_v2_api"] = val;
+    (*static_layer
+          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
+        val;
   }
 }
 

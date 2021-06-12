@@ -6,11 +6,11 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
-using testing::_;
 using testing::Ref;
 using testing::Return;
 
@@ -495,7 +494,11 @@ TEST(UtilityTest, TypedStructToInvalidType) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   const std::string bootstrap_config_yaml = R"EOF(
     admin:
-      access_log_path: /dev/null
+      access_log:
+      - name: envoy.access_loggers.file
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+          path: /dev/null
       address:
         pipe:
           path: "/"

@@ -29,9 +29,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
     deps = [
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",
@@ -51,9 +49,9 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_name = "envoy.filters.http.dynamic_forward_proxy",
-    # TODO(envoyproxy/windows-dev): Diagnose flake in msvc-cl pipeline, observed timeout in
-    # IpVersions/ProxyFilterIntegrationTest.ReloadClusterAndAttachToCache/IPv6
-    tags = ["flaky_on_windows"],
+    # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
+    #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
+    tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",

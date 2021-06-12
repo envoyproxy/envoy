@@ -36,14 +36,14 @@ Hello Envoy Distributors,
 The Envoy security team would like to provide advanced notice to the Envoy
 Private Distributors List of some details on the pending Envoy $VERSION
 security release, following the process described at
-https://github.com/envoyproxy/envoy/blob/master/SECURITY.md.
+https://github.com/envoyproxy/envoy/blob/main/SECURITY.md.
 
 This release will be made available on the $ORDINALDAY of $MONTH $YEAR at
 $PDTHOUR PDT ($GMTHOUR GMT). This release will fix $NUMDEFECTS security
 defect(s). The highest rated security defect is considered $SEVERITY severity.
 
 Below we provide details of these vulnerabilities under our embargo policy
-(https://github.com/envoyproxy/envoy/blob/master/SECURITY.md#embargo-policy).
+(https://github.com/envoyproxy/envoy/blob/main/SECURITY.md#embargo-policy).
 This information should be treated as confidential until public release by the
 Envoy maintainers on the Envoy GitHub.
 
@@ -86,7 +86,7 @@ As a reminder, these patches are under embargo until $ORDINALDAY of $MONTH $YEAR
 at $PDTHOUR PDT ($GMTHOUR GMT). The information below should be treated as
 confidential and shared only on a need-to-know basis. The rules outline in our
 embargo policy
-(https://github.com/envoyproxy/envoy/blob/master/SECURITY.md#embargo-policy)
+(https://github.com/envoyproxy/envoy/blob/main/SECURITY.md#embargo-policy)
 still apply, and it is extremely important that any communication related to
 these CVEs are not forwarded further.
 
@@ -201,6 +201,35 @@ Including the [$FIXGITSHORTCOMMITHASH]($FIXGITHUBCOMMITURL) commit is encouraged
 
 Thank you to $REPORTER, $DEVELOPERS, and the $RELEASEMANAGERS for the coordination in making this
 release.
+
+Thanks,
+
+$PERSON (on behalf of the Envoy security team and maintainers)
+```
+
+## Security Advisory (for feature accidentally marked as production)
+```
+Subject: Security advisory
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+
+Hello Envoy Community,
+
+The Envoy securitty team would like to announce a security advisory for a feature introduced in
+$ENVOYRELEASE. As this is a security advisory for a feature not considered production ready that may
+have been labeled as such, no fix is provided and the advice is to not make use of this feature in
+a production capacity until future hardening has been done.
+
+$DEFECTSSUMMARY
+
+<!-- Provide details on features, extensions, configuration that make it likely that a system is
+vulnerable in practice. -->
+
+The CVSS score for this is [$CVSSSTRING]($CVSSURL).
+
+**Thank you**
+
+Thank you to $REPORTER, $DEVELOPERS for the coordination in making this release.
 
 Thanks,
 

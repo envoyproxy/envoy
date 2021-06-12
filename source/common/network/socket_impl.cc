@@ -1,10 +1,10 @@
-#include "common/network/socket_impl.h"
+#include "source/common/network/socket_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/network/socket_interface.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -92,6 +92,14 @@ Api::SysCallIntResult SocketImpl::setSocketOption(int level, int optname, const 
 Api::SysCallIntResult SocketImpl::getSocketOption(int level, int optname, void* optval,
                                                   socklen_t* optlen) const {
   return io_handle_->getOption(level, optname, optval, optlen);
+}
+
+Api::SysCallIntResult SocketImpl::ioctl(unsigned long control_code, void* in_buffer,
+                                        unsigned long in_buffer_len, void* out_buffer,
+                                        unsigned long out_buffer_len,
+                                        unsigned long* bytes_returned) {
+  return io_handle_->ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
+                           bytes_returned);
 }
 
 Api::SysCallIntResult SocketImpl::setBlockingForTest(bool blocking) {

@@ -18,10 +18,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-#include "common/config/subscription_base.h"
-#include "common/init/target_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
 
@@ -42,7 +42,7 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   absl::node_hash_set<RouteConfigProvider*>& route_config_providers,
+                   absl::optional<RouteConfigProvider*>& route_config_providers,
                    const envoy::config::core::v3::ApiVersion resource_api_version =
                        envoy::config::core::v3::ApiVersion::AUTO);
   ~VhdsSubscription() override { init_target_.ready(); }
@@ -74,7 +74,7 @@ private:
   VhdsStats stats_;
   Envoy::Config::SubscriptionPtr subscription_;
   Init::TargetImpl init_target_;
-  absl::node_hash_set<RouteConfigProvider*>& route_config_providers_;
+  absl::optional<RouteConfigProvider*>& route_config_provider_opt_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

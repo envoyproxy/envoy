@@ -8,7 +8,7 @@ Jaeger tracing
    .. include:: _include/docker-env-setup-link.rst
 
    :ref:`curl <start_sandboxes_setup_curl>`
-	Used to make ``HTTP`` requests.
+        Used to make ``HTTP`` requests.
 
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
 capabilities using `Jaeger <https://jaegertracing.io/>`_ as the tracing provider. This sandbox
