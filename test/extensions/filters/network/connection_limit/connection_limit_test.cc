@@ -172,8 +172,8 @@ runtime_enabled:
                    ->value());
 }
 
-// Verify increment connection counter CAS edge cases.
-TEST_F(ConnectionLimitFilterTest, IncrementCasEdgeCases) {
+// Verify increment connection counter CAS edge case.
+TEST_F(ConnectionLimitFilterTest, IncrementCasEdgeCase) {
   initialize(R"EOF(
 stat_prefix: connection_limit_stats
 max_connections: 1
@@ -197,6 +197,23 @@ delay: 0s
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
   synchronizer().signal("increment_pre_cas");
   t1.join();
+}
+
+// Verify decrement connection counter assert case.
+TEST_F(ConnectionLimitFilterTest, decrementAssertCase) {
+  initialize(R"EOF(
+stat_prefix: connection_limit_stats
+max_connections: 1
+delay: 0s
+)EOF");
+
+  InSequence s;
+  ActiveFilter active_filter(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+
+  // Decrement connection counter twice which should never happen in production.
+  config_->decrementConnection();
+  EXPECT_DEATH(config_->decrementConnection(), "");
 }
 
 } // namespace ConnectionLimitFilter
