@@ -25,7 +25,7 @@ namespace Envoy {
 #define DUMP_DETAILS(member)                                                                       \
   do {                                                                                             \
     os << spaces << #member ": ";                                                                  \
-    if (member) {                                                                                  \
+    if ((member) != nullptr) {                                                                     \
       os << "\n";                                                                                  \
       (member)->dumpState(os, indent_level + 1);                                                   \
     } else {                                                                                       \
