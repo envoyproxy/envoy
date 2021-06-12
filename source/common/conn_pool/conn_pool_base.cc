@@ -373,13 +373,17 @@ void ConnPoolImplBase::drainConnectionsImpl() {
   }
 }
 
+bool ConnPoolImplBase::isIdleImpl() const {
+  return pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
+         connecting_clients_.empty();
+}
+
 void ConnPoolImplBase::checkForIdle() {
   if (is_draining_) {
     closeIdleConnectionsForDrainingPool();
   }
 
-  if (pending_streams_.empty() && ready_clients_.empty() && busy_clients_.empty() &&
-      connecting_clients_.empty()) {
+  if (isIdleImpl()) {
     ENVOY_LOG(debug, "invoking drained callbacks - is_draining_={}", is_draining_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb(is_draining_);

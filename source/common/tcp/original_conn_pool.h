@@ -30,6 +30,7 @@ public:
 
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb, DrainPool drain) override;
+  bool isIdle() const override;
   void drainConnections() override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;

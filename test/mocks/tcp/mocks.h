@@ -59,6 +59,7 @@ public:
 
   // Tcp::ConnectionPool::Instance
   MOCK_METHOD(void, addIdleCallback, (IdleCb cb, DrainPool));
+  MOCK_METHOD(bool, isIdle, (), (const));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));

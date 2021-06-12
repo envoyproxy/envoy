@@ -52,10 +52,15 @@ public:
 
   /**
    * Register a callback that gets called when the connection pool is fully idle. If `drain` is
-   * true, this also kicks off a drain. The owner of the connection pool is responsible for not
+   * `Yes`, this also kicks off a drain. The owner of the connection pool is responsible for not
    * creating any new streams.
    */
   virtual void addIdleCallback(IdleCb cb, DrainPool drain) PURE;
+
+  /**
+   * Returns true if the pool does not have any connections or pending requests.
+   */
+  virtual bool isIdle() const PURE;
 
   /**
    * Actively drain all existing connection pool connections. This method can be used in cases

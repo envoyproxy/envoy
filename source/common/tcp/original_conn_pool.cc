@@ -85,6 +85,11 @@ void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
                         conn.real_host_description_);
 }
 
+bool OriginalConnPoolImpl::isIdle() const {
+  return pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
+         ready_conns_.empty();
+}
+
 void OriginalConnPoolImpl::checkForIdle() {
   if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
       (is_draining_ || ready_conns_.empty())) {

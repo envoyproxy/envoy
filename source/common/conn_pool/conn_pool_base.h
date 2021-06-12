@@ -193,6 +193,9 @@ public:
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                          Network::ConnectionEvent event);
 
+  // Returns true if the pool is idle.
+  bool isIdleImpl() const;
+
   // See if the pool has gone idle. If we're draining, this will also close idle connections.
   void checkForIdle();
 

@@ -146,6 +146,7 @@ public:
   ~ConnPoolImpl() override { destructAllConnections(); }
 
   void addIdleCallback(IdleCb cb, DrainPool drain) override { addIdleCallbackImpl(cb, drain); }
+  bool isIdle() const override { return isIdleImpl(); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients

@@ -105,6 +105,7 @@ public:
   void addIdleCallback(IdleCb cb, DrainPool drain) override {
     conn_pool_->addIdleCallback(cb, drain);
   }
+  bool isIdle() const override { return conn_pool_->isIdle(); }
   void drainConnections() override { conn_pool_->drainConnections(); }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {

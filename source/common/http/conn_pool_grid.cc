@@ -341,6 +341,15 @@ void ConnectivityGrid::markHttp3Broken() { http3_status_tracker_.markHttp3Broken
 
 void ConnectivityGrid::markHttp3Confirmed() { http3_status_tracker_.markHttp3Confirmed(); }
 
+bool ConnectivityGrid::isIdle() const {
+  // This is O(n) but the function is constant and there are no plans for n > 8.
+  bool idle = true;
+  for (const auto& pool : pools_) {
+    idle = idle && pool->isIdle();
+  }
+  return idle;
+}
+
 void ConnectivityGrid::onIdleReceived() {
   // Don't do any work under the stack of ~ConnectivityGrid()
   if (destroying_) {
@@ -348,8 +357,7 @@ void ConnectivityGrid::onIdleReceived() {
   }
 
   // The idle state can come and go, so each time one of the pools becomes idle, check them all.
-  // TODO(ggreenway): is `!hasActiveConnections()` the same as idle?
-  if (!hasActiveConnections()) {
+  if (isIdle()) {
     for (auto& callback : idle_callbacks_) {
       callback(false);
     }

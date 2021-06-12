@@ -142,6 +142,7 @@ public:
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   void addIdleCallback(IdleCb cb, DrainPool drain) override;
+  bool isIdle() const override;
   void drainConnections() override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
