@@ -3,8 +3,8 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/documentation_url.h"
-#include "common/common/logger.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
 

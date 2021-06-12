@@ -71,7 +71,7 @@ envoy_extension_cc_test(
     ]),
     extension_name = "envoy.bootstrap.wasm",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/bootstrap/wasm:config",
         "//source/extensions/common/wasm:wasm_lib",

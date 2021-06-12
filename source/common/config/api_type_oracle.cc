@@ -1,4 +1,4 @@
-#include "common/config/api_type_oracle.h"
+#include "source/common/config/api_type_oracle.h"
 
 #include "udpa/annotations/versioning.pb.h"
 
@@ -30,15 +30,6 @@ ApiTypeOracle::getEarlierVersionMessageTypeName(const std::string& message_type)
     return desc->options().GetExtension(udpa::annotations::versioning).previous_message_type();
   }
   return absl::nullopt;
-}
-
-const absl::optional<std::string> ApiTypeOracle::getEarlierTypeUrl(const std::string& type_url) {
-  const std::string type{TypeUtil::typeUrlToDescriptorFullName(type_url)};
-  absl::optional<std::string> old_type = ApiTypeOracle::getEarlierVersionMessageTypeName(type);
-  if (old_type.has_value()) {
-    return TypeUtil::descriptorFullNameToTypeUrl(old_type.value());
-  }
-  return {};
 }
 
 } // namespace Config

@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth2/filter.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 
 #include <algorithm>
 #include <chrono>
@@ -6,19 +6,19 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/matchers.h"
-#include "common/crypto/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/matchers.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -138,9 +138,9 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
-  expires_ = Http::Utility::parseCookieValue(headers, "OauthExpires");
-  token_ = Http::Utility::parseCookieValue(headers, "BearerToken");
-  hmac_ = Http::Utility::parseCookieValue(headers, "OauthHMAC");
+  expires_ = std::string{Http::Utility::parseCookieValue(headers, "OauthExpires")};
+  token_ = std::string{Http::Utility::parseCookieValue(headers, "BearerToken")};
+  hmac_ = std::string{Http::Utility::parseCookieValue(headers, "OauthHMAC")};
   host_ = headers.Host()->value().getStringView();
 
   secret_.assign(secret.begin(), secret.end());

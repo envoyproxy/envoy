@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_session_cache.h"
+#include "source/common/quic/envoy_quic_session_cache.h"
 
 #include "absl/strings/escaping.h"
 #include "gmock/gmock.h"

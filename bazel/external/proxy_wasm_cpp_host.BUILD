@@ -18,7 +18,6 @@ cc_library(
         "src/*.h",
         "src/*.cc",
         "src/common/*.h",
-        "src/common/*.cc",
         "src/third_party/*.h",
         "src/third_party/*.cc",
     ]),
@@ -53,6 +52,18 @@ cc_library(
     deps = [
         ":common_lib",
         "//external:wee8",
+    ],
+)
+
+cc_library(
+    name = "wamr_lib",
+    srcs = glob([
+        "src/wamr/*.h",
+        "src/wamr/*.cc",
+    ]),
+    deps = [
+        ":common_lib",
+        "@envoy//bazel/foreign_cc:wamr",
     ],
 )
 

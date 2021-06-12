@@ -13,8 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
-#include "common/http/exception.h"
-#include "common/http/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -250,6 +250,14 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 absl::string_view parseCookieValue(const HeaderMap& headers, const absl::string_view key);
 
 /**
+ * Parse a particular value out of a set-cookie
+ * @param headers supplies the headers to get the set-cookie from.
+ * @param key the key for the particular set-cookie value to return
+ * @return absl::string_view the parsed set-cookie value, or "" if none exists
+ **/
+absl::string_view parseSetCookieValue(const HeaderMap& headers, const absl::string_view key);
+
+/**
  * Parse particular value(s) out of a cookie. The difference with
  * parseCookieValue is that it returns all the values of key, in case it is set
  * multiple times in the cookie headers, as in this example:
@@ -267,6 +275,12 @@ absl::InlinedVector<absl::string_view, 2> parseCookieValues(const HeaderMap& hea
                                                             const absl::string_view key,
                                                             size_t max_vals = 0,
                                                             bool reversed_order = false);
+
+absl::InlinedVector<absl::string_view, 2> parseSetCookieValues(const HeaderMap& headers,
+                                                            const absl::string_view key,
+                                                            size_t max_vals = 0,
+                                                            bool reversed_order = false);
+
 
 /**
  * Produce the value for a Set-Cookie header with the given parameters.
@@ -369,8 +383,8 @@ void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_function
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
-  // Whether this is the only address in the XFF header.
-  bool single_address_;
+  // Whether this address can be used to determine if it's an internal request.
+  bool allow_trusted_address_checks_;
 };
 
 /**
@@ -499,9 +513,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  const Router::RouteSpecificFilterConfig* generic_config =
-      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
-  return dynamic_cast<const ConfigType*>(generic_config);
+  if (!route || !route->routeEntry()) {
+    return nullptr;
+  }
+  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
 }
 
 /**

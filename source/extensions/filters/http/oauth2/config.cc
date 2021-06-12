@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth2/config.h"
+#include "source/extensions/filters/http/oauth2/config.h"
 
 #include <chrono>
 #include <memory>
@@ -13,11 +13,10 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
-#include "extensions/filters/http/oauth2/oauth.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -23,9 +23,6 @@ powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/lat
 set PATH=%PATH%;%USERPROFILE%\bazel
 ```
 
-If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
-to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
-
 ## Production environments
 
 To build Envoy with Bazel in a production environment, where the [Envoy
@@ -54,22 +51,33 @@ for how to update or override dependencies.
     On Ubuntu, run the following:
     ```console
     sudo apt-get install \
-       libtool \
-       cmake \
-       automake \
        autoconf \
+       automake \
+       cmake \
+       curl \
+       libtool \
        make \
        ninja-build \
-       curl \
+       patch \
+       python3-pip \
        unzip \
-       virtualenv \
-       patch
+       virtualenv
     ```
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
     ```console
-    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
+    dnf install \
+        aspell-en \
+        cmake \
+        libatomic \
+        libstdc++ \
+        libstdc++-static \
+        libtool \
+        lld \
+        ninja-build \
+        patch \
+        python3-pip
     ```
 
     ### Linux
@@ -156,9 +164,9 @@ for how to update or override dependencies.
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
     ```cmd
-    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python38
-    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
+    set PATH=%PATH%;%USERPROFILE%\Python39
+    set PATH=%PATH%;%USERPROFILE%\Python39\Scripts
     pip install wheel
     ```
 
@@ -186,7 +194,7 @@ for how to update or override dependencies.
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 
     Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value

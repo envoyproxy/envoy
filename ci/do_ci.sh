@@ -222,7 +222,7 @@ elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
   setup_gcc_toolchain
 
   echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
@@ -295,9 +295,6 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
 
   echo "Building and testing ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
-  # TODO(foreseeable): consolidate this and the API tool tests in a dedicated target.
-  bazel_with_collection //tools/envoy_headersplit:headersplit_test --spawn_strategy=local
-  bazel_with_collection //tools/envoy_headersplit:replace_includes_test --spawn_strategy=local
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -325,6 +322,9 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
 
   # Building all the dependencies from scratch to link them against libc++.
+  echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+
   echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
@@ -471,7 +471,7 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" wasm-cc
+  run_ci_verify "*" "wasm-cc|win32-front-proxy"
   exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc

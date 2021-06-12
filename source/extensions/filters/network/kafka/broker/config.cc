@@ -1,10 +1,10 @@
-#include "extensions/filters/network/kafka/broker/config.h"
+#include "source/extensions/filters/network/kafka/broker/config.h"
 
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/filters/network/kafka/broker/filter.h"
+#include "source/extensions/filters/network/kafka/broker/filter.h"
 
 namespace Envoy {
 namespace Extensions {

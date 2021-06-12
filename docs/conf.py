@@ -82,11 +82,15 @@ extlinks = {
 
 # Setup global substitutions
 if 'pre-release' in release_level:
-    substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha))]
+    substitutions = [
+        ('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
+        ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha)),
+        ('|envoy_distroless_docker_image|', 'envoy-distroless-dev:{}'.format(blob_sha))
+    ]
 else:
     substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha))]
+                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha)),
+                     ('|envoy_distroless_docker_image|', 'envoy-distroless:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -284,7 +288,7 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "redirects.txt"
+rediraffe_redirects = "envoy-redirects.txt"
 
 intersphinx_mapping = {
     'v1.5.0': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),

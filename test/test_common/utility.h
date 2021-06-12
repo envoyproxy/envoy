@@ -15,17 +15,17 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/c_smart_ptr.h"
-#include "common/common/empty_string.h"
-#include "common/common/thread.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/config/version_converter.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -277,6 +277,19 @@ public:
   waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Wait for a histogram to have samples.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the histogram was populated within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitUntilHistogramHasSamples(
+      Stats::Store& store, const std::string& name, Event::TestTimeSystem& time_system,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
    * Find a readout in a stats store.
@@ -554,7 +567,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -1100,6 +1115,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Random::RandomGenerator& rando
 ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
+
+// Useful for testing ScopeTrackedObject order of deletion.
+class MessageTrackedObject : public ScopeTrackedObject {
+public:
+  MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
+
+private:
+  absl::string_view sv_;
+};
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
