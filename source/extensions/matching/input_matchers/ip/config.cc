@@ -26,7 +26,7 @@ Config::createInputMatcher(const Protobuf::Message& config,
     ranges.emplace_back(std::move(range));
   }
 
-  const auto stat_prefix = ip_config.stat_prefix();
+  const absl::string_view stat_prefix = ip_config.stat_prefix();
   return std::make_unique<Matcher>(std::move(ranges), stat_prefix, context.scope());
 }
 /**

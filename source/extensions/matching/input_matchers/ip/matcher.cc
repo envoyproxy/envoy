@@ -35,7 +35,7 @@ bool Matcher::match(absl::optional<absl::string_view> input) {
   const auto ip = Network::Utility::parseInternetAddressNoThrow(std::string{ip_str});
   if (!ip) {
     stats_.ip_parsing_failed_.inc();
-    ENVOY_LOG(warn, "IP matcher: unable to parse address '{}'", ip_str);
+    ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", ip_str);
     return false;
   }
   return !trie_.getData(ip).empty();
