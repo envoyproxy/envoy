@@ -452,7 +452,8 @@ absl::InlinedVector<absl::string_view, 2> Utility::parseSetCookieValues(const He
   return parseCookieValuesImpl(headers, key, max_vals, reversed_order, Http::Headers::get().SetCookie.get());
 }
 
-absl::string_view Utility::parseCookie(const HeaderMap& headers, const absl::string_view key, const absl::string_view cookie_name) {
+static absl::string_view parseCookie(const HeaderMap& headers, const absl::string_view key,
+                                     const absl::string_view cookie_name) {
   const auto ret = parseCookieValuesImpl(headers, key, 1, true /* reversed_order */, cookie_name);
   if (ret.size() == 1) {
     return ret[0];
