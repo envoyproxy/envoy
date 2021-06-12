@@ -142,9 +142,8 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
                 port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromYaml(yaml), EnvoyException,
-      "ORIGINAL_DST clusters must have no load assignment configured");
+  EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml), EnvoyException,
+                            "ORIGINAL_DST clusters must have no load assignment configured");
 }
 
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
