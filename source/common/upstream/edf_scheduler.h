@@ -3,7 +3,7 @@
 #include <iostream>
 #include <queue>
 
-#include "source/envoy/upstream/scheduler.h"
+#include "envoy/upstream/scheduler.h"
 #include "source/common/common/assert.h"
 
 namespace Envoy {

@@ -153,8 +153,8 @@ envoy_cc_library(
         "wrsq_scheduler.h",
     ],
     deps = [
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/upstream:scheduler_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/upstream:scheduler_interface",
         "//source/common/common:assert_lib",
     ],
 )

@@ -3,9 +3,9 @@
 #include <memory>
 #include <random>
 
-#include "common/common/random_generator.h"
-#include "common/upstream/edf_scheduler.h"
-#include "common/upstream/wrsq_scheduler.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/upstream/edf_scheduler.h"
+#include "source/common/upstream/wrsq_scheduler.h"
 
 #include "test/benchmark/main.h"
 
