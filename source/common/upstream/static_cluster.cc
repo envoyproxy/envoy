@@ -15,7 +15,7 @@ StaticClusterImpl::StaticClusterImpl(
                       factory_context.dispatcher().timeSource()),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
-  const envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment =
+  const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
