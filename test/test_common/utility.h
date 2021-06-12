@@ -854,7 +854,7 @@ public:
   }
 
   absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
-    auto iter = context_map_.find(std::string(key));
+    auto iter = context_map_.find(key);
     if (iter == context_map_.end()) {
       return absl::nullopt;
     }

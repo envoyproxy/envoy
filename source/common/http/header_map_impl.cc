@@ -42,7 +42,7 @@ const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
 }
 
 bool validatedLowerCaseString(absl::string_view str) {
-  auto lower_case_str = LowerCaseString(std::string(str));
+  auto lower_case_str = LowerCaseString(str);
   return lower_case_str == str;
 }
 
