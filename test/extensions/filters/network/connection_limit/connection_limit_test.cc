@@ -200,7 +200,7 @@ delay: 0s
 }
 
 // Verify decrement connection counter assert case.
-TEST_F(ConnectionLimitFilterTest, decrementAssertCase) {
+TEST_F(ConnectionLimitFilterTest, DecrementAssertCase) {
   initialize(R"EOF(
 stat_prefix: connection_limit_stats
 max_connections: 1
