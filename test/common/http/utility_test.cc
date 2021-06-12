@@ -16,6 +16,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -547,6 +548,15 @@ TEST(HttpUtility, TestParseCookie) {
   absl::string_view key{"token"};
   absl::string_view value = Utility::parseCookieValue(headers, key);
   EXPECT_EQ(value, "abc123");
+}
+
+TEST(HttpUtility, TestParseCookieOldBehavior) {
+  TestRequestHeaderMapImpl headers{{"cookie", "key=v0"}, {"cookie", "key=v1; key=v2"}};
+
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.cookies_get_last_value_header", "false"}});
+  EXPECT_EQ(Utility::parseCookieValue(headers, "key"), "v1");
 }
 
 TEST(HttpUtility, TestParseSetCookie) {

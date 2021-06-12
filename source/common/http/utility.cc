@@ -381,21 +381,20 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
-static absl::InlinedVector<absl::string_view, 2> parseCookieValuesImpl(const HeaderMap& headers,
-                                                                     const absl::string_view key,
-                                                                     size_t max_vals,
-                                                                     bool reversed_order,
-                                                                     const absl::string_view cookie_name) {
+static absl::InlinedVector<absl::string_view, 2>
+parseCookieValuesImpl(const HeaderMap& headers, const absl::string_view key, size_t max_vals,
+                      bool reversed_order, bool reversed_order_in_header,
+                      const absl::string_view cookie_name) {
   absl::InlinedVector<absl::string_view, 2> ret;
 
-  const auto iterfunc = [&key, &ret, max_vals,
-                         reversed_order, cookie_name](const HeaderEntry& header) -> HeaderMap::Iterate {
+  const auto iterfunc = [&key, &ret, max_vals, reversed_order_in_header,
+                         cookie_name](const HeaderEntry& header) -> HeaderMap::Iterate {
     // Find the cookie headers in the request (typically, there's only one).
     if (header.key() == cookie_name) {
 
       // Split the cookie header into individual cookies.
       auto keyvalues = StringUtil::splitToken(header.value().getStringView(), ";");
-      if (reversed_order) {
+      if (reversed_order_in_header) {
         std::reverse(keyvalues.begin(), keyvalues.end());
       }
       for (const auto& s : keyvalues) {
@@ -439,22 +438,17 @@ static absl::InlinedVector<absl::string_view, 2> parseCookieValuesImpl(const Hea
 absl::InlinedVector<absl::string_view, 2> Utility::parseCookieValues(const HeaderMap& headers,
                                                                      const absl::string_view key,
                                                                      size_t max_vals,
-                                                                     bool reversed_order)
-{
-  return parseCookieValuesImpl(headers, key, max_vals, reversed_order, Http::Headers::get().Cookie.get());
-}
-
-absl::InlinedVector<absl::string_view, 2> Utility::parseSetCookieValues(const HeaderMap& headers,
-                                                                     const absl::string_view key,
-                                                                     size_t max_vals,
-                                                                     bool reversed_order)
-{
-  return parseCookieValuesImpl(headers, key, max_vals, reversed_order, Http::Headers::get().SetCookie.get());
+                                                                     bool reversed_order) {
+  return parseCookieValuesImpl(headers, key, max_vals, reversed_order, reversed_order,
+                               Http::Headers::get().Cookie.get());
 }
 
 static absl::string_view parseCookie(const HeaderMap& headers, const absl::string_view key,
                                      const absl::string_view cookie_name) {
-  const auto ret = parseCookieValuesImpl(headers, key, 1, true /* reversed_order */, cookie_name);
+  const auto ret = parseCookieValuesImpl(
+      headers, key, 1, true /* reversed_order */,
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cookies_get_last_value_header"),
+      cookie_name);
   if (ret.size() == 1) {
     return ret[0];
   }
@@ -465,7 +459,8 @@ absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl
   return parseCookie(headers, key, Http::Headers::get().Cookie.get());
 }
 
-absl::string_view Utility::parseSetCookieValue(const Http::HeaderMap& headers, const absl::string_view key) {
+absl::string_view Utility::parseSetCookieValue(const Http::HeaderMap& headers,
+                                               const absl::string_view key) {
   return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
 }
 

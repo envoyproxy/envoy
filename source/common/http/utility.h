@@ -276,12 +276,6 @@ absl::InlinedVector<absl::string_view, 2> parseCookieValues(const HeaderMap& hea
                                                             size_t max_vals = 0,
                                                             bool reversed_order = false);
 
-absl::InlinedVector<absl::string_view, 2> parseSetCookieValues(const HeaderMap& headers,
-                                                            const absl::string_view key,
-                                                            size_t max_vals = 0,
-                                                            bool reversed_order = false);
-
-
 /**
  * Produce the value for a Set-Cookie header with the given parameters.
  * @param key is the name of the cookie that is being set.
