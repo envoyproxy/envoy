@@ -557,7 +557,7 @@ TEST(HttpUtility, TestParseSetCookie) {
       {"set-cookie", "key2=value2; key3=value3"}};
 
   std::string key{"token"};
-  std::string value = Utility::parseSetCookieValue(headers, key);
+  absl::string_view value = Utility::parseSetCookieValue(headers, key);
   EXPECT_EQ(value, "abc123");
 }
 
