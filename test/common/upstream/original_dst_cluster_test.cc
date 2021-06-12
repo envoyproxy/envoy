@@ -144,7 +144,7 @@ TEST_F(OriginalDstClusterTest, BadConfigWithLoadAssignment) {
 
   EXPECT_THROW_WITH_MESSAGE(
       setupFromYaml(yaml), EnvoyException,
-      "ORIGINAL_DST clusters must have no load assignment or hosts configured");
+      "ORIGINAL_DST clusters must have no load assignment configured");
 }
 
 TEST_F(OriginalDstClusterTest, CleanupInterval) {
