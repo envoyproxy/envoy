@@ -126,9 +126,9 @@ typed_config:
 
   bool validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
                     absl::string_view hmac_secret) {
-    std::string expires = Http::Utility::parseSetCookieValue(headers, "OauthExpires");
-    std::string token = Http::Utility::parseSetCookieValue(headers, "BearerToken");
-    std::string hmac = Http::Utility::parseSetCookieValue(headers, "OauthHMAC");
+    std::string expires(Http::Utility::parseSetCookieValue(headers, "OauthExpires"));
+    std::string token(Http::Utility::parseSetCookieValue(headers, "BearerToken"));
+    std::string hmac(Http::Utility::parseSetCookieValue(headers, "OauthHMAC"));
 
     Http::TestRequestHeaderMapImpl validate_headers{{":authority", std::string(host)}};
 
