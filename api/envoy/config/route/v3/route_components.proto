@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 25]
+// [#next-free-field: 27]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -222,6 +222,12 @@ message VirtualHost {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 24;
+
+  // Specifies a list of HTTP query parameters that will be added to the HTTP path.
+  map<string, string> query_params_to_add = 25;
+
+  // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
+  repeated string query_params_to_remove = 26;
 }
 
 // A filter-defined action type.
@@ -245,7 +251,7 @@ message RouteList {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 20]
+// [#next-free-field: 22]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -358,6 +364,12 @@ message Route {
   //    every application endpoint. This is both not easily maintainable and
   //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
   string stat_prefix = 19;
+
+  // Specifies a list of HTTP query parameters that will be added to the HTTP path.
+  map<string, string> query_params_to_add = 20;
+
+  // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
+  repeated string query_params_to_remove = 21;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

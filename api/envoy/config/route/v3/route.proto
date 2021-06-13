@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 18]
+// [#next-free-field: 20]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
@@ -155,6 +155,12 @@ message RouteConfiguration {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
+
+  // Specifies a list of HTTP query parameters that will be added to the HTTP path.
+  map<string, string> query_params_to_add = 18;
+
+  // Specifies a list of HTTP query parameters that will be removed from the HTTP path.
+  repeated string query_params_to_remove = 19;
 }
 
 message Vhds {

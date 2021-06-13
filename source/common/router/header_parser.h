@@ -78,7 +78,7 @@ public:
 
   /**
    * Helper methods to evaluate methods without explicitly passing request and response headers.
-   * The method will try to fetch request headers from steam_info. Response headers will always be
+   * The method will try to fetch request headers from stream_info. Response headers will always be
    * empty.
    */
   void evaluateHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {

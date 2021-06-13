@@ -31,6 +31,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/query_params_evaluator.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -264,6 +265,13 @@ public:
     return HeaderParser::defaultParser();
   }
   absl::optional<bool> filterDisabled(absl::string_view config_name) const;
+  const QueryParamsEvaluator& queryParamsEvaluator() const {
+    if (query_params_evaluator_ != nullptr) {
+      return *query_params_evaluator_;
+    }
+
+    return QueryParamsEvaluator::defaultEvaluator();
+  }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -352,6 +360,7 @@ private:
   const CommonConfigSharedPtr global_route_config_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  QueryParamsEvaluatorPtr query_params_evaluator_;
   PerFilterConfigs per_filter_configs_;
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
@@ -407,7 +416,6 @@ using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
  */
 class RetryPolicyImpl : public RetryPolicy {
-
 public:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -501,7 +509,6 @@ private:
  * Implementation of HedgePolicy that reads from the proto route or virtual host config.
  */
 class HedgePolicyImpl : public HedgePolicy {
-
 public:
   explicit HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& hedge_policy);
   HedgePolicyImpl();
@@ -673,6 +680,12 @@ public:
       return *response_headers_parser_;
     }
     return HeaderParser::defaultParser();
+  }
+  const QueryParamsEvaluator& queryParamsEvaluator() const {
+    if (query_params_evaluator_ != nullptr) {
+      return *query_params_evaluator_;
+    }
+    return QueryParamsEvaluator::defaultEvaluator();
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
@@ -1111,6 +1124,7 @@ private:
    */
   absl::InlinedVector<const HeaderParser*, 3>
   getRequestHeaderParsers(bool specificity_ascend) const;
+  absl::InlinedVector<const QueryParamsEvaluator*, 3> getQueryParamEvaluators(bool specificity_ascend) const;
 
   /**
    * Returns a vector of response header parsers which applied or will apply header transformations
@@ -1211,6 +1225,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   RouteMetadataPackPtr metadata_;
+  QueryParamsEvaluatorPtr query_params_evaluator_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
@@ -1543,7 +1558,7 @@ private:
 };
 
 /**
- * Shared part of the route configuration implementation.
+ * Shared part of the global route configuration implementation.
  */
 class CommonConfigImpl : public CommonConfig {
 public:
@@ -1562,6 +1577,12 @@ public:
       return *response_headers_parser_;
     }
     return HeaderParser::defaultParser();
+  }
+  const QueryParamsEvaluator& queryParamsEvaluator() const {
+    if (query_params_evaluator_ != nullptr) {
+      return *query_params_evaluator_;
+    }
+    return QueryParamsEvaluator::defaultEvaluator();
   }
 
   const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const {
@@ -1595,6 +1616,7 @@ private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
+  QueryParamsEvaluatorPtr query_params_evaluator_;
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
