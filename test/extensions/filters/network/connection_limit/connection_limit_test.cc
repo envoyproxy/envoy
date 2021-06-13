@@ -213,7 +213,7 @@ delay: 0s
 
   // Decrement connection counter twice which should never happen in production.
   config_->decrementConnection();
-  EXPECT_DEATH(config_->decrementConnection(), "");
+  ASSERT_DEATH(config_->decrementConnection(), "");
 }
 
 } // namespace ConnectionLimitFilter
