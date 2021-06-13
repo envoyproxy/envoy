@@ -23,6 +23,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -343,38 +344,27 @@ protected:
   }
 
   void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
-    {
-      Thread::LockGuard lock(mu_);
-      work_finished_ = false;
-    }
+    worked_finished_ false;
+
     TimerPtr timer;
     dispatcher_->post([this, &timer, enable_timer_delegate]() {
-      {
-        Thread::LockGuard lock(mu_);
-        timer = dispatcher_->createTimer([this]() {
-          {
-            Thread::LockGuard lock(mu_);
-            ASSERT(!work_finished_);
-            work_finished_ = true;
-          }
-          cv_.notifyOne();
-        });
-        EXPECT_FALSE(timer->enabled());
-        enable_timer_delegate(*timer);
-        EXPECT_TRUE(timer->enabled());
-      }
+      timer = dispatcher_->createTimer([this]() {
+        worked_finished_ = true;
+        notification_.Notify();
+      });
+      EXPECT_FALSE(timer->enabled());
+      enable_timer_delegate(*timer);
+      EXPECT_TRUE(timer->enabled());
     });
-
-    Thread::LockGuard lock(mu_);
-    while (!work_finished_) {
-      cv_.wait(mu_);
-    }
+    notification_.WaitForNotification();
+    EXPECT_TRUE(worked_finished_);
   }
 
   NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
+  absl::Notification notification_;
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;
 
@@ -394,18 +384,12 @@ TEST_F(DispatcherImplTest, InitializeStats) {
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
-    {
-      Thread::LockGuard lock(mu_);
-      ASSERT(!work_finished_);
-      work_finished_ = true;
-    }
-    cv_.notifyOne();
+    worked_finished_ = true;
+    notification_.Notify();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 }
 
 TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
@@ -437,21 +421,15 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
         std::make_shared<RunOnDelete>([&delete_watcher2]() { delete_watcher2.ready(); });
     dispatcher_->post([&run_watcher2, on_delete_task2]() { run_watcher2.ready(); });
     dispatcher_->post([this]() {
-      {
-        Thread::LockGuard lock(mu_);
-        ASSERT(!work_finished_);
-        work_finished_ = true;
-      }
-      cv_.notifyOne();
+      worked_finished_ = true;
+      notification_.Notify();
     });
     dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
         [&deferred_delete_watcher]() -> void { deferred_delete_watcher.ready(); }));
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 }
 
 // Ensure that there is no deadlock related to calling a posted callback, or
@@ -498,18 +476,13 @@ TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
   dispatcher_->deleteInDispatcherThread(std::make_unique<TestDispatcherThreadDeletable>(
       [this, id = api_->threadFactory().currentThreadId()]() {
         ASSERT(id != api_->threadFactory().currentThreadId());
-        {
-          Thread::LockGuard lock(mu_);
-          ASSERT(!work_finished_);
-          work_finished_ = true;
-        }
-        cv_.notifyOne();
+        ASSERT(!work_finished_);
+        worked_finished_ = true;
+        notification_.Notify();
       }));
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 }
 
 TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
@@ -627,20 +600,16 @@ TEST_F(DispatcherImplTest, TimerWithScope) {
 
 TEST_F(DispatcherImplTest, IsThreadSafe) {
   dispatcher_->post([this]() {
-    {
-      Thread::LockGuard lock(mu_);
-      // Thread safe because it is called within the dispatcher thread's context.
-      EXPECT_TRUE(dispatcher_->isThreadSafe());
-      ASSERT(!work_finished_);
-      work_finished_ = true;
-    }
-    cv_.notifyOne();
+    // Thread safe because it is called within the dispatcher thread's context.
+    EXPECT_TRUE(dispatcher_->isThreadSafe());
+    ASSERT(!work_finished_);
+    work_finished_ = true;
+    notification_.Notify();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
+
   // Not thread safe because it is not called within the dispatcher thread's context.
   EXPECT_FALSE(dispatcher_->isThreadSafe());
 }
@@ -651,16 +620,13 @@ TEST_F(DispatcherImplTest, ShouldDumpNothingIfNoTrackedObjects) {
 
   // Call on FatalError to trigger dumps of tracked objects.
   dispatcher_->post([this, &ostream]() {
-    Thread::LockGuard lock(mu_);
     static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
     work_finished_ = true;
-    cv_.notifyOne();
+    notification_.Notify();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 
   // Check ostream still empty.
   EXPECT_EQ(ostream.contents(), "");
@@ -672,8 +638,6 @@ TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
 
   // Call on FatalError to trigger dumps of tracked objects.
   dispatcher_->post([this, &ostream]() {
-    Thread::LockGuard lock(mu_);
-
     // Add several tracked objects to the dispatcher
     MessageTrackedObject first{"first"};
     ScopeTrackerScopeState first_state{&first, *dispatcher_};
@@ -684,13 +648,12 @@ TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
 
     static_cast<DispatcherImpl*>(dispatcher_.get())->onFatalError(ostream);
     work_finished_ = true;
-    cv_.notifyOne();
+
+    notification_.Notify();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 
   // Check the dump includes and registered objects in a FILO order.
   EXPECT_EQ(ostream.contents(), "thirdsecondfirst");
@@ -699,8 +662,6 @@ TEST_F(DispatcherImplTest, ShouldDumpTrackedObjectsInFILO) {
 TEST_F(DispatcherImplTest, TracksIfTrackedObjectStackEmpty) {
   // Post on the dispatcher thread.
   dispatcher_->post([this]() {
-    Thread::LockGuard lock(mu_);
-
     // Initially should be empty
     ASSERT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
 
@@ -716,13 +677,11 @@ TEST_F(DispatcherImplTest, TracksIfTrackedObjectStackEmpty) {
     EXPECT_TRUE(dispatcher_->trackedObjectStackIsEmpty());
 
     work_finished_ = true;
-    cv_.notifyOne();
+    notification_.WaitForNotification();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
 }
 
 class TestFatalAction : public Server::Configuration::FatalAction {
@@ -756,20 +715,14 @@ TEST_F(DispatcherImplTest, OnlyRunsFatalActionsIfRunningOnSameThread) {
 
   // Should run since on same thread as dispatcher
   dispatcher_->post([this, &actions]() {
-    {
-      Thread::LockGuard lock(mu_);
-      static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
-      ASSERT(!work_finished_);
-      work_finished_ = true;
-    }
-    cv_.notifyOne();
+    static_cast<DispatcherImpl*>(dispatcher_.get())->runFatalActionsOnTrackedObject(actions);
+    ASSERT(!work_finished_);
+    work_finished_ = true;
+    notification_.Notify();
   });
 
-  Thread::LockGuard lock(mu_);
-  while (!work_finished_) {
-    cv_.wait(mu_);
-  }
-
+  notification_.WaitForNotification();
+  EXPECT_TRUE(worked_finished_);
   EXPECT_EQ(action->getNumTimesRan(), 1);
 }
 
