@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v4alpha;
 
-import "envoy/config/core/v4alpha/backoff.proto;
+import "envoy/config/core/v4alpha/backoff.proto";
 import "envoy/config/core/v4alpha/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
