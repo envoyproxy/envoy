@@ -65,13 +65,6 @@ public:
     return *this;
   }
 
-  // TODO(wbpcode): After having a constructor that accepts a string view, the constructor may no
-  // longer be necessary.
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
-    ASSERT(valid());
-    lower();
-  }
-
   explicit LowerCaseString(absl::string_view new_string) : string_(new_string) {
     ASSERT(valid());
     lower();
