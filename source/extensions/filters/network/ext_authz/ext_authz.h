@@ -47,11 +47,14 @@ struct InstanceStats {
  * Global configuration for ExtAuthz filter.
  */
 class Config {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   Config(const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& config,
          Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
+        destination_labels_(config.destination_labels()),
         include_peer_certificate_(config.include_peer_certificate()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
@@ -62,6 +65,7 @@ public:
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
   }
@@ -70,6 +74,7 @@ private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
+  LabelsMap destination_labels_;
   const bool include_peer_certificate_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
 };
@@ -85,6 +90,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Filters::Common::ExtAuthz::RequestCallbacks {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}

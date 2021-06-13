@@ -50,6 +50,8 @@ struct ExtAuthzFilterStats {
  * Configuration for the External Authorization (ext_authz) filter.
  */
 class FilterConfig {
+  using LabelsMap = Protobuf::Map<std::string, std::string>;
+
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
@@ -61,6 +63,7 @@ public:
         pack_as_bytes_(config.with_request_body().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
+        destination_labels_(config.destination_labels()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -124,6 +127,7 @@ public:
   }
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
+  const LabelsMap& destinationLabels() const { return destination_labels_; }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -159,6 +163,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
+  LabelsMap destination_labels_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
