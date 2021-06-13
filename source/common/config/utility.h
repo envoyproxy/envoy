@@ -60,7 +60,8 @@ struct RateLimitSettings {
   uint32_t max_tokens_{DefaultMaxTokens};
   double fill_rate_{DefaultFillRate};
   bool enabled_{false};
-  BackOffStrategy backoff_strategy_{DefaultRetryInitialDelayMs, DefaultRetryMaxDelayMs};
+  envoy::config::core::v3::BackOffStrategy backoff_strategy_{DefaultRetryInitialDelayMs,
+                                                             DefaultRetryMaxDelayMs};
 };
 
 using ApiType = ConstSingleton<ApiTypeValues>;
