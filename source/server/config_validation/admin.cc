@@ -14,6 +14,10 @@ const Network::Socket& ValidationAdmin::socket() { return *socket_; }
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 
+void ValidationAdmin::resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory&) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
 void ValidationAdmin::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&,
                                         const std::string&,
                                         Network::Address::InstanceConstSharedPtr,

@@ -122,7 +122,7 @@ public:
    */
   virtual ConfigTracker& getConfigTracker() PURE;
 
-  virtual void resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter);
+  virtual void resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) PURE;
 
   /**
    * Expose this Admin console as an HTTP server.

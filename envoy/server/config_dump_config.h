@@ -33,7 +33,7 @@ class ConfigDumpFilterFactory : public Config::TypedFactory {
 public:
   ~ConfigDumpFilterFactory() override = default;
 
-  virtual ConfigDumpFilterPtr createConfigDumpFilter(const MatchingParameters& params) const;
+  virtual ConfigDumpFilterPtr createConfigDumpFilter(const MatchingParameters& params) const PURE;
 
   std::string category() const override { return "envoy.admin.config_dump_filter"; }
 };

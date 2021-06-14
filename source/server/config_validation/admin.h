@@ -27,6 +27,7 @@ public:
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
+  void resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) override;
   void startHttpListener(const std::list<AccessLog::InstanceSharedPtr>& access_logs,
                          const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
