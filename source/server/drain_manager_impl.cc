@@ -15,11 +15,6 @@ namespace Envoy {
 namespace Server {
 
 DrainManagerImpl::DrainManagerImpl(Instance& server,
-                                   envoy::config::listener::v3::Listener::DrainType drain_type)
-    : server_(server), dispatcher_(server.dispatcher()), drain_type_(drain_type),
-      children_(server.dispatcher()) {}
-
-DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type,
                                    Event::Dispatcher& dispatcher)
     : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), children_(dispatcher) {}
@@ -86,19 +81,17 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
   if (draining_) {
     const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
 
-    // If we've already passed our deadline, or we have an immediate drain-strategy, call the
-    // callback with no delay specified
-    if (current_time > drain_deadline_ ||
-        server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
-      cb(std::chrono::milliseconds{0});
-      return nullptr;
-    }
-
-    // Otherwise we're using a gradual drain strategy, pick a random value within the remaining time
-    std::chrono::milliseconds remaining_time =
-        std::chrono::duration_cast<std::chrono::milliseconds>(drain_deadline_ - current_time);
-    cb(std::chrono::milliseconds(server_.api().randomGenerator().random() %
-                                 remaining_time.count()));
+    // Calculate the delay. If using an immediate drain-strategy or past our deadline, use
+    // a zero millisecond delay. Otherwise, pick a random value within the remaining time-span.
+    std::chrono::milliseconds drain_delay =
+        (server_.options().drainStrategy() != Server::DrainStrategy::Immediate &&
+         current_time < drain_deadline_)
+            ? std::chrono::milliseconds(server_.api().randomGenerator().random() %
+                                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                                            drain_deadline_ - current_time)
+                                            .count())
+            : std::chrono::milliseconds{0};
+    cb(drain_delay);
     return nullptr;
   }
 
@@ -120,19 +113,13 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;
 
-  // Call registered on-drain callbacks - immediately
-  if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
-    std::chrono::milliseconds no_delay{0};
-    cbs_.runCallbacksWith([no_delay = no_delay]() { return no_delay; });
-    return;
-  }
-
   // Call registered on-drain callbacks - with gradual delays
   // Note: This will distribute drain events in the first 1/4th of the drain window
   //       to ensure that we initiate draining with enough time for graceful shutdowns.
   const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
   std::chrono::seconds remaining_time{0};
-  if (current_time < drain_deadline_) {
+  if (server_.options().drainStrategy() != Server::DrainStrategy::Immediate &&
+      current_time < drain_deadline_) {
     remaining_time =
         std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
     ASSERT(server_.options().drainTime() >= remaining_time);

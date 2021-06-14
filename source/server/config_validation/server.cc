@@ -56,7 +56,7 @@ ValidationInstance::ValidationInstance(
       http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
       time_system_(time_system), server_contexts_(*this),
       drain_manager_(std::make_unique<Server::DrainManagerImpl>(
-          *this, envoy::config::listener::v3::Listener::DEFAULT)) {
+          *this, envoy::config::listener::v3::Listener::DEFAULT, this->dispatcher())) {
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {

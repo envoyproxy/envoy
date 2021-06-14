@@ -39,7 +39,8 @@ protected:
 
 TEST_F(DrainManagerImplTest, Default) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   // Test parent shutdown.
   Event::MockTimer* shutdown_timer = new Event::MockTimer(&server_.dispatcher_);
@@ -67,7 +68,8 @@ TEST_F(DrainManagerImplTest, Default) {
 
 TEST_F(DrainManagerImplTest, ModifyOnly) {
   InSequence s;
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY,
+                                 server_.dispatcher());
 
   EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
   EXPECT_FALSE(drain_manager.drainClose());
@@ -80,7 +82,8 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
                                             : Server::DrainStrategy::Immediate));
   // TODO(auni53): Add integration tests for this once TestDrainManager is
   // removed.
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   // Ensure drainClose() behaviour is determined by the deadline.
   drain_manager.startDrainSequence([] {});
@@ -125,7 +128,8 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   ON_CALL(server_.api_.random_, random()).WillByDefault(Return(4));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(3)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_TRUE(drain_manager.drainClose());
@@ -164,7 +168,8 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
                                             : Server::DrainStrategy::Immediate));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(4)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   {
     // Register callbacks (store in array to keep in scope for test)
@@ -202,7 +207,8 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(4)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   {
     // Register callbacks (store in array to keep in scope for test)
@@ -234,7 +240,8 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   {
     // Register callbacks (store in array to keep in scope for test)
@@ -266,7 +273,8 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginGradualStrategy) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   testing::MockFunction<void(std::chrono::milliseconds)> cb_before_drain;
   testing::MockFunction<void(std::chrono::milliseconds)> cb_after_drain;
@@ -291,7 +299,8 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginImmediateStrategy) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                                 server_.dispatcher());
 
   testing::MockFunction<void(std::chrono::milliseconds)> cb_before_drain;
   testing::MockFunction<void(std::chrono::milliseconds)> cb_after_drain;
@@ -313,8 +322,8 @@ TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  auto parent =
-      std::make_unique<DrainManagerImpl>(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto parent = std::make_unique<DrainManagerImpl>(
+      server_, envoy::config::listener::v3::Listener::DEFAULT, server_.dispatcher());
   auto child_a = parent->createChildManager(server_.dispatcher());
   auto child_b = parent->createChildManager(server_.dispatcher());
 
@@ -370,7 +379,8 @@ TEST_F(DrainManagerImplTest, DrainingCascadesThroughAllNodesInTree) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                            server_.dispatcher());
 
   auto b = a.createChildManager(server_.dispatcher());
   auto d = b->createChildManager(server_.dispatcher());
@@ -418,7 +428,8 @@ TEST_F(DrainManagerImplTest, DrainingIsIndependentToNeighbors) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                            server_.dispatcher());
 
   auto b = a.createChildManager(server_.dispatcher());
   auto d = b->createChildManager(server_.dispatcher());
@@ -458,7 +469,8 @@ TEST_F(DrainManagerImplTest, DrainOnlyCascadesDownwards) {
   ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
   ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
 
-  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT);
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                            server_.dispatcher());
   auto b = a.createChildManager(server_.dispatcher());
   auto c = b->createChildManager(server_.dispatcher());
 

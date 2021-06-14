@@ -26,7 +26,6 @@ namespace Server {
  */
 class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager {
 public:
-  DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
   DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type,
                    Event::Dispatcher& dispatcher);
 
@@ -52,7 +51,6 @@ private:
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
-  std::vector<Common::ThreadSafeCallbackHandlePtr> child_drain_cbs_;
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
   Common::ThreadSafeCallbackManager<> children_;
