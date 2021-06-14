@@ -7,6 +7,17 @@
 
 set -e
 
+if [[ ! $(command -v bazel) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+if [[ ! $(command -v jq) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: jq must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
