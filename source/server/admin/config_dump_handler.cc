@@ -133,7 +133,11 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
       return err.value().first;
     }
   } else {
-    addAllConfigToDump(dump, mask, include_eds);
+    auto err = addAllConfigToDump(dump, mask, include_eds);
+    if (err.has_value()) {
+      response.add(err.value().second);
+      return err.value().first;
+    }
   }
   MessageUtil::redact(dump);
 
@@ -176,7 +180,14 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       if (mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
-        trimResourceMessage(field_mask, msg);
+        // trimResourceMessage will LOG(FATAL) if `field_mask` is malformed.
+        TRY_ASSERT_MAIN_THREAD { trimResourceMessage(field_mask, msg); }
+        END_TRY
+        catch (...) {
+          return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+              Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
+                                                   " could not be successfully used."))};
+        }
       }
       auto* config = dump.add_configs();
       config->PackFrom(msg);
@@ -191,9 +202,10 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                           const absl::optional<std::string>& mask,
-                                           bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>>
+ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
+                                      const absl::optional<std::string>& mask,
+                                      bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
@@ -213,12 +225,21 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields.
-      ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+      TRY_ASSERT_MAIN_THREAD {
+        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+      }
+      END_TRY
+      catch (...) {
+        return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+            Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
+                                                 " could not be successfully used."))};
+      }
     }
 
     auto* config = dump.add_configs();
     config->PackFrom(*message);
   }
+  return absl::nullopt;
 }
 
 ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
