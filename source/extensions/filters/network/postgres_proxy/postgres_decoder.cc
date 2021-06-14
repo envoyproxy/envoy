@@ -207,7 +207,7 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
 Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   ASSERT(state_ == State::InitState);
 
-  // The minimum size of the message sufficient for parsing is 5 bytes.
+  // In Init state the minimum size of the message sufficient for parsing is 4 bytes.
   if (data.length() < 4) {
     // not enough data in the buffer.
     return Decoder::Result::NeedMoreData;
@@ -218,9 +218,6 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
   const auto msgParser = f();
   // Run the validation.
   message_len_ = data.peekBEInt<uint32_t>(0);
-// MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
-// as maximum size of initial packet.
-#define MAX_STARTUP_PACKET_LENGTH 10000
   if (message_len_ > MAX_STARTUP_PACKET_LENGTH) {
     // Message does not conform to the expected format. Move to out-of-sync state.
     data.drain(data.length());
@@ -265,7 +262,6 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
       ENVOY_LOG(trace, "postgres_proxy: detected encrypted traffic.");
       incSessionsEncrypted();
       state_ = State::EncryptedState;
-      startup_ = false;
     } else {
       result = Decoder::Result::Stopped;
       // Stay in InitState. After switch to SSL, another init packet will be sent.

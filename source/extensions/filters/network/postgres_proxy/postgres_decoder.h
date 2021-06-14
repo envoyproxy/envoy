@@ -171,7 +171,6 @@ protected:
   std::string message_;
   uint32_t message_len_{};
 
-  bool startup_{true};    // startup stage does not have 1st byte command
   bool encrypted_{false}; // tells if exchange is encrypted
 
   // Dispatchers for Backend (BE) and Frontend (FE) messages.
@@ -189,6 +188,11 @@ protected:
 
   MsgParserDict BE_errors_;
   MsgParserDict BE_notices_;
+
+  // MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
+  // as maximum size of initial packet.
+  // https://github.com/postgres/postgres/search?q=MAX_STARTUP_PACKET_LENGTH&type=code
+  static constexpr uint64_t MAX_STARTUP_PACKET_LENGTH = 10000;
 };
 
 } // namespace PostgresProxy
