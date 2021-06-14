@@ -507,9 +507,8 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
       return NormalizePathAction::Reject;
     }
   } else if (final_action == NormalizePathAction::Redirect) {
-    if (forwarding_path.has_value()) {
-      request_headers.setPath(forwarding_path.value());
-    }
+    ASSERT(forwarding_path.has_value());
+    request_headers.setPath(forwarding_path.value());
   }
   return final_action;
 }
