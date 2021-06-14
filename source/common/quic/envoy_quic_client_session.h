@@ -28,7 +28,8 @@ namespace Quic {
 // move FilterManager interface to EnvoyQuicServerSession.
 class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
                                public quic::QuicSpdyClientSession,
-                               public Network::ClientConnection {
+                               public Network::ClientConnection,
+                               public PacketsToReadDelegate {
 public:
   EnvoyQuicClientSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
@@ -70,6 +71,13 @@ public:
       quic::QuicReferenceCountedPointer<quic::QuicAckListenerInterface> ack_listener) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+
+  // PacketsToReadDelegate
+  size_t numPacketsExpectedPerEventLoop() override {
+    // Do one round of reading per active stream, or to see if there's a new
+    // active stream.
+    return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
+  }
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 

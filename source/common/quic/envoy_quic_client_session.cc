@@ -26,7 +26,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
 
 void EnvoyQuicClientSession::connect() {
-  dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket();
+  dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket(*this);
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
