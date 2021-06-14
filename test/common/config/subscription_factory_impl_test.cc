@@ -230,8 +230,6 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile)
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
   api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterSet primary_clusters;
