@@ -91,18 +91,18 @@ combinations of two dimensions.
 
 The first dimension is State of the World (SotW) vs. incremental. The SotW approach was the
 original mechanism used by xDS, in which the client must specify all resource names it is
-interested in with each request (except when making a wildcard request in LDS/CDS), and the server
-must return all resources the client has subscribed to in each request (in LDS/CDS). This means
-that if the client is already subscribing to 99 resources and wants to add an additional one, it
-must send a request with all 100 resource names, rather than just the one new one. And the server
-must then respond by sending all 100 resources, even if the 99 that were already subscribed to have
-not changed (in LDS/CDS). This mechanism can be a scalability limitation, which is why the
-incremental protocol variant was introduced. The incremental approach allows both the client and
-server to indicate only deltas relative to their previous state -- i.e., the client can say that
-it wants to add or remove its subscription to a particular resource name without resending those
-that have not changed, and the server can send updates only for those resources that have changed.
-The incremental protocol also provides a mechanism for lazy loading of resources. For details on
-the incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
+interested in with each request, and for LDS and CDS resources, the server must return all
+resources that the client has subscribed to in each request. This means that if the client is
+already subscribing to 99 resources and wants to add an additional one, it must send a request
+with all 100 resource names, rather than just the one new one. And for LDS and CDS resources, the
+server must then respond by sending all 100 resources, even if the 99 that were already subscribed
+to have not changed. This mechanism can be a scalability limitation, which is why the incremental
+protocol variant was introduced. The incremental approach allows both the client and server to
+indicate only deltas relative to their previous state -- i.e., the client can say that it wants
+to add or remove its subscription to a particular resource name without resending those that have
+not changed, and the server can send updates only for those resources that have changed. The
+incremental protocol also provides a mechanism for lazy loading of resources. For details on the
+incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
 
 The second dimension is using a separate gRPC stream for each resource type vs. aggregating all
 resource types onto a single gRPC stream. The former approach was the original mechanism used by
@@ -287,9 +287,9 @@ stream, the client's initial request on the new stream should indicate the most 
 seen by the client on the previous stream. Servers may decide to optimize by not resending
 resources that the client had already seen on the previous stream, but only if they know that the
 client is not subscribing to a new resource that it was not previously subscribed to. For example,
-it is generally safe for servers to do this optimization for wildcard LDS and CDS requests, and it
-is safe to do in environments where the clients will always subscribe to exactly the same set of
-resources.
+it is generally safe for servers to do this optimization for LDS and CDS when the only subscription
+is a wildcard subscription, and it is safe to do in environments where the clients will always
+subscribe to exactly the same set of resources.
 
 An example EDS request might be:
 
@@ -427,20 +427,41 @@ names becomes empty, that means that the client is no longer interested in any r
 specified type.
 
 For :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource
-types, there is also a "wildcard" mode, which is triggered when the initial request on the stream
-for that resource type contains no resource names. In this case, the server should use
-site-specific business logic to determine the full set of resources that the client is interested
-in, typically based on the client's :ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification. Note
-that once a stream has entered wildcard mode for a given resource type, there is no way to change
-the stream out of wildcard mode; resource names specified in any subsequent request on the stream
-will be ignored.
+types, there is also a "wildcard" subscription, which is triggered when subscribing to the special
+name "*". In this case, the server should use site-specific business logic to determine the full
+set of resources that the client is interested in, typically based on the client's
+:ref:`node <envoy_v3_api_msg_config.core.v3.Node>` identification.
+
+For historical reasons, if the client sends a request for a given resource type but has never
+explicitly subscribed to any resource names (i.e., in SotW, all requests on the stream for that
+resource type have had an empty :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>`
+field, or in incremental, having never sent a request on the stream for that resource type with a
+non-empty :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>`
+field), the server should treat that identically to how it would treat the client having
+explicitly subscribed to "*". However, once the client does explicitly subscribe to a resource
+name (whether it be "*" or any other name), then this legacy semantic is no longer available; at
+that point, clearing the list of subscribed resources is interpretted as an unsubscription (see
+:ref:`Unsubscribing From Resources<xds_protocol_unsubscribing>`) rather than as a subscription
+to "*".
+
+For example, in SotW:
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as a subscription to "*".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "*" and "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` set to "A". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".
+- Client sends a request with :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` unset. Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed to all resources). Although this request is identical to the first one, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the :ref:`resource_names <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.resource_names>` field.
+
+And in incremental:
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` unset. Server interprets this as a subscription to "*".
+- Client sends a request with :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` set to "A". Server interprets this as continuing the existing subscription to "*" and adding a new subscription to "A".
+- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to "*". Server interprets this as unsubscribing to "*" and continuing the existing subscription to "A".
+- Client sends a request with :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_unsubscribe>` set to "A". Server interprets this as unsubscribing to "A" (i.e., the client has now unsubscribed to all resources). Although the set of subscribed resources is now empty, just as it was after the initial request, it is not interpreted as a wildcard subscription, because there has previously been a request on this stream for this resource type that set the :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryRequest.resource_names_subscribe>` field.
 
 Client Behavior
 """""""""""""""
 
-Envoy will always use wildcard mode for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and
+Envoy will always use wildcard subscriptions for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and
 :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resources. However, other xDS clients (such as gRPC clients
-that use xDS) may specify explicit resource names for these resource types, for example if they
+that use xDS) may explicitly subscribe to specific resource names for these resource types, for example if they
 only have a singleton listener and already know its name from some out-of-band configuration.
 
 Grouping Resources into Responses
@@ -522,18 +543,13 @@ not exist if they have not received the resource. In Envoy, this is done for
 <envoy_v3_api_msg_config.endpoint.v3.ClusterLoadAssignment>` resources during :ref:`resource warming
 <xds_protocol_resource_warming>`.
 
-Note that this timeout is not strictly necessary when using wildcard mode for :ref:`Listener
-<envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` resource types, because
-in that case every response will contain all existing resources that are relevant to the
-client, so the client can know that a resource does not exist by its absence in the next
-response it sees. However, using a timeout is still recommended in this case, since it protects
-against the case where the management server fails to send a response in a timely manner.
-
 Note that even if a requested resource does not exist at the moment when the client requests it,
 that resource could be created at any time. Management servers must remember the set of resources
 being requested by the client, and if one of those resources springs into existence later, the
 server must send an update to the client informing it of the new resource. Clients that initially
 see a resource that does not exist must be prepared for the resource to be created at any time.
+
+.. _xds_protocol_unsubscribing:
 
 Unsubscribing From Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -550,10 +566,10 @@ to. For example, if the client had previously been subscribed to resources A and
 unsubscribe from B, it must send a new request containing only resource A.
 
 Note that for :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` and :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>`
-resource types where the stream is in "wildcard" mode (see :ref:`How the client specifies what
+resource types where the client is using a "wildcard" subscription (see :ref:`How the client specifies what
 resources to return <xds_protocol_resource_hints>` for details), the set of resources being
-subscribed to is determined by the server instead of the client, so there is no mechanism
-for the client to unsubscribe from resources.
+subscribed to is determined by the server instead of the client, so the client cannot unsubscribe
+from those resources individually; it can only unsubscribe from the wildcard as a whole.
 
 Requesting Multiple Resources on a Single Stream
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -778,8 +794,13 @@ On reconnect the Incremental xDS client may tell the server of its known
 resources to avoid resending them over the network by sending them in
 :ref:`initial_resource_versions <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.initial_resource_versions>`.
 Because no state is assumed to be preserved from the previous stream, the reconnecting
-client must provide the server with all resource names it is interested in. Note that for wildcard
-requests (CDS/LDS/SRDS), the request must have no resources in both
+client must provide the server with all resource names it is interested in.
+
+Note that for "wildcard" subscriptions (see :ref:`How the client specifies what
+resources to return <xds_protocol_resource_hints>` for details), the
+request must either specify "*" in the :ref:`resource_names_subscribe
+<envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>`
+field or (legacy behavior) the request must have no resources in both
 :ref:`resource_names_subscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_subscribe>` and
 :ref:`resource_names_unsubscribe <envoy_v3_api_field_service.discovery.v3.deltadiscoveryrequest.resource_names_unsubscribe>`.
 

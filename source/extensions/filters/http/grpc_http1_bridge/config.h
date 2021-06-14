@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace GrpcHttp1Bridge {
 class GrpcHttp1BridgeFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::grpc_http1_bridge::v3::Config> {
 public:
-  GrpcHttp1BridgeFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcHttp1Bridge) {}
+  GrpcHttp1BridgeFilterConfig() : FactoryBase("envoy.filters.http.grpc_http1_bridge") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config,

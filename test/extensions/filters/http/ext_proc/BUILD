@@ -99,6 +99,35 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "streaming_integration_test",
+    size = "medium",
+    srcs = ["streaming_integration_test.cc"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        ":test_processor_lib",
+        "//source/common/network:address_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "test_processor_lib",
+    srcs = ["test_processor.cc"],
+    hdrs = ["test_processor.h"],
+    extension_name = "envoy.filters.http.ext_proc",
+    deps = [
+        "@com_github_grpc_grpc//:grpc++",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_grpc",
+        "@envoy_api//envoy/service/ext_proc/v3alpha:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test_library(
     name = "mock_server_lib",
     srcs = ["mock_server.cc"],

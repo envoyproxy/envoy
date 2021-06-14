@@ -16,6 +16,7 @@
 #include "source/common/quic/envoy_quic_client_stream.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 
 namespace Envoy {
 namespace Quic {
@@ -27,7 +28,8 @@ namespace Quic {
 // move FilterManager interface to EnvoyQuicServerSession.
 class EnvoyQuicClientSession : public QuicFilterManagerConnectionImpl,
                                public quic::QuicSpdyClientSession,
-                               public Network::ClientConnection {
+                               public Network::ClientConnection,
+                               public PacketsToReadDelegate {
 public:
   EnvoyQuicClientSession(const quic::QuicConfig& config,
                          const quic::ParsedQuicVersionVector& supported_versions,
@@ -35,7 +37,8 @@ public:
                          const quic::QuicServerId& server_id,
                          std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
                          quic::QuicClientPushPromiseIndex* push_promise_index,
-                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                         Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                         EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory);
 
   ~EnvoyQuicClientSession() override;
 
@@ -69,6 +72,13 @@ public:
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
+  // PacketsToReadDelegate
+  size_t numPacketsExpectedPerEventLoop() override {
+    // Do one round of reading per active stream, or to see if there's a new
+    // active stream.
+    return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
+  }
+
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
@@ -77,6 +87,7 @@ protected:
   // quic::QuicSpdySession
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
+  std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
 
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
@@ -90,6 +101,7 @@ private:
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
   const absl::string_view host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
 };
 
 } // namespace Quic

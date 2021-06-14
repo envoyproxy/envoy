@@ -130,6 +130,9 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+    return address_list_;
+  }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
@@ -164,6 +167,7 @@ private:
   const std::string hostname_;
   const std::string health_checks_hostname_;
   Network::Address::InstanceConstSharedPtr address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
   mutable absl::Mutex metadata_mutex_;

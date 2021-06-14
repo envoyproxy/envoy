@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace TapFilter {
 class TapFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::tap::v3::Tap> {
 public:
-  TapFilterFactory() : FactoryBase(HttpFilterNames::get().Tap) {}
+  TapFilterFactory() : FactoryBase("envoy.filters.http.tap") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

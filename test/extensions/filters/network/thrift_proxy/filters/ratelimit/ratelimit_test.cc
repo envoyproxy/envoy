@@ -9,7 +9,6 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
-#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -338,7 +337,7 @@ TEST_F(ThriftRateLimitFilterTest, ErrorResponseWithDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
-        EXPECT_EQ(ns, ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT);
+        EXPECT_EQ(ns, "envoy.filters.thrift.rate_limit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
 

@@ -45,6 +45,7 @@ The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
+    brotli
     cache
     cors
     csrf

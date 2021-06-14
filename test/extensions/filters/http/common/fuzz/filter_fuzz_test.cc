@@ -1,6 +1,5 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/config/utility.h"
 #include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"

@@ -24,6 +24,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
+
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
@@ -33,8 +35,6 @@
 #include "source/server/drain_manager_impl.h"
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
-
-#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Server {
@@ -559,17 +559,6 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
         // main thread to avoid locking. This makes sure that we don't destroy the listener
         // while filters might still be using its context (stats, etc.).
         server_.dispatcher().post([this, draining_it]() -> void {
-          // TODO(lambdai): Resolve race condition below.
-          // Consider the below events in global sequence order
-          // main thread: calling drainListener
-          // work thread: deferred delete the active connection
-          // work thread: post to main that the drain is done
-          // main thread: erase the listener
-          // worker thread: execute destroying connection when the shared listener config is
-          // destroyed at step 4 (could be worse such as access the connection because connection is
-          // not yet started to deleted). The race condition is introduced because 3 occurs too
-          // early. My solution is to defer schedule the callback posting to main thread, by
-          // introducing DeferTaskUtil. So that 5 should always happen before 3.
           if (--draining_it->workers_pending_removal_ == 0) {
             draining_it->listener_->debugLog("draining listener removal complete");
             draining_listeners_.erase(draining_it);
@@ -833,6 +822,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   workers_started_ = true;
   uint32_t i = 0;
 
+  absl::BlockingCounter workers_waiting_to_run(workers_.size());
+  Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
+    workers_waiting_to_run.DecrementCount();
+  };
+
   // We can not use "Cleanup" to simplify this logic here, because it results in a issue if Envoy is
   // killed before workers are actually started. Specifically the AdminRequestGetStatsAndKill test
   // case in main_common_test fails with ASAN error if we use "Cleanup" here.
@@ -850,12 +844,16 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
                             }
                           });
     }
-    worker->start(guard_dog);
+    worker->start(guard_dog, worker_started_running);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_);
     }
     i++;
   }
+
+  // Wait for workers to start running.
+  workers_waiting_to_run.Wait();
+
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
     callback();
