@@ -59,6 +59,12 @@ public:
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
       proto_config_.set_transport_api_version(apiVersion());
 
+      // Add labels and verify they are passed.
+      Protobuf::Map<std::string, std::string> labels;
+      labels["label_1"] = "value_1";
+      labels["label_2"] = "value_2";
+      (*proto_config_.mutable_destination_labels()) = labels;
+
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
@@ -134,6 +140,8 @@ public:
     auto* http_request = attributes->mutable_request()->mutable_http();
 
     EXPECT_TRUE(attributes->request().has_time());
+    EXPECT_EQ("value_1", attributes->destination().labels().at("label_1"));
+    EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
 
     // Clear fields which are not relevant.
     attributes->clear_source();
