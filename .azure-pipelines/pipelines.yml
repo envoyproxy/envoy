@@ -56,7 +56,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: format
-    dependsOn: ["format_pre"]
+    dependsOn: [] #  "format_pre"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -191,7 +191,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
