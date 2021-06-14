@@ -56,7 +56,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: format
-    dependsOn: ["format_pre"]
+    dependsOn: [] #  "format_pre"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
