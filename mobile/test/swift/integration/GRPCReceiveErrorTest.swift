@@ -13,36 +13,36 @@ final class ReceiveErrorTests: XCTestCase {
     let localErrorFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
     let filterName = "error_validation_filter"
     let config =
-    """
-    static_resources:
-      listeners:
-      - name: base_api_listener
-        address:
-          socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-        api_listener:
-          api_listener:
-            "@type": \(hcmType)
-            stat_prefix: hcm
-            route_config:
-              name: api_router
-              virtual_hosts:
-              - name: api
-                domains: ["*"]
-                routes:
-                - match: { prefix: "/" }
-                  direct_response: { status: 503 }
-            http_filters:
-            - name: envoy.filters.http.platform_bridge
-              typed_config:
-                "@type": \(pbfType)
-                platform_filter_name: \(filterName)
-            - name: envoy.filters.http.local_error
-              typed_config:
-                "@type": \(localErrorFilterType)
-            - name: envoy.router
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-    """
+"""
+static_resources:
+  listeners:
+  - name: base_api_listener
+    address:
+      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
+    api_listener:
+      api_listener:
+        "@type": \(hcmType)
+        stat_prefix: hcm
+        route_config:
+          name: api_router
+          virtual_hosts:
+          - name: api
+            domains: ["*"]
+            routes:
+            - match: { prefix: "/" }
+              direct_response: { status: 503 }
+        http_filters:
+        - name: envoy.filters.http.platform_bridge
+          typed_config:
+            "@type": \(pbfType)
+            platform_filter_name: \(filterName)
+        - name: envoy.filters.http.local_error
+          typed_config:
+            "@type": \(localErrorFilterType)
+        - name: envoy.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+"""
 
     struct ErrorValidationFilter: ResponseFilter {
       let expectation: XCTestExpectation
