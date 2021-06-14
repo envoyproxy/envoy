@@ -16,7 +16,7 @@ public:
   absl::string_view name() override { return "envoy.wasm.runtime.wamr"; }
 };
 
-#if defined(ENVOY_WASM_WAMR)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
 REGISTER_FACTORY(WamrRuntimeFactory, WasmRuntimeFactory);
 #endif
 
