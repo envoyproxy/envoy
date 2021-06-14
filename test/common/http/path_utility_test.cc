@@ -218,90 +218,156 @@ TEST_F(PathUtilityTest, RemoveQueryAndFragment) {
 
 class PathTransformerTest : public testing::Test {
 public:
-  void setPathTransformer(std::vector<std::string> transformations_config) {
-    envoy::type::http::v3::PathTransformation path_transformation_config;
-    Protobuf::RepeatedPtrField<envoy::type::http::v3::PathTransformation_Operation>* operations =
-        path_transformation_config.mutable_operations();
-    for (std::string const& transformation : transformations_config) {
-      auto* operation = operations->Add();
-      if (transformation == "NormalizePathRFC3986") {
-        operation->mutable_normalize_path_rfc_3986();
-      } else if (transformation == "MergeSlashes") {
-        operation->mutable_merge_slashes();
-      }
-    }
-    path_transformer_ = std::make_unique<PathTransformer>(path_transformation_config);
+  void setPathTransformer(const std::string& path_transformation_config) {
+    envoy::type::http::v3::PathTransformation path_transformer;
+    TestUtility::loadFromYaml(path_transformation_config, path_transformer);
+
+    path_transformer_ = std::make_unique<PathTransformer>(path_transformer);
   }
+
   const PathTransformer& pathTransformer() { return *path_transformer_; }
 
   std::unique_ptr<PathTransformer> path_transformer_;
+  NormalizePathAction action_{NormalizePathAction::Continue};
 };
 
 TEST_F(PathTransformerTest, MergeSlashes) {
-  setPathTransformer({"MergeSlashes"});
-  NormalizePathAction action;
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - merge_slashes: {}
+)EOF";
+  setPathTransformer(path_transformation_config);
   PathTransformer const& path_transformer = pathTransformer();
-  EXPECT_EQ("", path_transformer.transform("", action).value());                // empty
-  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c", action).value());     // relative
-  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/", action).value()); // ends with slash
+  EXPECT_EQ("", path_transformer.transform("", action_).value());                // empty
+  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c", action_).value());     // relative
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a//b/c/", action_).value()); // ends with slash
   EXPECT_EQ("a/b/c/",
-            path_transformer.transform("a//b/c/", action).value());  // relative ends with slash
-  EXPECT_EQ("/a", path_transformer.transform("/a", action).value()); // no-op
-  EXPECT_EQ("/a/b/c", path_transformer.transform("//a/b/c", action).value()); // double / start
+            path_transformer.transform("a//b/c/", action_).value());  // relative ends with slash
+  EXPECT_EQ("/a", path_transformer.transform("/a", action_).value()); // no-op
+  EXPECT_EQ("/a/b/c", path_transformer.transform("//a/b/c", action_).value()); // double / start
   EXPECT_EQ("/a/b/c",
-            path_transformer.transform("/a//b/c", action).value()); // double / in the middle
-  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a/b/c//", action).value()); // double / end
+            path_transformer.transform("/a//b/c", action_).value()); // double / in the middle
+  EXPECT_EQ("/a/b/c/", path_transformer.transform("/a/b/c//", action_).value()); // double / end
   EXPECT_EQ("/a/b/c",
-            path_transformer.transform("/a///b/c", action).value()); // triple / in the middle
+            path_transformer.transform("/a///b/c", action_).value()); // triple / in the middle
   EXPECT_EQ("/a/b/c",
-            path_transformer.transform("/a////b/c", action).value()); // quadruple / in the middle
-  EXPECT_EQ("/a/b?a=///c", path_transformer.transform("/a//b?a=///c", action)
+            path_transformer.transform("/a////b/c", action_).value()); // quadruple / in the middle
+  EXPECT_EQ("/a/b?a=///c", path_transformer.transform("/a//b?a=///c", action_)
                                .value()); // slashes in the query are ignored
-  EXPECT_EQ("/a/b?", path_transformer.transform("/a//b?", action).value()); // empty query
+  EXPECT_EQ("/a/b?", path_transformer.transform("/a//b?", action_).value()); // empty query
   EXPECT_EQ("/a/?b",
-            path_transformer.transform("//a/?b", action).value()); // ends with slash + query
+            path_transformer.transform("//a/?b", action_).value()); // ends with slash + query
 }
 
 TEST_F(PathTransformerTest, RfcNormalize) {
-  setPathTransformer({"NormalizePathRFC3986"});
-  NormalizePathAction action;
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+)EOF";
+  setPathTransformer(path_transformation_config);
   PathTransformer const& path_transformer = pathTransformer();
-  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action)
+  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action_)
                           .value()); // Already normalized path don't change.
 
-  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action).value());   // parent dir
-  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/./c", action).value()); // current dir
-  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action).value());   // non / start
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action_).value());   // parent dir
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/./c", action_).value()); // current dir
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action_).value());   // non / start
   EXPECT_EQ("/c",
-            path_transformer.transform("/a/b/../../../../c", action).value()); // out number parent
+            path_transformer.transform("/a/b/../../../../c", action_).value()); // out number parent
   EXPECT_EQ("/c",
-            path_transformer.transform("/a/..\\c", action).value()); // "..\\" canonicalization
-  EXPECT_EQ(
-      "/%c0%af",
-      path_transformer.transform("/%c0%af", action).value()); // 2 bytes unicode reserved characters
+            path_transformer.transform("/a/..\\c", action_).value()); // "..\\" canonicalization
+  EXPECT_EQ("/%c0%af", path_transformer.transform("/%c0%af", action_)
+                           .value()); // 2 bytes unicode reserved characters
   EXPECT_EQ("/%5c%25",
-            path_transformer.transform("/%5c%25", action).value()); // reserved characters
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action).value()); // %2E escape
+            path_transformer.transform("/%5c%25", action_).value()); // reserved characters
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action_).value()); // %2E escape
 
-  EXPECT_EQ("/A/B/C", path_transformer.transform("/A/B/C", action).value());      // empty
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action).value()); // relative
-  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2e%2e/c", action).value()); // ends with slash
+  EXPECT_EQ("/A/B/C", path_transformer.transform("/A/B/C", action_).value());      // empty
+  EXPECT_EQ("/a/c", path_transformer.transform("/a/b/%2E%2E/c", action_).value()); // relative
+  EXPECT_EQ("/a/c",
+            path_transformer.transform("/a/b/%2e%2e/c", action_).value()); // ends with slash
   EXPECT_EQ("/a/%2F%2f/c",
-            path_transformer.transform("/a/%2F%2f/c", action).value()); // relative ends with slash
+            path_transformer.transform("/a/%2F%2f/c", action_).value()); // relative ends with slash
 
-  EXPECT_FALSE(path_transformer.transform("/xyz/.%00../abc", action).has_value());
-  EXPECT_FALSE(path_transformer.transform("/xyz/%00.%00./abc", action).has_value());
-  EXPECT_FALSE(path_transformer.transform("/xyz/AAAAA%%0000/abc", action).has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/.%00../abc", action_).has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/%00.%00./abc", action_).has_value());
+  EXPECT_FALSE(path_transformer.transform("/xyz/AAAAA%%0000/abc", action_).has_value());
+}
+
+TEST_F(PathTransformerTest, SetNormalizePathAction) {
+  // If an operation change the path, the action_ will be set.
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+        normalize_path_action: REDIRECT
+)EOF";
+  setPathTransformer(path_transformation_config);
+  action_ = NormalizePathAction::Continue;
+  PathTransformer path_transformer = pathTransformer();
+  // Path is not modified, don't set action_.
+  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Continue);
+  // Path is modified, set action_.
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Redirect);
+
+  path_transformation_config = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+        normalize_path_action: REJECT
+)EOF";
+  setPathTransformer(path_transformation_config);
+  action_ = NormalizePathAction::Continue;
+  path_transformer = pathTransformer();
+  // Path is not modified, don't set action_.
+  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Continue);
+  // Path is modified, set action_.
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Reject);
+  action_ = NormalizePathAction::Continue;
+  // Validate that path transformer will still perform correctly.
+  EXPECT_EQ("/x/y/z", path_transformer.transform("/x/y/z", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Continue);
+
+  path_transformation_config = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
+      - merge_slashes: {}
+        normalize_path_action: REDIRECT
+)EOF";
+  setPathTransformer(path_transformation_config);
+  action_ = NormalizePathAction::Continue;
+  path_transformer = pathTransformer();
+  // normalize_path_rfc_3986 normalizes the path, action_ should be continue.
+  EXPECT_EQ("/a/c", path_transformer.transform("a/b/../c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Continue);
+  // merge_slashes normalizes the path, action_ should be redirect.
+  EXPECT_EQ("/a/c", path_transformer.transform("a//c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Redirect);
+  action_ = NormalizePathAction::Continue;
+  // Both operation modify the path, action_ should be redirect.
+  EXPECT_EQ("/a/c", path_transformer.transform("a//c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Redirect);
 }
 
 TEST_F(PathTransformerTest, DuplicateTransformation) {
-  EXPECT_THROW(setPathTransformer({"MergeSlashes", "MergeSlashes"}), EnvoyException);
-  EXPECT_THROW(setPathTransformer({"MergeSlashes", "NormalizePathRFC3986", "MergeSlashes"}),
-               EnvoyException);
-  EXPECT_THROW(setPathTransformer({"NormalizePathRFC3986", "MergeSlashes", "NormalizePathRFC3986"}),
-               EnvoyException);
-  EXPECT_NO_THROW(setPathTransformer({"MergeSlashes", "NormalizePathRFC3986"}));
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+      - normalize_path_rfc_3986: {}
+      - merge_slashes: {}
+)EOF";
+  EXPECT_THROW(setPathTransformer(path_transformation_config), EnvoyException);
+  path_transformation_config = R"EOF(
+      operations:
+      - merge_slashes: {}
+      - merge_slashes: {}
+)EOF";
+  EXPECT_THROW(setPathTransformer(path_transformation_config), EnvoyException);
 }
+
 TEST_F(PathUtilityTest, UnescapeSlashes) {
   using UnescapeResult = std::tuple<std::string, PathUtil::UnescapeSlashesResult>;
   auto unescapeSlashes = [this](const std::string& path_value) {

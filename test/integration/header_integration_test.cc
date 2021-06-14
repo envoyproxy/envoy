@@ -1323,6 +1323,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRejected) {
                                    });
 }
 
+// Normalizing the path trigger reject action.
 TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
@@ -1440,6 +1441,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                    });
 }
 
+// Path normalization triggers redirect action.
 TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::KEEP_UNCHANGED;
@@ -1469,7 +1471,8 @@ TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
                                    });
 }
 
-TEST_P(HeaderIntegrationTest, PathMergeSlashesAndRedirect) {
+// Path normalization triggers redirect action.
+TEST_P(HeaderIntegrationTest, RedirectOverwriteContinueAction) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::KEEP_UNCHANGED;
   forwarding_transformation_ = R"EOF(
@@ -1482,10 +1485,12 @@ TEST_P(HeaderIntegrationTest, PathMergeSlashesAndRedirect) {
   initializeFilter(HeaderMode::Append, false);
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  // Both Chromium URL normalization and merge slashes operations are performed.
+  // If one of the operation set action to be redirect, the action will be redirect.
   IntegrationStreamDecoderPtr response =
       codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/private//aa"},
+          {":path", "/private//aa/bb/../"},
           {":scheme", "http"},
           {":authority", "path-sanitization.com"},
       });
@@ -1493,7 +1498,7 @@ TEST_P(HeaderIntegrationTest, PathMergeSlashesAndRedirect) {
   Http::TestResponseHeaderMapImpl response_headers{response->headers()};
   compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
                                        {"server", "envoy"},
-                                       {"location", "/private/aa"},
+                                       {"location", "/private/aa/"},
                                        {":status", "307"},
                                    });
 }
