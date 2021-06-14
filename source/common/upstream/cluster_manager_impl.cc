@@ -1480,13 +1480,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
                   ENVOY_LOG(debug, "Erasing idle pool for host {}", host);
                   container->pools_->erasePool(priority, hash_key);
 
-                  // We want to clean up after ourselves if the host isn't particularly active (i.e.
-                  // we hit our configured timeout on the last pool and don't have any other pools
-                  // for that host).
                   if (container->pools_->size() == 0) {
-                    ENVOY_LOG(
-                        debug,
-                        "Pool container empty for host after idle timeout, erasing host entry");
+                    ENVOY_LOG(debug, "Pool container empty for host {}, erasing host entry", host);
                     parent_.host_http_conn_pool_map_.erase(
                         host); // NOTE: `container` is erased after this point in the lambda.
                   }
@@ -1576,9 +1571,6 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
                 container.pools_.erase(erase_iter);
               }
 
-              // We want to clean up after ourselves if the host isn't particularly active (i.e. we
-              // hit our configured timeout on the last pool and don't have any other pools for that
-              // host).
               if (container.pools_.empty()) {
                 parent_.host_tcp_conn_pool_map_.erase(
                     host); // NOTE: `container` is erased after this point in the lambda.
