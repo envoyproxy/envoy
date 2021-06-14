@@ -45,7 +45,7 @@ DnsCacheImpl::DnsCacheImpl(
   for (const auto& hostname : config.prefetch_hostnames()) {
     // No need to get a resolution handle on this resolution as the only outcome needed is for the
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
-    // potential optimization of having the entry be pre-loaded the first time a true consumer of
+    // potential optimization of having the entry be prefetched the first time a true consumer of
     // this DNS cache asks for it.
     main_thread_dispatcher_.post(
         [this, host = hostname.address(), default_port = hostname.port_value()]() {
