@@ -490,14 +490,11 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   if (final_action == NormalizePathAction::Reject) {
     return final_action;
   }
-
+  ASSERT(forwarding_path.has_value());
   absl::optional<std::string> filter_path;
-  if (forwarding_path.has_value()) {
-    request_headers.setForwardingPath(forwarding_path.value());
-    filter_path = config.filterPathTransformer().transform(forwarding_path.value(), final_action);
-  } else {
-    return NormalizePathAction::Reject;
-  }
+
+  request_headers.setForwardingPath(forwarding_path.value());
+  filter_path = config.filterPathTransformer().transform(forwarding_path.value(), final_action);
 
   if (final_action == NormalizePathAction::Continue) {
     if (filter_path.has_value()) {

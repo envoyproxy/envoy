@@ -1053,7 +1053,10 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
 // Route selection and path to upstream are the exact string literal
 // from downstream.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
-  normalize_path_ = false;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+              )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1208,7 +1211,11 @@ TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
 // Path to decide route and path to upstream are both
 // the normalized.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
-  normalize_path_ = true;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1238,7 +1245,11 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
-  normalize_path_ = true;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1343,7 +1354,11 @@ TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::KEEP_UNCHANGED;
-  normalize_path_ = true;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1376,9 +1391,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
   forwarding_transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
-        normalize_path_action: CONTINUE
       - merge_slashes: {}
-        normalize_path_action: CONTINUE
 )EOF";
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1427,7 +1440,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                    });
 }
 
-TEST_P(HeaderIntegrationTest, PathNormalizedRedirected) {
+TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::KEEP_UNCHANGED;
   forwarding_transformation_ = R"EOF(
@@ -1452,6 +1465,35 @@ TEST_P(HeaderIntegrationTest, PathNormalizedRedirected) {
   compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
                                        {"server", "envoy"},
                                        {"location", "/public"},
+                                       {":status", "307"},
+                                   });
+}
+
+TEST_P(HeaderIntegrationTest, PathMergeSlashesAndRedirect) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::KEEP_UNCHANGED;
+  forwarding_transformation_ = R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+        normalize_path_action: CONTINUE
+      - merge_slashes: {}
+        normalize_path_action: REDIRECT
+)EOF";
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private//aa"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      });
+  EXPECT_TRUE(response->waitForEndStream());
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
+                                       {"server", "envoy"},
+                                       {"location", "/private/aa"},
                                        {":status", "307"},
                                    });
 }
