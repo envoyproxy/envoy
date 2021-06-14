@@ -694,19 +694,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
   filter_manager_.streamInfo().onRequestComplete();
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
-
-  if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_body_size_.recordValue(
-          filter_manager_.streamInfo().bytesReceived());
-      req_resp_stats->get().upstream_rs_body_size_.recordValue(
-          filter_manager_.streamInfo().bytesSent());
-    }
-  }
 
   if (connection_manager_.remote_close_) {
     filter_manager_.streamInfo().setResponseCodeDetails(
@@ -794,17 +781,6 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
-
-  if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rs_headers_size_.recordValue(headers.byteSize());
-    }
-  }
-
   // No response is sent back downstream for internal redirects, so don't charge downstream stats.
   const absl::optional<std::string>& response_code_details =
       filter_manager_.streamInfo().responseCodeDetails();
@@ -864,17 +840,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
   if (request_header_timer_ != nullptr) {
     request_header_timer_->disableTimer();
     request_header_timer_.reset();
-  }
-
-  Upstream::HostDescriptionConstSharedPtr upstream_host =
-      connection_manager_.read_callbacks_->upstreamHost();
-
-  if (upstream_host != nullptr) {
-    Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats =
-        upstream_host->cluster().requestResponseSizeStats();
-    if (req_resp_stats.has_value()) {
-      req_resp_stats->get().upstream_rq_headers_size_.recordValue(request_headers_->byteSize());
-    }
   }
 
   // Both saw_connection_close_ and is_head_request_ affect local replies: set

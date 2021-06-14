@@ -7,7 +7,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/filters/http/buffer/buffer_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -40,10 +39,10 @@ public:
 
   void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
                         const Router::RouteSpecificFilterConfig* vhost_settings) {
-    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Buffer))
+    ON_CALL(callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.buffer"))
         .WillByDefault(Return(route_settings));
     ON_CALL(callbacks_.route_->route_entry_.virtual_host_,
-            perFilterConfig(HttpFilterNames::get().Buffer))
+            perFilterConfig("envoy.filters.http.buffer"))
         .WillByDefault(Return(vhost_settings));
   }
 

@@ -21,7 +21,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -113,7 +112,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // configured at the filter level.
   fault_settings_ = config_->settings();
   const auto* per_route_settings = Http::Utility::resolveMostSpecificPerFilterConfig<FaultSettings>(
-      Extensions::HttpFilters::HttpFilterNames::get().Fault, decoder_callbacks_->route());
+      "envoy.filters.http.fault", decoder_callbacks_->route());
   fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
 
   if (!matchesTargetUpstreamCluster()) {

@@ -135,6 +135,13 @@ public:
         stream_state_ = StreamState::Closed;
       }
     }
+
+    void closeLocalAndRemote() {
+      remote_closed_ = true;
+      local_closed_ = true;
+      stream_state_ = StreamState::Closed;
+    }
+
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
@@ -176,11 +183,11 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }

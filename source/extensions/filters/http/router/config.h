@@ -6,7 +6,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,7 @@ namespace RouterFilter {
 class RouterFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::router::v3::Router> {
 public:
-  RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
+  RouterFilterConfig() : FactoryBase("envoy.filters.http.router") {}
 
 private:
   bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::router::v3::Router&,

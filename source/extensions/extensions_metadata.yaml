@@ -83,6 +83,11 @@ envoy.filters.http.admission_control:
   - envoy.filters.http
   security_posture: unknown
   status: alpha
+envoy.filters.http.alternate_protocols_cache:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.http.aws_lambda:
   categories:
   - envoy.filters.http
@@ -184,11 +189,6 @@ envoy.filters.http.grpc_stats:
   security_posture: unknown
   status: alpha
 envoy.filters.http.grpc_web:
-  categories:
-  - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
-  status: stable
-envoy.filters.http.gzip:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
@@ -428,6 +428,11 @@ envoy.filters.udp_listener.udp_proxy:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.formatter.req_without_query:
+  categories:
+  - envoy.formatter
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.grpc_credentials.aws_iam:
   categories:
   - envoy.grpc_credentials
@@ -489,6 +494,16 @@ envoy.matching.input_matchers.consistent_hashing:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.quic.proof_source.filter_chain:
+  categories:
+  - envoy.quic.proof_source
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.quic.crypto_stream.server.quiche:
+  categories:
+  - envoy.quic.server.crypto_stream
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.rate_limit_descriptors.expr:
   categories:
   - envoy.rate_limit_descriptors

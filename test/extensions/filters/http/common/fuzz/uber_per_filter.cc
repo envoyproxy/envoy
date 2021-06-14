@@ -5,7 +5,6 @@
 
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/http/common/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
@@ -109,12 +108,12 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   const std::string name = Extensions::HttpFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
   // Map filter name to clean-up function.
-  if (filter_name == HttpFilterNames::get().GrpcJsonTranscoder) {
+  if (filter_name == "envoy.filters.http.grpc_json_transcoder") {
     // Add a valid service proto descriptor.
     addBookstoreProtoDescriptor(message);
-  } else if (name == HttpFilterNames::get().Squash) {
+  } else if (name == "envoy.filters.http.squash") {
     cleanAttachmentTemplate(message);
-  } else if (name == HttpFilterNames::get().Tap) {
+  } else if (name == "envoy.filters.http.tap") {
     // TapDS oneof field and OutputSinkType StreamingGrpc not implemented
     cleanTapConfig(message);
   }
