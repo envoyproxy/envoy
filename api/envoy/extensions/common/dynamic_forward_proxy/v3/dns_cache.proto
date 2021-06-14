@@ -110,8 +110,8 @@ message DnsCacheConfig {
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   config.core.v3.DnsResolutionConfig dns_resolution_config = 9;
 
-  // Hostnames that should be prefetched into the cache upon cache creation. This might provide a
+  // Hostnames that should be preresolved into the cache upon creation. This might provide a
   // performance improvement, in the form of cache hits, for hostnames that are going to be
   // resolved during steady state and are known at config load time.
-  repeated config.core.v3.SocketAddress prefetch_hostnames = 10;
+  repeated config.core.v3.SocketAddress preresolve_hostnames = 10;
 }
