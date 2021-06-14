@@ -334,7 +334,7 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   // Validate that there are no active listeners and workers are started.
@@ -716,7 +716,7 @@ dynamic_listeners:
 )EOF");
 
   EXPECT_CALL(*worker_, addListener(_, _, _));
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   worker_->callAddCompletion(true);
 
@@ -1040,7 +1040,7 @@ dynamic_listeners:
 static_listeners:
 )EOF");
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
@@ -1117,7 +1117,7 @@ filter_chains: {}
       }))
       .RetiresOnSaturation();
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
@@ -1259,7 +1259,7 @@ dynamic_listeners:
 
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _));
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
@@ -1464,7 +1464,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add and initialize foo listener.
@@ -1525,7 +1525,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener directly into active.
@@ -1585,7 +1585,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener directly into active.
@@ -1638,7 +1638,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1675,7 +1675,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqualToFalse)) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1713,7 +1713,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, ReusePortEqualToTrue) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1768,7 +1768,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   const std::string listener_foo_yaml = R"EOF(
@@ -1821,7 +1821,7 @@ TEST_F(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Make sure the config dump is empty by default.
@@ -1857,7 +1857,7 @@ dynamic_listeners:
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   const std::string listener_foo_yaml = R"EOF(
@@ -1907,7 +1907,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Remove an unknown listener.
@@ -1989,7 +1989,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener in inbound direction.
@@ -2094,7 +2094,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopAllListeners) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2142,7 +2142,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2199,7 +2199,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into active.
@@ -2236,7 +2236,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StaticListenerAddFailure) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into active.
@@ -2307,7 +2307,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2364,7 +2364,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, EarlyShutdown) {
   // If stopWorkers is called before the workers are started, it should be a no-op: they should be
   // neither started nor stopped.
-  EXPECT_CALL(*worker_, start(_)).Times(0);
+  EXPECT_CALL(*worker_, start(_, _)).Times(0);
   EXPECT_CALL(*worker_, stop()).Times(0);
   manager_->stopWorkers();
 }
@@ -4597,7 +4597,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 
 // Validate that dispatcher stats prefix is set correctly when enabled.
 TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(*worker_, initializeStats(_));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 }
@@ -4727,7 +4727,7 @@ api_listener:
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4789,7 +4789,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4858,7 +4858,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4921,7 +4921,7 @@ filter_chains:
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -5003,7 +5003,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -5153,7 +5153,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5179,7 +5179,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfImplicitTlsInspectorChanges) {
   auto tls_inspector_injection_enabled_guard = enableTlsInspectorInjectionForThisTest();
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5205,7 +5205,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        DEPRECATED_FEATURE_TEST(TraditionalUpdateIfImplicitProxyProtocolChanges)) {
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5225,7 +5225,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZeroFilterChain) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5249,7 +5249,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5316,7 +5316,7 @@ TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
 TEST_F(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(callback_, Call());
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 }

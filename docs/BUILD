@@ -17,9 +17,7 @@ envoy_package()
 filegroup(
     name = "configs",
     srcs = glob(
-        [
-            "root/**/*.yaml",
-        ],
+        ["root/**/*.yaml"],
         exclude = [
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
@@ -40,11 +38,7 @@ filegroup(
 
 filegroup(
     name = "proto_examples",
-    srcs = glob(
-        [
-            "root/**/*.pb",
-        ],
-    ),
+    srcs = glob(["root/**/*.pb"]),
 )
 
 filegroup(
@@ -65,14 +59,23 @@ filegroup(
 genrule(
     name = "v2_redirects",
     outs = ["v2_redirects.txt"],
-    cmd = "jq -r 'with_entries(.key |= sub(\"^envoy/\";\"api-v3/\")) | with_entries(.value |= sub(\"^envoy/\";\"api-v2/\")) | to_entries[] | \"\\(.value)\t\t\\(.key)\"' docs/v2_mapping.json > $@",
-    tools = ["//docs:v2_mapping.json"],
+    cmd = """
+    jq -r 'with_entries(.key |= sub("^envoy/";"api-v3/"))
+          | with_entries(.value |= sub("^envoy/";"api-v2/"))
+          | to_entries[]
+          | "\\(.value)\t\t\\(.key)"' \\
+        $(location :v2_mapping.json) > $@
+    """,
+    tools = [":v2_mapping.json"],
 )
 
 genrule(
     name = "redirects",
     outs = ["envoy-redirects.txt"],
-    cmd = "cat $(location //docs:redirects.txt) > $@ && cat $(location :v2_redirects) >> $@",
+    cmd = """
+    cat $(location :redirects.txt) > $@ \\
+    && cat $(location :v2_redirects) >> $@
+    """,
     tools = [
         ":redirects.txt",
         ":v2_redirects",
@@ -82,16 +85,21 @@ genrule(
 genrule(
     name = "google_vrp_config",
     outs = ["google_vrp_config.tar"],
-    cmd = "tar cfh $@ --transform='s/configs/configuration\\/best_practices/' $(location //configs:google-vrp/envoy-edge.yaml)",
-    tools = [
-        "//configs:google-vrp/envoy-edge.yaml",
-    ],
+    cmd = """
+    tar cfh $@ --transform='s/configs/configuration\\/best_practices/' \\
+        $(location //configs:google-vrp/envoy-edge.yaml)
+    """,
+    tools = ["//configs:google-vrp/envoy-edge.yaml"],
 )
 
 genrule(
     name = "base_rst",
     outs = ["base_rst.tar"],
-    cmd = "tar cfh $@ --transform='s/docs\\///' $(locations base_rst_files) && tar -rh --file=$@ --transform='s/docs\\/root\\///' $(locations root_rst_files) && tar -r --file=$@ -C $$(dirname $(location redirects)) $$(basename $(location redirects))",
+    cmd = """
+    tar cfh $@ --transform='s/docs\\///' $(locations base_rst_files) \\
+    && tar rhf $@ --transform='s/docs\\/root\\///' $(locations root_rst_files) \\
+    && tar rf $@ -C $$(dirname $(location redirects)) $$(basename $(location redirects))
+    """,
     tools = [
         ":base_rst_files",
         ":redirects",
@@ -102,8 +110,84 @@ genrule(
 genrule(
     name = "examples_rst",
     outs = ["examples_rst.tar"],
-    cmd = "tar cfh $@ --transform='s/examples/start\\/sandboxes\\/_include/' $(locations //examples:files)",
+    cmd = """
+    tar cfh $@ --transform='s/examples/start\\/sandboxes\\/_include/' \\
+        $(locations //examples:files)
+    """,
+    tools = ["//examples:files"],
+)
+
+genrule(
+    name = "extensions_security_rst",
+    srcs = ["//source/extensions:extensions_metadata.yaml"],
+    outs = ["extensions_security_rst.tar"],
+    cmd = """
+    $(location //tools/docs:generate_extensions_security_rst) \\
+        $(location //source/extensions:extensions_metadata.yaml) $@
+    """,
+    tools = ["//tools/docs:generate_extensions_security_rst"],
+)
+
+genrule(
+    name = "external_deps_rst",
+    srcs = [
+        "//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations.bzl",
+        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+    ],
+    outs = ["external_deps_rst.tar"],
+    cmd = "$(location //tools/docs:generate_external_deps_rst) $@",
+    tools = ["//tools/docs:generate_external_deps_rst"],
+)
+
+genquery(
+    name = "v3_proto_srcs",
+    expression = "labels(srcs, labels(deps, @envoy_api_canonical//:v3_protos))",
+    scope = ["@envoy_api_canonical//:v3_protos"],
+)
+
+genrule(
+    name = "empty_protos_rst",
+    srcs = [":empty_extensions.json"],
+    outs = ["empty_protos_rst.tar"],
+    cmd = """
+    $(location //tools/protodoc:generate_empty) \\
+        $(location empty_extensions.json) $@
+    """,
+    tools = ["//tools/protodoc:generate_empty"],
+)
+
+genrule(
+    name = "api_rst",
+    srcs = [
+        "//tools/protodoc:api_v3_protodoc",
+        ":v3_proto_srcs",
+    ],
+    outs = ["api_rst.tar"],
+    cmd = """
+    $(location //tools/docs:generate_api_rst) \\
+        $(location v3_proto_srcs) $(locations //tools/protodoc:api_v3_protodoc) $@
+    """,
+    tools = ["//tools/docs:generate_api_rst"],
+)
+
+genrule(
+    name = "rst",
+    outs = ["rst.tar"],
+    cmd = """
+    cat $(location base_rst) > $@ \\
+    && tar -Af $@ $(location api_rst) \\
+    && tar -Af $@ $(location examples_rst) \\
+    && tar -Af $@ $(location extensions_security_rst) \\
+    && tar -Af $@ $(location external_deps_rst) \\
+    && tar -Af $@ $(location empty_protos_rst)
+    """,
     tools = [
-        "//examples:files",
+        ":api_rst",
+        ":base_rst",
+        ":empty_protos_rst",
+        ":examples_rst",
+        ":extensions_security_rst",
+        ":external_deps_rst",
     ],
 )

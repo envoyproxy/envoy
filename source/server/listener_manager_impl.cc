@@ -24,6 +24,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
+
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
@@ -820,6 +822,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   workers_started_ = true;
   uint32_t i = 0;
 
+  absl::BlockingCounter workers_waiting_to_run(workers_.size());
+  Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
+    workers_waiting_to_run.DecrementCount();
+  };
+
   // We can not use "Cleanup" to simplify this logic here, because it results in a issue if Envoy is
   // killed before workers are actually started. Specifically the AdminRequestGetStatsAndKill test
   // case in main_common_test fails with ASAN error if we use "Cleanup" here.
@@ -837,12 +844,16 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
                             }
                           });
     }
-    worker->start(guard_dog);
+    worker->start(guard_dog, worker_started_running);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_);
     }
     i++;
   }
+
+  // Wait for workers to start running.
+  workers_waiting_to_run.Wait();
+
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
     callback();
