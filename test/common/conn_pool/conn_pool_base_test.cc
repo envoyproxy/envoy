@@ -218,7 +218,7 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggered) {
   pool_.onStreamClosed(*clients_.back(), false);
 
   testing::MockFunction<void(bool)> idle_pool_callback;
-  EXPECT_CALL(idle_pool_callback, Call(false)).Times(1);
+  EXPECT_CALL(idle_pool_callback, Call(false));
   pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction(),
                             ConnectionPool::Instance::DrainPool::No);
   dispatcher_.clearDeferredDeleteList();
