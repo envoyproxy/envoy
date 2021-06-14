@@ -278,7 +278,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_F(StrictDnsClusterImplTest, Basic) {
+TEST_F(StrictDnsClusterImplTest, DEPRECATED_FEATURE_TEST(Basic)) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, dispatcher_);
   ResolverData resolver1(*dns_resolver_, dispatcher_);
@@ -304,14 +304,13 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         max_pending_requests: 2
         max_requests: 3
         max_retries: 4
+    max_requests_per_connection: 3
     protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
       hpack_table_size: 0
     http_protocol_options:
       header_key_format:
         proper_case_words: {}
-    common_http_protocol_options:
-      max_requests_per_connection: 3
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -604,7 +603,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
+TEST_F(StrictDnsClusterImplTest, DEPRECATED_FEATURE_TEST(LoadAssignmentBasic)) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, dispatcher_);
   ResolverData resolver2(*dns_resolver_, dispatcher_);
@@ -636,12 +635,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
         max_requests: 3
         max_retries: 4
 
+    max_requests_per_connection: 3
 
     http2_protocol_options:
       hpack_table_size: 0
-
-    common_http_protocol_options:
-      max_requests_per_connection: 3
 
     load_assignment:
       policy:
@@ -1161,6 +1158,7 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
         max_pending_requests: 2
         max_requests: 3
         max_retries: 4
+    max_requests_per_connection: 3
     protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
       hpack_table_size: 2048
@@ -1168,8 +1166,6 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
     http_protocol_options:
       header_key_format:
         proper_case_words: {}
-    common_http_protocol_options:
-      max_requests_per_connection: 3
     load_assignment:
         endpoints:
           - lb_endpoints:

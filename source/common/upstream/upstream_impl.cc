@@ -732,8 +732,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
-      max_requests_per_connection_(
-          http_protocol_options_->common_http_protocol_options_.max_requests_per_connection()),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_requests_per_connection,
+          http_protocol_options_->common_http_protocol_options_.max_requests_per_connection())),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
@@ -786,6 +787,12 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+  if (config.has_max_requests_per_connection() &&
+      http_protocol_options_->common_http_protocol_options_.max_requests_per_connection()) {
+    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
+                         "HttpProtocolOptions can be specified");
+  }
+
   switch (config.lb_policy()) {
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
