@@ -90,7 +90,7 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
-  void setAllowUnkownFields(bool allow_unknown_static_fields) {
+  void setAllowUnknownFields(bool allow_unknown_static_fields) {
     allow_unknown_static_fields_ = allow_unknown_static_fields;
   }
   void setRejectUnknownFieldsDynamic(bool reject_unknown_dynamic_fields) {
