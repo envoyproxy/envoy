@@ -35,9 +35,9 @@ DnsCacheImpl::DnsCacheImpl(
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
   if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts_) {
-    throw EnvoyException(
-        fmt::format("DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
-                    config.name(), config.preresolve_hostnames().size(), max_hosts_));
+    throw EnvoyException(fmt::format(
+        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
+        config.name(), config.preresolve_hostnames().size(), max_hosts_));
   }
 
   // Preresolved hostnames are resolved without a read lock on primary hosts because it is done
