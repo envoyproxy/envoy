@@ -53,6 +53,14 @@ public:
   static bool shouldRunTestForIpVersion(Network::Address::IpVersion type);
 
   /**
+   * Check whether listeners should be altered to conform to the existing
+   * IP family type for the specific test
+   * @return bool if listeners are allowed to be specified in different types from the current
+   * version.
+   */
+  static bool allowListenersOnBothIPFamilyTypes();
+
+  /**
    * Return a vector of IP address parameters to test. Tests can be run with
    * only IPv4 addressing or only IPv6 addressing by setting the environment
    * variable ENVOY_IP_TEST_VERSIONS to "v4only" or "v6only", respectively.
