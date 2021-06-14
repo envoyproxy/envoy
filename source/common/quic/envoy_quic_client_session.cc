@@ -35,7 +35,7 @@ void EnvoyQuicClientSession::connect() {
 void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
-  onConnectionCloseEvent(frame, source, connection()->transport_version());
+  onConnectionCloseEvent(frame, source, version());
 }
 
 void EnvoyQuicClientSession::Initialize() {

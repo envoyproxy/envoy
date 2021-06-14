@@ -152,7 +152,7 @@ protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source,
-                              quic::QuicTransportVersion version);
+                              const quic::ParsedQuicVersion& version);
 
   void closeConnectionImmediately() override;
 

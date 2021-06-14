@@ -86,7 +86,7 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
-  onConnectionCloseEvent(frame, source, connection()->transport_version());
+  onConnectionCloseEvent(frame, source, version());
 }
 
 void EnvoyQuicServerSession::Initialize() {

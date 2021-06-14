@@ -159,7 +159,7 @@ void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
 
 void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source,
-    quic::QuicTransportVersion version) {
+    const quic::ParsedQuicVersion& version) {
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
                                            " with details: ", frame.error_details);
   if (network_connection_ != nullptr) {
@@ -172,10 +172,10 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
   }
 
   if (!codec_stats_.has_value()) {
-    // The connection is closed before it can be used. stats are not recorded.
+    // The connection was closed before it could be used. Stats are not recorded.
     return;
   }
-  switch (version) {
+  switch (version.transport_version) {
   case quic::QUIC_VERSION_43:
     codec_stats_->quic_version_43_.inc();
     return;
@@ -186,7 +186,6 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     codec_stats_->quic_version_50_.inc();
     return;
   case quic::QUIC_VERSION_51:
-    std::cout << "logging" << std::endl;
     codec_stats_->quic_version_51_.inc();
     return;
   case quic::QUIC_VERSION_IETF_DRAFT_29:
