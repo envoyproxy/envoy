@@ -35,4 +35,6 @@ internal class MockEnvoyEngine : EnvoyEngine {
   override fun recordHistogramValue(elements: String, tags: MutableMap<String, String>, value: Int): Int = 0
 
   override fun registerStringAccessor(accessorName: String, accessor: EnvoyStringAccessor): Int = 0
+
+  override fun flushStats() = Unit
 }

@@ -23,6 +23,7 @@ def swift_dependencies():
 def kotlin_dependencies():
     maven_install(
         artifacts = [
+            "com.google.code.findbugs:jsr305:3.0.2",
             # Kotlin
             "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.11",
             "androidx.recyclerview:recyclerview:1.1.0",

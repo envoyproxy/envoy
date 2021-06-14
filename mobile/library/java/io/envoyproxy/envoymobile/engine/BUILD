@@ -5,7 +5,6 @@ licenses(["notice"])  # Apache 2
 android_library(
     name = "envoy_engine_lib",
     srcs = [
-        "AndroidAppLifecycleMonitor.java",
         "AndroidEngineImpl.java",
         "AndroidJniLibrary.java",
         "AndroidNetworkMonitor.java",
@@ -43,6 +42,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "@maven//:com_google_code_findbugs_jsr305",
     ],
 )
 

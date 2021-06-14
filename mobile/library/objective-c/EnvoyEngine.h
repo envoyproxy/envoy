@@ -253,7 +253,7 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// Typed configuration that may be used for starting Envoy.
 @interface EnvoyConfiguration : NSObject
 
-@property (nonatomic, strong, nullable) NSString *statsDomain;
+@property (nonatomic, strong, nullable) NSString *grpcStatsDomain;
 @property (nonatomic, assign) UInt32 connectTimeoutSeconds;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) UInt32 dnsFailureRefreshSecondsBase;
@@ -272,22 +272,22 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /**
  Create a new instance of the configuration.
  */
-- (instancetype)initWithStatsDomain:(nullable NSString *)statsDomain
-              connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
-                  dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
-       dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
-        dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
-                  statsFlushSeconds:(UInt32)statsFlushSeconds
-           streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
-                         appVersion:(NSString *)appVersion
-                              appId:(NSString *)appId
-                    virtualClusters:(NSString *)virtualClusters
-             directResponseMatchers:(NSString *)directResponseMatchers
-                    directResponses:(NSString *)directResponses
-                  nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
-                platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
-                    stringAccessors:
-                        (NSDictionary<NSString *, EnvoyStringAccessor *> *)stringAccessors;
+- (instancetype)
+         initWithGrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+           connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
+               dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
+    dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
+     dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
+               statsFlushSeconds:(UInt32)statsFlushSeconds
+        streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
+                      appVersion:(NSString *)appVersion
+                           appId:(NSString *)appId
+                 virtualClusters:(NSString *)virtualClusters
+          directResponseMatchers:(NSString *)directResponseMatchers
+                 directResponses:(NSString *)directResponses
+               nativeFilterChain:(NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+             platformFilterChain:(NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
+                 stringAccessors:(NSDictionary<NSString *, EnvoyStringAccessor *> *)stringAccessors;
 
 /**
  Resolves the provided configuration template using properties on this configuration.
@@ -398,6 +398,8 @@ extern const int kEnvoyFailure;
  @return A status indicating if the action was successful.
  */
 - (int)recordHistogramValue:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value;
+
+- (void)flushStats;
 
 @end
 

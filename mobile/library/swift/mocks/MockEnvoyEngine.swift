@@ -31,6 +31,7 @@ final class MockEnvoyEngine: NSObject {
   /// Closure called when `recordHistogramValue(_:value)` is called.
   static var onRecordHistogramValue: (
     (_ elements: String, _ tags: [String: String], _ value: UInt) -> Void)?
+  static var onFlushStats: (() -> Void)?
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
@@ -79,5 +80,9 @@ extension MockEnvoyEngine: EnvoyEngine {
   func recordHistogramValue(_ elements: String, tags: [String: String], value: UInt) -> Int32 {
     MockEnvoyEngine.onRecordHistogramValue?(elements, tags, value)
     return kEnvoySuccess
+  }
+
+  func flushStats() {
+    MockEnvoyEngine.onFlushStats?()
   }
 }

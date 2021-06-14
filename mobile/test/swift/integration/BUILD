@@ -35,6 +35,16 @@ envoy_mobile_swift_test(
 )
 
 envoy_mobile_swift_test(
+    name = "stat_flush_integration_test",
+    srcs = [
+        "StatFlushIntegrationTest.swift",
+    ],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+    ],
+)
+
+envoy_mobile_swift_test(
     name = "direct_response_filter_mutation_integration_test",
     srcs = [
         "DirectResponseFilterMutationIntegrationTest.swift",

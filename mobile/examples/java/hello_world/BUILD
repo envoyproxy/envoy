@@ -32,5 +32,6 @@ kt_android_library(
         "//examples/kotlin/shared:hello_envoy_shared_lib",
         artifact("androidx.recyclerview:recyclerview"),
         artifact("androidx.annotation:annotation"),
+        artifact("com.google.code.findbugs:jsr305"),
     ],
 )

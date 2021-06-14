@@ -23,7 +23,8 @@ open class EngineBuilder(
   protected var logger: ((String) -> Unit)? = null
   private var engineType: () -> EnvoyEngine = { EnvoyEngineImpl(onEngineRunning, logger) }
   private var logLevel = LogLevel.INFO
-  private var statsDomain: String? = null
+  private var grpcStatsDomain: String? = null
+  private var statsDPort: Int? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
@@ -51,14 +52,31 @@ open class EngineBuilder(
 
   /**
    * Add a domain to flush stats to.
-   * Passing nil disables stats emission.
+   * Passing nil disables stats emission via the gRPC stat sink.
    *
-   * @param statsDomain The domain to use for stats.
+   * Only one of the statsd and gRPC stat sink can be enabled.
+   *
+   * @param grpcStatsDomain The domain to use for stats.
    *
    * @return this builder.
    */
-  fun addStatsDomain(statsDomain: String?): EngineBuilder {
-    this.statsDomain = statsDomain
+  fun addGrpcStatsDomain(grpcStatsDomain: String?): EngineBuilder {
+    this.grpcStatsDomain = grpcStatsDomain
+    return this
+  }
+
+  /**
+   * Add a loopback port to emit statsD stats to.
+   * Passing nil disables stats emission via the statsD stat sink.
+   *
+   * Only one of the statsD and gRPC stat sink can be enabled.
+   *
+   * @param port The port to send statsD UDP packets to via loopback
+   *
+   * @return this builder.
+   */
+  fun addStatsDPort(port: Int): EngineBuilder {
+    this.statsDPort = port
     return this
   }
 
@@ -239,7 +257,7 @@ open class EngineBuilder(
         EngineImpl(
           engineType(),
           EnvoyConfiguration(
-            statsDomain, connectTimeoutSeconds,
+            grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId, virtualClusters,
             nativeFilterChain, platformFilterChain, stringAccessors
@@ -252,7 +270,7 @@ open class EngineBuilder(
         EngineImpl(
           engineType(),
           EnvoyConfiguration(
-            statsDomain, connectTimeoutSeconds,
+            grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             statsFlushSeconds, streamIdleTimeoutSeconds, appVersion, appId, virtualClusters,
             nativeFilterChain, platformFilterChain, stringAccessors

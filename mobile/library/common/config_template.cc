@@ -57,7 +57,7 @@ const char* fake_remote_cluster_template = R"(
               socket_address: { address: 127.0.0.1, port_value: 10101 }
 )";
 
-const char* stats_sink_template = R"(
+const char* grpc_stats_sink_template = R"(
 stats_sinks:
   - name: envoy.metrics_service
     typed_config:
@@ -68,6 +68,17 @@ stats_sinks:
       grpc_service:
         envoy_grpc:
           cluster_name: stats
+)";
+
+const char* statsd_sink_template = R"(
+stats_sinks:
+- name: envoy.stat_sinks.statsd
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: {{ port }}
 )";
 
 const std::string config_header = R"(

@@ -41,6 +41,11 @@ extern const char* fake_remote_cluster_template;
 extern const char* fake_remote_listener_template;
 
 /**
- * Template used for setting up the stats sink.
+ * Template used for setting up the gRPC stats sink.
  */
-extern const char* stats_sink_template;
+extern const char* grpc_stats_sink_template;
+
+/**
+ * Template used for setting up the statsd stats sink.
+ */
+extern const char* statsd_sink_template;
