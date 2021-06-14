@@ -146,6 +146,16 @@ envoy_status_t record_histogram_value(envoy_engine_t, const char* elements, envo
   return ENVOY_FAILURE;
 }
 
+void flush_stats(envoy_engine_t) {
+  if (auto e = engine()) {
+    e->dispatcher().post([]() {
+      if (auto e = engine()) {
+        e->flushStats();
+      }
+    });
+  }
+}
+
 envoy_status_t register_platform_api(const char* name, void* api) {
   Envoy::Api::External::registerApi(std::string(name), api);
   return ENVOY_SUCCESS;

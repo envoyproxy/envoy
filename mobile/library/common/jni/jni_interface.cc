@@ -120,10 +120,18 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_nativeFilterTemplateString(JNIE
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_statsSinkTemplateString(JNIEnv* env,
-                                                                         jclass // class
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_gRPCStatsSinkTemplateString(JNIEnv* env,
+                                                                             jclass // class
 ) {
-  jstring result = env->NewStringUTF(stats_sink_template);
+  jstring result = env->NewStringUTF(grpc_stats_sink_template);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_statsdSinkTemplateString(JNIEnv* env,
+                                                                          jclass // class
+) {
+  jstring result = env->NewStringUTF(statsd_sink_template);
   return result;
 }
 
@@ -179,6 +187,14 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramDuration(JNIEnv*
                                        durationMs, MILLISECONDS);
   env->ReleaseStringUTFChars(elements, native_elements);
   return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_flushStats(JNIEnv* env,
+                                                            jclass, // class
+                                                            jlong engine) {
+  jni_log("[Envoy]", "flushStats");
+  flush_stats(engine);
 }
 
 extern "C" JNIEXPORT jint JNICALL

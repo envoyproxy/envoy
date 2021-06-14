@@ -59,4 +59,8 @@ extension EngineImpl: Engine {
   func pulseClient() -> PulseClient {
     return self.pulseClientImpl
   }
+
+  func flushStats() {
+    self.engine.flushStats()
+  }
 }

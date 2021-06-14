@@ -19,7 +19,7 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsDomain(const std::string& stats_domain) {
+EngineBuilder& EngineBuilder::addGrpcStatsDomain(const std::string& stats_domain) {
   this->stats_domain_ = stats_domain;
   return *this;
 }

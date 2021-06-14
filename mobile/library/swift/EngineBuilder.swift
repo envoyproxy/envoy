@@ -13,7 +13,7 @@ public class EngineBuilder: NSObject {
     case custom(String)
   }
 
-  private var statsDomain: String?
+  private var grpcStatsDomain: String?
   private var connectTimeoutSeconds: UInt32 = 30
   private var dnsRefreshSeconds: UInt32 = 60
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
@@ -48,12 +48,12 @@ public class EngineBuilder: NSObject {
   /// Add a stats domain for Envoy to flush stats to.
   /// Passing nil disables stats emission.
   ///
-  /// - parameter statsDomain: The domain to use for stats.
+  /// - parameter grpcStatsDomain: The domain to use for stats.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addStatsDomain(_ statsDomain: String?) -> Self {
-    self.statsDomain = statsDomain
+  public func addGrpcStatsDomain(_ grpcStatsDomain: String?) -> Self {
+    self.grpcStatsDomain = grpcStatsDomain
     return self
   }
 
@@ -228,7 +228,7 @@ public class EngineBuilder: NSObject {
   public func build() -> Engine {
     let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger)
     let config = EnvoyConfiguration(
-      statsDomain: self.statsDomain,
+      grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
       dnsRefreshSeconds: self.dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,

@@ -23,10 +23,10 @@ class EngineBuilderTest {
   fun `specifying stats domain overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.addStatsDomain("stats.envoyproxy.io")
+    engineBuilder.addGrpcStatsDomain("stats.envoyproxy.io")
 
     val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration!!.statsDomain).isEqualTo("stats.envoyproxy.io")
+    assertThat(engine.envoyConfiguration!!.grpcStatsDomain).isEqualTo("stats.envoyproxy.io")
   }
 
   @Test

@@ -99,6 +99,13 @@ public:
   envoy_status_t recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
                                       uint64_t value, envoy_histogram_stat_unit_t unit_measure);
 
+  /**
+   * Flush the stats sinks outside of a flushing interval.
+   * Note: stat flushing is done asynchronously, this function will never block.
+   * This is a noop if called before the underlying EnvoyEngine has started.
+   */
+  void flushStats();
+
 private:
   envoy_status_t main(std::string config, std::string log_level);
 

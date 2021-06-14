@@ -29,23 +29,22 @@ public class AndroidEngineImpl implements EnvoyEngine {
 
   public int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
                              String logLevel) {
-    // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
-    // gets fixed. AndroidAppLifecycleMonitor monitor = new AndroidAppLifecycleMonitor();
-    // application.registerActivityLifecycleCallbacks(monitor);
     return envoyEngine.runWithTemplate(configurationYAML, envoyConfiguration, logLevel);
   }
 
   @Override
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
-    // gets fixed. AndroidAppLifecycleMonitor monitor = new AndroidAppLifecycleMonitor();
-    // application.registerActivityLifecycleCallbacks(monitor);
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 
   @Override
   public void terminate() {
     envoyEngine.terminate();
+  }
+
+  @Override
+  public void flushStats() {
+    envoyEngine.flushStats();
   }
 
   @Override

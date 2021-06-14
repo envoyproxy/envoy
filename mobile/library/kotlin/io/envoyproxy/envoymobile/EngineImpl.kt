@@ -43,4 +43,8 @@ class EngineImpl constructor(
   override fun terminate() {
     envoyEngine.terminate()
   }
+
+  override fun flushStats() {
+    envoyEngine.flushStats()
+  }
 }

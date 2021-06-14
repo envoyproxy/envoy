@@ -134,6 +134,14 @@ envoy_status_t record_histogram_value(envoy_engine_t engine, const char* element
                                       envoy_histogram_stat_unit_t unit_measure);
 
 /**
+ * Flush the stats sinks outside of a flushing interval.
+ * Note: flushing before the engine has started will result in a no-op.
+ * Note: stats flushing may not be synchronous.
+ * Therefore, this function may return prior to flushing taking place.
+ */
+void flush_stats(envoy_engine_t engine);
+
+/**
  * Statically register APIs leveraging platform libraries.
  * Warning: Must be completed before any calls to run_engine().
  * @param name, identifier of the platform API

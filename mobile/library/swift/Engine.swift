@@ -9,4 +9,9 @@ public protocol Engine: AnyObject {
 
   /// A client for recording time series metrics.
   func pulseClient() -> PulseClient
+
+  /// Flush the stats sinks outside of a flushing interval.
+  /// Note: stat flushing is done asynchronously, this function will never block.
+  /// This is a noop if called before the underlying EnvoyEngine has started.
+  func flushStats()
 }

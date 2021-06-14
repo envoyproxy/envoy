@@ -4,13 +4,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import javax.annotation.Nullable;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
-  public final String statsDomain;
+  public final String grpcStatsDomain;
+  public final Integer statsdPort;
   public final Integer connectTimeoutSeconds;
   public final Integer dnsRefreshSeconds;
   public final Integer dnsFailureRefreshSecondsBase;
@@ -29,7 +31,7 @@ public class EnvoyConfiguration {
   /**
    * Create a new instance of the configuration.
    *
-   * @param statsDomain                  the domain to flush stats to.
+   * @param grpcStatsDomain              the domain to flush stats to.
    * @param connectTimeoutSeconds        timeout for new network connections to hosts in
    *                                     the cluster.
    * @param dnsRefreshSeconds            rate in seconds to refresh DNS.
@@ -44,14 +46,16 @@ public class EnvoyConfiguration {
    * @param httpPlatformFilterFactories  the configuration for platform filters.
    * @param stringAccessors              platform string accessors to register.
    */
-  public EnvoyConfiguration(String statsDomain, int connectTimeoutSeconds, int dnsRefreshSeconds,
+  public EnvoyConfiguration(String grpcStatsDomain, @Nullable Integer statsdPort,
+                            int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
                             int statsFlushSeconds, int streamIdleTimeoutSeconds, String appVersion,
                             String appId, String virtualClusters,
                             List<EnvoyNativeFilterConfig> nativeFilterChain,
                             List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
                             Map<String, EnvoyStringAccessor> stringAccessors) {
-    this.statsDomain = statsDomain;
+    this.grpcStatsDomain = grpcStatsDomain;
+    this.statsdPort = statsdPort;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
@@ -79,6 +83,7 @@ public class EnvoyConfiguration {
    *                                 resolved.
    */
   String resolveTemplate(final String templateYAML, final String statsSinkTemplateYAML,
+                         final String statsdSinkTemplateYAML,
                          final String platformFilterTemplateYAML,
                          final String nativeFilterTemplateYAML) {
     final StringBuilder filterConfigBuilder = new StringBuilder();
@@ -98,9 +103,24 @@ public class EnvoyConfiguration {
     }
     String nativeFilterConfigChain = nativeFilterConfigBuilder.toString();
 
+    // We could support this in the future, as Envoy supports multiple stat sinks. It require
+    // some changes to how we template the sink configuration though, so keeping it simple for now.
+    if (statsdPort != null && grpcStatsDomain != null) {
+      throw new ConfigurationException("cannot enable both statsD and gRPC metrics sink");
+    }
+    String statsSinkConfiguration = null;
+    if (statsdPort != null) {
+      statsSinkConfiguration =
+          statsdSinkTemplateYAML.replace("{{ port }}", String.valueOf(statsdPort));
+    } else if (grpcStatsDomain != null) {
+      statsSinkConfiguration = statsSinkTemplateYAML;
+    }
+
     String resolvedConfiguration =
-        templateYAML.replace("{{ stats_domain }}", statsDomain != null ? statsDomain : "0.0.0.0")
-            .replace("{{ stats_sink }}", statsDomain != null ? statsSinkTemplateYAML : "")
+        templateYAML
+            .replace("{{ stats_domain }}", grpcStatsDomain != null ? grpcStatsDomain : "0.0.0.0")
+            .replace("{{ stats_sink }}",
+                     statsSinkConfiguration != null ? statsSinkConfiguration : "")
             .replace("{{ platform_filter_chain }}", filterConfigChain)
             .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
             .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
