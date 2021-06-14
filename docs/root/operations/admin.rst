@@ -205,6 +205,12 @@ modify different aspects of the server:
   For example, get the names of all active dynamic clusters with
   ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
 
+  .. warning
+    Passing an invalid FieldMask, such as one that indexes through a repeated field of the
+    given resource, will crash Envoy.
+    For example: `/config_dump?resource=static_listeners&mask=listener.filter_chains.filters`
+    will crash because `filter_chains` is a repeated field.
+
 .. http:get:: /contention
 
   Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_v3_api_msg_admin.v3.MutexStats>`) in JSON
