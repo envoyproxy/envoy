@@ -849,30 +849,5 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingUpstreamTap) {
   EXPECT_TRUE(traces[2].socket_streamed_trace_segment().event().read().data().truncated());
 }
 
-class UpstreamPlaintextTest : public SslIntegrationTest {
-  void createUpstreams() override {
-    upstream_tls_ = false;
-    autonomous_upstream_ = true;
-    SslIntegrationTest::createUpstreams();
-    upstream_tls_ = true;
-  }
-};
-
-TEST_P(UpstreamPlaintextTest, TestErrors) {
-  initialize();
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection({});
-  };
-
-  codec_client_ = makeHttpConnection(creator());
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("500", response->headers().getStatusValue());
-}
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamPlaintextTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 } // namespace Ssl
 } // namespace Envoy
