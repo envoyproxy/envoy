@@ -40,7 +40,7 @@ DnsCacheImpl::DnsCacheImpl(
                     config.name(), config.prefetch_hostnames().size(), max_hosts_));
   }
 
-  // Pre-Loaded hostnames are resolved without a read lock on primary hosts because it is done
+  // Prefetched hostnames are resolved without a read lock on primary hosts because it is done
   // during object construction.
   for (const auto& hostname : config.prefetch_hostnames()) {
     // No need to get a resolution handle on this resolution as the only outcome needed is for the
