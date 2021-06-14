@@ -127,44 +127,6 @@ protected:
     return secret;
   }
 
-  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    ProtobufWkt::Struct val;
-    (*val.mutable_fields())["private_key_file"].set_string_value(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
-    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
-
-    // check the key type and set the mode accordingly
-    std::string mode;
-    std::string private_key = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-    if (pkey == nullptr) {
-      throw EnvoyException("Failed to read private key from disk.");
-    }
-    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-      mode = "rsa";
-    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
-      mode = "ecdsa";
-    }
-    (*val.mutable_fields())["mode"].set_string_value(mode);
-
-    secret.set_name(server_cert_rsa_);
-    auto* tls_certificate = secret.mutable_tls_certificate();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::temporaryPath("root/current/servercert.pem"));
-    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
-        "type.googleapis.com/google.protobuf.Struct");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
-    auto* watched_directory = tls_certificate->mutable_watched_directory();
-    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
-    return secret;
-  }
-
   envoy::extensions::transport_sockets::tls::v3::Secret getCvcSecret() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
     secret.set_name(validation_secret_);
@@ -511,9 +473,54 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   }
 }
 
+class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
+public:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    ProtobufWkt::Struct val;
+    (*val.mutable_fields())["private_key_file"].set_string_value(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
+    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
+
+    // check the key type and set the mode accordingly
+    std::string mode;
+    std::string private_key = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+
+    EXPECT_TRUE(pkey != nullptr);
+
+    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
+      mode = "rsa";
+    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
+      mode = "ecdsa";
+    }
+    (*val.mutable_fields())["mode"].set_string_value(mode);
+
+    secret.set_name(server_cert_rsa_);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::temporaryPath("root/current/servercert.pem"));
+    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
+    auto* watched_directory = tls_certificate->mutable_watched_directory();
+    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
+    return secret;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
+
 // Validate that a basic SDS updates work with a private key provider.
-TEST_P(SdsDynamicDownstreamIntegrationTest, BasicPrivateKeyProvider) {
+TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
   v3_resource_api_ = true;
+
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
@@ -528,14 +535,14 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicPrivateKeyProvider) {
   };
   initialize();
 
-  waitForSdsUpdateStats(1);
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
   testRouterHeaderOnlyRequestAndResponse(&creator);
 
-  waitForSdsUpdateStats(1);
   cleanupUpstreamAndDownstream();
 }
 
