@@ -28,14 +28,16 @@ namespace {
 
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  void initialize(bool set_pre_load_hostnames = false, uint max_hosts = 1024) {
+  void initialize(std::vector<std::string> prefetch_hostnames = {}, uint max_hosts = 1024) {
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
-    if (set_pre_load_hostnames)  {
-      envoy::config::core::v3::SocketAddress* address = config_.add_pre_load_hostnames();
-      address->set_address("bar");
-      address->set_port_value(443);
+    if (prefetch_hostnames.size() != 0) {
+      for (const auto& hostname : prefetch_hostnames) {
+        envoy::config::core::v3::SocketAddress* address = config_.add_prefetch_hostnames();
+        address->set_address(hostname);
+        address->set_port_value(443);
+      }
     }
 
     EXPECT_CALL(dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
@@ -104,14 +106,15 @@ MATCHER_P(CustomDnsResolversSizeEquals, expected_resolvers, "") {
   return expected_resolvers.size() == arg.size();
 }
 
-TEST_F(DnsCacheImplTest, PreLoadSuccess) {
+TEST_F(DnsCacheImplTest, PrefetchSuccess) {
   Network::DnsResolver::ResolveCb resolve_cb;
-  EXPECT_CALL(*resolver_, resolve("bar", _, _))
+  EXPECT_CALL(*resolver_, resolve("bar.baz.com", _, _))
       .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("bar", DnsHostInfoEquals("10.0.0.1:443", "bar", false)));
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("bar.baz.com", DnsHostInfoEquals("10.0.0.1:443", "bar.baz.com", false)));
 
-  initialize(true /* set_pre_load_hostnames */);
+  initialize({"bar.baz.com"} /* prefetch_hostnames */);
 
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"10.0.0.1"}));
@@ -119,17 +122,16 @@ TEST_F(DnsCacheImplTest, PreLoadSuccess) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   MockLoadDnsCacheEntryCallbacks callbacks;
-  auto result = dns_cache_->loadDnsCacheEntry("bar", 80, callbacks);
+  auto result = dns_cache_->loadDnsCacheEntry("bar.baz.com", 80, callbacks);
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_NE(absl::nullopt, result.host_info_);
 }
 
-TEST_F(DnsCacheImplTest, PreLoadOverflow) {
-  initialize(true, 0);
-  EXPECT_EQ(1, TestUtility::findCounter(store_, "dns_cache.foo.host_overflow")->value());
-  checkStats(0 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
-             0 /* added */, 0 /* removed */, 0 /* num hosts */);
+TEST_F(DnsCacheImplTest, PrefetchFailure) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize({"bar.baz.com"} /* prefetch_hostnames */, 0 /* max_hosts */), EnvoyException,
+      "DNS Cache [foo] configured with prefetch_hostnames=1 larger than max_hosts=0");
 }
 
 // Basic successful resolution and then re-resolution.
@@ -732,7 +734,7 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
 
 // Max host overflow.
 TEST_F(DnsCacheImplTest, MaxHostOverflow) {
-  initialize(false /* set_pre_load_hostnames */, 0 /* max_hosts */);
+  initialize({} /* prefetch_hostnames */, 0 /* max_hosts */);
   InSequence s;
 
   MockLoadDnsCacheEntryCallbacks callbacks;
