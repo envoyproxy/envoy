@@ -96,6 +96,7 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/rbac/v2",
     "envoy/config/filter/network/sni_cluster/v2",
     "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
+    "envoy/config/filter/thrift/rate_limit/v2alpha1",
     "envoy/config/filter/udp/udp_proxy/v2alpha",
 ]
 
