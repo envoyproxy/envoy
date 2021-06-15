@@ -64,8 +64,6 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   // This is also necessary for prefetch to be used with such protocols.
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
-  }
-  if (event == Network::ConnectionEvent::Connected) {
     connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
   }
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
