@@ -91,6 +91,7 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/kafka_broker/v2alpha1",
     "envoy/config/filter/network/local_rate_limit/v2alpha",
     "envoy/config/filter/network/mongo_proxy/v2",
+    "envoy/config/filter/network/mysql_proxy/v1alpha1",
     "envoy/config/filter/network/rate_limit/v2",
     "envoy/config/filter/network/rbac/v2",
     "envoy/config/filter/network/sni_cluster/v2",

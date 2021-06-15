@@ -32,7 +32,6 @@ proto_library(
         "//envoy/config/filter/http/health_check/v2:pkg",
         "//envoy/config/filter/http/ip_tagging/v2:pkg",
         "//envoy/config/filter/network/http_connection_manager/v2:pkg",
-        "//envoy/config/filter/network/mysql_proxy/v1alpha1:pkg",
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
