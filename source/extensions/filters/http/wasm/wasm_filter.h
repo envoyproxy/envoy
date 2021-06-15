@@ -9,7 +9,6 @@
 
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -103,7 +103,6 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":cache_filter_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
     ],

@@ -52,6 +52,11 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/tools/extensions"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/protodoc"
   schedule:
     interval: "daily"
@@ -63,11 +68,6 @@ updates:
 
 - package-ecosystem: "pip"
   directory: "/tools/code_format"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/envoy_headersplit"
   schedule:
     interval: "daily"
 
@@ -93,5 +93,10 @@ updates:
 
 - package-ecosystem: "docker"
   directory: "/.devcontainer"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "github-actions"
+  directory: "/"
   schedule:
     interval: daily

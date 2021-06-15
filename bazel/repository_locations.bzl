@@ -81,13 +81,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-92.0.4491.6 (linux/dev)
-        version = "c5ad6dcb65e532589e8acb9e9adbde62463af13d",
-        sha256 = "6b4674999af85c4a19f2b51132db3507520070923cd967bb1cd157d43b3f68d9",
+        # chromium-92.0.4511.0 (linux/dev)
+        version = "75edea1922aefe415e0e60ac576116634b0a94f8",
+        sha256 = "70e9d8737e35d67f94b9e742ca59c02c36f30f1d822d5a3706511a23798d8049",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-04-22",
+        release_date = "2021-05-13",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -798,12 +798,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        version = "6460972177446abe179ea430bf85b217c5ce240b",
-        sha256 = "5397ae241fc505e887203dc2c2f439549e42b1287687b155bcecac34536db434",
+        version = "aee86fb6ffce85e884a6f613ae5f47ce2c6b1e23",
+        sha256 = "a1b2c0cdd53a3a932db991bee736c6df20912c3d8070be9fbb4152575837cbf9",
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-04-21",
+        release_date = "2021-06-02",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -965,8 +965,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "WebAssembly for Proxies (C++ host implementation)",
         project_desc = "WebAssembly for Proxies (C++ host implementation)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-host",
-        version = "e94ef50d83a944fd873a07beb1b300eb003fee15",
-        sha256 = "bc087d50a155766dd26fb40891f16eaf2e5405fbabdcc61c4d48293d6ab28f75",
+        version = "5bc556e5c8e829d59ad7282c0465f610bce01382",
+        sha256 = "3fa66ff992f7a35bd90cb34852fae4a77ff4524e26e1494cadcd23dd50ed944b",
         strip_prefix = "proxy-wasm-cpp-host-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-host/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -982,7 +982,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wavm",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2021-06-08",
+        release_date = "2021-06-15",
         cpe = "N/A",
     ),
     proxy_wasm_rust_sdk = dict(

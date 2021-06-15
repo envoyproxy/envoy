@@ -46,6 +46,7 @@ public:
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -702,9 +703,6 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
   // shouldn't be called because the connection is closed.
   quic_stream_->encodeData(buffer, false);
-  EXPECT_GT(quic_session_.bytesToSend(), 0u);
-  // Clearing watermark buffer accounting takes effect is the next event loop.
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_session_.bytesToSend(), 0u);
 }
 

@@ -100,10 +100,10 @@ listener_filters:
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "foo1.com"
-        - suffix: "cluster_0"
         virtual_domains:
+        - name: "im_just_here_so_coverage_doesnt_fail.foo1.com"
+          endpoint:
+            cluster_name: "cluster_0"
         - name: "www.foo1.com"
           endpoint:
             address_list:
@@ -157,8 +157,6 @@ listener_filters:
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "google.com"
         virtual_domains:
         - name: "www.google.com"
           endpoint:

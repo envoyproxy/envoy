@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.set_metadata.v3;
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.set_metadata.v3";
