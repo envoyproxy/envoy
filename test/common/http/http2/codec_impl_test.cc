@@ -1890,7 +1890,7 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreErro
   EXPECT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
 
-  // Not verifying the http2.streams_active server/client guages here as the
+  // Not verifying the http2.streams_active server/client gauges here as the
   // EXPECT_THROW_WITH_MESSAGE above doesn't let us fully capture the behavior of the real system.
   // In the real world, the status returned from dispatch would trigger a connection close which
   // would result in the active stream gauges to go down to 0.
