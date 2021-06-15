@@ -1032,6 +1032,16 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
+void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
+  addConfigModifier(
+      [max_requests_per_connection](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()->set_max_requests_per_connection(
+            max_requests_per_connection);
+      });
+}
+
 envoy::config::route::v3::VirtualHost
 ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const char* cluster) {
   envoy::config::route::v3::VirtualHost virtual_host;

@@ -2216,6 +2216,42 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("max_duration_timeout"));
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionNotReached) {
+  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
+  config_helper_.setDownstreamMaxRequestsPerConnection(3);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  ASSERT_TRUE(response->waitForEndStream());
+  test_server_->waitForCounterEq("http.config_test.downstream_cx_max_requests", 0);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
+  config_helper_.setDownstreamMaxRequestsPerConnection(3);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+  codec_client_->sendData(*request_encoder_, 1024 * 65, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests")->value(), 1);
+}
+
 // Make sure that invalid authority headers get blocked at or before the HCM.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
