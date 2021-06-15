@@ -102,10 +102,9 @@ public:
                Network::TransportSocketOptionsSharedPtr transport_socket_options,
                bool test_new_connection_pool);
 
-  void addIdleCallback(IdleCb cb, DrainPool drain) override {
-    conn_pool_->addIdleCallback(cb, drain);
-  }
+  void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
   bool isIdle() const override { return conn_pool_->isIdle(); }
+  void startDrain() override { return conn_pool_->startDrain(); }
   void drainConnections() override { conn_pool_->drainConnections(); }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
@@ -974,14 +973,8 @@ TEST_P(TcpConnPoolImplTest, DrainCallback) {
   initialize();
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  conn_pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        ENVOY_LOG_MISC(debug, "Callback called is_drained = {}", is_drained);
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
@@ -1008,13 +1001,9 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
+
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
     // pending requests.
@@ -1038,13 +1027,8 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   initialize();
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  conn_pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
@@ -1132,23 +1116,18 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
 // Test that connections that are closed due to idle timeout causes the idle callback to be fired.
 TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
   initialize();
-  testing::MockFunction<void(bool)> idle_callback;
-  conn_pool_->addIdleCallback(idle_callback.AsStdFunction(),
-                              Envoy::ConnectionPool::Instance::DrainPool::No);
+  testing::MockFunction<void()> idle_callback;
+  conn_pool_->addIdleCallback(idle_callback.AsStdFunction());
 
-  EXPECT_CALL(idle_callback, Call(false));
+  EXPECT_CALL(idle_callback, Call());
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
   c1.releaseConn();
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  ENVOY_LOG_MISC(debug, "Should have called idle callback");
-
-  testing::MockFunction<void(bool)> drained_callback;
-  EXPECT_CALL(idle_callback, Call(true));
-  EXPECT_CALL(drained_callback, Call(true));
-  conn_pool_->addIdleCallback(drained_callback.AsStdFunction(),
-                              ConnectionPool::Instance::DrainPool::Yes);
+  testing::MockFunction<void()> drained_callback;
+  EXPECT_CALL(idle_callback, Call());
+  conn_pool_->startDrain();
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
   dispatcher_.clearDeferredDeleteList();
 }

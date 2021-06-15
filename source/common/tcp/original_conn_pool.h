@@ -29,8 +29,9 @@ public:
   ~OriginalConnPoolImpl() override;
 
   // ConnectionPool::Instance
-  void addIdleCallback(IdleCb cb, DrainPool drain) override;
+  void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
+  void startDrain() override;
   void drainConnections() override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;

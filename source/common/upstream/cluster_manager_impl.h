@@ -359,15 +359,15 @@ private:
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool ready_to_drain_{false};
-      uint64_t drains_remaining_{};
+      bool draining_{false};
+      bool do_not_delete_{false};
     };
 
     struct TcpConnPoolsContainer {
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
-      uint64_t drains_remaining_{};
+      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -445,8 +445,7 @@ private:
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
+    void drainTcpConnPools(TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,

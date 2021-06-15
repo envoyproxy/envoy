@@ -58,8 +58,9 @@ public:
   ~MockInstance() override;
 
   // Tcp::ConnectionPool::Instance
-  MOCK_METHOD(void, addIdleCallback, (IdleCb cb, DrainPool));
+  MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
   MOCK_METHOD(bool, isIdle, (), (const));
+  MOCK_METHOD(void, startDrain, ());
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
@@ -75,6 +76,7 @@ public:
 
   std::list<NiceMock<Envoy::ConnectionPool::MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;
+  IdleCb idle_cb_;
 
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
       new NiceMock<Upstream::MockHostDescription>()};

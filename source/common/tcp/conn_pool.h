@@ -145,8 +145,9 @@ public:
                                                 transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  void addIdleCallback(IdleCb cb, DrainPool drain) override { addIdleCallbackImpl(cb, drain); }
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
+  void startDrain() override { startDrainImpl(); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients

@@ -326,12 +326,11 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   }
 }
 
-void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainPool drain) {
-  idle_callbacks_.push_back(cb);
-  is_draining_ = (drain == Instance::DrainPool::Yes) || is_draining_;
-  if (is_draining_) {
-    checkForIdle();
-  }
+void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
+
+void ConnPoolImplBase::startDrainImpl() {
+  is_draining_ = true;
+  checkForIdle();
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
@@ -386,7 +385,7 @@ void ConnPoolImplBase::checkForIdle() {
   if (isIdleImpl()) {
     ENVOY_LOG(debug, "invoking drained callbacks - is_draining_={}", is_draining_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
-      cb(is_draining_);
+      cb();
     }
   }
 }

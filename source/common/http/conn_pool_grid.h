@@ -141,8 +141,9 @@ public:
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
-  void addIdleCallback(IdleCb cb, DrainPool drain) override;
+  void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
+  void startDrain() override;
   void drainConnections() override;
   Upstream::HostDescriptionConstSharedPtr host() const override;
   bool maybePreconnect(float preconnect_ratio) override;
@@ -166,16 +167,16 @@ public:
   // event that HTTP/3 is marked broken again.
   void markHttp3Confirmed();
 
+protected:
+  // Set the required idle callback on the pool.
+  void setupPool(ConnectionPool::Instance& pool);
+
 private:
   friend class ConnectivityGridForTest;
 
   // Called by each pool as it idles. The grid is responsible for calling
   // idle_callbacks_ once all pools have idled.
   void onIdleReceived();
-
-  // Called by each pool as it drains. The grid is responsible for calling
-  // idle_callbacks_ once all pools have drained.
-  void onDrainReceived();
 
   // Returns true if HTTP/3 should be attempted because there is an alternate protocol
   // that specifies HTTP/3 and HTTP/3 is not broken.

@@ -949,13 +949,8 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
 
-  conn_pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
 
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
@@ -981,13 +976,8 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(drained, ready());

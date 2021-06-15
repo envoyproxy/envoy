@@ -52,8 +52,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   // We have room for a new pool. Allocate one and let it know about any cached callbacks.
   auto new_pool = factory();
   connPoolResource.inc();
-  for (const auto& [cb, drain] : cached_callbacks_) {
-    new_pool->addIdleCallback(cb, drain);
+  for (const auto& cb : cached_callbacks_) {
+    new_pool->addIdleCallback(cb);
   }
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
@@ -88,13 +88,28 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb, DrainPool drain) {
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
-    pool_pair.second->addIdleCallback(cb, drain);
+    pool_pair.second->addIdleCallback(cb);
   }
 
-  cached_callbacks_.emplace_back(std::move(cb), drain);
+  cached_callbacks_.emplace_back(std::move(cb));
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::startDrain() {
+  // Copy the `active_pools_` so that it is safe for the call to result
+  // in deletion, and avoid iteration through a mutating container.
+  std::vector<POOL_TYPE*> pools;
+  pools.reserve(active_pools_.size());
+  for (auto& pool_pair : active_pools_) {
+    pools.push_back(pool_pair.second.get());
+  }
+
+  for (auto* pool : pools) {
+    pool->startDrain();
+  }
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>

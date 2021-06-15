@@ -160,7 +160,8 @@ public:
                             int64_t connecting_and_connected_capacity, float preconnect_ratio,
                             bool anticipate_incoming_stream = false);
 
-  void addIdleCallbackImpl(Instance::IdleCb cb, Instance::DrainPool drain);
+  void addIdleCallbackImpl(Instance::IdleCb cb);
+  void startDrainImpl();
   void drainConnectionsImpl();
 
   // Closes and destroys all connections. This must be called in the destructor of

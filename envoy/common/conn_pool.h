@@ -46,21 +46,24 @@ public:
   /**
    * Called when a connection pool has no pending streams, busy connections, or ready connections.
    */
-  using IdleCb = std::function<void(bool is_drained)>;
-
-  enum class DrainPool { Yes, No };
+  using IdleCb = std::function<void()>;
 
   /**
-   * Register a callback that gets called when the connection pool is fully idle. If `drain` is
-   * `Yes`, this also kicks off a drain. The owner of the connection pool is responsible for not
-   * creating any new streams.
+   * Register a callback that gets called when the connection pool is fully idle.
    */
-  virtual void addIdleCallback(IdleCb cb, DrainPool drain) PURE;
+  virtual void addIdleCallback(IdleCb cb) PURE;
 
   /**
    * Returns true if the pool does not have any connections or pending requests.
    */
   virtual bool isIdle() const PURE;
+
+  /**
+   * Starts draining a pool in preparation for deletion. When the process completes, the function
+   * registered via `addIdleCallback()` is called. The callback may occur before this call returns
+   * if the pool can be immediately drained.
+   */
+  virtual void startDrain() PURE;
 
   /**
    * Actively drain all existing connection pool connections. This method can be used in cases

@@ -16,7 +16,6 @@ public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
   using IdleCb = typename ConnPoolMapType::IdleCb;
-  using DrainPool = typename ConnPoolMapType::DrainPool;
   using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
 
   PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
@@ -50,10 +49,15 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addIdleCallback(const IdleCb& cb, DrainPool drain);
+  void addIdleCallback(const IdleCb& cb);
 
   /**
-   * Instructs each connection pool to drain its connections.
+   * See `Envoy::ConnectionPool::Instance::startDrain()`.
+   */
+  void startDrain();
+
+  /**
+   * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
   void drainConnections();
 

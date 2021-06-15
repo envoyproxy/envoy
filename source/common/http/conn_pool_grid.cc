@@ -235,17 +235,13 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
     pool = std::next(pools_.begin());
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
-    (*pool)->addIdleCallback(
-        [this](bool is_drained) {
-          if (!is_drained) {
-            onIdleReceived();
-          }
-        },
-        DrainPool::No);
-  }
+  setupPool(**pool);
 
   return pool;
+}
+
+void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
+  pool.addIdleCallback([this]() { onIdleReceived(); });
 }
 
 bool ConnectivityGrid::hasActiveConnections() const {
@@ -281,33 +277,26 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   return ret;
 }
 
-void ConnectivityGrid::addIdleCallback(IdleCb cb, DrainPool drain) {
+void ConnectivityGrid::addIdleCallback(IdleCb cb) {
   // Add the callback to the list of callbacks to be called when all drains are
   // complete.
   idle_callbacks_.emplace_back(cb);
+}
 
-  if (drain == DrainPool::Yes) {
-    if (drains_needed_ > 0) {
-      // A drain callback has already been set, and only needs to happen once.
-      return;
-    }
+void ConnectivityGrid::startDrain() {
+  if (drains_needed_ > 0) {
+    // A drain callback has already been set, and only needs to happen once.
+    return;
+  }
 
-    // If this is the first time an idle callback has been added, track the
-    // number of pools which need to be drained in order to pass drain-completion
-    // up to the callers. Note that no new pools can be created from this point on
-    // as createNextPool fast-fails if `drains_needed_` is non-zero.
-    drains_needed_ = pools_.size();
-    for (auto& pool : pools_) {
-      pool->addIdleCallback(
-          [this](bool is_drained) -> void {
-            if (is_drained) {
-              onDrainReceived();
-            }
-          },
-          DrainPool::Yes);
-    }
-  } else {
-    // Idle (not drained) callbacks are setup when the pool is constructed in createNextPool.
+  // If this is the first time an idle callback has been added, track the
+  // number of pools which need to be drained in order to pass drain-completion
+  // up to the callers. Note that no new pools can be created from this point on
+  // as createNextPool fast-fails if `drains_needed_` is non-zero.
+  drains_needed_ = pools_.size();
+
+  for (auto& pool : pools_) {
+    pool->startDrain();
   }
 }
 
@@ -345,7 +334,7 @@ bool ConnectivityGrid::isIdle() const {
   // This is O(n) but the function is constant and there are no plans for n > 8.
   bool idle = true;
   for (const auto& pool : pools_) {
-    idle = idle && pool->isIdle();
+    idle &= pool->isIdle();
   }
   return idle;
 }
@@ -356,25 +345,17 @@ void ConnectivityGrid::onIdleReceived() {
     return;
   }
 
-  // The idle state can come and go, so each time one of the pools becomes idle, check them all.
-  if (isIdle()) {
-    for (auto& callback : idle_callbacks_) {
-      callback(false);
+  bool drained = false;
+  if (drains_needed_ > 0) {
+    if (--drains_needed_ == 0) {
+      // All the pools have drained. Notify drain subscribers.
+      drained = true;
     }
   }
-}
 
-void ConnectivityGrid::onDrainReceived() {
-  // Don't do any work under the stack of ~ConnectivityGrid()
-  if (destroying_) {
-    return;
-  }
-
-  ASSERT(drains_needed_ > 0);
-  if (--drains_needed_ == 0) {
-    // All the pools have drained. Notify drain subscribers.
+  if (drained || isIdle()) {
     for (auto& callback : idle_callbacks_) {
-      callback(true);
+      callback();
     }
   }
 }

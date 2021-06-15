@@ -1089,13 +1089,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
   ReadyWatcher drained;
-  pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
@@ -1131,13 +1126,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1180,13 +1170,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1241,13 +1226,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  pool_->addIdleCallback(
-      [&](bool is_drained) -> void {
-        if (is_drained) {
-          drained.ready();
-        }
-      },
-      ConnectionPool::Instance::DrainPool::Yes);
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();

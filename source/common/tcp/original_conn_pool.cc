@@ -68,12 +68,11 @@ void OriginalConnPoolImpl::closeConnections() {
   }
 }
 
-void OriginalConnPoolImpl::addIdleCallback(IdleCb cb, DrainPool drain) {
-  idle_callbacks_.push_back(cb);
-  is_draining_ = (drain == DrainPool::Yes) || is_draining_;
-  if (is_draining_) {
-    checkForIdle();
-  }
+void OriginalConnPoolImpl::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
+
+void OriginalConnPoolImpl::startDrain() {
+  is_draining_ = true;
+  checkForIdle();
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -101,7 +100,7 @@ void OriginalConnPoolImpl::checkForIdle() {
     }
     ENVOY_LOG(debug, "Calling idle callbacks - drained={}", is_draining_);
     for (const IdleCb& cb : idle_callbacks_) {
-      cb(is_draining_);
+      cb();
     }
   }
 }

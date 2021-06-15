@@ -217,18 +217,14 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggered) {
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
 
-  testing::MockFunction<void(bool)> idle_pool_callback;
-  EXPECT_CALL(idle_pool_callback, Call(false));
-  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction(),
-                            ConnectionPool::Instance::DrainPool::No);
+  testing::MockFunction<void()> idle_pool_callback;
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
   dispatcher_.clearDeferredDeleteList();
   clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
 
-  testing::MockFunction<void(bool)> drained_pool_callback;
-  EXPECT_CALL(idle_pool_callback, Call(true));
-  EXPECT_CALL(drained_pool_callback, Call(true));
-  pool_.addIdleCallbackImpl(drained_pool_callback.AsStdFunction(),
-                            ConnectionPool::Instance::DrainPool::Yes);
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.startDrainImpl();
 }
 
 } // namespace ConnectionPool

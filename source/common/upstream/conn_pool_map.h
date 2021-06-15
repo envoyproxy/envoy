@@ -21,7 +21,6 @@ template <typename KEY_TYPE, typename POOL_TYPE> class ConnPoolMap {
 public:
   using PoolFactory = std::function<std::unique_ptr<POOL_TYPE>()>;
   using IdleCb = typename POOL_TYPE::IdleCb;
-  using DrainPool = typename POOL_TYPE::DrainPool;
   using PoolOptRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
 
   ConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
@@ -57,10 +56,15 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addIdleCallback(const IdleCb& cb, DrainPool drain);
+  void addIdleCallback(const IdleCb& cb);
 
   /**
-   * Instructs each connection pool to drain its connections.
+   * See `Envoy::ConnectionPool::Instance::startDrain()`.
+   */
+  void startDrain();
+
+  /**
+   * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
   void drainConnections();
 
@@ -78,7 +82,7 @@ private:
 
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
-  std::vector<std::tuple<IdleCb, DrainPool>> cached_callbacks_;
+  std::vector<IdleCb> cached_callbacks_;
   Common::DebugRecursionChecker recursion_checker_;
   const HostConstSharedPtr host_;
   const ResourcePriority priority_;
