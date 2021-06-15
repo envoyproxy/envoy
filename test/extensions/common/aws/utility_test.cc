@@ -100,7 +100,8 @@ TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
 // Verify the format of a minimalist canonical request
 TEST(UtilityTest, MinimalCanonicalRequest) {
   std::map<std::string, std::string> headers;
-  const auto request = Utility::createCanonicalRequest("GET", "", headers, "content-hash");
+  const auto request =
+      Utility::createCanonicalRequest("appmesh", "GET", "", headers, "content-hash");
   EXPECT_EQ(R"(GET
 /
 
@@ -112,10 +113,11 @@ content-hash)",
 
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const std::map<std::string, std::string> headers;
-  const auto request = Utility::createCanonicalRequest("GET", "?query", headers, "content-hash");
+  const auto request =
+      Utility::createCanonicalRequest("appmesh", "GET", "?query", headers, "content-hash");
   EXPECT_EQ(R"(GET
 /
-query
+query=
 
 
 content-hash)",
@@ -128,7 +130,8 @@ TEST(UtilityTest, CanonicalRequestWithHeaders) {
       {"header2", "value2"},
       {"header3", "value3"},
   };
-  const auto request = Utility::createCanonicalRequest("GET", "", headers, "content-hash");
+  const auto request =
+      Utility::createCanonicalRequest("appmesh", "GET", "", headers, "content-hash");
   EXPECT_EQ(R"(GET
 /
 
@@ -139,6 +142,144 @@ header3:value3
 header1;header2;header3
 content-hash)",
             request);
+}
+
+TEST(UtilityTest, CanonicalizePathStringReturnSlash) {
+  std::string path = "";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringSlash) {
+  std::string path = "/";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringSlashes) {
+  std::string path = "///";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringPrefixSlash) {
+  std::string path = "test";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringSuffixSlash) {
+  std::string path = "test/";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringNormalizeSlash) {
+  std::string path = "test////test///";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test/test/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringWithEncoding) {
+  std::string path = "test$file.txt";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test%24file.txt", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringWithEncodingSpaces) {
+  std::string path = "/test and test/";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test%20and%20test/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizePathStringWithAlreadyEncodedSpaces) {
+  std::string path = "/test%20and%20test/";
+  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  EXPECT_EQ("/test%2520and%2520test/", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizeS3PathStringDoNotNormalizeSlash) {
+  std::string path = "/test//test///";
+  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
+  EXPECT_EQ("/test//test///", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizeS3PathStringSlashes) {
+  std::string path = "///";
+  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
+  EXPECT_EQ("///", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizeS3PathStringWithEncoding) {
+  std::string path = "/test$file.txt";
+  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
+  EXPECT_EQ("/test%24file.txt", canonical_path);
+}
+
+TEST(UtilityTest, CanonicalizeS3PathStringWithEncodingSpaces) {
+  std::string path = "/test and test/";
+  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
+  EXPECT_EQ("/test%20and%20test/", canonical_path);
+}
+
+TEST(UtilityTest, EncodePathSegment) {
+  std::string path = "test^!@=-_~.";
+  const auto encoded_path = Utility::encodePathSegment(path, "appmesh");
+  EXPECT_EQ("test%5E%21%40%3D-_~.", encoded_path);
+}
+
+TEST(UtilityTest, EncodeS3PathSegment) {
+  std::string path = "/test/^!@=/-_~.";
+  const auto encoded_path = Utility::encodePathSegment(path, "s3");
+  EXPECT_EQ("/test/%5E%21%40%3D/-_~.", encoded_path);
+}
+
+TEST(UtilityTest, CanonicalizeQueryString) {
+  std::string query = "a=1&b=2";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1&b=2", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringTrailingEquals) {
+  std::string query = "a&b";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=&b=", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringSorted) {
+  std::string query = "a=3&b=1&a=2&a=1";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1&a=2&a=3&b=1", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringEncoded) {
+  std::string query = "a=^!@&b=/-_~.";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=%5E%21%40&b=%2F-_~.", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringWithPlus) {
+  std::string query = "a=1+2";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1%202", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringDoubleEncodeEquals) {
+  std::string query = "a=!.!=!";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=%21.%21%253D%21", canonical_query);
+}
+
+TEST(UtilityTest, EncodeQuerySegment) {
+  std::string query = "^!@/-_~.";
+  const auto encoded_query = Utility::encodeQueryParam(query);
+  EXPECT_EQ("%5E%21%40%2F-_~.", encoded_query);
+}
+
+TEST(UtilityTest, EncodeQuerySegmentReserved) {
+  std::string query = "?=&";
+  const auto encoded_query = Utility::encodeQueryParam(query);
+  EXPECT_EQ("%3F%253D%26", encoded_query);
 }
 
 // Verify headers are joined with ";"
