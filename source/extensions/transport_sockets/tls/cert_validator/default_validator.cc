@@ -222,9 +222,8 @@ int DefaultCertValidator::doVerifyCertChain(
   }
 
   return allow_untrusted_certificate_ ? 1
-         : verify_trusted_ca_
-             ? validated != Envoy::Ssl::ClientValidationStatus::Failed
-             : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+         : verify_trusted_ca_         ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                                      : validated == Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
