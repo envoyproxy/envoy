@@ -7,6 +7,31 @@ ARCH="$$(uname -m)"
 SYSTEM="$$(uname -s)"
 PLATFORM="$${SYSTEM}-$${ARCH}"
 
+detect::compiler() {
+  local out=$$(mktemp -d)
+
+  cat >$${out}/detect.cc <<EOF
+#include <stdio.h>
+
+// See https://sourceforge.net/p/predef/wiki/Compilers/
+
+int main(void)
+{
+#if __clang__
+    ::printf("clang\n");
+#elif __GNUC__
+    printf("gcc\n");
+#else
+    ::printf("unknown\n");
+#endif
+    return 0;
+}
+EOF
+
+  $${CXX} -o $${out}/detect $${out}/detect.cc
+  $${out}/detect
+}
+
 case $${PLATFORM} in
 Linux-x86_64|Linux-s390x|Linux-aarch64|Linux-ppc64le)
   ;;
@@ -30,15 +55,22 @@ rm -rf out/wee8
 # Export compiler configuration.
 export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
 if [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; then
-  export IS_CLANG=true
   export CC=$${CC:-clang}
   export CXX=$${CXX:-clang++}
-  export CXXFLAGS="$${CXXFLAGS} -Wno-implicit-int-float-conversion -Wno-builtin-assume-aligned-alignment -Wno-final-dtor-non-final-class -Wno-invalid-constexpr"
 else
-  export IS_CLANG=false
   export CC=$${CC:-gcc}
   export CXX=$${CXX:-g++}
 fi
+
+case $$(detect::compiler) in
+clang)
+  export IS_CLANG=true
+  export CXXFLAGS="$${CXXFLAGS} -Wno-implicit-int-float-conversion -Wno-builtin-assume-aligned-alignment -Wno-final-dtor-non-final-class -Wno-invalid-constexpr"
+  ;;
+*)
+  export IS_CLANG=false
+  ;;
+esac
 
 export AR=$${AR:-ar}
 export NM=$${NM:-nm}
