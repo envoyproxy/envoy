@@ -128,13 +128,13 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  WasmFilterConfig factory;
 
   // Intentionally we scope the factory here, and make the context outlive it.
   // This case happens when the config is updated by ECDS, and
   // we have to make sure that contexts still hold valid WasmVMs in these cases.
   std::shared_ptr<Envoy::Extensions::Common::Wasm::Context> context = nullptr;
   {
+    WasmFilterConfig factory;
     Http::FilterFactoryCb cb =
         factory.createFilterFactoryFromProto(proto_config, "stats", context_);
     EXPECT_CALL(init_watcher_, ready());
