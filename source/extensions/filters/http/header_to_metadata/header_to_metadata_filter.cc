@@ -101,6 +101,10 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
     throw EnvoyException("header_to_metadata_filter: Per filter configs must at least specify "
                          "either request or response rules");
   }
+
+  if (config.max_header_value_len()) {
+    max_header_value_len_ = config.max_header_value_len();
+  }
 }
 
 bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
@@ -157,7 +161,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   ASSERT(!value.empty());
 
-  if (value.size() >= MAX_HEADER_VALUE_LEN) {
+  if (value.size() >= config_->getMaxHeaderValueLen()) {
     // Too long, go away.
     ENVOY_LOG(debug, "metadata value is too long");
     return false;

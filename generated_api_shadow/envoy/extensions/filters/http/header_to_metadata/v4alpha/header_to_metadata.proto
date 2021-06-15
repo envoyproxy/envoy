@@ -127,4 +127,7 @@ message Config {
 
   // The list of rules to apply to responses.
   repeated Rule response_rules = 2;
+
+  // Configure max_header_value_len.
+  uint32 max_header_value_len = 3;
 }

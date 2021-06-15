@@ -408,7 +408,8 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
  */
 TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
   initializeFilter(request_config_yaml);
-  auto length = Envoy::Extensions::HttpFilters::HeaderToMetadataFilter::MAX_HEADER_VALUE_LEN + 1;
+  auto length =
+      Envoy::Extensions::HttpFilters::HeaderToMetadataFilter::DEFAULT_MAX_HEADER_VALUE_LEN + 1;
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(length, 'x')}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
