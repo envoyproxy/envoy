@@ -1106,6 +1106,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
     }
   }
   thread_local_clusters_.clear();
+
+  // Ensure that all pools are completely destructed.
+  thread_local_dispatcher_.clearDeferredDeleteList();
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) {
