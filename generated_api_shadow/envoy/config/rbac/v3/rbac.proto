@@ -25,9 +25,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
-// service. RBAC policies are additive. The policies are examined in order. Requests are allowed
-// or denied based on the `action` and whether a matching policy is found. For instance, if the
-// action is ALLOW and a matching policy is found the request should be allowed.
+// service. Requests are allowed or denied based on the `action` and whether a matching policy is
+// found. For instance, if the action is ALLOW and a matching policy is found the request should be
+// allowed.
 //
 // RBAC can also be used to make access logging decisions by communicating with access loggers
 // through dynamic metadata. When the action is LOG and at least one policy matches, the
@@ -105,6 +105,7 @@ message RBAC {
   Action action = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
+  // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
 }
 

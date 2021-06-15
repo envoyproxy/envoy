@@ -592,12 +592,14 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
 
-#ifdef ENVOY_ENABLE_QUICHE
+#ifdef ENVOY_ENABLE_QUIC
 
 } // namespace
 } // namespace Http
 } // namespace Envoy
-#include "source/extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+
+#include "test/mocks/server/transport_socket_factory_context.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
 namespace {
@@ -607,7 +609,9 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto factory =
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
   factory->initialize();
   ASSERT_FALSE(factory->usesProxyProtocolOptions());
   auto& matcher =
@@ -616,10 +620,10 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), options_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

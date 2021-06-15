@@ -4,7 +4,6 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -192,8 +191,7 @@ protected:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)[Extensions::HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder].PackFrom(
-              per_route_config);
+          (*config)["envoy.filters.http.grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);

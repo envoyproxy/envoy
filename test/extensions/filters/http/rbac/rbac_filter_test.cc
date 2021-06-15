@@ -5,7 +5,6 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/utility.h"
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/common/rbac/mocks.h"
 #include "test/extensions/filters/http/rbac/mocks.h"
@@ -88,11 +87,10 @@ public:
   }
 
   void setMetadata() {
-    ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
+    ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(HttpFilterNames::get().Rbac,
-                                                                  obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.filters.http.rbac", obj));
         }));
 
     ON_CALL(req_info_,
@@ -195,7 +193,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ("testrbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
   EXPECT_EQ("testrbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
   EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
   EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
@@ -214,7 +212,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
+  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.rbac"))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));

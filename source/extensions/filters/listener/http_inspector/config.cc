@@ -4,7 +4,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/listener/http_inspector/http_inspector.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +32,7 @@ public:
         envoy::extensions::filters::listener::http_inspector::v3::HttpInspector>();
   }
 
-  std::string name() const override { return ListenerFilterNames::get().HttpInspector; }
+  std::string name() const override { return "envoy.filters.listener.http_inspector"; }
 };
 
 /**

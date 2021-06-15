@@ -30,7 +30,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/extensions/common/dynamic_forward_proxy:mocks",
         "//test/mocks/http:http_mocks",

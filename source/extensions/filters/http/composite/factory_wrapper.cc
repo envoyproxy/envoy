@@ -55,9 +55,8 @@ void FactoryCallbacksWrapper::addStreamFilter(Http::StreamFilterSharedPtr,
       "cannot delegate to stream filter that instantiates a match tree"));
 }
 
-void FactoryCallbacksWrapper::addAccessLogHandler(AccessLog::InstanceSharedPtr) {
-  errors_.push_back(
-      absl::InvalidArgumentError("cannot delegate to filter that adds an access log handler"));
+void FactoryCallbacksWrapper::addAccessLogHandler(AccessLog::InstanceSharedPtr access_log) {
+  access_loggers_.push_back(std::move(access_log));
 }
 } // namespace Composite
 } // namespace HttpFilters

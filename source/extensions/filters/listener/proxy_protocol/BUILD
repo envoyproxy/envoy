@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
-        "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
@@ -47,7 +46,6 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
     ],
