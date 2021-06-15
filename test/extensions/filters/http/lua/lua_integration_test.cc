@@ -1,8 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -16,14 +14,14 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Create the xDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
@@ -47,7 +45,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().Lua;
+          const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
               R"EOF(
             foo.bar:

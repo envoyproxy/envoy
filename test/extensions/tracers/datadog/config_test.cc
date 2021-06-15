@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/datadog.pb.validate.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 
-#include "extensions/tracers/datadog/config.h"
+#include "source/extensions/tracers/datadog/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"

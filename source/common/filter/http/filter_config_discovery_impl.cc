@@ -1,4 +1,4 @@
-#include "common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/http/filter_config_discovery_impl.h"
 
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
@@ -6,11 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/containers.h"
-#include "common/common/thread.h"
-#include "common/config/utility.h"
-#include "common/grpc/common.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/containers.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 

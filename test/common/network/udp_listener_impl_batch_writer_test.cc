@@ -21,13 +21,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/utility.h"
 
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
@@ -230,23 +230,12 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
       // shorter than initial payload
       EXPECT_TRUE(send_result.ok());
       EXPECT_EQ(send_result.rc_, following_payload.length());
-      EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+      EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
       internal_buffer.append(following_payload);
-      // Send another packet and verify that writer gets blocked later
-      EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-          .WillOnce(Invoke([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
-            errno = EWOULDBLOCK;
-            return -1;
-          }));
-      following_buffer->add(following_payload);
-      UdpSendData final_send_data{send_to_addr_->ip(),
-                                  *server_socket_->addressProvider().localAddress(),
-                                  *following_buffer};
-      send_result = listener_->send(final_send_data);
+    } else {
+      EXPECT_FALSE(send_result.ok());
+      EXPECT_EQ(send_result.rc_, 0);
     }
-
-    EXPECT_FALSE(send_result.ok());
-    EXPECT_EQ(send_result.rc_, 0);
     EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());
     EXPECT_EQ(listener_config_.listenerScope().counterFromString("total_bytes_sent").value(),
               total_bytes_sent);

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/kafka_request_parser.h"
+#include "source/extensions/filters/network/kafka/kafka_request_parser.h"
 
 namespace Envoy {
 namespace Extensions {

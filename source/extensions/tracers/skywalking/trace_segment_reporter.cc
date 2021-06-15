@@ -1,4 +1,4 @@
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "envoy/http/header_map.h"
 

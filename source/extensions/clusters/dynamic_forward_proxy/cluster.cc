@@ -1,12 +1,11 @@
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/network/transport_socket_options_impl.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {

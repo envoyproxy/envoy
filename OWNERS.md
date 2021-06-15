@@ -40,7 +40,7 @@ routing PRs, questions, etc. to the right place.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
   * Docs, tooling, CI, containers and sandbox examples
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liason.
+  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
 

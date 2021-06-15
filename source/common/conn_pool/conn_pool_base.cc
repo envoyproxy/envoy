@@ -1,10 +1,10 @@
-#include "common/conn_pool/conn_pool_base.h"
+#include "source/common/conn_pool/conn_pool_base.h"
 
-#include "common/common/assert.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -561,13 +561,13 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
 
-ActiveClient::~ActiveClient() { releaseResources(); }
+ActiveClient::~ActiveClient() { releaseResourcesBase(); }
 
 void ActiveClient::onEvent(Network::ConnectionEvent event) {
   parent_.onConnectionEvent(*this, "", event);
 }
 
-void ActiveClient::releaseResources() {
+void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
     resources_released_ = true;
 

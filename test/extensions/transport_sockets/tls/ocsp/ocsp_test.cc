@@ -1,7 +1,6 @@
-#include "common/filesystem/filesystem_impl.h"
-
-#include "extensions/transport_sockets/tls/ocsp/ocsp.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/extensions/transport_sockets/tls/ocsp/ocsp.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"

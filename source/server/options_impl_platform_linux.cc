@@ -2,15 +2,14 @@
 #error "Linux platform file is part of non-Linux build."
 #endif
 
-#include "server/options_impl_platform_linux.h"
+#include "source/server/options_impl_platform_linux.h"
 
 #include <sched.h>
 
 #include <thread>
 
-#include "common/api/os_sys_calls_impl_linux.h"
-
-#include "server/options_impl_platform.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#include "source/server/options_impl_platform.h"
 
 namespace Envoy {
 

@@ -3,8 +3,8 @@
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/macros.h"
-#include "common/common/matchers.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/matchers.h"
 
 #include "test/test_common/utility.h"
 

@@ -3,8 +3,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/listener/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -22,7 +20,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  std::string name() const override { return ListenerFilterNames::get().OriginalSrc; }
+  std::string name() const override { return "envoy.filters.listener.original_src"; }
 };
 
 } // namespace OriginalSrc

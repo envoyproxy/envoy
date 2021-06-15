@@ -1,6 +1,6 @@
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 
-#include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 #include "test/mocks/stream_info/mocks.h"
 

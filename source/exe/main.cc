@@ -1,7 +1,7 @@
-#include "exe/main_common.h"
+#include "source/exe/main_common.h"
 
 #ifdef WIN32
-#include "exe/service_base.h"
+#include "source/exe/service_base.h"
 #endif
 
 // NOLINT(namespace-envoy)

@@ -1,7 +1,7 @@
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
 
-#include "common/network/io_socket_error_impl.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -54,13 +54,14 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
-  size_t payload_len = static_cast<size_t>(buffer.length());
+  ASSERT(buffer.getRawSlices().size() == 1);
+  size_t payload_len = static_cast<size_t>(buffer.frontSlice().len_);
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
-  quic::WriteResult quic_result =
-      WritePacket(buffer.toString().c_str(), payload_len, self_addr.host(), peer_addr,
-                  /*quic::PerPacketOptions=*/nullptr);
+  quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
+                                              payload_len, self_addr.host(), peer_addr,
+                                              /*quic::PerPacketOptions=*/nullptr);
   updateUdpGsoBatchWriterStats(quic_result);
 
   return convertQuicWriteResult(quic_result, payload_len);
