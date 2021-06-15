@@ -266,6 +266,9 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
                                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!deferred_deleting_);
 
+  // New streams should not be created during draining.
+  ASSERT(drains_needed_ == 0);
+
   if (pools_.empty()) {
     createNextPool();
   }
