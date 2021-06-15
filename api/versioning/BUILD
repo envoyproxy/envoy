@@ -141,6 +141,7 @@ proto_library(
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/rate_limit_descriptors/expr/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",
+        "//envoy/extensions/resource_monitors/downstream_connections/v3:pkg",
         "//envoy/extensions/resource_monitors/fixed_heap/v3:pkg",
         "//envoy/extensions/resource_monitors/injected_resource/v3:pkg",
         "//envoy/extensions/retry/host/omit_canary_hosts/v3:pkg",
