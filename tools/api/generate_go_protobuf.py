@@ -54,8 +54,7 @@ def generate_protobufs(targets, output, api_repo):
             prefix = ''
         else:
             prefix = os.path.join('external', api_repo)
-        input_dir = os.path.join(
-            bazel_bin, prefix, rule_dir, proto + '_', IMPORT_BASE, rule_dir)
+        input_dir = os.path.join(bazel_bin, prefix, rule_dir, proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
 
