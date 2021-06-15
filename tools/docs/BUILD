@@ -15,16 +15,6 @@ py_binary(
     ],
 )
 
-genrule(
-    name = "extensions_security_rst",
-    srcs = ["//source/extensions:extensions_metadata.yaml"],
-    outs = ["extensions_security_rst.tar"],
-    cmd = (
-        "$(location generate_extensions_security_rst) $(location //source/extensions:extensions_metadata.yaml) $@"
-    ),
-    tools = [":generate_extensions_security_rst"],
-)
-
 py_binary(
     name = "generate_external_deps_rst",
     srcs = [
@@ -36,16 +26,9 @@ py_binary(
     ],
 )
 
-genrule(
-    name = "external_deps_rst",
+py_binary(
+    name = "generate_api_rst",
     srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "generate_api_rst.py",
     ],
-    outs = ["external_deps_rst.tar"],
-    cmd = (
-        "$(location generate_external_deps_rst) $@"
-    ),
-    tools = [":generate_external_deps_rst"],
 )

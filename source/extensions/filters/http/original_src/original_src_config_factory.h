@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ namespace OriginalSrc {
 class OriginalSrcConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::original_src::v3::OriginalSrc> {
 public:
-  OriginalSrcConfigFactory() : FactoryBase(HttpFilterNames::get().OriginalSrc) {}
+  OriginalSrcConfigFactory() : FactoryBase("envoy.filters.http.original_src") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::original_src::v3::OriginalSrc& proto_config,

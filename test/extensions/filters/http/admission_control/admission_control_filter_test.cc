@@ -36,6 +36,7 @@ public:
   MOCK_METHOD(RequestData, requestCounts, ());
   MOCK_METHOD(void, recordSuccess, ());
   MOCK_METHOD(void, recordFailure, ());
+  MOCK_METHOD(uint32_t, averageRps, (), (const));
 };
 
 class MockResponseEvaluator : public ResponseEvaluator {
@@ -141,6 +142,10 @@ sampling_window: 10s
 aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
+max_rejection_probability:
+  default_value:
+    value: 100.0
+  runtime_key: "foo.max_rejection_probability"
 success_criteria:
   http_criteria:
   grpc_criteria:
@@ -170,6 +175,7 @@ success_criteria:
 
   // The filter is bypassed via runtime.
   EXPECT_CALL(controller_, requestCounts()).Times(0);
+  EXPECT_CALL(controller_, averageRps()).Times(0);
 
   // We expect no rejections.
   Http::TestRequestHeaderMapImpl request_headers;
@@ -188,6 +194,7 @@ TEST_F(AdmissionControlTest, DisregardHealthChecks) {
   // We do not make admission decisions for health checks, so we expect no lookup of request success
   // counts.
   EXPECT_CALL(controller_, requestCounts()).Times(0);
+  EXPECT_CALL(controller_, averageRps()).Times(0);
 
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -205,6 +212,7 @@ TEST_F(AdmissionControlTest, HttpFailureBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isHttpSuccess(500)).WillRepeatedly(Return(false));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -224,6 +232,7 @@ TEST_F(AdmissionControlTest, HttpSuccessBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isHttpSuccess(200)).WillRepeatedly(Return(true));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -241,6 +250,7 @@ TEST_F(AdmissionControlTest, GrpcFailureBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -260,6 +270,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehaviorTrailer) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -278,6 +289,7 @@ TEST_F(AdmissionControlTest, GrpcFailureBehaviorTrailer) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(7)).WillRepeatedly(Return(false));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -297,6 +309,7 @@ TEST_F(AdmissionControlTest, GrpcSuccessBehavior) {
 
   EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 100)));
   EXPECT_CALL(*evaluator_, isGrpcSuccess(0)).WillRepeatedly(Return(true));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(99));
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -320,6 +333,10 @@ sr_threshold:
 aggression:
   default_value: 1.0
   runtime_key: "foo.aggression"
+max_rejection_probability:
+  default_value:
+    value: 80.0
+  runtime_key: "foo.max_rejection_probability"
 success_criteria:
   http_criteria:
   grpc_criteria:
@@ -335,6 +352,8 @@ success_criteria:
   // Increase aggression and expect higher rejection probabilities for the same values.
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(2.0));
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(100.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 80.0))
+      .WillRepeatedly(Return(80.0));
   verifyProbabilities(100, 0.0);
   verifyProbabilities(95, 0.22);
   verifyProbabilities(75, 0.5);
@@ -343,12 +362,113 @@ success_criteria:
   // from there.
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(1.0));
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(95.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 80.0))
+      .WillRepeatedly(Return(80.0));
   verifyProbabilities(100, 0.0);
   verifyProbabilities(98, 0.0);
   verifyProbabilities(95, 0.0);
   verifyProbabilities(90, 0.05);
   verifyProbabilities(75, 0.20);
   verifyProbabilities(50, 0.46);
+
+  // Validate max rejection probability
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(1.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(100.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 80.0))
+      .WillRepeatedly(Return(10.0));
+
+  verifyProbabilities(100, 0.0);
+  verifyProbabilities(95, 0.05);
+  verifyProbabilities(80, 0.1);
+  verifyProbabilities(0, 0.1);
+}
+
+// Validate RPS threshold.
+TEST_F(AdmissionControlTest, RpsThreshold) {
+  std::string yaml = R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+aggression:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+rps_threshold:
+  default_value: 0
+  runtime_key: "foo.rps_threshold"
+max_rejection_probability:
+  default_value:
+    value: 100.0
+  runtime_key: "foo.max_rejection_probability"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  auto config = makeConfig(yaml);
+  setupFilter(config);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 0)).WillRepeatedly(Return(10));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(1));
+  EXPECT_CALL(controller_, requestCounts()).Times(0);
+
+  // Continue expected.
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 0)).WillRepeatedly(Return(10));
+  EXPECT_CALL(controller_, averageRps()).WillRepeatedly(Return(100));
+
+  // We expect rejection counter to increment upon failure.
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 0, time_system_);
+
+  EXPECT_CALL(controller_, requestCounts()).WillRepeatedly(Return(RequestData(100, 0)));
+  EXPECT_CALL(*evaluator_, isHttpSuccess(500)).WillRepeatedly(Return(false));
+
+  // StopIteration expected.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  sampleHttpRequest("500");
+
+  TestUtility::waitForCounterEq(scope_, "test_prefix.rq_rejected", 1, time_system_);
+}
+
+// Validate max rejection probability.
+TEST_F(AdmissionControlTest, MaxRejectionProbability) {
+  std::string yaml = R"EOF(
+enabled:
+  default_value: true
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+sr_threshold:
+  default_value:
+    value: 100.0
+  runtime_key: "foo.threshold"
+aggression:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+max_rejection_probability:
+  default_value:
+    value: 80.0
+  runtime_key: "foo.max_rejection_probability"
+success_criteria:
+  http_criteria:
+  grpc_criteria:
+)EOF";
+
+  auto config = makeConfig(yaml);
+  setupFilter(config);
+
+  // Validate max rejection probability
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.aggression", 1.0)).WillRepeatedly(Return(1.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.threshold", 100.0)).WillRepeatedly(Return(100.0));
+  EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 80.0))
+      .WillRepeatedly(Return(10.0));
+
+  verifyProbabilities(100, 0.0);
+  verifyProbabilities(95, 0.05);
+  verifyProbabilities(80, 0.1);
+  verifyProbabilities(0, 0.1);
 }
 
 } // namespace

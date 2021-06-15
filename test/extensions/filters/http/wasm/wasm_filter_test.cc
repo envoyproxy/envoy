@@ -1615,7 +1615,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
   rootContext().onTick(0);
@@ -1660,7 +1660,7 @@ TEST_P(WasmHttpFilterTest, Property) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));

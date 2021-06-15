@@ -117,7 +117,6 @@ envoy_cc_library(
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
-        "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
@@ -243,7 +242,6 @@ envoy_cc_library(
     hdrs = [
         "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
-        "quiche_text_utils_impl.h",
     ],
     external_deps = [
         "abseil_hash",

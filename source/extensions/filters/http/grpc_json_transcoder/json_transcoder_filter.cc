@@ -17,7 +17,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -419,7 +418,7 @@ JsonTranscoderFilter::JsonTranscoderFilter(JsonTranscoderConfig& config) : confi
 
 void JsonTranscoderFilter::initPerRouteConfig() {
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<JsonTranscoderConfig>(
-      HttpFilterNames::get().GrpcJsonTranscoder, decoder_callbacks_->route());
+      "envoy.filters.http.grpc_json_transcoder", decoder_callbacks_->route());
 
   per_route_config_ = route_local ? route_local : &config_;
 }

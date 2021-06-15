@@ -2,7 +2,6 @@
 
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 
@@ -72,8 +71,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   UNREFERENCED_PARAMETER(request_headers_to_add);
 
   if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
-    decoder_callbacks_->streamInfo().setDynamicMetadata(
-        ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT, *dynamic_metadata);
+    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.thrift.rate_limit",
+                                                        *dynamic_metadata);
   }
 
   state_ = State::Complete;

@@ -35,7 +35,6 @@ envoy_cc_extension(
         ":http_inspector_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/extensions/filters/listener/http_inspector/v3:pkg_cc_proto",
     ],
 )
