@@ -125,6 +125,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
+    "envoy.filters.network.connection_limit":           "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":            "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
