@@ -94,7 +94,7 @@ Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storag
                                                            socklen_t ss_len, bool v6only) {
   // Though we don't have any test coverage where address validation in addressFromSockAddr() fails,
   // this code is called in worker thread and can throw in theory. In that case, the program will
-  // crash due to uncaught exception. In pratice, we don't expect any address validation in
+  // crash due to uncaught exception. In practice, we don't expect any address validation in
   // addressFromSockAddr() to fail in worker thread.
   StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
   return throwOnError(address);

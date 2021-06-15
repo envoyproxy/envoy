@@ -117,6 +117,8 @@ MEMCPY_WHITELIST = (
 EXCEPTION_DENYLIST = (
     "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
 
+# Files that are allowed to use try without main thread assertion.
+# TODO(chaoqin-li1123): remove try catch pattern in dns_impl.cc.
 RAW_TRY_ALLOWLIST = (
     "./source/common/common/regex.cc", "./source/common/common/thread.h",
     "./source/common/network/utility.cc", "./source/common/network/dns_impl.cc")
