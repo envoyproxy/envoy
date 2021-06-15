@@ -60,12 +60,14 @@ public:
     while (stream->Read(&request)) {
       if (request.has_client_start()) {
         client_versions = request.client_start().rpc_versions();
+        client_max_frame_size = request.client_start().max_frame_size();
         // Sets response to make first request successful.
         response.set_out_frames(kClientInitFrame);
         response.set_bytes_consumed(0);
         response.mutable_status()->set_code(grpc::StatusCode::OK);
       } else if (request.has_server_start()) {
         server_versions = request.server_start().rpc_versions();
+        server_max_frame_size = request.server_start().max_frame_size();
         response.mutable_status()->set_code(grpc::StatusCode::CANCELLED);
       }
       stream->Write(response);
@@ -81,9 +83,8 @@ public:
   grpc::gcp::RpcProtocolVersions client_versions;
   grpc::gcp::RpcProtocolVersions server_versions;
 
-  // TODO(yihuazhang): Test maximum frame size stored in handshake messages
-  // after updating test/core/tsi/alts/fake_handshaker/handshaker.proto to
-  // support maximum frame size negotiation.
+  size_t client_max_frame_size{0};
+  size_t server_max_frame_size{0};
 };
 
 class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
@@ -389,6 +390,15 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.max_rpc_version().minor());
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().major());
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().minor());
+}
+
+// Verifies that handshake request should include max frame size.
+TEST_P(AltsIntegrationTestCapturingHandshaker, CheckMaxFrameSize) {
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  EXPECT_FALSE(codec_client_->connected());
+  EXPECT_EQ(capturing_handshaker_service_->client_max_frame_size, 16384);
+  EXPECT_EQ(capturing_handshaker_service_->server_max_frame_size, 16384);
 }
 
 } // namespace
