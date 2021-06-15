@@ -47,9 +47,9 @@ def generate_protobufs(targets, output, api_repo):
         #
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
-        _, stripped_path = rule.decode().rsplit('//', 1) # envoy/config/bootstrap/v3:pkg_go_proto
+        _, stripped_path = rule.decode().rsplit('//', 1)  # envoy/config/bootstrap/v3:pkg_go_proto
         rule_dir, proto = stripped_path.rsplit(':', 1)
-    
+
         if len(api_repo) == 0:
             prefix = ''
         else:
