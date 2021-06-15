@@ -22,14 +22,13 @@ envoy_cc_library(
         "//visibility:public",
     ],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/extensions/transport_sockets:well_known_names",
     ],
 )
 
@@ -40,11 +39,9 @@ envoy_cc_extension(
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],

@@ -1,29 +1,31 @@
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include <cstdint>
 #include <memory>
 
 #include "envoy/http/codec.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/config/utility.h"
-#include "common/http/exception.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/http3/quic_codec_factory.h"
-#include "common/http/http3/well_known_names.h"
-#include "common/http/status.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/status.h"
+#include "source/common/http/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/codec_impl.h"
+#endif
 
 namespace Envoy {
 namespace Http {
 
-CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
+CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
       idle_timeout_(host_->cluster().idleTimeout()) {
-  if (type_ != Type::HTTP3) {
+  if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
     // details)
@@ -32,6 +34,23 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
   connection_->addConnectionCallbacks(*this);
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new CodecReadFilter(*this)});
 
+  if (idle_timeout_) {
+    idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
+    enableIdleTimer();
+  }
+
+  // We just universally set no delay on connections. Theoretically we might at some point want
+  // to make this configurable.
+  connection_->noDelay(true);
+}
+
+CodecClient::~CodecClient() {
+  ASSERT(connect_called_, "CodecClient::connect() is not called through out the life time.");
+}
+
+void CodecClient::connect() {
+  connect_called_ = true;
+  ASSERT(codec_ != nullptr);
   // In general, codecs are handed new not-yet-connected connections, but in the
   // case of ALPN, the codec may be handed an already connected connection.
   if (!connection_->connecting()) {
@@ -41,20 +60,7 @@ CodecClient::CodecClient(Type type, Network::ClientConnectionPtr&& connection,
     ENVOY_CONN_LOG(debug, "connecting", *connection_);
     connection_->connect();
   }
-
-  if (idle_timeout_) {
-    idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
-    enableIdleTimer();
-  }
-
-  // We just universally set no delay on connections. Theoretically we might at some point want
-  // to make this configurable.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_nodelay")) {
-    connection_->noDelay(true);
-  }
 }
-
-CodecClient::~CodecClient() = default;
 
 void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
@@ -89,7 +95,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
   }
 
   // HTTP/1 can signal end of response by disconnecting. We need to handle that case.
-  if (type_ == Type::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
+  if (type_ == CodecType::HTTP1 && event == Network::ConnectionEvent::RemoteClose &&
       !active_requests_.empty()) {
     Buffer::OwnedImpl empty;
     onData(empty);
@@ -101,11 +107,21 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
                    active_requests_.size());
     disableIdleTimer();
     idle_timer_.reset();
+    StreamResetReason reason = StreamResetReason::ConnectionFailure;
+    if (connected_) {
+      reason = StreamResetReason::ConnectionTermination;
+      if (protocol_error_) {
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+          reason = StreamResetReason::ProtocolError;
+          connection_->streamInfo().setResponseFlag(
+              StreamInfo::ResponseFlag::UpstreamProtocolError);
+        }
+      }
+    }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.
-      active_requests_.front()->encoder_->getStream().resetStream(
-          connected_ ? StreamResetReason::ConnectionTermination
-                     : StreamResetReason::ConnectionFailure);
+      active_requests_.front()->encoder_->getStream().resetStream(reason);
     }
   }
 }
@@ -137,14 +153,15 @@ void CodecClient::onData(Buffer::Instance& data) {
 
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
-    close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
     if (!isPrematureResponseError(status) ||
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
       host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      protocol_error_ = true;
     }
+    close();
   }
 
   // All data should be consumed at this point if the connection remains open.
@@ -152,34 +169,42 @@ void CodecClient::onData(Buffer::Instance& data) {
          absl::StrCat("extraneous bytes after response complete: ", data.length()));
 }
 
-CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& connection,
+CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                                  Upstream::HostDescriptionConstSharedPtr host,
                                  Event::Dispatcher& dispatcher,
                                  Random::RandomGenerator& random_generator)
     : CodecClient(type, std::move(connection), host, dispatcher) {
-
   switch (type) {
-  case Type::HTTP1: {
+  case CodecType::HTTP1: {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
         host->cluster().maxResponseHeadersCount());
     break;
   }
-  case Type::HTTP2: {
+  case CodecType::HTTP2: {
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   }
-  case Type::HTTP3: {
-    codec_ = std::unique_ptr<ClientConnection>(
-        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpClientConnectionFactory>(
-            Http::QuicCodecNames::get().Quiche)
-            .createQuicClientConnection(*connection_, *this));
+  case CodecType::HTTP3: {
+#ifdef ENVOY_ENABLE_QUIC
+    auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
+    codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
+        quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
+        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+    // Initialize the session after max request header size is changed in above http client
+    // connection creation.
+    quic_session.Initialize();
     break;
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    NOT_REACHED_GCOVR_EXCL_LINE;
+#endif
   }
   }
+  connect();
 }
 
 } // namespace Http

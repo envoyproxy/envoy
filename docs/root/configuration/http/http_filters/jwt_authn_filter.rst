@@ -45,7 +45,7 @@ JwtProvider
 Default Extract Location
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-If *from_headers* and *from_params* is empty,  the default location to extract JWT is from HTTP header::
+If *from_headers* and *from_params* is empty, the default location to extract JWT is from HTTP header::
 
   Authorization: Bearer <token>
 
@@ -81,7 +81,7 @@ Remote JWKS config example
         cache_duration:
           seconds: 300
 
-Above example fetches JWSK from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
+Above example fetches JWKS from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
 
 Following cluster **example_jwks_cluster** is needed to fetch JWKS.
 

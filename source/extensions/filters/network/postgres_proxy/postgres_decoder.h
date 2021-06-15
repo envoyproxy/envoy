@@ -3,12 +3,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/common/sqlutils/sqlutils.h"
-#include "extensions/filters/network/postgres_proxy/postgres_message.h"
-#include "extensions/filters/network/postgres_proxy/postgres_session.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/sqlutils/sqlutils.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_message.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_session.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -43,6 +42,8 @@ public:
   virtual void incErrors(ErrorType) PURE;
 
   virtual void processQuery(const std::string&) PURE;
+
+  virtual bool onSSLRequest() PURE;
 };
 
 // Postgres message decoder.
@@ -50,7 +51,16 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual bool onData(Buffer::Instance& data, bool frontend) PURE;
+  // The following values are returned by the decoder, when filter
+  // passes bytes of data via onData method:
+  enum Result {
+    ReadyForNext, // Decoder processed previous message and is ready for the next message.
+    NeedMoreData, // Decoder needs more data to reconstruct the message.
+    Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
+            // data. This happens when decoder wants filter to perform some action, for example to
+            // call starttls transport socket to enable TLS.
+  };
+  virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;
 
   const Extensions::Common::SQLUtils::SQLUtils::DecoderAttributes& getAttributes() const {
@@ -69,7 +79,7 @@ class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
   DecoderImpl(DecoderCallbacks* callbacks) : callbacks_(callbacks) { initialize(); }
 
-  bool onData(Buffer::Instance& data, bool frontend) override;
+  Result onData(Buffer::Instance& data, bool frontend) override;
   PostgresSession& getSession() override { return session_; }
 
   std::string getMessage() { return message_; }
@@ -121,7 +131,7 @@ protected:
     MsgAction unknown_;
   };
 
-  bool parseHeader(Buffer::Instance& data);
+  Result parseHeader(Buffer::Instance& data);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();

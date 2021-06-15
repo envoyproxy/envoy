@@ -13,15 +13,16 @@ struct TestStream;
 
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize) -> Action {
-        self.dispatch_http_call(
+        match self.dispatch_http_call(
             "cluster",
             vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],
             Some(b"hello world"),
             vec![("trail", "cow")],
             Duration::from_secs(5),
-        )
-        .unwrap();
-        info!("onRequestHeaders");
+        ) {
+            Ok(_) => info!("onRequestHeaders"),
+            Err(_) => info!("async_call rejected"),
+        };
         Action::Pause
     }
 }

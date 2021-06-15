@@ -11,11 +11,11 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -36,7 +36,7 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
   }
 
   const auto flags_and_mode = translateFlag(in);
-  fd_ = ::open(path_.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+  fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
@@ -75,8 +75,16 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
   return {out, mode};
 }
 
-FilePtr InstanceImplPosix::createFile(const std::string& path) {
-  return std::make_unique<FileImplPosix>(path);
+FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
+  switch (file_info.file_type_) {
+  case DestinationType::File:
+    return std::make_unique<FileImplPosix>(file_info);
+  case DestinationType::Stderr:
+    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stderr, "/dev/stderr"});
+  case DestinationType::Stdout:
+    return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stdout, "/dev/stdout"});
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool InstanceImplPosix::fileExists(const std::string& path) {

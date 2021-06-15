@@ -15,6 +15,7 @@ statistics:
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
    downstream_cx_upgrades_total, Counter, Total successfully upgraded connections. These are also counted as total http1/http2 connections.
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
+   downstream_cx_http3_total, Counter, Total HTTP/3 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
    downstream_cx_destroy_local, Counter, Total connections destroyed due to local close
@@ -26,6 +27,7 @@ statistics:
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
    downstream_cx_upgrades_active, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
+   downstream_cx_http3_active, Gauge, Total active HTTP/3 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
    downstream_cx_rx_bytes_total, Counter, Total bytes received
@@ -41,13 +43,16 @@ statistics:
    downstream_rq_total, Counter, Total requests
    downstream_rq_http1_total, Counter, Total HTTP/1.1 requests
    downstream_rq_http2_total, Counter, Total HTTP/2 requests
+   downstream_rq_http3_total, Counter, Total HTTP/3 requests
    downstream_rq_active, Gauge, Total active requests
+   downstream_rq_rejected_via_ip_detection, Counter, Total requests rejected because the original IP detection failed
    downstream_rq_response_before_rq_complete, Counter, Total responses sent before the request was complete
    downstream_rq_rx_reset, Counter, Total request resets received
    downstream_rq_tx_reset, Counter, Total request resets sent
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
    downstream_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body
    downstream_rq_completed, Counter, Total requests that resulted in a response (e.g. does not include aborted requests)
+   downstream_rq_failed_path_normalization, Counter, Total requests redirected due to different original and normalized URL paths or when path normalization failed. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    downstream_rq_1xx, Counter, Total 1xx responses
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
@@ -59,6 +64,7 @@ statistics:
    downstream_rq_max_duration_reached, Counter, Total requests closed due to max duration reached
    downstream_rq_timeout, Counter, Total requests closed due to a timeout on the request path
    downstream_rq_overload_close, Counter, Total requests closed due to Envoy overload
+   downstream_rq_redirected_with_normalized_path, Counter, Total requests redirected due to different original and normalized URL paths. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics
@@ -81,7 +87,12 @@ the following statistics:
 Per listener statistics
 -----------------------
 
-Additional per listener statistics are rooted at *listener.<address>.http.<stat_prefix>.* with the
+Per listener statistics are rooted at *listener.<address>*.
+
+HTTP per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Additional HTTP statistics are of the form *http.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
@@ -95,15 +106,28 @@ following statistics:
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
 
+HTTP/3 per listener statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+HTTP/3 statistics with the form of *http3.downstream.<stat_prefix>.*:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   <tx/rx>.quic_connection_close_error_code_<error_code>, Counter, A collection of counters that are lazily initialized to record each quic connection close error code that's present.
+   <tx/rx>.quic_reset_stream_error_code_<error_code>, Counter, A collection of counters that that lazily initialized to record quic stream reset error codes.
+
+
 .. _config_http_conn_man_stats_per_codec:
 
 Per codec statistics
 -----------------------
 
-Each codec has the option of adding per-codec statistics. Both http1 and http2 have codec stats.
+Each codec has the option of adding per-codec statistics. http1, http2, and http3 all have codec stats.
 
-Http1 codec statistics
-~~~~~~~~~~~~~~~~~~~~~~
+HTTP/1 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
 
 On the downstream side all http1 statistics are rooted at *http1.*
 
@@ -118,8 +142,8 @@ On the upstream side all http1 statistics are rooted at *cluster.<name>.http1.*
    response_flood, Counter, Total number of connections closed due to response flooding
    requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
 
-Http2 codec statistics
-~~~~~~~~~~~~~~~~~~~~~~
+HTTP/2 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
 
 On the downstream side all http2 statistics are rooted at *http2.*
 
@@ -135,13 +159,15 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    inbound_empty_frames_flood, Counter, Total number of connections terminated for exceeding the limit on consecutive inbound frames with an empty payload and no end stream flag. The limit is configured by setting the :ref:`max_consecutive_inbound_frames_with_empty_payload config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_consecutive_inbound_frames_with_empty_payload>`.
    inbound_priority_frames_flood, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
    inbound_window_update_frames_flood, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type WINDOW_UPDATE. The limit is configured by setting the :ref:`max_inbound_window_updateframes_per_data_frame_sent config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`.
+   metadata_empty_frames, Counter, Total number of metadata frames that were received and contained empty maps.
    outbound_flood, Counter, Total number of connections terminated for exceeding the limit on outbound frames of all types. The limit is configured by setting the :ref:`max_outbound_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_frames>`.
    outbound_control_flood, Counter, "Total number of connections terminated for exceeding the limit on outbound frames of types PING, SETTINGS and RST_STREAM. The limit is configured by setting the :ref:`max_outbound_control_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_control_frames>`."
    requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
+   stream_refused_errors, Counter, Total number of invalid frames received by Envoy with a `REFUSED_STREAM` error code
    trailers, Counter, Total number of trailers seen on requests coming from downstream
-   tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
+   tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
    keepalive_timeout, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
    streams_active, Gauge, Active streams as observed by the codec
@@ -152,6 +178,24 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
   The HTTP/2 `streams_active` gauge may be greater than the HTTP connection manager
   `downstream_rq_active` gauge due to differences in stream accounting between the codec and the
   HTTP connection manager.
+
+HTTP/3 codec statistics
+~~~~~~~~~~~~~~~~~~~~~~~
+
+On the downstream side all http3 statistics are rooted at *http3.*
+
+On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   dropped_headers_with_underscores, Counter, Total number of dropped headers with names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
+   rx_reset, Counter, Total number of reset stream frames received by Envoy
+   tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
+   metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
+
 
 Tracing statistics
 ------------------

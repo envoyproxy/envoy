@@ -1,3 +1,5 @@
+#pragma once
+
 namespace Envoy {
 
 // TODO(ggreenway): replace 'latest' with the current version, pulled from the VERSION file at

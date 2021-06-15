@@ -7,11 +7,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/eds.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/eds.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -97,7 +96,7 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
     cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
                                                 std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
@@ -132,6 +131,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
+  Server::MockOptions options_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -882,10 +882,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithDrain) {
   add_endpoint(80, 1);
 
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -995,10 +996,11 @@ TEST_F(EdsTest, EndpointMovedWithDrain) {
   add_endpoint(81, 0);
   add_endpoint(80, 1);
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -1076,10 +1078,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
   add_endpoint(80, 1);
 
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1189,10 +1192,11 @@ TEST_F(EdsTest, EndpointMoved) {
   add_endpoint(81, 0);
   add_endpoint(80, 1);
   // Verify that no hosts gets added or removed to/from the PrioritySet.
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_TRUE(added.empty());
-    EXPECT_TRUE(removed.empty());
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_TRUE(added.empty());
+        EXPECT_TRUE(removed.empty());
+      });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -1276,10 +1280,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
   add_endpoint(81, 0, 82);
 
   // Changing a health check endpoint at the same time as priority is an add and immediate remove
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_EQ(added.size(), 1);
-    EXPECT_EQ(removed.size(), 1);
-  });
+  auto member_update_cb =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(added.size(), 1);
+        EXPECT_EQ(removed.size(), 1);
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
@@ -1298,10 +1303,11 @@ TEST_F(EdsTest, EndpointMovedToNewPriorityWithHealthAddressChange) {
   add_endpoint(81, 1, 83);
 
   // Changing a health check endpoint at the same time as priority is an add and immediate remove
-  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-    EXPECT_EQ(added.size(), 1);
-    EXPECT_EQ(removed.size(), 1);
-  });
+  auto member_update_cb2 =
+      cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+        EXPECT_EQ(added.size(), 1);
+        EXPECT_EQ(removed.size(), 1);
+      });
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 

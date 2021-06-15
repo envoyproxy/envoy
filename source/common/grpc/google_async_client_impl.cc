@@ -1,17 +1,17 @@
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/base64.h"
-#include "common/common/empty_string.h"
-#include "common/common/lock_guard.h"
-#include "common/config/datasource.h"
-#include "common/grpc/common.h"
-#include "common/grpc/google_grpc_creds_impl.h"
-#include "common/grpc/google_grpc_utils.h"
-#include "common/router/header_parser.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/config/datasource.h"
+#include "source/common/grpc/common.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
+#include "source/common/grpc/google_grpc_utils.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/support/proto_buffer_reader.h"
 
@@ -258,12 +258,22 @@ void GoogleAsyncStreamImpl::writeQueued() {
 }
 
 void GoogleAsyncStreamImpl::onCompletedOps() {
-  Thread::LockGuard lock(completed_ops_lock_);
-  while (!completed_ops_.empty()) {
+  // The items in completed_ops_ execute in the order they were originally added to the queue since
+  // both the post callback scheduled by the completionThread and the deferred deletion of the
+  // GoogleAsyncClientThreadLocal happen on the dispatcher thread.
+  std::deque<std::pair<GoogleAsyncTag::Operation, bool>> completed_ops;
+  {
+    Thread::LockGuard lock(completed_ops_lock_);
+    completed_ops = std::move(completed_ops_);
+    // completed_ops_ should be empty after the move.
+    ASSERT(completed_ops_.empty());
+  }
+
+  while (!completed_ops.empty()) {
     GoogleAsyncTag::Operation op;
     bool ok;
-    std::tie(op, ok) = completed_ops_.front();
-    completed_ops_.pop_front();
+    std::tie(op, ok) = completed_ops.front();
+    completed_ops.pop_front();
     handleOpCompletion(op, ok);
   }
 }

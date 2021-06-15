@@ -1,9 +1,9 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
-#include "extensions/filters/network/dubbo_proxy/serializer.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/serializer.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -13,16 +13,15 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
@@ -221,11 +220,11 @@ bool Filter::parseV2Header(char* buf) {
         memset(&la6, 0, sizeof(la6));
         ra6.sin6_family = AF_INET6;
         ra6.sin6_port = v6->src_port;
-        memcpy(ra6.sin6_addr.s6_addr, v6->src_addr, sizeof(ra6.sin6_addr.s6_addr));
+        safeMemcpy(&(ra6.sin6_addr.s6_addr), &(v6->src_addr));
 
         la6.sin6_family = AF_INET6;
         la6.sin6_port = v6->dst_port;
-        memcpy(la6.sin6_addr.s6_addr, v6->dst_addr, sizeof(la6.sin6_addr.s6_addr));
+        safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
         proxy_protocol_header_.emplace(WireHeader{
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
@@ -372,7 +371,7 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
                                       tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? ListenerFilterNames::get().ProxyProtocol
+                                     ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
 
       ProtobufWkt::Struct metadata(

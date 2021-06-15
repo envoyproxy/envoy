@@ -6,19 +6,16 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_balancer_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/network/utility.h"
-
-#include "server/connection_handler_impl.h"
-
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -87,10 +84,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
   const std::string& name() const override { return name_; }
-  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
-  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-    return absl::nullopt;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override {
+    return Network::UdpListenerConfigOptRef();
   }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -326,11 +321,6 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        return os_sys_calls_actual_.ioctl(fd, request, argp);
-      }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -778,11 +768,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
       }));
-  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        return os_sys_calls_actual_.ioctl(fd, request, argp);
-      }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
@@ -848,11 +833,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
-  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, unsigned long int request, void* argp) {
-        return os_sys_calls_actual_.ioctl(fd, request, argp);
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -943,6 +923,8 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   disconnect();
 }
 
+const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
+
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -971,9 +953,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1064,9 +1046,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(2, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
@@ -1118,9 +1100,9 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1341,10 +1323,8 @@ public:
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override { return absl::nullopt; }
-  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-    return absl::nullopt;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override {
+    return Network::UdpListenerConfigOptRef();
   }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
@@ -1458,11 +1438,10 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
-  Server::Configuration::NamedListenerFilterConfigFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
-          getFactory(ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  Server::Configuration::NamedListenerFilterConfigFactory* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(ProxyProtocol);
 
-  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  EXPECT_EQ(factory->name(), ProxyProtocol);
 
   const std::string yaml = R"EOF(
       rules:

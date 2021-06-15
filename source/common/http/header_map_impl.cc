@@ -1,4 +1,4 @@
-#include "common/http/header_map_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 #include <cstdint>
 #include <list>
@@ -7,11 +7,11 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/empty_string.h"
-#include "common/runtime/runtime_features.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"
 
@@ -428,7 +428,10 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const uint64_t added_size = appendToHeader(entry[0]->value(), value);
+    const std::string delimiter = (key == Http::Headers::get().Cookie ? "; " : ",");
+    const uint64_t added_size = header_map_correctly_coalesce_cookies_
+                                    ? appendToHeader(entry[0]->value(), value, delimiter)
+                                    : appendToHeader(entry[0]->value(), value);
     addSize(added_size);
   } else {
     addCopy(key, value);
@@ -446,19 +449,8 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_vie
 }
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_set_copy_replace_all_headers")) {
-    auto entry = getExisting(key);
-    if (!entry.empty()) {
-      updateSize(entry[0]->value().size(), value.size());
-      entry[0]->value(value);
-    } else {
-      addCopy(key, value);
-    }
-  } else {
-    remove(key);
-    addCopy(key, value);
-  }
+  remove(key);
+  addCopy(key, value);
 }
 
 uint64_t HeaderMapImpl::byteSize() const { return cached_byte_size_; }

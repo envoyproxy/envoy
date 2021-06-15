@@ -6,10 +6,10 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
+#include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -44,7 +44,7 @@ public:
 
   MOCK_METHOD(void, logEject,
               (const HostDescriptionConstSharedPtr& host, Detector& detector,
-               envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced));
   MOCK_METHOD(void, logUneject, (const HostDescriptionConstSharedPtr& host));
 };
 
@@ -74,7 +74,7 @@ public:
   MockHealthCheckHostMonitor();
   ~MockHealthCheckHostMonitor() override;
 
-  MOCK_METHOD(void, setUnhealthy, ());
+  MOCK_METHOD(void, setUnhealthy, (UnhealthyType));
 };
 
 class MockHostDescription : public HostDescription {
@@ -83,6 +83,8 @@ public:
   ~MockHostDescription() override;
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
+  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
+              (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
@@ -113,6 +115,7 @@ public:
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
+  envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
@@ -157,6 +160,8 @@ public:
   }
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
+  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
+              (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
@@ -174,9 +179,7 @@ public:
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
-  MOCK_METHOD(ActiveHealthFailureType, getActiveHealthFailureType, (), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
-  MOCK_METHOD(void, setActiveHealthFailureType, (ActiveHealthFailureType type));
   MOCK_METHOD(Host::Health, health, (), (const));
   MOCK_METHOD(const std::string&, hostnameForHealthChecks, (), (const));
   MOCK_METHOD(const std::string&, hostname, (), (const));

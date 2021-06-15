@@ -1,7 +1,7 @@
-#include "common/config/xds_context_params.h"
+#include "source/common/config/xds_context_params.h"
 
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -42,7 +42,7 @@ const NodeContextRenderers& nodeParamCbs() {
 void mergeMetadataJson(Protobuf::Map<std::string, std::string>& params,
                        const ProtobufWkt::Struct& metadata, const std::string& prefix) {
   for (const auto& it : metadata.fields()) {
-    params[prefix + it.first] = MessageUtil::getJsonStringFromMessage(it.second);
+    params[prefix + it.first] = MessageUtil::getJsonStringFromMessageOrDie(it.second);
   }
 }
 

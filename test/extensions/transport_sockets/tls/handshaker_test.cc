@@ -3,9 +3,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/handshaker.h"
 
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/mocks/network/connection.h"
@@ -153,7 +152,10 @@ TEST_F(HandshakerTest, ErrorCbOnAbnormalOperation) {
   BIO* bio = BIO_new(BIO_s_socket());
   SSL_set_bio(client_ssl_.get(), bio, bio);
 
-  StrictMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<MockHandshakeCallbacks> handshake_callbacks;
+  NiceMock<Network::MockConnection> mock_connection;
+
+  ON_CALL(handshake_callbacks, connection).WillByDefault(ReturnRef(mock_connection));
   EXPECT_CALL(handshake_callbacks, onFailure);
 
   SslHandshakerImpl handshaker(std::move(server_ssl_), 0, &handshake_callbacks);

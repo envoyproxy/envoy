@@ -17,8 +17,8 @@ envoy_cc_library(
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
@@ -31,15 +31,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/integration:__subpackages__",
-    ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/cors:cors_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",

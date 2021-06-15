@@ -5,14 +5,14 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 
-#include "common/common/c_smart_ptr.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/memory/stats.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -68,6 +68,8 @@ public:
       : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {
     store_->addSink(sink_);
   }
+
+  ~StatsThreadLocalStoreTest() override { tls_.shutdownGlobalThreading(); }
 
   void resetStoreWithAlloc(Allocator& alloc) {
     store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
@@ -128,6 +130,7 @@ public:
   }
 
   void TearDown() override {
+    tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
     tls_.shutdownThread();
   }
@@ -318,6 +321,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&t1, store_->textReadouts().front().get()); // front() ok when size()==1
   EXPECT_EQ(2UL, store_->textReadouts().front().use_count());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 
@@ -415,6 +419,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
                                                      Stats::Histogram::Unit::Unspecified));
   }
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   scope1->deliverHistogramToSinks(h1, 100);
   scope1->deliverHistogramToSinks(h2, 200);
@@ -460,6 +465,7 @@ TEST_F(StatsThreadLocalStoreTest, HistogramScopeOverlap) {
   EXPECT_EQ(0, store_->histograms().size());
   EXPECT_EQ(0, numTlsHistograms());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
 
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
@@ -476,6 +482,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   Counter& c1 = scope1->counterFromString("c1");
   EXPECT_EQ("scope1___foo.c1", c1.name());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -499,13 +506,14 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ("scope1.c1", c1->name());
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_, _));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
 
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -541,6 +549,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   TextReadout& t1 = scope2->textReadoutFromString("some_string");
   EXPECT_EQ("scope1.foo.some_string", t1.name());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -605,6 +614,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ("abc", t2.value());
   EXPECT_EQ(1UL, store_->textReadouts().size());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -650,6 +660,7 @@ TEST_F(StatsThreadLocalStoreTest, TextReadoutAllLengths) {
   t.set("");
   EXPECT_EQ("", t.value());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -805,6 +816,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
 }
 
@@ -816,10 +828,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
 
   // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()
-      ->mutable_exclusion_list()
-      ->add_patterns()
-      ->set_hidden_envoy_deprecated_regex(".*[A-Z].*");
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*[A-Z].*"));
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
@@ -919,6 +929,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ("", invalid_string_2.value());
 
   // Expected to free lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
 }
 
@@ -938,6 +949,7 @@ public:
   }
 
   ~RememberStatsMatcherTest() override {
+    tls_.shutdownGlobalThreading();
     store_.shutdownThreading();
     tls_.shutdownThread();
   }
@@ -1111,6 +1123,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
   histogram.recordValue(42);
   textReadout.set("fortytwo");
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -1127,6 +1140,7 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   // This works fine, and we can find it by its long name because heap-stats do not
   // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -1143,6 +1157,7 @@ protected:
 
   ~StatsThreadLocalStoreTestNoFixture() override {
     if (threading_enabled_) {
+      tls_.shutdownGlobalThreading();
       store_.shutdownThreading();
       tls_.shutdownThread();
     }
@@ -1189,6 +1204,7 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->counterFromString("c1");
   store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   store_->textReadoutFromString("t1");
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   store_->counterFromString("c2");
   store_->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
@@ -1208,6 +1224,7 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
   EXPECT_EQ(2L, TestUtility::findTextReadout(*store_, "t2").use_count());
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -1222,6 +1239,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
   h1.recordValue(1);
 
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
 
   // Validate that merge callback is called during shutdown and there is no ASSERT.
@@ -1229,6 +1247,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   store_->mergeHistograms([&merge_called]() -> void { merge_called = true; });
 
   EXPECT_TRUE(merge_called);
+  tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
 }
@@ -1243,7 +1262,9 @@ TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
 
   store.initializeThreading(*dispatcher, tls);
   { ScopePtr scope1 = store.createScope("scope1."); }
+  tls.shutdownGlobalThreading();
   store.shutdownThreading();
+  tls.shutdownThread();
 }
 
 // Histogram tests
@@ -1502,15 +1523,7 @@ protected:
   }
 
   ~ThreadLocalRealThreadsTestBase() override {
-    {
-      BlockingBarrier blocking_barrier(1);
-      main_dispatcher_->post(blocking_barrier.run([this]() {
-        store_->shutdownThreading();
-        tls_->shutdownGlobalThreading();
-        tls_->shutdownThread();
-      }));
-    }
-
+    shutdownThreading();
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
     }
@@ -1525,6 +1538,17 @@ protected:
       main_dispatcher_->exit();
     });
     main_thread_->join();
+  }
+
+  void shutdownThreading() {
+    BlockingBarrier blocking_barrier(1);
+    main_dispatcher_->post(blocking_barrier.run([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls_->shutdownThread();
+    }));
   }
 
   void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
@@ -1766,8 +1790,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
   EXPECT_EQ(0, store_->histograms().size());
   EXPECT_EQ(0, numTlsHistograms());
 
-  store_->shutdownThreading();
-
+  shutdownThreading();
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
 }
 

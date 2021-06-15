@@ -30,7 +30,7 @@ Scroll down on the left, and click on “Upload coverage reports”
 This will provide a link on the right, telling you where the coverage
 upload went, in this case a link to
 “https://storage.googleapis.com/envoy-pr/269d783/coverage/index.html” (which
-will only be valid for some number of days). 
+will only be valid for some number of days).
 
 ![coverage upload](upload.png)
 
@@ -44,6 +44,3 @@ tested switch statements are considered uncovered lines. Generally this will
 instead provide a branch of code which simply needs unit tests.
 
 ![coverage file](file.png)
-
-
-

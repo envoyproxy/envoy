@@ -3,8 +3,6 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 
-#include "extensions/grpc_credentials/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace GrpcCredentials {
@@ -32,7 +30,7 @@ public:
   getChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                         Api::Api& api) override;
 
-  std::string name() const override { return GrpcCredentialsNames::get().AccessTokenExample; }
+  std::string name() const override { return "envoy.grpc_credentials.access_token_example"; }
 };
 
 /*

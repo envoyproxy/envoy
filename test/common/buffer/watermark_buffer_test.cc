@@ -1,9 +1,9 @@
 #include <array>
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/test_common/test_runtime.h"
@@ -18,7 +18,7 @@ const char TEN_BYTES[] = "0123456789";
 
 class WatermarkBufferTest : public testing::Test {
 public:
-  WatermarkBufferTest() { buffer_.setWatermarks(5, 10); }
+  WatermarkBufferTest() { buffer_.setWatermarks(10); }
 
   Buffer::WatermarkBuffer buffer_{[&]() -> void { ++times_low_watermark_called_; },
                                   [&]() -> void { ++times_high_watermark_called_; },
@@ -104,7 +104,7 @@ TEST_F(WatermarkBufferTest, PrependBuffer) {
   WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_high_watermark_hits; },
                                [&]() -> void { ++prefix_buffer_overflow_watermark_hits; }};
-  prefixBuffer.setWatermarks(5, 10);
+  prefixBuffer.setWatermarks(10);
   prefixBuffer.add(prefix);
   prefixBuffer.add(suffix);
 
@@ -121,13 +121,20 @@ TEST_F(WatermarkBufferTest, PrependBuffer) {
 TEST_F(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
-  RawSlice out;
-  buffer_.reserve(10, &out, 1);
-  memcpy(out.mem_, &TEN_BYTES[0], 10);
-  out.len_ = 10;
-  buffer_.commit(&out, 1);
+  {
+    auto reservation = buffer_.reserveForRead();
+    reservation.commit(10);
+  }
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());
+
+  {
+    auto reservation = buffer_.reserveSingleSlice(10);
+    reservation.commit(10);
+  }
+  // Buffer is already above high watermark, so it won't be called a second time.
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(30, buffer_.length());
 }
 
 TEST_F(WatermarkBufferTest, Drain) {
@@ -189,18 +196,18 @@ TEST_F(WatermarkBufferTest, DrainUsingExtract) {
 // Verify that low watermark callback is called on drain in the case where the
 // high watermark is non-zero and low watermark is 0.
 TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
-  buffer_.setWatermarks(0, 10);
+  buffer_.setWatermarks(1);
 
   // Draining from above to below the low watermark does nothing if the high
   // watermark never got hit.
-  buffer_.add(TEN_BYTES, 10);
-  buffer_.drain(10);
+  buffer_.add(TEN_BYTES, 1);
+  buffer_.drain(1);
   EXPECT_EQ(0, times_high_watermark_called_);
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Go above the high watermark then drain down to just above the low watermark.
-  buffer_.add(TEN_BYTES, 11);
-  buffer_.drain(10);
+  buffer_.add(TEN_BYTES, 2);
+  buffer_.drain(1);
   EXPECT_EQ(1, buffer_.length());
   EXPECT_EQ(0, times_low_watermark_called_);
 
@@ -209,7 +216,7 @@ TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
   EXPECT_EQ(1, times_low_watermark_called_);
 
   // Going back above should trigger the high again
-  buffer_.add(TEN_BYTES, 11);
+  buffer_.add(TEN_BYTES, 2);
   EXPECT_EQ(2, times_high_watermark_called_);
 }
 
@@ -277,18 +284,18 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.add(TEN_BYTES, 9);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 9);
+  buffer_.setWatermarks(9);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.setWatermarks(1, 8);
+  buffer_.setWatermarks(8);
   EXPECT_EQ(1, times_high_watermark_called_);
 
-  buffer_.setWatermarks(8, 20);
+  buffer_.setWatermarks(16);
   EXPECT_EQ(0, times_low_watermark_called_);
-  buffer_.setWatermarks(9, 20);
+  buffer_.setWatermarks(18);
   EXPECT_EQ(1, times_low_watermark_called_);
-  buffer_.setWatermarks(7, 20);
+  buffer_.setWatermarks(14);
   EXPECT_EQ(1, times_low_watermark_called_);
-  buffer_.setWatermarks(9, 20);
+  buffer_.setWatermarks(18);
   EXPECT_EQ(1, times_low_watermark_called_);
   EXPECT_EQ(0, times_overflow_watermark_called_);
 
@@ -348,7 +355,7 @@ TEST_F(WatermarkBufferTest, MoveBackWithWatermarks) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   // Stick 20 bytes in buffer_ and expect the high watermark is hit.
   buffer_.add(TEN_BYTES, 10);
@@ -386,7 +393,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermark) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -432,7 +439,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabled) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -474,10 +481,8 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
   const uint32_t segment_denominator = 128;
   const uint32_t big_segment_len = std::numeric_limits<uint32_t>::max() / segment_denominator + 1;
   for (uint32_t i = 0; i < segment_denominator; ++i) {
-    Buffer::RawSlice iovecs[2];
-    uint64_t num_reserved = buffer1.reserve(big_segment_len, iovecs, 2);
-    EXPECT_GE(num_reserved, 1);
-    buffer1.commit(iovecs, num_reserved);
+    auto reservation = buffer1.reserveSingleSlice(big_segment_len);
+    reservation.commit(big_segment_len);
   }
   EXPECT_GT(buffer1.length(), std::numeric_limits<uint32_t>::max());
   EXPECT_LT(buffer1.length(), high_watermark_threshold * overflow_multiplier);
@@ -486,12 +491,9 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkDisabledOnVeryHighValue) {
 
   // Reserve and commit additional space on the buffer beyond the expected
   // high_watermark_threshold * overflow_multiplier threshold.
-  // Adding high_watermark_threshold * overflow_multiplier - buffer1.length() + 1 bytes
-  Buffer::RawSlice iovecs[2];
-  uint64_t num_reserved = buffer1.reserve(
-      high_watermark_threshold * overflow_multiplier - buffer1.length() + 1, iovecs, 2);
-  EXPECT_GE(num_reserved, 1);
-  buffer1.commit(iovecs, num_reserved);
+  const uint64_t size = high_watermark_threshold * overflow_multiplier - buffer1.length() + 1;
+  auto reservation = buffer1.reserveSingleSlice(size);
+  reservation.commit(size);
   EXPECT_EQ(buffer1.length(), high_watermark_threshold * overflow_multiplier + 1);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
@@ -508,7 +510,7 @@ TEST_F(WatermarkBufferTest, OverflowWatermarkEqualHighWatermark) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
 
   buffer1.add(TEN_BYTES, 10);
   EXPECT_EQ(0, high_watermark_buffer1);
@@ -538,25 +540,25 @@ TEST_F(WatermarkBufferTest, MoveWatermarksOverflow) {
   Buffer::WatermarkBuffer buffer1{[&]() -> void { ++low_watermark_buffer1; },
                                   [&]() -> void { ++high_watermark_buffer1; },
                                   [&]() -> void { ++overflow_watermark_buffer1; }};
-  buffer1.setWatermarks(5, 10);
+  buffer1.setWatermarks(10);
   buffer1.add(TEN_BYTES, 9);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 9);
+  buffer1.setWatermarks(9);
   EXPECT_EQ(0, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 8);
+  buffer1.setWatermarks(8);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 5);
+  buffer1.setWatermarks(5);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(0, overflow_watermark_buffer1);
-  buffer1.setWatermarks(1, 4);
+  buffer1.setWatermarks(4);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);
 
   // Overflow is only triggered once
-  buffer1.setWatermarks(3, 6);
+  buffer1.setWatermarks(6);
   EXPECT_EQ(0, low_watermark_buffer1);
   EXPECT_EQ(1, high_watermark_buffer1);
   EXPECT_EQ(1, overflow_watermark_buffer1);

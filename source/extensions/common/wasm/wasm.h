@@ -14,16 +14,15 @@
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/datasource.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/version/version.h"
-
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/wasm_extension.h"
-#include "extensions/common/wasm/wasm_vm.h"
-#include "extensions/common/wasm/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/datasource.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/version/version.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/wasm_extension.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "include/proxy-wasm/exports.h"
 #include "include/proxy-wasm/wasm.h"
@@ -46,8 +45,7 @@ struct WasmStats {
 // Wasm execution instance. Manages the Envoy side of the Wasm interface.
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
-  Wasm(absl::string_view runtime, absl::string_view vm_id, absl::string_view vm_configuration,
-       absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
+  Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
        Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher);
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);
   ~Wasm() override;
@@ -63,7 +61,7 @@ public:
   Network::DnsResolverSharedPtr& dnsResolver() { return dns_resolver_; }
 
   // WasmBase
-  void error(absl::string_view message) override;
+  void error(std::string_view message) override;
   proxy_wasm::CallOnThreadFunction callOnThreadFunction() override;
   ContextBase* createContext(const std::shared_ptr<PluginBase>& plugin) override;
   ContextBase* createRootContext(const std::shared_ptr<PluginBase>& plugin) override;
@@ -141,15 +139,19 @@ using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 
 class PluginHandle : public PluginHandleBase, public ThreadLocal::ThreadLocalObject {
 public:
-  explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, absl::string_view plugin_key)
-      : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle), plugin_key),
-        wasm_handle_(wasm_handle) {}
+  explicit PluginHandle(const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)
+      : PluginHandleBase(std::static_pointer_cast<WasmHandleBase>(wasm_handle),
+                         std::static_pointer_cast<PluginBase>(plugin)),
+        wasm_handle_(wasm_handle),
+        root_context_id_(wasm_handle->wasm()->getRootContext(plugin, false)->id()) {}
 
   WasmSharedPtr& wasm() { return wasm_handle_->wasm(); }
   WasmHandleSharedPtr& wasmHandleForTest() { return wasm_handle_; }
+  uint32_t rootContextId() { return root_context_id_; }
 
 private:
   WasmHandleSharedPtr wasm_handle_;
+  const uint32_t root_context_id_;
 };
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
@@ -160,9 +162,9 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // all failures synchronously as it has no facility to report configuration update failures
 // asynchronously. Callers should throw an exception if they are part of a synchronous xDS update
 // because that is the mechanism for reporting configuration errors.
-bool createWasm(const VmConfig& vm_config, const PluginSharedPtr& plugin,
-                const Stats::ScopeSharedPtr& scope, Upstream::ClusterManager& cluster_manager,
-                Init::Manager& init_manager, Event::Dispatcher& dispatcher, Api::Api& api,
+bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
+                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
                 Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
                 Config::DataSource::RemoteAsyncDataProviderPtr& remote_data_provider,
                 CreateWasmCallback&& callback,
@@ -174,7 +176,6 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
                              CreateContextFn create_root_context_for_testing = nullptr);
 
 void clearCodeCacheForTesting();
-std::string anyToBytes(const ProtobufWkt::Any& any);
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
 EnvoyWasm::WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 

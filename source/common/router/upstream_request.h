@@ -13,14 +13,14 @@
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/conn_pool.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/cleanup.h"
-#include "common/common/hash.h"
-#include "common/common/hex.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -58,6 +58,8 @@ public:
   void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
+  void dumpState(std::ostream& os, int indent_level) const override;
+
   // UpstreamToDownstream (Http::StreamCallbacks)
   void onResetStream(Http::StreamResetReason reason,
                      absl::string_view transport_failure_reason) override;
@@ -125,6 +127,9 @@ private:
     return encode_complete_ && !buffered_request_body_ && !encode_trailers_ &&
            downstream_metadata_map_vector_.empty();
   }
+  void addResponseHeadersSize(uint64_t size) {
+    response_headers_size_ = response_headers_size_.value_or(0) + size;
+  }
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
@@ -139,6 +144,9 @@ private:
   StreamInfo::StreamInfoImpl stream_info_;
   StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
+  // This is wrapped in an optional, since we want to avoid computing zero size headers when in
+  // reality we just didn't get a response back.
+  absl::optional<uint64_t> response_headers_size_{};
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;

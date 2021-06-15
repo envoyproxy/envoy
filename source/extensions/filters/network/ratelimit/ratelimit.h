@@ -13,7 +13,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {

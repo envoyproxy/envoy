@@ -7,10 +7,10 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/common/wasm/context.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,9 +32,9 @@ using WasmHandleSharedPtr = std::shared_ptr<WasmHandle>;
 using CreateContextFn =
     std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
 using PluginHandleExtensionFactory = std::function<PluginHandleBaseSharedPtr(
-    const WasmHandleSharedPtr& base_wasm, absl::string_view plugin_key)>;
+    const WasmHandleSharedPtr& wasm_handle, const PluginSharedPtr& plugin)>;
 using WasmHandleExtensionFactory = std::function<WasmHandleBaseSharedPtr(
-    const VmConfig& vm_config, const Stats::ScopeSharedPtr& scope,
+    WasmConfig& config, const Stats::ScopeSharedPtr& scope,
     Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
     Server::ServerLifecycleNotifier& lifecycle_notifier, absl::string_view vm_key)>;
 using WasmHandleExtensionCloneFactory = std::function<WasmHandleBaseSharedPtr(

@@ -5,7 +5,6 @@ package envoy.config.core.v4alpha;
 import "envoy/config/core/v4alpha/base.proto";
 import "envoy/config/core/v4alpha/extension.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
@@ -97,5 +96,6 @@ message SubstitutionFormatString {
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
   repeated TypedExtensionConfig formatters = 6;
 }

@@ -5,14 +5,13 @@
 
 #include "envoy/config/trace/v3/datadog.pb.h"
 
-#include "common/common/base64.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/datadog/datadog_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -400,6 +399,15 @@ TEST_F(DatadogDriverTest, CancelInflightRequestsOnDestruction) {
 
   // Trigger destruction.
   driver_.reset();
+}
+
+TEST_F(DatadogDriverTest, Logging) {
+  setupValidDriver();
+
+  // Ensure calls to the logger function work without errors or crashes.
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::debug, "debug");
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::info, "info");
+  driver_->tracerOptions().log_func(datadog::opentracing::LogLevel::error, "error");
 }
 
 } // namespace

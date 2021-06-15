@@ -13,10 +13,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/thread.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -99,6 +100,7 @@ public:
   MOCK_METHOD(uint64_t, features, (), (const));
   MOCK_METHOD(const Http::Http1Settings&, http1Settings, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Http2ProtocolOptions&, http2Options, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Http3ProtocolOptions&, http3Options, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::HttpProtocolOptions&, commonHttpProtocolOptions, (),
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
@@ -122,6 +124,7 @@ public:
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
+  MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
   MOCK_METHOD(ClusterStats&, stats, (), (const));
@@ -140,6 +143,8 @@ public:
   MOCK_METHOD(bool, warmHosts, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>&,
               upstreamHttpProtocolOptions, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&,
+              alternateProtocolsCacheOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
@@ -147,11 +152,14 @@ public:
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
+  Http::Http3::CodecStats& http3CodecStats() const override;
 
   std::string name_{"fake_cluster"};
+  std::string observability_name_{"observability_name"};
   absl::optional<std::string> eds_service_name_;
   Http::Http1Settings http1_settings_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
@@ -181,6 +189,8 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocols_cache_options_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
@@ -190,8 +200,10 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  Stats::ScopePtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
+  mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

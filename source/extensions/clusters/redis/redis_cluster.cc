@@ -1,8 +1,8 @@
 #include "redis_cluster.h"
 
-#include "envoy/config/cluster/redis/redis_cluster.pb.h"
-#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.h"
+#include "envoy/extensions/clusters/redis/v3/redis_cluster.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -17,7 +17,7 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 
 RedisCluster::RedisCluster(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
     Network::DnsResolverSharedPtr dns_resolver,
@@ -100,8 +100,8 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsPtr&& slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.primary(), *this, true, time_source_));
     all_new_hosts.emplace(slot.primary()->asString());
     for (auto const& replica : slot.replicas()) {
-      new_hosts.emplace_back(new RedisHost(info(), "", replica, *this, false, time_source_));
-      all_new_hosts.emplace(replica->asString());
+      new_hosts.emplace_back(new RedisHost(info(), "", replica.second, *this, false, time_source_));
+      all_new_hosts.emplace(replica.first);
     }
   }
 
@@ -381,12 +381,11 @@ RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
+    const envoy::extensions::clusters::redis::v3::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Envoy::Stats::ScopePtr&& stats_scope) {
-  if (!cluster.has_cluster_type() ||
-      cluster.cluster_type().name() != Extensions::Clusters::ClusterTypes::get().Redis) {
+  if (!cluster.has_cluster_type() || cluster.cluster_type().name() != "envoy.clusters.redis") {
     throw EnvoyException("Redis cluster can only created with redis cluster type.");
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy

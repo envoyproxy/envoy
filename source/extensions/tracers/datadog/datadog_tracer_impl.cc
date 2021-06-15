@@ -1,15 +1,14 @@
-#include "extensions/tracers/datadog/datadog_tracer_impl.h"
+#include "source/extensions/tracers/datadog/datadog_tracer_impl.h"
 
 #include "envoy/config/trace/v3/datadog.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
-#include "common/version/version.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,6 +39,20 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
       datadog::opentracing::PropagationStyle::Datadog};
   tracer_options_.extract = std::set<datadog::opentracing::PropagationStyle>{
       datadog::opentracing::PropagationStyle::Datadog};
+  tracer_options_.log_func = [](datadog::opentracing::LogLevel level,
+                                opentracing::string_view message) {
+    switch (level) {
+    case datadog::opentracing::LogLevel::debug:
+      ENVOY_LOG(debug, "{}", message);
+      break;
+    case datadog::opentracing::LogLevel::info:
+      ENVOY_LOG(info, "{}", message);
+      break;
+    case datadog::opentracing::LogLevel::error:
+      ENVOY_LOG(error, "{}", message);
+      break;
+    }
+  };
 
   // Configuration overrides for tracer options.
   if (!datadog_config.service_name().empty()) {

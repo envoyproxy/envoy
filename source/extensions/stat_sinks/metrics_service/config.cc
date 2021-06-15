@@ -1,17 +1,16 @@
-#include "extensions/stat_sinks/metrics_service/config.h"
+#include "source/extensions/stat_sinks/metrics_service/config.h"
 
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/assert.h"
-#include "common/config/utility.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/network/resolver_impl.h"
-
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +26,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::MetricsServiceConfig&>(
           config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
-  const auto& transport_api_version = Config::Utility::getAndCheckTransportVersion(sink_config);
+  const auto transport_api_version = Config::Utility::getAndCheckTransportVersion(sink_config);
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   std::shared_ptr<GrpcMetricsStreamer<envoy::service::metrics::v3::StreamMetricsMessage,
@@ -39,7 +38,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
 
   return std::make_unique<MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                                              envoy::service::metrics::v3::StreamMetricsResponse>>(
-      grpc_metrics_streamer,
+      grpc_metrics_streamer, sink_config.emit_tags_as_labels(),
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, report_counters_as_deltas, false));
 }
 

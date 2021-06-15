@@ -5,7 +5,7 @@
 #include <cerrno>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -20,7 +20,8 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long int request, void* argp) {
+SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long request, void* argp,
+                                       unsigned long, void*, unsigned long, unsigned long*) {
   const int rc = ::ioctl(sockfd, request, argp);
   return {rc, rc != -1 ? 0 : errno};
 }

@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/tcp_proxy",
@@ -28,8 +28,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":proxy_filter_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",

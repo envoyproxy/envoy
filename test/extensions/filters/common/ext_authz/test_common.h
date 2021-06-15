@@ -4,9 +4,8 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/test_common/utility.h"
@@ -32,16 +31,17 @@ public:
   static Http::ResponseMessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                                       const std::string& body = std::string{});
 
-  static CheckResponsePtr makeCheckResponse(
-      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
-      envoy::type::v3::StatusCode http_status_code = envoy::type::v3::OK,
-      const std::string& body = std::string{},
-      const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+  static CheckResponsePtr makeCheckResponse(Grpc::Status::GrpcStatus response_status,
+                                            envoy::type::v3::StatusCode http_status_code,
+                                            const std::string& body,
+                                            const HeaderValueOptionVector& headers,
+                                            const HeaderValueOptionVector& downstream_headers);
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
+                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{});
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
@@ -102,6 +102,12 @@ MATCHER_P(AuthzOkResponse, response, "") {
 
   // Compare headers_to_add.
   if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
+    return false;
+  }
+
+  // Compare response_headers_to_add.
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_add,
+                                       arg->response_headers_to_add)) {
     return false;
   }
 

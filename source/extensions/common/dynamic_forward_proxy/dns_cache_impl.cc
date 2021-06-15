@@ -1,13 +1,14 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/config/utility.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +21,8 @@ DnsCacheImpl::DnsCacheImpl(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(main_thread_dispatcher.createDnsResolver({}, config.use_tcp_for_dns_lookups())),
-      tls_slot_(tls), scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher)), tls_slot_(tls),
+      scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, loader, config.name(), config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
@@ -46,6 +47,29 @@ DnsCacheImpl::~DnsCacheImpl() {
   }
 }
 
+Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+    Event::Dispatcher& main_thread_dispatcher) {
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  if (config.has_dns_resolution_config()) {
+    dns_resolver_options.CopyFrom(config.dns_resolution_config().dns_resolver_options());
+    if (!config.dns_resolution_config().resolvers().empty()) {
+      const auto& resolver_addrs = config.dns_resolution_config().resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+    // compatible utilize config.use_tcp_for_dns_lookups() if `config.dns_resolution_config`
+    // is not set.
+    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
+  }
+  return main_thread_dispatcher.createDnsResolver(resolvers, dns_resolver_options);
+}
+
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {
   return {ALL_DNS_CACHE_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
@@ -56,42 +80,38 @@ DnsCacheImpl::loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
   ENVOY_LOG(debug, "thread local lookup for host '{}'", host);
   ThreadLocalHostInfo& tls_host_info = *tls_slot_;
 
-  auto [cache_hit, is_overflow] = [&]() {
-    // TODO(chradcliffe): Consider returning the looked-up host
+  auto [is_overflow, host_info] = [&]() {
     absl::ReaderMutexLock read_lock{&primary_hosts_lock_};
     auto tls_host = primary_hosts_.find(host);
-    bool cache_hit =
-        tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete();
-    bool is_overflow = primary_hosts_.size() >= max_hosts_;
-    return std::make_tuple(cache_hit, is_overflow);
+    return std::make_tuple(
+        primary_hosts_.size() >= max_hosts_,
+        (tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete())
+            ? absl::optional<DnsHostInfoSharedPtr>(tls_host->second->host_info_)
+            : absl::nullopt);
   }();
 
-  if (cache_hit) {
+  if (host_info) {
     ENVOY_LOG(debug, "cache hit for host '{}'", host);
-    return {LoadDnsCacheEntryStatus::InCache, nullptr};
+    return {LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
   } else if (is_overflow) {
     ENVOY_LOG(debug, "DNS cache overflow for host '{}'", host);
     stats_.host_overflow_.inc();
-    return {LoadDnsCacheEntryStatus::Overflow, nullptr};
+    return {LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt};
   } else {
     ENVOY_LOG(debug, "cache miss for host '{}', posting to main thread", host);
     main_thread_dispatcher_.post(
         [this, host = std::string(host), default_port]() { startCacheLoad(host, default_port); });
     return {LoadDnsCacheEntryStatus::Loading,
             std::make_unique<LoadDnsCacheEntryHandleImpl>(tls_host_info.pending_resolutions_, host,
-                                                          callbacks)};
+                                                          callbacks),
+            absl::nullopt};
   }
 }
 
-Upstream::ResourceAutoIncDecPtr
-DnsCacheImpl::canCreateDnsRequest(ResourceLimitOptRef pending_requests) {
-  const auto has_pending_requests = pending_requests.has_value();
-  auto& current_pending_requests =
-      has_pending_requests ? pending_requests->get() : resource_manager_.pendingRequests();
+Upstream::ResourceAutoIncDecPtr DnsCacheImpl::canCreateDnsRequest() {
+  auto& current_pending_requests = resource_manager_.pendingRequests();
   if (!current_pending_requests.canCreate()) {
-    if (!has_pending_requests) {
-      stats_.dns_rq_pending_overflow_.inc();
-    }
+    stats_.dns_rq_pending_overflow_.inc();
     return nullptr;
   }
   return std::make_unique<Upstream::ResourceAutoIncDec>(current_pending_requests);
@@ -204,7 +224,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
       host_to_erase = std::move(host_it->second);
       primary_hosts_.erase(host_it);
     }
-    notifyThreads(host);
+    notifyThreads(host, primary_host->host_info_);
   } else {
     startResolve(host, *primary_host);
   }
@@ -276,7 +296,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (first_resolve || address_changed) {
     primary_host_info->host_info_->setFirstResolveComplete();
-    notifyThreads(host);
+    notifyThreads(host, primary_host_info->host_info_);
   }
 
   // Kick off the refresh timer.
@@ -308,10 +328,11 @@ void DnsCacheImpl::runRemoveCallbacks(const std::string& host) {
   }
 }
 
-void DnsCacheImpl::notifyThreads(const std::string& host) {
-  auto host_ptr = std::make_shared<const std::string>(host);
-  tls_slot_.runOnAllThreads([host_ptr](OptRef<ThreadLocalHostInfo> local_host_info) {
-    local_host_info->onHostMapUpdate(host_ptr);
+void DnsCacheImpl::notifyThreads(const std::string& host,
+                                 const DnsHostInfoImplSharedPtr& resolved_info) {
+  auto shared_info = std::make_shared<HostMapUpdateInfo>(host, resolved_info);
+  tls_slot_.runOnAllThreads([shared_info](OptRef<ThreadLocalHostInfo> local_host_info) {
+    local_host_info->onHostMapUpdate(shared_info);
   });
 }
 
@@ -325,13 +346,13 @@ DnsCacheImpl::ThreadLocalHostInfo::~ThreadLocalHostInfo() {
 }
 
 void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
-    std::shared_ptr<const std::string> resolved_host) {
-  auto host_it = pending_resolutions_.find(*resolved_host);
+    const HostMapUpdateInfoSharedPtr& resolved_host) {
+  auto host_it = pending_resolutions_.find(resolved_host->host_);
   if (host_it != pending_resolutions_.end()) {
     for (auto* resolution : host_it->second) {
       auto& callbacks = resolution->callbacks_;
       resolution->cancel();
-      callbacks.onLoadDnsCacheComplete();
+      callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }
     pending_resolutions_.erase(host_it);
   }

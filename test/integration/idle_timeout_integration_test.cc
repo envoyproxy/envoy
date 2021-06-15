@@ -68,10 +68,10 @@ public:
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
-    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
       ASSERT_TRUE(codec_client_->waitForDisconnect());
     } else {
-      response.waitForReset();
+      ASSERT_TRUE(response.waitForReset());
       codec_client_->close();
     }
     if (!stat_name.empty()) {
@@ -114,7 +114,7 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
@@ -150,7 +150,7 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
@@ -162,7 +162,7 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(1024, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
@@ -202,13 +202,13 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutWithLargeBuffer) {
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
   // Make sure that for HTTP/1.1 reads are enabled even though the first request
   // ended in the "backed up" state.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_TRUE(response2->complete());
 }
 
@@ -357,7 +357,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
   // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;
@@ -370,7 +370,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequestWithHeaders) {
-  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+  if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
   }
   enable_request_timeout_ = true;

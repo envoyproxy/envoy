@@ -1,6 +1,6 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_interface.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
@@ -136,11 +136,11 @@ TEST_P(SocketInterfaceIntegrationTest, UdpSendToInternalAddressWithSocketInterfa
                                                       local_valid_address, nullptr);
 
   Buffer::OwnedImpl buffer;
-  Buffer::RawSlice iovec;
-  buffer.reserve(100, &iovec, 1);
+  auto reservation = buffer.reserveSingleSlice(100);
 
+  auto slice = reservation.slice();
   auto result =
-      socket->ioHandle().sendmsg(&iovec, 1, 0, local_valid_address->ip(), *peer_internal_address);
+      socket->ioHandle().sendmsg(&slice, 1, 0, local_valid_address->ip(), *peer_internal_address);
   ASSERT_FALSE(result.ok());
   ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::NoSupport);
 }

@@ -10,7 +10,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {
@@ -227,6 +227,7 @@ public:
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
+  const sockaddr_un& getSockAddr() const { return pipe_.address_; }
   socklen_t sockAddrLen() const override {
     if (pipe_.abstract_namespace_) {
       return offsetof(struct sockaddr_un, sun_path) + pipe_.address_length_;

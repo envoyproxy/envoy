@@ -16,7 +16,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
         "//source/common/http:codec_client_lib",

@@ -4,7 +4,6 @@ package envoy.extensions.filters.network.rocketmq_proxy.v4alpha;
 
 import "envoy/extensions/filters/network/rocketmq_proxy/v4alpha/route.proto";
 
-import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";

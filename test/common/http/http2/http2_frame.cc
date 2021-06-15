@@ -4,7 +4,7 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/hex.h"
+#include "source/common/common/hex.h"
 
 #include "nghttp2/nghttp2.h"
 
@@ -248,7 +248,7 @@ Http2Frame Http2Frame::makeWindowUpdateFrame(uint32_t stream_index, uint32_t inc
 
 // Note: encoder in codebase persists multiple maps, with each map representing an individual frame.
 Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
-                                                        MetadataMap& metadata_map,
+                                                        const MetadataMap& metadata_map,
                                                         MetadataFlags flags) {
   const int numberOfNameValuePairs = metadata_map.size();
   absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);

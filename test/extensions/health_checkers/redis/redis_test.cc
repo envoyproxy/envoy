@@ -4,8 +4,8 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "extensions/health_checkers/redis/redis.h"
-#include "extensions/health_checkers/redis/utility.h"
+#include "source/extensions/health_checkers/redis/redis.h"
+#include "source/extensions/health_checkers/redis/utility.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
@@ -53,7 +53,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
@@ -76,7 +76,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
@@ -113,7 +113,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
@@ -136,7 +136,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 
@@ -160,7 +160,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
         key: foo
     )EOF";
 
@@ -221,7 +221,7 @@ public:
     custom_health_check:
       name: redis
       typed_config:
-        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+        "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);

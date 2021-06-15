@@ -5,7 +5,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -30,7 +30,7 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
 }
 
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
 }
 
@@ -56,7 +56,7 @@ TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   cleanupUpstreamAndDownstream();
   const std::string log_line = waitForAccessLog(listener_access_log_name_);
-  EXPECT_EQ(log_line, "\"foo.com\"");
+  EXPECT_EQ(log_line, "foo.com");
 }
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
@@ -240,11 +240,10 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");

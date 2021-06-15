@@ -1,10 +1,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"

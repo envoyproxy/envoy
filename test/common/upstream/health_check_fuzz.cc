@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/fuzz/utility.h"
@@ -304,7 +304,7 @@ void TcpHealthCheckFuzz::raiseEvent(const Network::ConnectionEvent& event_type, 
   }
 
   // In the specific case of:
-  // https://github.com/envoyproxy/envoy/blob/master/source/common/upstream/health_checker_impl.cc#L489
+  // https://github.com/envoyproxy/envoy/blob/main/source/common/upstream/health_checker_impl.cc#L489
   // This blows away client, should create a new one
   if (event_type == Network::ConnectionEvent::Connected && empty_response_) {
     ENVOY_LOG_MISC(trace, "Will create client from connected event and empty response.");
@@ -343,9 +343,9 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
             Event::MockDispatcher dispatcher_;
             auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
             test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecClient::Type::HTTP1, std::move(conn_data.connection_),
-                test_session.codec_, nullptr,
-                Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source), dispatcher_);
+                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", *time_source),
+                dispatcher_);
             return test_session.codec_client_;
           }));
   expectStreamCreate();

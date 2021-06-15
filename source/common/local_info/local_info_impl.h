@@ -5,9 +5,9 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/config/context_provider_impl.h"
-#include "common/config/version_converter.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/config/context_provider_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace LocalInfo {
@@ -32,6 +32,14 @@ const envoy::config::core::v3::Node buildLocalNode(const envoy::config::core::v3
   return local_node;
 }
 
+const absl::string_view getZoneName(const envoy::config::core::v3::Node& node,
+                                    absl::string_view zone_name) {
+  if (zone_name.empty()) {
+    return node.locality().zone();
+  }
+  return zone_name;
+}
+
 } // namespace
 
 class LocalInfoImpl : public LocalInfo {
@@ -43,8 +51,14 @@ public:
                 absl::string_view node_name)
       : node_(buildLocalNode(node, zone_name, cluster_name, node_name)), address_(address),
         context_provider_(node_, node_context_params),
-        zone_stat_name_storage_(zone_name, symbol_table),
-        zone_stat_name_(zone_stat_name_storage_.statName()) {}
+        zone_stat_name_storage_(getZoneName(node_, zone_name), symbol_table),
+        zone_stat_name_(zone_stat_name_storage_.statName()),
+        dynamic_update_callback_handle_(context_provider_.addDynamicContextUpdateCallback(
+            [this](absl::string_view resource_type_url) {
+              (*node_.mutable_dynamic_parameters())
+                  [toStdStringView(resource_type_url)] // NOLINT(std::string_view)
+                      .CopyFrom(context_provider_.dynamicContext(resource_type_url));
+            })) {}
 
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
   const std::string& zoneName() const override { return node_.locality().zone(); }
@@ -53,13 +67,15 @@ public:
   const std::string& nodeName() const override { return node_.id(); }
   const envoy::config::core::v3::Node& node() const override { return node_; }
   const Config::ContextProvider& contextProvider() const override { return context_provider_; }
+  Config::ContextProvider& contextProvider() override { return context_provider_; }
 
 private:
-  const envoy::config::core::v3::Node node_;
+  envoy::config::core::v3::Node node_;
   const Network::Address::InstanceConstSharedPtr address_;
-  const Config::ContextProviderImpl context_provider_;
+  Config::ContextProviderImpl context_provider_;
   const Stats::StatNameManagedStorage zone_stat_name_storage_;
   const Stats::StatName zone_stat_name_;
+  Common::CallbackHandlePtr dynamic_update_callback_handle_;
 };
 
 } // namespace LocalInfo

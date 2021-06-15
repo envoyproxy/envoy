@@ -29,7 +29,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/global.h"
@@ -49,6 +49,8 @@ public:
   MOCK_METHOD(void, finalizeResponseHeaders,
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
+  MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(std::string, newPath, (const Http::RequestHeaderMap& headers), (const));
   MOCK_METHOD(void, rewritePathHeader,
               (Http::RequestHeaderMap & headers, bool insert_envoy_original_path), (const));
@@ -358,6 +360,8 @@ public:
   MOCK_METHOD(void, finalizeResponseHeaders,
               (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
               (const));
+  MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
   MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
   MOCK_METHOD(const HedgePolicy&, hedgePolicy, (), (const));
   MOCK_METHOD(const Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
@@ -370,18 +374,20 @@ public:
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(bool, usingNewTimeouts, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxGrpcTimeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutOffset, (), (const));
   MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
-  MOCK_METHOD(const std::string&, virtualHostName, (), (const));
   MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
   MOCK_METHOD(bool, autoHostRewrite, (), (const));
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
   MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
+              (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
@@ -473,6 +479,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
+  MOCK_METHOD(uint32_t, maxDirectResponseBodySizeBytes, (), (const));
 
   std::shared_ptr<MockRoute> route_;
   std::list<Http::LowerCaseString> internal_only_headers_;
@@ -503,10 +510,12 @@ public:
 
   MOCK_METHOD(RouteConfigProviderSharedPtr, createRdsRouteConfigProvider,
               (const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+               const OptionalHttpFilters& optional_http_filters,
                Server::Configuration::ServerFactoryContext& factory_context,
                const std::string& stat_prefix, Init::Manager& init_manager));
   MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
               (const envoy::config::route::v3::RouteConfiguration& route_config,
+               const OptionalHttpFilters& optional_http_filters,
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator));
 };
@@ -556,6 +565,7 @@ public:
   MOCK_METHOD(void, decode100ContinueHeaders, (Http::ResponseHeaderMapPtr &&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
   MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());

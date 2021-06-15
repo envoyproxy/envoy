@@ -16,15 +16,14 @@ namespace {
 class AwsLambdaFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                        public HttpIntegrationTest {
 public:
-  AwsLambdaFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  AwsLambdaFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void SetUp() override {
     // Set these environment variables to quickly sign credentials instead of attempting to query
     // instance metadata and timing-out.
     TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "aws-user", 1 /*overwrite*/);
     TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1 /*overwrite*/);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   void TearDown() override { fake_upstream_connection_.reset(); }
@@ -118,7 +117,7 @@ public:
       upstream_request_->encodeData(buffer, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
 
     // verify headers

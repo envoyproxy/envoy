@@ -11,9 +11,17 @@ Cluster Protocol Options
 
 Thrift connections to upstream hosts can be configured by adding an entry to the appropriate
 Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`
-keyed by `envoy.filters.network.thrift_proxy`. The
+keyed by ``envoy.filters.network.thrift_proxy``. The
 :ref:`ThriftProtocolOptions<envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProtocolOptions>`
 message describes the available options.
+
+Downstream Requests Limit
+-------------------------
+Thrift Proxy can set the
+:ref:`maximum number of requests<envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.max_requests_per_connection>`
+that each downstream connection can handle. When the number of requests exceeds the connection limit, Thrift Proxy will
+actively disconnect from the Thrift client.
+
 
 Thrift Request Metadata
 -----------------------
@@ -39,16 +47,16 @@ Twitter protocol request contexts are converted into headers which are available
 In addition, the following fields are presented as headers:
 
 Client Identifier
-    The ClientId's `name` field (nested in the RequestHeader `client_id` field) becomes the
-    `:client-id` header.
+    The ClientId's ``name`` field (nested in the RequestHeader ``client_id`` field) becomes the
+    ``:client-id`` header.
 
 Destination
-    The RequestHeader `dest` field becomes the `:dest` header.
+    The RequestHeader ``dest`` field becomes the ``:dest`` header.
 
 Delegations
-    Each Delegation from the RequestHeader `delegations` field is added as a header. The header
-    name is the prefix `:d:` followed by the Delegation's `src`. The value is the Delegation's
-    `dst` field.
+    Each Delegation from the RequestHeader ``delegations`` field is added as a header. The header
+    name is the prefix ``:d:`` followed by the Delegation's ``src``. The value is the Delegation's
+    ``dst`` field.
 
 Metadata Interoperability
 ~~~~~~~~~~~~~~~~~~~~~~~~~

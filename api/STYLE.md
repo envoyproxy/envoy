@@ -25,15 +25,19 @@ In addition, the following conventions should be followed:
 
 * Use [wrapped scalar
   types](https://github.com/google/protobuf/blob/master/src/google/protobuf/wrappers.proto)
-  where there is a real need for the field to have a default value that does not
-  match the proto3 defaults (0/false/""). This should not be done for fields
-  where the proto3 defaults make sense. All things being equal, pick appropriate
-  logic, e.g. enable vs. disable for a `bool` field, such that the proto3
-  defaults work, but only where this doesn't result in API gymnastics.
+  if there is any potential need for a field to have a default value that does not
+  match the proto3 defaults (0/false/""). For example, new features whose
+  default value may change in the future or security mitigations that should be
+  default safe in the future but are temporarily not enabled.
 
 * Use a `[#not-implemented-hide:]` `protodoc` annotation in comments for fields that lack Envoy
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
+
+* Use a `[#alpha:]` annotation in comments for messages that are considered alpha
+  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging messages that are used as part of the core API
+  as alpha without having to break it into its own file.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
@@ -81,6 +85,12 @@ In addition, the following conventions should be followed:
   pattern forces developers to explicitly choose the correct enum value for
   their use case, and avoid misunderstanding of the default behavior.
 
+* For time-related fields, prefer using the well-known types `google.protobuf.Duration` or
+  `google.protobuf.Timestamp` instead of raw integers for seconds.
+
+* If a field is going to contain raw bytes rather than a human-readable string, the field should
+  be of type `bytes` instead of `string`.
+
 * Proto fields should be sorted logically, not by field number.
 
 ## Package organization
@@ -103,11 +113,11 @@ organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
+   below. Refer to the [Cache filter config](envoy/extensions/filters/http/cache/v3alpha/cache.proto)
    as an example of `v3alpha`, and the
-   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+   [Buffer filter config](envoy/extensions/filters/http/buffer/v3/buffer.proto) as an example of `v3`.
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
-   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
+   `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
@@ -117,8 +127,7 @@ To add an extension config to the API, the steps below should be followed:
        deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
    )
    ```
-1. Add to the v3 extension config proto `import "udpa/annotations/migrate.proto";`
-   and `import "udpa/annotations/status.proto";`
+1. Add to the v3 extension config proto `import "udpa/annotations/status.proto";`
 1. If this is still WiP and subject to breaking changes, set
    `option (udpa.annotations.file_status).work_in_progress = true;`.
 1. Add to the v3 extension config proto a file level
@@ -221,7 +230,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergnomics (such as not using `oneof` when we would prefer
+  fields or reduced ergonomics (such as not using `oneof` when we would prefer
   to), in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,

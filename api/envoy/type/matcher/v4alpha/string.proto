@@ -4,7 +4,6 @@ package envoy.type.matcher.v4alpha;
 
 import "envoy/type/matcher/v4alpha/regex.proto";
 
-import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";

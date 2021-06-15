@@ -17,9 +17,9 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 
-#include "common/common/logger.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Server {
@@ -170,7 +170,8 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
+              Instance& server);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -182,13 +183,13 @@ public:
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
-    const std::string& accessLogPath() const override { return access_log_path_; }
     const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
+    std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
 
-    std::string access_log_path_;
     std::string profile_path_;
+    std::list<AccessLog::InstanceSharedPtr> access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
   };

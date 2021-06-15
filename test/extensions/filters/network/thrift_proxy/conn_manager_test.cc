@@ -3,14 +3,13 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/config.h"
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -118,6 +117,33 @@ public:
     // NOP currently.
     filter_->onAboveWriteBufferHighWatermark();
     filter_->onBelowWriteBufferLowWatermark();
+  }
+
+  // Return the number of requests actually sent.
+  uint32_t sendRequests(uint32_t request_number) {
+    for (uint32_t i = 0; i < request_number; i++) {
+      writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+      writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+      ThriftFilters::DecoderFilterCallbacks* callbacks{};
+      ON_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+          .WillByDefault(
+              Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+      EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+      if (!callbacks) {
+        return i;
+      }
+
+      FramedTransportImpl transport;
+      BinaryProtocolImpl proto;
+      callbacks->startUpstreamResponse(transport, proto);
+
+      EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+      EXPECT_EQ(ThriftFilters::ResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+    }
+    return request_number;
   }
 
   void writeMessage(Buffer::Instance& buffer, TransportType transport_type,
@@ -1058,6 +1084,178 @@ TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
   EXPECT_EQ(0U, stats_.request_active_.value());
 }
 
+// Test the base case where there is no limit on the number of requests.
+TEST_F(ThriftConnectionManagerTest, RequestWithNoMaxRequestsLimit) {
+  initializeFilter("");
+  EXPECT_EQ(0, config_->maxRequestsPerConnection());
+
+  EXPECT_EQ(50, sendRequests(50));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, store_.counter("test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("test.request").value());
+  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(50U, store_.counter("test.response").value());
+  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+// Test the case where there is a limit on the number of requests but the actual number of requests
+// does not reach the limit.
+TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitButNotReach) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    route_config:
+      name: local_route
+    max_requests_per_connection: 50
+    )EOF";
+
+  initializeFilter(yaml);
+  EXPECT_EQ(50, config_->maxRequestsPerConnection());
+
+  EXPECT_EQ(49, sendRequests(49));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, store_.counter("test.downstream_cx_max_requests").value());
+  EXPECT_EQ(49U, store_.counter("test.request").value());
+  EXPECT_EQ(49U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(49U, store_.counter("test.response").value());
+  EXPECT_EQ(49U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(49U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+// Test the case where there is a limit on the number of requests and the actual number of requests
+// happens to reach the limit.
+TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReached) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    route_config:
+      name: local_route
+    max_requests_per_connection: 50
+    )EOF";
+
+  initializeFilter(yaml);
+  EXPECT_EQ(50, config_->maxRequestsPerConnection());
+
+  // Since max requests per connection is set to 50, the connection will be disconnected after
+  // all 50 requests is completed.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  EXPECT_EQ(50, sendRequests(50));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("test.request").value());
+  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(50U, store_.counter("test.response").value());
+  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+// Test the case where there is a limit on the number of requests and the actual number of requests
+// exceeds the limit.
+TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedWithMoreRequests) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    route_config:
+      name: local_route
+    max_requests_per_connection: 50
+    )EOF";
+
+  initializeFilter(yaml);
+  EXPECT_EQ(50, config_->maxRequestsPerConnection());
+
+  // Since max requests per connection is set to 50, the connection will be disconnected after
+  // all 50 requests is completed.
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  EXPECT_EQ(50, sendRequests(55));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.downstream_cx_max_requests").value());
+  EXPECT_EQ(50U, store_.counter("test.request").value());
+  EXPECT_EQ(50U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(50U, store_.counter("test.response").value());
+  EXPECT_EQ(50U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(50U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
+// Test cases where the number of requests is limited and the actual number of requests exceeds the
+// limit several times.
+TEST_F(ThriftConnectionManagerTest, RequestWithMaxRequestsLimitAndReachedRepeatedly) {
+  const std::string yaml = R"EOF(
+    stat_prefix: test
+    route_config:
+      name: local_route
+    max_requests_per_connection: 5
+    )EOF";
+
+  initializeFilter(yaml);
+  EXPECT_EQ(5, config_->maxRequestsPerConnection());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(5);
+
+  auto mock_new_connection = [this]() {
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+    filter_ = nullptr;
+
+    filter_callbacks_.connection_.read_enabled_ = true;
+    filter_callbacks_.connection_.state_ = Network::Connection::State::Open;
+    filter_callbacks_.connection_.callbacks_.clear();
+
+    ON_CALL(random_, random()).WillByDefault(Return(42));
+    filter_ = std::make_unique<ConnectionManager>(
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+    filter_->onNewConnection();
+
+    filter_->onAboveWriteBufferHighWatermark();
+    filter_->onBelowWriteBufferLowWatermark();
+  };
+
+  EXPECT_EQ(5, sendRequests(6));
+
+  for (size_t i = 0; i < 4; i++) {
+    mock_new_connection();
+    EXPECT_EQ(5, sendRequests(6));
+  }
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(5U, store_.counter("test.downstream_cx_max_requests").value());
+  EXPECT_EQ(25U, store_.counter("test.request").value());
+  EXPECT_EQ(25U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
+  EXPECT_EQ(25U, store_.counter("test.response").value());
+  EXPECT_EQ(25U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(25U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
 TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
   custom_transport_ = new NiceMock<MockTransport>();
   custom_protocol_ = new NiceMock<MockProtocol>();
@@ -1179,7 +1377,8 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilter) {
   EXPECT_EQ(1U, stats_.request_active_.value());
 }
 
-// Tests stop iteration/resume with multiple filters when iteration is stopped during transportEnd.
+// Tests stop iteration/resume with multiple filters when iteration is stopped during
+// transportEnd.
 TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
   auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
   custom_filter_.reset(filter);
@@ -1639,6 +1838,55 @@ route_config:
   callbacks->continueDecoding();
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+}
+
+// When a local reply was sent, payload passthrough is disabled because there's no
+// active RPC left.
+TEST_F(ThriftConnectionManagerTest, NoPayloadPassthroughOnLocalReply) {
+  const std::string yaml = R"EOF(
+transport: FRAMED
+protocol: BINARY
+payload_passthrough: true
+stat_prefix: test
+route_config:
+  name: "routes"
+  routes:
+    - match:
+        method_name: not_handled
+      route:
+        cluster: cluster
+)EOF";
+
+  initializeFilter(yaml);
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, passthroughSupported()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*decoder_filter_, passthroughData(_)).Times(0);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  NiceMock<MockDirectResponse> direct_response;
+  EXPECT_CALL(direct_response, encode(_, _, _))
+      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
+        buffer.add("response");
+        return DirectResponse::ResponseType::ErrorReply;
+      }));
+
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        callbacks->sendLocalReply(direct_response, false);
+        return FilterStatus::StopIteration;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_EQ(nullptr, route);
 }
 
 } // namespace ThriftProxy

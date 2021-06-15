@@ -1,13 +1,12 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
@@ -88,6 +87,10 @@ public:
               - exact: Foo
                 ignore_case: true
               - prefix: "X-"
+                ignore_case: true
+            allowed_client_headers_on_success:
+              patterns:
+              - prefix: "X-Downstream-"
                 ignore_case: true
         )EOF";
       TestUtility::loadFromYaml(default_yaml, proto_config);
@@ -296,8 +299,11 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 
 // Verify client response headers when authorization_headers_to_add is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  const auto expected_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
@@ -457,7 +463,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
       TestCommon::makeHeaderValueOption(
-          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
+          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}),
+      TestCommon::makeHeaderValueOption({}));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info_);

@@ -5,9 +5,12 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tcp/upstream.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -19,7 +22,7 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
-  bool valid() const { return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_data_.has_value(); }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -31,7 +34,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  Tcp::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -46,12 +49,11 @@ public:
 
   HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
-               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-               Http::CodecClient::Type type);
+               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks, Http::CodecType type);
   ~HttpConnPool() override;
 
   // HTTP/3 upstreams are not supported at the moment.
-  bool valid() const { return conn_pool_ != nullptr && type_ <= Http::CodecClient::Type::HTTP2; }
+  bool valid() const { return conn_pool_data_.has_value() && type_ <= Http::CodecType::HTTP2; }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -94,9 +96,9 @@ private:
   void onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
                           const Network::Address::InstanceConstSharedPtr& local_address,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
-  const std::string hostname_;
-  Http::CodecClient::Type type_;
-  Http::ConnectionPool::Instance* conn_pool_{};
+  const TunnelingConfig config_;
+  Http::CodecType type_;
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -120,6 +122,9 @@ private:
 
 class HttpUpstream : public GenericUpstream, protected Http::StreamCallbacks {
 public:
+  using TunnelingConfig =
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
   ~HttpUpstream() override;
   virtual bool isValidResponse(const Http::ResponseHeaderMap&) PURE;
 
@@ -145,11 +150,12 @@ public:
   }
 
 protected:
-  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
+  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   Http::RequestEncoder* request_encoder_{};
-  const std::string hostname_;
+  const TunnelingConfig config_;
+  std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
 
 private:
   class DecoderShim : public Http::ResponseDecoder {
@@ -173,6 +179,9 @@ private:
     }
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
+    void dumpState(std::ostream& os, int indent_level) const override {
+      DUMP_STATE_UNIMPLEMENTED(DecoderShim);
+    }
 
   private:
     HttpUpstream& parent_;
@@ -189,7 +198,7 @@ private:
 
 class Http1Upstream : public HttpUpstream {
 public:
-  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
+  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
 
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -198,7 +207,7 @@ public:
 
 class Http2Upstream : public HttpUpstream {
 public:
-  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const std::string& hostname);
+  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;

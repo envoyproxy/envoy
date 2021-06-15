@@ -26,10 +26,8 @@ envoy_cc_extension(
         "//test/common/config:__subpackages__",
         "//test/common/crypto:__subpackages__",
     ],
-    security_posture = "unknown",
-    undocumented = True,
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
         "//source/common/crypto:utility_lib",
     ],

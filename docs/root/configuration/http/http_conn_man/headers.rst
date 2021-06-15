@@ -189,7 +189,9 @@ Given an HTTP request that has traveled through a series of zero or more proxies
 Envoy, the trusted client address is the earliest source IP address that is known to be
 accurate. The source IP address of the immediate downstream node's connection to Envoy is
 trusted. XFF *sometimes* can be trusted. Malicious clients can forge XFF, but the last
-address in XFF can be trusted if it was put there by a trusted proxy.
+address in XFF can be trusted if it was put there by a trusted proxy. Alternatively, Envoy
+supports :ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+for determining the *trusted client address* or original IP address.
 
 Envoy's default rules for determining the trusted client address (*before* appending anything
 to XFF) are:
@@ -200,8 +202,11 @@ to XFF) are:
   node's connection to Envoy.
 
 In an environment where there are one or more trusted proxies in front of an edge
-Envoy instance, the *xff_num_trusted_hops* configuration option can be used to trust
-additional addresses from XFF:
+Envoy instance, the :ref:`XFF extension <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+can be configured via the :ref:`original_ip_detection_extensions field
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+to set the *xff_num_trusted_hops* option which controls the number of additional
+addresses that are to be trusted:
 
 * If *use_remote_address* is false and *xff_num_trusted_hops* is set to a value *N* that is
   greater than zero, the trusted client address is the (N+1)th address from the right end
@@ -358,6 +363,9 @@ following features are available:
   :ref:`config_http_conn_man_headers_x-envoy-force-trace` and
   :ref:`config_http_conn_man_headers_x-client-trace-id` headers.
 
+See the architecture overview on
+:ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
+
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
@@ -470,6 +478,15 @@ tracing context for the SkyWalking tracer and is used to establish the relations
 the tracing spans of downstream and Envoy. See more on SkyWalking tracing
 `here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
 
+.. _config_http_conn_man_headers_x-amzn-trace-id:
+
+x-amzn-trace-id
+---------------
+
+The *x-amzn-trace-id* HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+`here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
@@ -479,7 +496,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v3 <envoy_v3_api_msg_config.route.v3.RouteConfiguration>` API documentation.
 
-No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
+Neither *:-prefixed* pseudo-headers nor the Host: header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`,
 :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`, and
@@ -605,11 +622,17 @@ Supported variable names are:
   TCP
     The validity start date of the client certificate used to establish the downstream TLS connection.
 
+  DOWNSTREAM_PEER_CERT_V_START can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_start>`.
+
 %DOWNSTREAM_PEER_CERT_V_END%
   HTTP
     The validity end date of the client certificate used to establish the downstream TLS connection.
   TCP
     The validity end date of the client certificate used to establish the downstream TLS connection.
+
+  DOWNSTREAM_PEER_CERT_V_END can be customized with specifiers as specified in
+  :ref:`access log format rules<config_access_log_format_downstream_peer_cert_v_end>`.
 
 %HOSTNAME%
     The system hostname.

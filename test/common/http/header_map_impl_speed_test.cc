@@ -1,5 +1,5 @@
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
 #include "benchmark/benchmark.h"
 
@@ -110,7 +110,7 @@ static void headerMapImplSetInlineInteger(benchmark::State& state) {
   auto headers = Http::ResponseHeaderMapImpl::create();
   addDummyHeaders(*headers, state.range(0));
   for (auto _ : state) { // NOLINT
-    headers->setConnection(value);
+    headers->setContentLength(value++);
   }
   benchmark::DoNotOptimize(headers->size());
 }

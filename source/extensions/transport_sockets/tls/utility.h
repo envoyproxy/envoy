@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "common/common/utility.h"
+#include "envoy/ssl/context.h"
+
+#include "source/common/common/utility.h"
 
 #include "absl/types/optional.h"
 #include "openssl/ssl.h"
@@ -14,6 +16,9 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 namespace Utility {
+
+Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path,
+                                                     TimeSource& time_source);
 
 /**
  * Retrieves the serial number of a certificate.
@@ -88,6 +93,13 @@ SystemTime getExpirationTime(const X509& cert);
  * @return std::string error message
  */
 absl::optional<std::string> getLastCryptoError();
+
+/**
+ * Returns error string corresponding error code derived from OpenSSL.
+ * @param err error code
+ * @return string message corresponding error code.
+ */
+absl::string_view getErrorDescription(int err);
 
 } // namespace Utility
 } // namespace Tls

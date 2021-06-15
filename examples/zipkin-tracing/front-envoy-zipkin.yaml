@@ -19,7 +19,7 @@ static_resources:
                 collector_cluster: zipkin
                 collector_endpoint: "/api/v2/spans"
                 collector_endpoint_version: HTTP_JSON
-          codec_type: auto
+          codec_type: AUTO
           stat_prefix: ingress_http
           route_config:
             name: local_route
@@ -46,10 +46,8 @@ static_resources:
             typed_config: {}
   clusters:
   - name: service1
-    connect_timeout: 0.250s
-    type: strict_dns
-    lb_policy: round_robin
-    http2_protocol_options: {}
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -60,9 +58,8 @@ static_resources:
                 address: service1
                 port_value: 8000
   - name: zipkin
-    connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: zipkin
       endpoints:

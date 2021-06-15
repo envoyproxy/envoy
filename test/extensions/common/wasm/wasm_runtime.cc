@@ -13,26 +13,44 @@ std::vector<std::string> runtimes() {
 
 std::vector<std::string> sandboxRuntimes() {
   std::vector<std::string> runtimes;
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
   runtimes.push_back("v8");
 #endif
-#if defined(ENVOY_WASM_WAVM)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAVM)
   runtimes.push_back("wavm");
 #endif
-#if defined(ENVOY_WASM_WASMTIME)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
+  runtimes.push_back("wamr");
+#endif
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
   runtimes.push_back("wasmtime");
 #endif
   return runtimes;
 }
 
+std::vector<std::string> languages() {
+  std::vector<std::string> languages;
+#if !defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  languages.push_back("cpp");
+#endif
+  languages.push_back("rust");
+  return languages;
+}
+
 std::vector<std::tuple<std::string, std::string>> runtimesAndLanguages() {
   std::vector<std::tuple<std::string, std::string>> values;
   for (const auto& runtime : sandboxRuntimes()) {
-    values.push_back(std::make_tuple(runtime, "cpp"));
-    values.push_back(std::make_tuple(runtime, "rust"));
+    for (const auto& language : languages()) {
+      values.push_back(std::make_tuple(runtime, language));
+    }
   }
   values.push_back(std::make_tuple("null", "cpp"));
   return values;
+}
+
+std::string wasmTestParamsToString(const ::testing::TestParamInfo<std::string>& p) {
+  return p.param;
 }
 
 } // namespace Wasm

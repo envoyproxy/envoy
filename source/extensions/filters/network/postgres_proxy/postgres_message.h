@@ -1,4 +1,6 @@
-#include "common/buffer/buffer_impl.h"
+#pragma once
+
+#include "source/common/buffer/buffer_impl.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"

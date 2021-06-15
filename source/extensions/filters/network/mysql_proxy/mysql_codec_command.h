@@ -1,7 +1,8 @@
 #pragma once
-#include "common/buffer/buffer_impl.h"
+#include "envoy/buffer/buffer.h"
 
-#include "extensions/filters/network/mysql_proxy/mysql_codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,16 +36,17 @@ public:
   };
 
   // MySQLCodec
-  int parseMessage(Buffer::Instance&, uint32_t len) override;
-  std::string encode() override;
+  DecodeStatus parseMessage(Buffer::Instance&, uint32_t len) override;
+  void encode(Buffer::Instance&) const override;
 
   Cmd parseCmd(Buffer::Instance& data);
   Cmd getCmd() const { return cmd_; }
   const std::string& getData() const { return data_; }
   std::string& getDb() { return db_; }
   void setCmd(Cmd cmd);
-  void setData(std::string& data);
-  void setDb(std::string db);
+  void setData(const std::string& data);
+  void setDb(const std::string& db);
+  void setIsQuery(bool is_query) { is_query_ = is_query; }
   bool isQuery() { return is_query_; }
 
 private:
@@ -54,18 +56,19 @@ private:
   bool is_query_;
 };
 
+/* CommandResponse has many types. ref https://dev.mysql.com/doc/internals/en/text-protocol.html
+ * We just get all data
+ */
 class CommandResponse : public MySQLCodec {
 public:
   // MySQLCodec
-  int parseMessage(Buffer::Instance&, uint32_t) override { return MYSQL_SUCCESS; }
-  std::string encode() override { return ""; }
-
-  void setServerStatus(uint16_t status);
-  void setWarnings(uint16_t warnings);
+  DecodeStatus parseMessage(Buffer::Instance&, uint32_t) override;
+  void encode(Buffer::Instance&) const override;
+  const std::string& getData() const { return data_; }
+  void setData(const std::string& data) { data_ = data; }
 
 private:
-  uint16_t server_status_;
-  uint16_t warnings_;
+  std::string data_;
 };
 
 } // namespace MySQLProxy

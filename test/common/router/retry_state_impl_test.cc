@@ -3,10 +3,10 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/stats/stats.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/router/reset_header_parser.h"
-#include "common/router/retry_state_impl.h"
-#include "common/upstream/resource_manager_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/reset_header_parser.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
@@ -1318,58 +1318,6 @@ TEST_F(RouterRetryStateImplTest, RemoveAllRetryHeaders) {
     EXPECT_FALSE(request_headers.has("x-envoy-retriable-status-codes"));
     EXPECT_FALSE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
     EXPECT_FALSE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
-  }
-
-  // Repeat policy is enabled case with runtime flag disabled.
-  {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.consume_all_retry_headers", "false"}});
-
-    Http::TestRequestHeaderMapImpl request_headers{
-        {"x-envoy-retry-on", "5xx,retriable-header-names,retriable-status-codes"},
-        {"x-envoy-retry-grpc-on", "resource-exhausted"},
-        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
-        {"x-envoy-retriable-status-codes", "418,420"},
-        {"x-envoy-max-retries", "7"},
-        {"x-envoy-hedge-on-per-try-timeout", "true"},
-        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
-    };
-    setup(request_headers);
-    EXPECT_TRUE(state_->enabled());
-
-    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
-    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
-    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
-    EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
-    EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
-    EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
-    EXPECT_TRUE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
-  }
-
-  // Repeat policy is disabled case with runtime flag disabled.
-  {
-    TestScopedRuntime scoped_runtime;
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.consume_all_retry_headers", "false"}});
-
-    Http::TestRequestHeaderMapImpl request_headers{
-        {"x-envoy-retriable-header-names", "X-Upstream-Pushback"},
-        {"x-envoy-retriable-status-codes", "418,420"},
-        {"x-envoy-max-retries", "7"},
-        {"x-envoy-hedge-on-per-try-timeout", "true"},
-        {"x-envoy-upstream-rq-per-try-timeout-ms", "2"},
-    };
-    setup(request_headers);
-    EXPECT_EQ(nullptr, state_);
-
-    EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
-    EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
-    EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
-    EXPECT_TRUE(request_headers.has("x-envoy-retriable-header-names"));
-    EXPECT_TRUE(request_headers.has("x-envoy-retriable-status-codes"));
-    EXPECT_TRUE(request_headers.has("x-envoy-hedge-on-per-try-timeout"));
-    EXPECT_TRUE(request_headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
   }
 }
 

@@ -8,7 +8,7 @@
 The application is installed on specific GitHub repositories and interacts with these by receiving webhooks and making GitHub API calls. A root `repokitteh.star` script tells the application what to do based on the webhook received.
 
 ## Integration with Envoy
-The file [repokitteh.star](https://github.com/envoyproxy/envoy/blob/master/repokitteh.star), which resides in the root of the Envoy repository tells RepoKitteh what functionality to use. The file is written in the [Starlark language](https://github.com/bazelbuild/starlark/), which is a Python dialect with well defined threading and hermeticity guarantees.
+The file [repokitteh.star](https://github.com/envoyproxy/envoy/blob/main/repokitteh.star), which resides in the root of the Envoy repository tells RepoKitteh what functionality to use. The file is written in the [Starlark language](https://github.com/bazelbuild/starlark/), which is a Python dialect with well defined threading and hermeticity guarantees.
 
 For example, the statement
 ```
@@ -31,6 +31,18 @@ Adds `@someone` as an assignee to the issue or pull request that this comment is
 /unassign @someone
 ```
 Removes `@someone` as an assignee.
+
+```
+/assign-from @envoyproxy/some-team [@envoyproxy/another-team..]
+```
+Assign a random member from `@envoyproxy/some-team` to an issue or pull request. Additional teams may be specified as
+extra args. Example teams include:
+- `@envoyproxy/senior-maintainers` (Senior maintainers)
+- `@envoyproxy/maintainers` (All maintainers)
+- `@envoyproxy/api-shepherds` (API shepherds)
+- `@envoyproxy/dependency-shepherds` (Dependency shepherds)
+- `@envoyproxy/first-pass-reviewers` (Contributors that provide first-pass
+  reviews, typically non-senior maintainers and maintainer applicants)
 
 Only organization members can assign or unassign other users, who must be organization members as well.
 
@@ -75,7 +87,7 @@ Sets the label `waiting:any` on a PR. When a new commit is pushed or any comment
 
 [Demo PR](https://github.com/envoyproxy/envoybot/pull/15)
 
-### [Azure Pipelines Retest](https://github.com/envoyproxy/envoy/blob/master/ci/repokitteh/modules/azure_pipelines.star)
+### [Azure Pipelines Retest](https://github.com/envoyproxy/envoy/blob/main/ci/repokitteh/modules/azure_pipelines.star)
 Restart failed Azure pipelines.
 
 Example:

@@ -1,9 +1,7 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -144,7 +142,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("via_upstream"));
@@ -166,7 +164,7 @@ TEST_P(RBACIntegrationTest, Denied) {
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
@@ -189,7 +187,7 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
   // Note the whitespace in the policy id is replaced by '_'.
@@ -218,7 +216,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -242,7 +240,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
       },
       1024);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
@@ -262,7 +260,7 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
   ASSERT_TRUE(response->headers().ContentLength());
@@ -282,7 +280,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
+        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
       });
   config_helper_.addFilter(RBAC_CONFIG);
 
@@ -302,7 +300,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -328,7 +326,7 @@ TEST_P(RBACIntegrationTest, PathWithQueryAndFragment) {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -355,7 +353,7 @@ TEST_P(RBACIntegrationTest, PathIgnoreCase) {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -379,7 +377,7 @@ TEST_P(RBACIntegrationTest, LogConnectionAllow) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -403,7 +401,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchCondition) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
@@ -426,7 +424,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderNoMatch) {
           {"xxx", "zzz"},
       },
       1024);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("403", response->headers().getStatusValue());
 }
@@ -452,7 +450,7 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderMatch) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

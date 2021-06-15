@@ -4,7 +4,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -40,8 +40,8 @@ public:
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
-    address_ = address;
-    health_check_address_ = health_check_address;
+    setAddress(address);
+    setHealthCheckAddress(health_check_address);
   }
 
   // Upstream::Host
@@ -95,6 +95,9 @@ public:
   }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
+  const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const override {
+    return logical_host_->addressList();
+  }
   const envoy::config::core::v3::Locality& locality() const override {
     return logical_host_->locality();
   }

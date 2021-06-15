@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "extensions/filters/http/ext_authz/config.h"
+#include "source/extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/test_runtime.h"
@@ -58,7 +58,7 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
       }));
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -125,7 +125,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   EXPECT_CALL(context, scope());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   testing::StrictMock<Http::MockFilterChainFactoryCallbacks> filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

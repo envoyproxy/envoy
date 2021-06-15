@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include "envoy/grpc/async_client_manager.h"

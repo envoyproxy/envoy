@@ -1,13 +1,13 @@
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include <algorithm>
 #include <iostream>
 #include <memory>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -246,12 +246,12 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
     ASSERT(decode_search != decode_map_.end(),
            "Please see "
-           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
            "debugging-symbol-table-assertions");
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
     ASSERT(encode_search != encode_map_.end(),
            "Please see "
-           "https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#"
+           "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
            "debugging-symbol-table-assertions");
 
     ++encode_search->second.ref_count_;

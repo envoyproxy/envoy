@@ -1,13 +1,12 @@
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/http/headers.h"
-
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -233,6 +232,8 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
                : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl(), rc);
+    ENVOY_CONN_LOG(trace, "ssl error occurred while read: {}", handshake_callbacks_->connection(),
+                   Utility::getErrorDescription(err));
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:

@@ -3,10 +3,9 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 
-#include "common/config/metadata.h"
-
-#include "extensions/filters/network/thrift_proxy/router/config.h"
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/router/config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/utility.h"

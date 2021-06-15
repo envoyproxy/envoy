@@ -1,18 +1,17 @@
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include <memory>
 #include <string>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/config/datasource.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/datasource.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
 
 #include "openssl/ssl.h"
 
@@ -26,8 +25,8 @@ namespace {
 std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConfigProviders(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
   if (!config.tls_certificates().empty()) {
-    std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
     for (const auto& tls_certificate : config.tls_certificates()) {
       if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
           !tls_certificate.has_private_key()) {
@@ -39,20 +38,22 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
     return providers;
   }
   if (!config.tls_certificate_sds_secret_configs().empty()) {
-    const auto& sds_secret_config = config.tls_certificate_sds_secret_configs(0);
-    if (sds_secret_config.has_sds_config()) {
-      // Fetch dynamic secret.
-      return {factory_context.secretManager().findOrCreateTlsCertificateProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context)};
-    } else {
-      // Load static secret.
-      auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
-          sds_secret_config.name());
-      if (!secret_provider) {
-        throw EnvoyException(fmt::format("Unknown static secret: {}", sds_secret_config.name()));
+    for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
+      if (sds_secret_config.has_sds_config()) {
+        // Fetch dynamic secret.
+        providers.push_back(factory_context.secretManager().findOrCreateTlsCertificateProvider(
+            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context));
+      } else {
+        // Load static secret.
+        auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
+            sds_secret_config.name());
+        if (!secret_provider) {
+          throw EnvoyException(fmt::format("Unknown static secret: {}", sds_secret_config.name()));
+        }
+        providers.push_back(secret_provider);
       }
-      return {secret_provider};
     }
+    return providers;
   }
   return {};
 }
@@ -234,6 +235,7 @@ ContextConfigImpl::ContextConfigImpl(
         factory_context.messageValidationVisitor());
   }
   capabilities_ = handshaker_factory->capabilities();
+  sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
 }
 
 Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidationContextConfig(
@@ -246,31 +248,27 @@ Ssl::CertificateValidationContextConfigPtr ContextConfigImpl::getCombinedValidat
 }
 
 void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
-  if (!tls_certificate_providers_.empty()) {
-    if (tc_update_callback_handle_) {
-      tc_update_callback_handle_->remove();
-    }
-    // Once tls_certificate_config_ receives new secret, this callback updates
-    // ContextConfigImpl::tls_certificate_config_ with new secret.
-    tc_update_callback_handle_ =
-        tls_certificate_providers_[0]->addUpdateCallback([this, callback]() {
-          // This breaks multiple certificate support, but today SDS is only single cert.
-          // TODO(htuch): Fix this when SDS goes multi-cert.
+  // When any of tls_certificate_providers_ receives a new secret, this callback updates
+  // ContextConfigImpl::tls_certificate_configs_ with new secret.
+  for (const auto& tls_certificate_provider : tls_certificate_providers_) {
+    tc_update_callback_handles_.push_back(
+        tls_certificate_provider->addUpdateCallback([this, callback]() {
           tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), nullptr,
-                                                api_);
+          for (const auto& tls_certificate_provider : tls_certificate_providers_) {
+            auto* secret = tls_certificate_provider->secret();
+            if (secret != nullptr) {
+              tls_certificate_configs_.emplace_back(*secret, nullptr, api_);
+            }
+          }
           callback();
-        });
+        }));
   }
   if (certificate_validation_context_provider_) {
-    if (cvc_update_callback_handle_) {
-      cvc_update_callback_handle_->remove();
-    }
     if (default_cvc_) {
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
-      // context. The combined certificate validation context is created by merging new secret into
-      // default_cvc_.
+      // context. The combined certificate validation context is created by merging new secret
+      // into default_cvc_.
       cvc_update_callback_handle_ =
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             validation_context_config_ = getCombinedValidationContextConfig(
@@ -293,18 +291,6 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
 
 Ssl::HandshakerFactoryCb ContextConfigImpl::createHandshaker() const {
   return handshaker_factory_cb_;
-}
-
-ContextConfigImpl::~ContextConfigImpl() {
-  if (tc_update_callback_handle_) {
-    tc_update_callback_handle_->remove();
-  }
-  if (cvc_update_callback_handle_) {
-    cvc_update_callback_handle_->remove();
-  }
-  if (cvc_validation_callback_handle_) {
-    cvc_validation_callback_handle_->remove();
-  }
 }
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
@@ -434,21 +420,9 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   }
 }
 
-ServerContextConfigImpl::~ServerContextConfigImpl() {
-  if (stk_update_callback_handle_ != nullptr) {
-    stk_update_callback_handle_->remove();
-  }
-  if (stk_validation_callback_handle_ != nullptr) {
-    stk_validation_callback_handle_->remove();
-  }
-}
-
 void ServerContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) {
   ContextConfigImpl::setSecretUpdateCallback(callback);
   if (session_ticket_keys_provider_) {
-    if (stk_update_callback_handle_) {
-      stk_update_callback_handle_->remove();
-    }
     // Once session_ticket_keys_ receives new secret, this callback updates
     // ContextConfigImpl::session_ticket_keys_ with new session ticket keys.
     stk_update_callback_handle_ =

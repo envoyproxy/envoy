@@ -1,6 +1,5 @@
 #include "test/server/config_validation/xds_fuzz.h"
 
-#include "envoy/api/v2/route.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
@@ -57,7 +56,7 @@ void XdsFuzzTest::updateRoute(
 XdsFuzzTest::XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
                          envoy::config::core::v3::ApiVersion api_version)
     : HttpIntegrationTest(
-          Http::CodecClient::Type::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
+          Http::CodecType::HTTP2, TestEnvironment::getIpVersionsForTest()[0],
           ConfigHelper::adsBootstrap(input.config().sotw_or_delta() ==
                                              test::server::config_validation::Config::SOTW
                                          ? "GRPC"
@@ -93,7 +92,7 @@ void XdsFuzzTest::initialize() {
     ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
     ads_cluster->set_name("ads_cluster");
   });
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
   if (xds_stream_ == nullptr) {
     createXdsConnection();
@@ -209,7 +208,7 @@ void XdsFuzzTest::addRoute(const std::string& route_name) {
 AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
                                         const std::string& expected_version) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+    envoy::service::discovery::v3::DiscoveryRequest discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
       ENVOY_LOG_MISC(debug, "Received gRPC message with type {} and version {}",
@@ -217,7 +216,7 @@ AssertionResult XdsFuzzTest::waitForAck(const std::string& expected_type_url,
     } while (expected_type_url != discovery_request.type_url() ||
              expected_version != discovery_request.version_info());
   } else {
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
+    envoy::service::discovery::v3::DeltaDiscoveryRequest delta_discovery_request;
     do {
       VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
       ENVOY_LOG_MISC(debug, "Received gRPC message with type {}",

@@ -1,43 +1,50 @@
 #pragma once
 
-#include <chrono>
-#include <map>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+
+#include "absl/strings/string_view.h"
+#include "hessian2/basic_codec/object_codec.hpp"
+#include "hessian2/codec.hpp"
+#include "hessian2/object.hpp"
+#include "hessian2/reader.hpp"
+#include "hessian2/writer.hpp"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-/*
- * Hessian deserialization
- * See http://hessian.caucho.com/doc/hessian-serialization.html
- */
 class HessianUtils {
 public:
-  static std::string peekString(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static long peekLong(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static bool peekBool(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static int peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static double peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static void peekNull(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
-  static std::chrono::milliseconds peekDate(Buffer::Instance& buffer, size_t* size,
-                                            uint64_t offset = 0);
-  static std::string peekByte(Buffer::Instance& buffer, size_t* size, uint64_t offset = 0);
+  static uint32_t getParametersNumber(const std::string& parameters_type);
+};
 
-  static std::string readString(Buffer::Instance& buffer);
-  static long readLong(Buffer::Instance& buffer);
-  static bool readBool(Buffer::Instance& buffer);
-  static int readInt(Buffer::Instance& buffer);
-  static double readDouble(Buffer::Instance& buffer);
-  static void readNull(Buffer::Instance& buffer);
-  static std::chrono::milliseconds readDate(Buffer::Instance& buffer);
-  static std::string readByte(Buffer::Instance& buffer);
+class BufferWriter : public Hessian2::Writer {
+public:
+  BufferWriter(Envoy::Buffer::Instance& buffer) : buffer_(buffer) {}
 
-  static size_t writeString(Buffer::Instance& buffer, absl::string_view str);
-  static size_t writeInt(Buffer::Instance& buffer, uint8_t value);
+  // Hessian2::Writer
+  void rawWrite(const void* data, uint64_t size) override;
+  void rawWrite(absl::string_view data) override;
+
+private:
+  Envoy::Buffer::Instance& buffer_;
+};
+
+class BufferReader : public Hessian2::Reader {
+public:
+  BufferReader(Envoy::Buffer::Instance& buffer, uint64_t initial_offset = 0) : buffer_(buffer) {
+    initial_offset_ = initial_offset;
+  }
+
+  // Hessian2::Reader
+  uint64_t length() const override { return buffer_.length(); }
+  void rawReadNBytes(void* data, size_t len, size_t peek_offset) override;
+
+private:
+  Envoy::Buffer::Instance& buffer_;
 };
 
 } // namespace DubboProxy

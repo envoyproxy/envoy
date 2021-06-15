@@ -1,11 +1,15 @@
+#include <memory>
+
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/socket.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -20,6 +24,27 @@ using testing::Return;
 namespace Envoy {
 namespace Network {
 namespace {
+
+class MockSingleFamilySocketInterface : public SocketInterfaceImpl {
+public:
+  explicit MockSingleFamilySocketInterface(Address::IpVersion version) : version_(version) {}
+  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
+              (const));
+  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
+  bool ipFamilySupported(int domain) override {
+    return (version_ == Address::IpVersion::v4) ? domain == AF_INET : domain == AF_INET6;
+  }
+  const Address::IpVersion version_;
+};
+
+TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
+  absl::string_view serverName("www.EXAMPLE.com");
+  absl::string_view expectedServerName("www.example.com");
+  auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
+  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr);
+  conn_socket_.setRequestedServerName(serverName);
+  EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
+}
 
 template <Network::Socket::Type Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -170,6 +195,40 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
 TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
   TestListenSocket socket(Utility::getIpv4AnyAddress());
   EXPECT_EQ(Address::IpVersion::v4, socket.ipVersion());
+}
+
+TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsdSocketCreated) {
+  auto mock_interface = std::make_unique<MockSingleFamilySocketInterface>(version_);
+  auto* mock_interface_ptr = mock_interface.get();
+  auto any_address = version_ == Address::IpVersion::v4 ? Utility::getIpv4AnyAddress()
+                                                        : Utility::getIpv6AnyAddress();
+
+  StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
+
+  {
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    TcpListenSocket virtual_listener_socket(any_address, nullptr,
+                                            /*bind_to_port*/ false);
+  }
+}
+
+TEST_P(ListenSocketImplTestTcp, DeathAtUnSupportedIpFamilyListenSocket) {
+  auto mock_interface = std::make_unique<MockSingleFamilySocketInterface>(version_);
+  auto* mock_interface_ptr = mock_interface.get();
+  auto the_other_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
+                                                              : Utility::getIpv4AnyAddress();
+  StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
+  {
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    EXPECT_DEATH(
+        {
+          TcpListenSocket virtual_listener_socket(the_other_address, nullptr,
+                                                  /*bind_to_port*/ false);
+        },
+        ".*");
+  }
 }
 
 TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }

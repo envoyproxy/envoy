@@ -2,10 +2,14 @@
 
 #include <string>
 
+#include "source/common/common/macros.h"
+#include "source/common/common/safe_memcpy.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "xxhash.h"
 
 namespace Envoy {
@@ -21,6 +25,14 @@ public:
   static uint64_t xxHash64(absl::string_view input, uint64_t seed = 0) {
     return XXH64(input.data(), input.size(), seed);
   }
+
+  /**
+   * Return 64-bit hash from the xxHash algorithm for a collection of strings.
+   * @param input supplies the absl::Span<absl::string_view> to hash.
+   * @param seed supplies the hash seed which defaults to 0.
+   * See https://github.com/Cyan4973/xxHash for details.
+   */
+  static uint64_t xxHash64(absl::Span<absl::string_view> input, uint64_t seed = 0);
 
   /**
    * TODO(gsagula): extend xxHash to handle case-insensitive.
@@ -58,7 +70,7 @@ public:
 private:
   static inline uint64_t unalignedLoad(const char* p) {
     uint64_t result;
-    memcpy(&result, p, sizeof(result));
+    safeMemcpyUnsafeSrc(&result, p);
     return result;
   }
 

@@ -3,13 +3,14 @@
 #include <vector>
 
 #include "envoy/common/regex.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/http/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/http/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -65,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -111,6 +113,13 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
+   * Validates the provided scheme is valid (either http or https)
+   * @param scheme the scheme to validate
+   * @return bool true if the scheme is valid.
+   */
+  static bool schemeIsValid(const absl::string_view scheme);
+
+  /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
    * @return bool true if the header values are valid, according to the aforementioned RFC.
@@ -143,12 +152,7 @@ public:
   static bool isConnectResponse(const RequestHeaderMap* request_headers,
                                 const ResponseHeaderMap& response_headers);
 
-  /**
-   * Add headers from one HeaderMap to another
-   * @param headers target where headers will be added
-   * @param headers_to_add supplies the headers to be added
-   */
-  static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
+  static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
    * @brief a helper function to determine if the headers represent an envoy internal request
@@ -174,18 +178,40 @@ public:
                                     const RequestOrResponseHeaderMap& headers);
 
   /**
+   * @brief Remove the trailing host dot from host/authority header.
+   */
+  static void stripTrailingHostDot(RequestHeaderMap& headers);
+
+  /**
    * @brief Remove the port part from host/authority header if it is equal to provided port.
+   * @return absl::optional<uint32_t> containing the port, if removed, else absl::nullopt.
    * If port is not passed, port part from host/authority header is removed.
    */
-  static void stripPortFromHost(RequestHeaderMap& headers, absl::optional<uint32_t> listener_port);
+  static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
+                                                    absl::optional<uint32_t> listener_port);
 
-  /* Does a common header check ensuring required headers are present.
+  /**
+   * @brief Return the index of the port, or npos if the host has no port
+   *
+   * Note this does not do validity checks on the port, it just finds the
+   * trailing : which is not a part of an IP address.
+   */
+  static absl::string_view::size_type getPortStart(absl::string_view host);
+
+  /* Does a common header check ensuring required request headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
    * host/authority for HTTP/1.1 or CONNECT requests.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
-  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+  static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /* Does a common header check ensuring required response headers are present.
+   * Current required response headers only includes :status.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional
@@ -193,6 +219,42 @@ public:
    * may not be removed.
    */
   static bool isRemovableHeader(absl::string_view header);
+
+  /**
+   * Returns true if a header may be safely modified without causing additional
+   * problems. Currently header names beginning with ":" and the "host" header
+   * may not be modified.
+   */
+  static bool isModifiableHeader(absl::string_view header);
+
+  enum class HeaderValidationResult {
+    ACCEPT = 0,
+    DROP,
+    REJECT,
+  };
+
+  /**
+   * Check if the given header_name has underscore.
+   * Return HeaderValidationResult and populate the given counters based on
+   * headers_with_underscores_action.
+   */
+  static HeaderValidationResult checkHeaderNameForUnderscores(
+      const std::string& header_name,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action,
+      Stats::Counter& dropped_headers_with_underscores,
+      Stats::Counter& requests_rejected_with_underscores_in_headers);
+
+  /**
+   * Check if header_value represents a valid value for HTTP content-length header.
+   * Return HeaderValidationResult and populate should_close_connection
+   * according to override_stream_error_on_invalid_http_message.
+   */
+  static HeaderValidationResult
+  validateContentLength(absl::string_view header_value,
+                        bool override_stream_error_on_invalid_http_message,
+                        bool& should_close_connection);
 };
+
 } // namespace Http
 } // namespace Envoy

@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
 )
 
@@ -11,7 +12,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_extension(
+envoy_cc_library(
     name = "admission_control_filter_lib",
     srcs = [
         "admission_control.cc",
@@ -21,15 +22,13 @@ envoy_cc_extension(
         "admission_control.h",
         "thread_local_controller.h",
     ],
-    security_posture = "unknown",
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_object",
         "//source/common/common:cleanup_lib",
         "//source/common/http:codes_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
@@ -40,12 +39,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/common:enum_to_int",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
         "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

@@ -29,7 +29,7 @@ specific place yourself.
 
 Static linking is already available (because of a `HeapProfilerDump()` call
 inside
-[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L32-L39)).
+[`Envoy::Profiler::Heap::stopProfiler())`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.cc#L32-L39)).
 
 ### Compiling a statically-linked Envoy
 
@@ -82,7 +82,7 @@ is controlled by `ProfilerStart()`/`ProfilerStop()`, and the
 [Gperftools Heap Profiler](https://gperftools.github.io/gperftools/heapprofile.html)
 is controlled by `HeapProfilerStart()`, `HeapProfilerStop()` and `HeapProfilerDump()`.
 
-These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.h)).
+These functions are wrapped by Envoy objects defined in [`source/common/profiler/profiler.h`](https://github.com/envoyproxy/envoy/blob/main/source/common/profiler/profiler.h)).
 
 To enable profiling programmatically:
 
@@ -95,7 +95,7 @@ Example:
 
 ```c++
     // includes
-    #include "common/profiler/profiler.h"
+    #include "source/common/profiler/profiler.h"
     ...
     Function(...) {
         if (!Profiler::Cpu::startProfiler(profile_path)) {
@@ -190,11 +190,21 @@ $ perf record -g -F 99 -p `pgrep envoy`
 [ perf record: Captured and wrote 0.694 MB perf.data (1532 samples) ]
 ```
 
-The program will store the collected sampling data in the file `perf.data` whose
-format is also understood by recent enough versions of `pprof`:
+The program will store the collected sampling data in the file `perf.data`. After installing
+[perf_to_profile](https://github.com/google/perf_data_converter) this format
+is also understood by recent enough versions of `pprof`:
 ```
-$ pprof -http=localhost:9999 perf.data
+$ pprof -http=localhost:9999 /path/to/envoy perf.data
 ```
+
+Note that to see correct function names you need to pass an Envoy binary with debug symbols retained.
+Its version must be the same as the version of the profiled Envoy binary.
+You can get it from [envoyproxy/envoy-debug](https://hub.docker.com/r/envoyproxy/envoy-debug).
+
+Alternatively, you can use [allegro/envoy-perf-pprof](https://github.com/allegro/envoy-perf-pprof) which
+wraps the pprof setup mentioned above (installing perf_to_profile, pprof and getting
+the proper Envoy debug version) in a Dockerfile.
+
 ## Memory analysis
 
 Unfortunately `perf` doesn't support heap profiling analogous to `gperftools`, but still
@@ -258,7 +268,7 @@ account other memory allocating functions.
 
 In case there is a need to measure how long a code path takes time to execute in Envoy you may
 resort to instrumenting the code with the
-[performance annotations](https://github.com/envoyproxy/envoy/blob/master/source/common/common/perf_annotation.h).
+[performance annotations](https://github.com/envoyproxy/envoy/blob/main/source/common/common/perf_annotation.h).
 
 There are two types of the annotations. The first one is used to measure operations limited by
 a common lexical scope. For example:

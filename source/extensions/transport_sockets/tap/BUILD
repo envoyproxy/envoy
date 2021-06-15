@@ -15,7 +15,7 @@ envoy_cc_library(
     name = "tap_config_interface",
     hdrs = ["tap_config.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
+        "//envoy/network:connection_interface",
         "//source/extensions/common/tap:tap_interface",
     ],
 )
@@ -39,7 +39,7 @@ envoy_cc_library(
     hdrs = ["tap.h"],
     deps = [
         ":tap_config_interface",
-        "//include/envoy/network:transport_socket_interface",
+        "//envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
         "//source/extensions/transport_sockets/common:passthrough_lib",
@@ -54,19 +54,16 @@ envoy_cc_extension(
     # TODO(#9953) clean up.
     extra_visibility = [
         "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
+        "//test/extensions/transport_sockets/tls/integration:__subpackages__",
     ],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "alpha",
     deps = [
         ":tap_config_impl",
         ":tap_lib",
-        "//include/envoy/network:transport_socket_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:transport_socket_config_interface",
+        "//envoy/network:transport_socket_interface",
+        "//envoy/registry",
+        "//envoy/server:transport_socket_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3:pkg_cc_proto",
     ],

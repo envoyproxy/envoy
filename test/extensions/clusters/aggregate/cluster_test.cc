@@ -2,9 +2,8 @@
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
-#include "common/singleton/manager_impl.h"
-
-#include "extensions/clusters/aggregate/cluster.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -101,14 +100,16 @@ public:
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
 
     cluster_ =
         std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
                                   factory_context, std::move(scope), false);
 
     cm_.initializeThreadLocalClusters({"primary", "secondary"});
+    primary_.cluster_.info_->name_ = "primary";
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
+    secondary_.cluster_.info_->name_ = "secondary";
     EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
@@ -135,6 +136,7 @@ public:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_, random_)};
+  Server::MockOptions options_;
   std::shared_ptr<Cluster> cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;

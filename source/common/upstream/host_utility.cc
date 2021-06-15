@@ -1,4 +1,4 @@
-#include "common/upstream/host_utility.h"
+#include "source/common/upstream/host_utility.h"
 
 #include <string>
 
@@ -53,6 +53,20 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::strin
   case Host::HealthFlag::PENDING_ACTIVE_HC: {
     if (host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
       health_status += "/pending_active_hc";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL: {
+    if (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL)) {
+      health_status += "/excluded_via_immediate_hc_fail";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::ACTIVE_HC_TIMEOUT: {
+    if (host.healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
+      health_status += "/active_hc_timeout";
     }
     break;
   }

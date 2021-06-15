@@ -1,8 +1,7 @@
-#include "server/config_validation/api.h"
+#include "source/server/config_validation/api.h"
 
-#include "common/common/assert.h"
-
-#include "server/config_validation/dispatcher.h"
+#include "source/common/common/assert.h"
+#include "source/server/config_validation/dispatcher.h"
 
 namespace Envoy {
 namespace Api {
@@ -15,6 +14,12 @@ ValidationImpl::ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Sto
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name) {
   return Event::DispatcherPtr{new Event::ValidationDispatcher(name, *this, time_system_)};
+}
+
+Event::DispatcherPtr
+ValidationImpl::allocateDispatcher(const std::string&,
+                                   const Event::ScaledRangeTimerManagerFactory&) {
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string&,

@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -16,10 +17,11 @@ envoy_extension_cc_test(
     srcs = ["kill_request_filter_test.cc"],
     extension_name = "envoy.filters.http.kill_request",
     deps = [
-        "//include/envoy/http:metadata_interface",
+        "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/http/kill_request:kill_request_filter_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -45,5 +47,19 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/kill_request:kill_request_config",
         "//test/integration:http_protocol_integration_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "crash_integration_test",
+    size = "large",
+    srcs = ["crash_integration_test.cc"],
+    shard_count = 2,
+    deps = [
+        "//source/extensions/filters/http/kill_request:kill_request_config",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/integration/filters:stop_and_continue_filter_config_proto_cc_proto",
+        "//test/integration/filters:stop_iteration_and_continue",
+        "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
     ],
 )

@@ -4,12 +4,11 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/test_common/simulated_time_system.h"
@@ -522,7 +521,7 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 TEST(ParseCommaDelimitedList, Null) {
   Http::TestResponseHeaderMapImpl headers;
   std::vector<std::string> result =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
 
   EXPECT_EQ(result.size(), 0);
 }
@@ -530,7 +529,7 @@ TEST(ParseCommaDelimitedList, Null) {
 TEST(ParseCommaDelimitedList, Empty) {
   Http::TestResponseHeaderMapImpl headers{{"vary", ""}};
   std::vector<std::string> result =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
 
   EXPECT_EQ(result.size(), 1);
   EXPECT_EQ(result[0], "");
@@ -539,7 +538,7 @@ TEST(ParseCommaDelimitedList, Empty) {
 TEST(ParseCommaDelimitedList, SingleValue) {
   Http::TestResponseHeaderMapImpl headers{{"vary", "accept"}};
   std::vector<std::string> result =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
 
   EXPECT_EQ(result.size(), 1);
   EXPECT_EQ(result[0], "accept");
@@ -559,7 +558,7 @@ INSTANTIATE_TEST_SUITE_P(MultipleValuesMixedSpaces, ParseCommaDelimitedListMulti
 
 TEST_P(ParseCommaDelimitedListMultipleTest, MultipleValuesMixedSpaces) {
   std::vector<std::string> result =
-      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::Headers::get().Vary));
+      CacheHeadersUtils::parseCommaDelimitedList(headers.get(Http::CustomHeaders::get().Vary));
   EXPECT_EQ(result.size(), 2);
   EXPECT_EQ(result[0], "accept");
   EXPECT_EQ(result[1], "accept-language");
@@ -584,28 +583,28 @@ TEST(CreateVaryKey, EmptyVaryEntry) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", ""}};
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\n\r\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\n\r\n");
 }
 
 TEST(CreateVaryKey, SingleHeaderExists) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept"}};
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r"
-      "image/*\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r"
+            "image/*\n");
 }
 
 TEST(CreateVaryKey, SingleHeaderMissing) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept"}};
   Http::TestRequestHeaderMapImpl request_headers;
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersAllExist) {
@@ -613,21 +612,21 @@ TEST(CreateVaryKey, MultipleHeadersAllExist) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"accept-language", "en-us"}, {"width", "640"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r"
-      "image/*\naccept-language\r"
-      "en-us\nwidth\r640\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r"
+            "image/*\naccept-language\r"
+            "en-us\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersSomeExist) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "image/*"}, {"width", "640"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r"
-      "image/*\naccept-language\r\nwidth\r640\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r"
+            "image/*\naccept-language\r\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, ExtraRequestHeaders) {
@@ -635,19 +634,19 @@ TEST(CreateVaryKey, ExtraRequestHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "image/*"}, {"heigth", "1280"}, {"width", "640"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r"
-      "image/*\nwidth\r640\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r"
+            "image/*\nwidth\r640\n");
 }
 
 TEST(CreateVaryKey, MultipleHeadersNoneExist) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept, accept-language, width"}};
   Http::TestRequestHeaderMapImpl request_headers;
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\naccept\r\naccept-language\r\nwidth\r\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\naccept\r\naccept-language\r\nwidth\r\n");
 }
 
 TEST(CreateVaryKey, DifferentHeadersSameValue) {
@@ -655,12 +654,12 @@ TEST(CreateVaryKey, DifferentHeadersSameValue) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "accept, accept-language"}};
 
   Http::TestRequestHeaderMapImpl request_headers1{{"accept", "foo"}};
-  std::string vary_key1 =
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers1);
+  std::string vary_key1 = VaryHeader::createVaryKey(
+      response_headers.get(Http::CustomHeaders::get().Vary), request_headers1);
 
   Http::TestRequestHeaderMapImpl request_headers2{{"accept-language", "foo"}};
-  std::string vary_key2 =
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers2);
+  std::string vary_key2 = VaryHeader::createVaryKey(
+      response_headers.get(Http::CustomHeaders::get().Vary), request_headers2);
 
   ASSERT_NE(vary_key1, vary_key2);
 }
@@ -669,11 +668,11 @@ TEST(CreateVaryKey, MultiValueSameHeader) {
   Http::TestResponseHeaderMapImpl response_headers{{"vary", "width"}};
   Http::TestRequestHeaderMapImpl request_headers{{"width", "foo"}, {"width", "bar"}};
 
-  ASSERT_EQ(
-      VaryHeader::createVaryKey(response_headers.get(Http::Headers::get().Vary), request_headers),
-      "vary-key\nwidth\r"
-      "foo\r"
-      "bar\n");
+  ASSERT_EQ(VaryHeader::createVaryKey(response_headers.get(Http::CustomHeaders::get().Vary),
+                                      request_headers),
+            "vary-key\nwidth\r"
+            "foo\r"
+            "bar\n");
 }
 
 envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {

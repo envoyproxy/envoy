@@ -5,18 +5,17 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
-#include "test/test_common/utility.h"
-
-//#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -191,6 +190,13 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamClusterInfo(cluster_info);
     EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
     EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
+
+    const std::string session_id =
+        "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+    auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
+    stream_info.setUpstreamSslConnection(ssl_info);
+    EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
   }
 }
 
@@ -248,20 +254,7 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 
 TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
-  EXPECT_TRUE(stream_info.getRequestIDExtension());
-
-  auto rid_extension = stream_info.getRequestIDExtension();
-
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  rid_extension->set(request_headers, false);
-  rid_extension->set(request_headers, true);
-  rid_extension->setInResponse(response_headers, request_headers);
-  uint64_t out = 123;
-  EXPECT_FALSE(rid_extension->modBy(request_headers, out, 10000));
-  EXPECT_EQ(out, 123);
-  rid_extension->setTraceStatus(request_headers, Http::TraceStatus::Forced);
-  EXPECT_EQ(rid_extension->getTraceStatus(request_headers), Http::TraceStatus::NoTrace);
+  EXPECT_EQ(nullptr, stream_info.getRequestIDProvider());
 }
 
 TEST_F(StreamInfoImplTest, ConnectionID) {

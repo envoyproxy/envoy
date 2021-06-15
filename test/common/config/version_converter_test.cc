@@ -3,9 +3,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/well_known.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/well_known.h"
 
 #include "test/common/config/version_converter.pb.h"
 #include "test/test_common/utility.h"

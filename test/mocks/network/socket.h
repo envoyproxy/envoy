@@ -36,6 +36,8 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, listen, (int), (override));
   MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*),
               (const, override));
+  MOCK_METHOD(Api::SysCallIntResult, ioctl,
+              (unsigned long, void*, unsigned long, void*, unsigned long, unsigned long*));
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool), (override));
   MOCK_METHOD(void, addOption, (const Socket::OptionConstSharedPtr&), (override));
   MOCK_METHOD(void, addOptions, (const Socket::OptionsSharedPtr&), (override));

@@ -14,8 +14,8 @@ envoy_cc_library(
         "utility.h",
     ],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/common/crypto:crypto_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common/crypto:crypto_interface",
         "//source/common/common:assert_lib",
         "//source/common/singleton:threadsafe_singleton",
     ],

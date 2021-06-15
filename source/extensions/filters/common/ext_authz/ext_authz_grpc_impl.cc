@@ -1,14 +1,14 @@
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,6 +59,12 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
       if (response->ok_response().headers_to_remove_size() > 0) {
         for (const auto& header : response->ok_response().headers_to_remove()) {
           authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
+        }
+      }
+      if (response->ok_response().response_headers_to_add_size() > 0) {
+        for (const auto& header : response->ok_response().response_headers_to_add()) {
+          authz_response->response_headers_to_add.emplace_back(
+              Http::LowerCaseString(header.header().key()), header.header().value());
         }
       }
     }

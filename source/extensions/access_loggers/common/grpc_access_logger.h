@@ -9,9 +9,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -68,9 +68,10 @@ public:
    * @param config supplies the configuration for the logger.
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
-  virtual typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                                 GrpcAccessLoggerType logger_type,
-                                                                 Stats::Scope& scope) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config,
+                    envoy::config::core::v3::ApiVersion transport_version,
+                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) PURE;
 };
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
@@ -219,6 +220,7 @@ private:
   virtual void initMessage() PURE;
   virtual void addEntry(HttpLogProto&& entry) PURE;
   virtual void addEntry(TcpLogProto&& entry) PURE;
+  virtual void clearMessage() { message_.Clear(); }
 
   void flush() {
     if (isEmpty()) {
@@ -233,7 +235,7 @@ private:
     if (client_.log(message_)) {
       // Clear the message regardless of the success.
       approximate_message_size_bytes_ = 0;
-      message_.Clear();
+      clearMessage();
     }
   }
 
@@ -276,9 +278,10 @@ public:
     });
   }
 
-  typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                         GrpcAccessLoggerType logger_type,
-                                                         Stats::Scope& scope) override {
+  typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config,
+                    envoy::config::core::v3::ApiVersion transport_version,
+                    GrpcAccessLoggerType logger_type, Stats::Scope& scope) override {
     // TODO(euroelessar): Consider cleaning up loggers.
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -289,7 +292,7 @@ public:
     const Grpc::AsyncClientFactoryPtr factory =
         async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false);
     const auto logger = createLogger(
-        config, factory->create(),
+        config, transport_version, factory->create(),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
         scope);
@@ -313,7 +316,8 @@ private:
 
   // Create the specific logger type for this cache.
   virtual typename GrpcAccessLogger::SharedPtr
-  createLogger(const ConfigProto& config, Grpc::RawAsyncClientPtr&& client,
+  createLogger(const ConfigProto& config, envoy::config::core::v3::ApiVersion transport_version,
+               Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
 

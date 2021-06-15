@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "test/mocks/upstream/basic_resource_limit.h"
 
@@ -34,16 +34,16 @@ public:
   struct MockLoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandle* handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
     MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
-    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
+    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
   }
-  Upstream::ResourceAutoIncDecPtr
-  canCreateDnsRequest(ResourceLimitOptRef pending_requests) override {
-    Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_(pending_requests);
+  Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
+    Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_();
     return std::unique_ptr<Upstream::ResourceAutoIncDec>(raii_ptr);
   }
   MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
@@ -58,7 +58,7 @@ public:
 
   MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb));
   MOCK_METHOD((absl::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
-  MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, (ResourceLimitOptRef));
+  MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
@@ -109,7 +109,7 @@ public:
   MockLoadDnsCacheEntryCallbacks();
   ~MockLoadDnsCacheEntryCallbacks() override;
 
-  MOCK_METHOD(void, onLoadDnsCacheComplete, ());
+  MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
 };
 
 } // namespace DynamicForwardProxy

@@ -18,8 +18,6 @@ envoy_cc_extension(
     name = "kafka_broker_config_lib",
     srcs = ["broker/config.cc"],
     hdrs = ["broker/config.h"],
-    security_posture = "requires_trusted_downstream_and_upstream",
-    status = "wip",
     deps = [
         ":kafka_broker_filter_lib",
         "//source/extensions/filters/network:well_known_names",
@@ -39,9 +37,9 @@ envoy_cc_library(
     deps = [
         ":kafka_request_codec_lib",
         ":kafka_response_codec_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -228,8 +226,9 @@ envoy_cc_library(
     ],
     deps = [
         ":kafka_types_lib",
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:byte_order_lib",
+        "//source/common/common:safe_memcpy_lib",
     ],
 )
 

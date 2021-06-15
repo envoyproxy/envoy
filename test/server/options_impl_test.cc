@@ -13,16 +13,13 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/utility.h"
-
-#include "server/options_impl.h"
-
-#include "extensions/filters/http/buffer/buffer_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
+#include "source/server/options_impl.h"
 
 #if defined(__linux__)
 #include <sched.h>
-#include "server/options_impl_platform_linux.h"
+#include "source/server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -243,6 +240,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
+  EXPECT_EQ(options->coreDumpEnabled(), command_line_options->enable_core_dump());
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
   EXPECT_EQ(options->socketPath(), command_line_options->socket_path());
   EXPECT_EQ(options->socketMode(), command_line_options->socket_mode());
@@ -642,13 +640,13 @@ TEST(FactoryByTypeTest, EarlierVersionConfigType) {
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   ProtobufWkt::Any non_api_type;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::

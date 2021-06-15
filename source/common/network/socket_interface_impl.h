@@ -2,7 +2,7 @@
 
 #include "envoy/network/socket.h"
 
-#include "common/network/socket_interface.h"
+#include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
@@ -20,6 +20,7 @@ public:
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
     return "envoy.extensions.network.socket_interface.default_socket_interface";

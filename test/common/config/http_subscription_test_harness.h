@@ -8,12 +8,12 @@
 #include "envoy/http/async_client.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/utility.h"
-#include "common/config/http_subscription_impl.h"
-#include "common/config/utility.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/http_subscription_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -111,13 +111,13 @@ public:
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
-    subscription_->start(cluster_names);
+    subscription_->start(flattenResources(cluster_names));
   }
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
-    subscription_->updateResourceInterest(cluster_names);
+    subscription_->updateResourceInterest(flattenResources(cluster_names));
     timer_cb_();
   }
 

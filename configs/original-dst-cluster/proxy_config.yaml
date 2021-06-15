@@ -4,6 +4,7 @@ static_resources:
       socket_address:
         address: 0.0.0.0
         port_value: 10000
+    traffic_direction: OUTBOUND
     filter_chains:
     - filters:
       - name: envoy.filters.network.http_connection_manager
@@ -24,7 +25,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.router
             typed_config: {}
-          codec_type: auto
+          codec_type: AUTO
     listener_filters:
     - name: envoy.filters.listener.original_dst
       typed_config: {}
@@ -36,7 +37,6 @@ static_resources:
     dns_lookup_family: V4_ONLY
 cluster_manager: {}
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       address: 127.0.0.1

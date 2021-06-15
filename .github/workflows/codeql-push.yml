@@ -15,7 +15,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -34,24 +34,25 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
+      uses: github/codeql-action/init@a66b44a48a44d63acf71688c56aa168ac171d4cf # v1
       # Override language selection by uncommenting this and choosing your languages
       with:
-         languages: cpp
+        languages: cpp
 
     - name: Install deps
       shell: bash
       run: |
        sudo apt-get update && sudo apt-get install libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
-       mkdir -p bin/clang10
-       cd bin/clang10
-       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-       tar -xf clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
-       export PATH=bin/clang10/bin:$PATH
+       mkdir -p bin/clang11
+       cd bin/clang11
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+       tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz --strip-components 1
+       export PATH=bin/clang11/bin:$PATH
+
 
     - name: Build
       run: |
-       bazel/setup_clang.sh bin/clang10
+       bazel/setup_clang.sh bin/clang11
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"
@@ -59,7 +60,7 @@ jobs:
     - name: Clean Artifacts
       run: |
         git clean -xdf
-       
+
     - name: Perform CodeQL Analysis
       if: env.BUILD_TARGETS != ''
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@a66b44a48a44d63acf71688c56aa168ac171d4cf # v1

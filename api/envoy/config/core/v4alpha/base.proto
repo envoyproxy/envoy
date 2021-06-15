@@ -8,9 +8,10 @@ import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/semantic_version.proto";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
+
+import "xds/core/v3/context_params.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -65,12 +66,12 @@ enum TrafficDirection {
 message Locality {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.Locality";
 
-  // Region this :ref:`zone <envoy_api_field_config.core.v4alpha.Locality.zone>` belongs to.
+  // Region this :ref:`zone <envoy_v3_api_field_config.core.v3.Locality.zone>` belongs to.
   string region = 1;
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
+  // service exposes :ref:`zone data <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
   // either in this message or via :option:`--service-zone`. The meaning of zone
   // is context dependent, e.g. `Availability Zone (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -130,7 +131,7 @@ message Extension {
 // Identifies a specific Envoy instance. The node identifier is presented to the
 // management server, which may use this identifier to distinguish per Envoy
 // configuration for serving.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.Node";
 
@@ -150,10 +151,10 @@ message Node {
   // optional, it should be set if any of the following features are used:
   // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
   // verification
-  // <envoy_api_field_config.core.v4alpha.HealthCheck.HttpHealthCheck.service_name_matcher>`,
-  // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v4alpha.Runtime>`,
+  // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
+  // :ref:`runtime override directory <envoy_v3_api_msg_config.bootstrap.v3.Runtime>`,
   // :ref:`user agent addition
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v4alpha.HttpConnectionManager.add_user_agent>`,
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
   // :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   // <arch_overview_tracing>`, either in this message or via
@@ -163,6 +164,13 @@ message Node {
   // Opaque metadata extending the node identifier. Envoy will pass this
   // directly to the management server.
   google.protobuf.Struct metadata = 3;
+
+  // Map from xDS resource type URL to dynamic context parameters. These may vary at runtime (unlike
+  // other fields in this message). For example, the xDS client may have a shard identifier that
+  // changes during the lifetime of the xDS client. In Envoy, this would be achieved by updating the
+  // dynamic context on the Server::Instance's LocalInfo context provider. The shard ID dynamic
+  // parameter then appears in this field during future discovery requests.
+  map<string, xds.core.v3.ContextParams> dynamic_parameters = 12;
 
   // Locality specifying where the Envoy instance is running.
   Locality locality = 4;
@@ -218,7 +226,19 @@ message Metadata {
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
+  // If both *filter_metadata* and
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+  // fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
   map<string, google.protobuf.Struct> filter_metadata = 1;
+
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // namespace is reserved for Envoy's built-in filters.
+  // The value is encoded as google.protobuf.Any.
+  // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+  // and *typed_filter_metadata* fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
+  map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 
 // Runtime derived uint32 with a default when not specified.
@@ -340,7 +360,7 @@ message DataSource {
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.core.v3.RetryPolicy";
 
-  // Specifies parameters that control :ref:`retry backoff strategy <envoy_api_msg_config.core.v4alpha.BackoffStrategy>`.
+  // Specifies parameters that control :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
   // This parameter is optional, in which case the default base interval is 1000 milliseconds. The
   // default maximum interval is 10 times the base interval.
   BackoffStrategy retry_back_off = 1;
@@ -382,7 +402,7 @@ message AsyncDataSource {
 }
 
 // Configuration for transport socket in :ref:`listeners <config_listeners>` and
-// :ref:`clusters <envoy_api_msg_config.cluster.v4alpha.Cluster>`. If the configuration is
+// :ref:`clusters <envoy_v3_api_msg_config.cluster.v3.Cluster>`. If the configuration is
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {
@@ -410,7 +430,7 @@ message TransportSocket {
 // .. note::
 //
 //   Parsing of the runtime key's data is implemented such that it may be represented as a
-//   :ref:`FractionalPercent <envoy_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
+//   :ref:`FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
 //   and may also be represented as an integer with the assumption that the value is an integral
 //   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
 //   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.

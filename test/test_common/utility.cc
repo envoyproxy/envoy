@@ -20,18 +20,17 @@
 #include "envoy/http/codec.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread_impl.h"
-#include "common/common/utility.h"
-#include "common/config/resource_name.h"
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
-#include "common/http/header_utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
@@ -42,6 +41,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -223,6 +223,45 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
   return AssertionSuccess();
 }
 
+AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
+                                                          const std::string& name,
+                                                          Event::TestTimeSystem& time_system,
+                                                          Event::Dispatcher& main_dispatcher,
+                                                          std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (true) {
+    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
+    if (histo) {
+      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
+      if (sample_count) {
+        break;
+      }
+    }
+
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to have samples", name);
+    }
+  }
+  return AssertionSuccess();
+}
+
+uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
+                                      const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  uint64_t sample_count = 0;
+  absl::Notification notification;
+
+  main_dispatcher.post([&] {
+    sample_count = histogram.cumulativeStatistics().sampleCount();
+    notification.Notify();
+  });
+  notification.WaitForNotification();
+
+  return sample_count;
+}
+
 std::list<Network::DnsResponse>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses, std::chrono::seconds ttl) {
   std::list<Network::DnsResponse> ret;
@@ -352,8 +391,6 @@ void ConditionalInitializer::wait() {
   mutex_.Await(absl::Condition(&ready_));
   EXPECT_TRUE(ready_);
 }
-
-constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 
 namespace Api {
 

@@ -1,6 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
 #include "gtest/gtest.h"
 

@@ -29,10 +29,10 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/common/sqlutils:sqlutils_lib",
@@ -45,7 +45,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     repository = "@envoy",
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":filter",
         "//source/extensions/filters/network:well_known_names",

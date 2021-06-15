@@ -4,20 +4,21 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/network/address.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -122,7 +123,6 @@ class TestClientConnectionImpl : public Network::ClientConnectionImpl {
 public:
   using ClientConnectionImpl::ClientConnectionImpl;
   Buffer::Instance& readBuffer() { return *read_buffer_; }
-  ConnectionSocketPtr& socket() { return socket_; }
 };
 
 class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
@@ -259,7 +259,6 @@ protected:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<Network::TcpListenSocket> socket_{nullptr};
   Network::MockTcpListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
   Network::ListenerPtr listener_;
   Network::ClientConnectionPtr client_connection_;
   StrictMock<MockConnectionCallbacks> client_callbacks_;
@@ -400,13 +399,14 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  // Avoid setting noDelay on the fake fd of 0.
-  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
-  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mocks.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::TransportSocketConnectTimeout, _))
+      .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
@@ -421,11 +421,10 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
@@ -440,12 +439,14 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
   ConnectionMocks mocks = createConnectionMocks(false);
   MockTransportSocket* transport_socket = mocks.transport_socket_.get();
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
-  auto* mock_timer = new NiceMock<Event::MockTimer>(mocks.dispatcher_.get());
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(*mocks.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::TransportSocketConnectTimeout, _))
+      .WillOnce(DoAll(SaveArg<1>(&mock_timer->callback_), Return(mock_timer)));
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   bool timer_destroyed = false;
@@ -603,24 +604,7 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   MockConnectionStats client_connection_stats;
   client_connection_->setConnectionStats(client_connection_stats.toBufferStats());
   EXPECT_TRUE(client_connection_->connecting());
-
-  // Make sure that NO_DELAY starts out false, so that the check below verifies that it transitions
-  // to true actually tests something.
-  int initial_value = 0;
-  socklen_t size = sizeof(int);
-  Api::SysCallIntResult result = testClientConnection()->socket()->getSocketOption(
-      IPPROTO_TCP, TCP_NODELAY, &initial_value, &size);
-  ASSERT_EQ(0, result.rc_);
-  ASSERT_EQ(0, initial_value);
-
   client_connection_->connect();
-
-  int new_value = 0;
-  result = testClientConnection()->socket()->getSocketOption(IPPROTO_TCP, TCP_NODELAY,
-                                                             &initial_value, &size);
-  ASSERT_EQ(0, result.rc_);
-  ASSERT_EQ(0, new_value);
-
   // The Network::Connection class oddly uses onWrite as its indicator of if
   // it's done connection, rather than the Connected event.
   EXPECT_TRUE(client_connection_->connecting());
@@ -1899,19 +1883,22 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 }
 
 // Test DumpState methods.
-TEST_P(ConnectionImplTest, NetworkAndPipeSocketDumpsWithoutAllocatingMemory) {
+TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  // Avoid setting noDelay on the fake fd of 0.
-  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
   Address::InstanceConstSharedPtr server_addr;
+  Address::InstanceConstSharedPtr local_addr;
   if (GetParam() == Network::Address::IpVersion::v4) {
     server_addr = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("1.1.1.1", 80, nullptr)};
+    local_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("1.2.3.4", 56789, nullptr)};
   } else {
     server_addr = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("::1", 80, nullptr)};
+    local_addr = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance("::1:2:3:4", 56789, nullptr)};
   }
 
   auto connection_socket =
@@ -1933,12 +1920,12 @@ TEST_P(ConnectionImplTest, NetworkAndPipeSocketDumpsWithoutAllocatingMemory) {
         contents,
         HasSubstr(
             "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
-            "/pipe/path"));
+            "1.2.3.4:56789"));
   } else {
     EXPECT_THAT(
         contents,
         HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
-                  "/pipe/path"));
+                  "[::1:2:3:4]:56789"));
   }
 }
 
@@ -1947,11 +1934,10 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ConnectionMocks mocks = createConnectionMocks(false);
   IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  auto local_addr = std::make_shared<Network::Address::PipeInstance>("/pipe/path");
 
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), local_addr, nullptr),
+      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::move(mocks.transport_socket_), stream_info_, true);
 
   // Start measuring memory and dump state.
@@ -1997,6 +1983,7 @@ private:
 class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
+    EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -2017,7 +2004,8 @@ public:
         TransportSocketPtr(transport_socket_), stream_info_, true);
     connection_->addConnectionCallbacks(callbacks_);
     // File events will trigger setTrackedObject on the dispatcher.
-    EXPECT_CALL(dispatcher_, setTrackedObject(_)).WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
+    EXPECT_CALL(dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   }
 
   ~MockTransportConnectionImplTest() override { connection_->close(ConnectionCloseType::NoFlush); }

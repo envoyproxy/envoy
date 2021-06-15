@@ -1,10 +1,10 @@
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -301,7 +301,7 @@ void ConnectionManager::onGetConsumerListByGroup(RemotingCommandPtr request) {
   RemotingCommandPtr response = std::make_unique<RemotingCommand>(
       enumToSignedInt(ResponseCode::Success), request->version(), request->opaque());
   response->markAsResponse();
-  std::string json = MessageUtil::getJsonStringFromMessage(body_struct);
+  std::string json = MessageUtil::getJsonStringFromMessageOrDie(body_struct);
   response->body().add(json);
   ENVOY_LOG(trace, "GetConsumerListByGroup respond with body: {}", json);
 

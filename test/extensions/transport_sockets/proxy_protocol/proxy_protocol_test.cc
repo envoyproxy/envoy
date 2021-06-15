@@ -1,12 +1,11 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/proxy_protocol.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"

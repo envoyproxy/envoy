@@ -8,8 +8,9 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/config_provider_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -62,9 +63,11 @@ public:
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD(void, start, (const std::set<std::string>& resources));
-  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
-  MOCK_METHOD(void, requestOnDemandUpdate, (const std::set<std::string>& add_these_names));
+  MOCK_METHOD(void, start, (const absl::flat_hash_set<std::string>& resources));
+  MOCK_METHOD(void, updateResourceInterest,
+              (const absl::flat_hash_set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, requestOnDemandUpdate,
+              (const absl::flat_hash_set<std::string>& add_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -75,7 +78,7 @@ public:
   MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder, bool use_namespace_matching));
+               OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options));
   MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -105,19 +108,20 @@ public:
   MOCK_METHOD(ScopedResume, pause, (const std::vector<std::string> type_urls), (override));
 
   MOCK_METHOD(void, addSubscription,
-              (const std::set<std::string>& resources, const std::string& type_url,
+              (const absl::flat_hash_set<std::string>& resources, const std::string& type_url,
                SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD(void, updateResourceInterest,
-              (const std::set<std::string>& resources, const std::string& type_url));
+              (const absl::flat_hash_set<std::string>& resources, const std::string& type_url));
 
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
-              (const std::string& type_url, const std::set<std::string>& resources,
+              (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-               const bool use_prefix_matching));
+               const SubscriptionOptions& options));
 
   MOCK_METHOD(void, requestOnDemandUpdate,
-              (const std::string& type_url, const std::set<std::string>& add_these_names));
+              (const std::string& type_url,
+               const absl::flat_hash_set<std::string>& add_these_names));
 };
 
 class MockGrpcStreamCallbacks
@@ -170,6 +174,17 @@ public:
   ~MockContextProvider() override;
 
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
+  MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
+              (absl::string_view resource_type_url), (const));
+  MOCK_METHOD(void, setDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key,
+               absl::string_view value));
+  MOCK_METHOD(void, unsetDynamicContextParam,
+              (absl::string_view resource_type_url, absl::string_view key));
+  MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
+              (UpdateNotificationCb callback), (const));
+
+  Common::CallbackManager<absl::string_view> update_cb_handler_;
 };
 
 } // namespace Config

@@ -1,9 +1,8 @@
-#include "extensions/filters/http/lua/wrappers.h"
+#include "source/extensions/filters/http/lua/wrappers.h"
 
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -138,6 +137,11 @@ int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
   lua_pushstring(
       state, stream_info_.downstreamAddressProvider().directRemoteAddress()->asString().c_str());
+  return 1;
+}
+
+int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
+  lua_pushstring(state, stream_info_.requestedServerName().c_str());
   return 1;
 }
 

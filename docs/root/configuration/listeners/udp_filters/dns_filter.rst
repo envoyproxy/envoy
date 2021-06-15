@@ -39,22 +39,20 @@ Example Configuration
       stat_prefix: "dns_filter_prefix"
       client_config:
         resolution_timeout: 5s
-        upstream_resolvers:
-        - socket_address:
-            address: "8.8.8.8"
-            port_value: 53
-        - socket_address:
-            address: "8.8.4.4"
-            port_value: 53
+        dns_resolution_config:
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
+          resolvers:
+          - socket_address:
+              address: "8.8.8.8"
+              port_value: 53
+          - socket_address:
+              address: "8.8.4.4"
+              port_value: 53
         max_pending_lookups: 256
       server_config:
         inline_dns_table:
-          known_suffixes:
-          - suffix: "domain1.com"
-          - suffix: "domain2.com"
-          - suffix: "domain3.com"
-          - suffix: "domain4.com"
-          - suffix: "domain5.com"
           virtual_domains:
             - name: "www.domain1.com"
               endpoint:
@@ -97,14 +95,14 @@ Example Configuration
                         port: 5060
 
 
-In this example, Envoy is configured to respond to client queries for four domains. For any
+In this example, Envoy is configured to respond to client queries for five domains. For any
 other query, it will forward upstream to external resolvers. The filter will return an address
 matching the input query type. If the query is for type A records and no A records are configured,
 Envoy will return no addresses and set the response code appropriately. Conversely, if there are
 matching records for the query type, each configured address is returned. This is also true for
 AAAA records. Only A, AAAA, and SRV records are supported. If the filter parses queries for other
 record types, the filter immediately responds indicating that the type is not supported. The
-filter can also redirect a query for a DNS name to the enpoints of a cluster. "www.domain4.com"
+filter can also redirect a query for a DNS name to the endpoints of a cluster. "www.domain4.com"
 in the configuration demonstrates this. Along with an address list, a cluster name is a valid
 endpoint for a DNS name.
 
@@ -123,7 +121,7 @@ adhere to the convention outlined in the RFC.
 
 The filter can also consume its domain configuration from an external DNS table. The same entities
 appearing in the static configuration can be stored as JSON or YAML in a separate file and referenced
-using the :ref:`external_dns_table DataSource <envoy_api_msg_core.DataSource>` directive:
+using the :ref:`external_dns_table DataSource <envoy_v3_api_msg_config.core.v3.datasource>` directive:
 
 Example External DnsTable Configuration
 ---------------------------------------
@@ -147,10 +145,6 @@ DnsTable JSON Configuration
 .. code-block:: json
 
   {
-    "known_suffixes": [
-      { "suffix": "suffix1.com" },
-      { "suffix": "suffix2.com" }
-    ],
     "virtual_domains": [
       {
         "name": "www.suffix1.com",

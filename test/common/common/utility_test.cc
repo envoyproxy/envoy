@@ -7,7 +7,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
@@ -20,12 +20,34 @@
 #include "gtest/gtest.h"
 
 using testing::ContainerEq;
+using testing::ElementsAre;
+using testing::WhenSorted;
 #ifdef WIN32
 using testing::HasSubstr;
 using testing::Not;
 #endif
 
 namespace Envoy {
+
+TEST(IntUtil, roundUpToMultiple) {
+  // Round up to non-power-of-2
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(1, 3));
+  EXPECT_EQ(3, IntUtil::roundUpToMultiple(3, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(4, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(5, 3));
+  EXPECT_EQ(6, IntUtil::roundUpToMultiple(6, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(20, 3));
+  EXPECT_EQ(21, IntUtil::roundUpToMultiple(21, 3));
+
+  // Round up to power-of-2
+  EXPECT_EQ(0, IntUtil::roundUpToMultiple(0, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(3, 4));
+  EXPECT_EQ(4, IntUtil::roundUpToMultiple(4, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(5, 4));
+  EXPECT_EQ(8, IntUtil::roundUpToMultiple(8, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(21, 4));
+  EXPECT_EQ(24, IntUtil::roundUpToMultiple(24, 4));
+}
 
 TEST(StringUtil, strtoull) {
   uint64_t out;
@@ -260,6 +282,58 @@ TEST(StringUtil, escape) {
   EXPECT_EQ(StringUtil::escape("{\"linux\": \"penguin\"}"), "{\\\"linux\\\": \\\"penguin\\\"}");
 }
 
+TEST(StringUtil, escapeToOstream) {
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello world");
+    EXPECT_EQ(ostream.contents(), "hello world");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "hello\nworld\n");
+    EXPECT_EQ(ostream.contents(), "hello\\nworld\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "\t\nworld\r\n");
+    EXPECT_EQ(ostream.contents(), "\\t\\nworld\\r\\n");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "{'linux': \"penguin\"}");
+    EXPECT_EQ(ostream.contents(), "{\\'linux\\': \\\"penguin\\\"}");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, R"(\\)");
+    EXPECT_EQ(ostream.contents(), R"(\\\\)");
+  }
+
+  {
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "vertical\vtab");
+    EXPECT_EQ(ostream.contents(), "vertical\\vtab");
+  }
+
+  {
+    using namespace std::string_literals;
+    std::array<char, 64> buffer;
+    OutputBufferStream ostream{buffer.data(), buffer.size()};
+    StringUtil::escapeToOstream(ostream, "null\0char"s);
+    EXPECT_EQ(ostream.contents(), "null\\0char");
+  }
+}
+
 TEST(StringUtil, toUpper) {
   EXPECT_EQ(StringUtil::toUpper(""), "");
   EXPECT_EQ(StringUtil::toUpper("a"), "A");
@@ -488,6 +562,7 @@ TEST(AccessLogDateTimeFormatter, fromTime) {
 }
 
 TEST(Primes, isPrime) {
+  EXPECT_FALSE(Primes::isPrime(0));
   EXPECT_TRUE(Primes::isPrime(67));
   EXPECT_FALSE(Primes::isPrime(49));
   EXPECT_FALSE(Primes::isPrime(102));
@@ -495,6 +570,7 @@ TEST(Primes, isPrime) {
 }
 
 TEST(Primes, findPrimeLargerThan) {
+  EXPECT_EQ(1, Primes::findPrimeLargerThan(0));
   EXPECT_EQ(67, Primes::findPrimeLargerThan(62));
   EXPECT_EQ(107, Primes::findPrimeLargerThan(103));
   EXPECT_EQ(10007, Primes::findPrimeLargerThan(9991));
@@ -976,5 +1052,28 @@ TEST(ErrorDetailsTest, WindowsFormatMessage) {
   EXPECT_EQ(errorDetails(99999), "Unknown error");
 }
 #endif
+
+TEST(SetUtil, All) {
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {1, 3}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(2)));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {4, 5}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(1, 2, 3)));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({}, {4, 5}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre()));
+  }
+  {
+    absl::flat_hash_set<uint32_t> result;
+    SetUtil::setDifference({1, 2, 3}, {}, result);
+    EXPECT_THAT(result, WhenSorted(ElementsAre(1, 2, 3)));
+  }
+}
 
 } // namespace Envoy

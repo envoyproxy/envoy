@@ -7,15 +7,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/api/api_impl.h"
-#include "common/config/well_known_names.h"
-#include "common/json/json_loader.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/cluster_manager_impl.h"
-
-#include "server/configuration_impl.h"
-
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/extensions/stat_sinks/well_known_names.h"
+#include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -32,7 +30,6 @@
 
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
@@ -68,7 +65,7 @@ protected:
             server_.dnsResolver(), server_.sslContextManager(), server_.dispatcher(),
             server_.localInfo(), server_.secretManager(), server_.messageValidationContext(), *api_,
             server_.httpContext(), server_.grpcContext(), server_.routerContext(),
-            server_.accessLogManager(), server_.singletonManager()) {}
+            server_.accessLogManager(), server_.singletonManager(), server_.options()) {}
 
   void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
     envoy::config::metrics::v3::StatsdSink statsd_sink;
@@ -95,9 +92,16 @@ TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
   std::string json = R"EOF(
   {
     "stats_flush_interval": "0.500s",
-
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -123,7 +127,15 @@ TEST_F(ConfigurationImplTest, StatsOnAdmin) {
     "stats_flush_on_admin": true,
 
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -148,7 +160,15 @@ TEST_F(ConfigurationImplTest, NegativeStatsOnAdmin) {
     "stats_flush_on_admin": false,
 
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -171,7 +191,15 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
     "stats_flush_interval": "0.500s",
 
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -223,7 +251,15 @@ TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {
       ]
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -267,7 +303,15 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenTracingConfigurationAbsent) {
       "clusters": []
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -307,7 +351,15 @@ TEST_F(ConfigurationImplTest, NullTracerSetWhenHttpKeyAbsentFromTracerConfigurat
     },
     "tracing": {},
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -359,7 +411,15 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       }
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -385,7 +445,15 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
       "clusters": []
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -417,7 +485,15 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
       "clusters": []
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -447,7 +523,15 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
       "clusters": []
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -476,7 +560,15 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
       "clusters": []
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -520,7 +612,8 @@ TEST(InitialImplTest, LayeredRuntime) {
   )EOF";
   const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -532,7 +625,8 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   const auto bootstrap =
       TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -543,87 +637,19 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
-// An empty deprecated Runtime has an empty static and admin layer injected.
-TEST(InitialImplTest, EmptyDeprecatedRuntime) {
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
-  NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer: {}
-  - name: admin
-    admin_layer: {}
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
-// A deprecated Runtime is transformed to the equivalent LayeredRuntime.
-TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string bootstrap_yaml = R"EOF(
-  runtime:
-    symlink_root: /srv/runtime/current
-    subdirectory: envoy
-    override_subdirectory: envoy_override
-    base:
-      health_check:
-        min_interval: 5
-  )EOF";
-  const auto bootstrap =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
-  NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer:
-      health_check:
-        min_interval: 5
-  - name: root
-    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy }
-  - name: override
-    disk_layer: { symlink_root: /srv/runtime/current, subdirectory: envoy_override, append_service_cluster: true }
-  - name: admin
-    admin_layer: {}
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
-// A v2 bootstrap implies runtime override for API features.
-TEST(InitialImplTest, V2BootstrapRuntimeInjection) {
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
-  NiceMock<MockOptions> options;
-  absl::optional<uint32_t> version{2};
-  EXPECT_CALL(options, bootstrapVersion()).WillOnce(ReturnRef(version));
-  InitialImpl config(bootstrap, options);
-
-  const std::string expected_yaml = R"EOF(
-  layers:
-  - name: base
-    static_layer: {}
-  - name: admin
-    admin_layer: {}
-  - name: "enabled_deprecated_v2_api (auto-injected)"
-    static_layer:
-      envoy.reloadable_features.enable_deprecated_v2_api: true
-  )EOF";
-  const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
-  EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
-}
-
 TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   std::string json = R"EOF(
   {
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -650,7 +676,8 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
-  InitialImpl config(bootstrap, options);
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -662,6 +689,38 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
       socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
+}
+
+TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
 
 TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
@@ -724,7 +783,15 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerHostWeightsLimit) {
       ]
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -830,7 +897,15 @@ TEST_F(ConfigurationImplTest, ExceedLoadBalancerLocalityWeightsLimit) {
       ]
     },
     "admin": {
-      "access_log_path": "/dev/null",
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
       "address": {
         "socket_address": {
           "address": "1.2.3.4",
@@ -936,6 +1011,63 @@ TEST_F(ConfigurationImplTest, CanSetMultiWatchdogConfigs) {
 
   EXPECT_EQ(config.mainThreadWatchdogConfig().missTimeout(), std::chrono::milliseconds(2000));
   EXPECT_EQ(config.workerWatchdogConfig().missTimeout(), std::chrono::milliseconds(500));
+}
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithAccessLog)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          }
+        }
+      ],
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  NiceMock<Server::MockInstance> server;
+  InitialImpl config(bootstrap, options, server_);
+  Network::MockListenSocket socket_mock;
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
 } // namespace
 } // namespace Configuration
