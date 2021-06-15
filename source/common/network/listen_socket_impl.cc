@@ -1,4 +1,4 @@
-#include "common/network/listen_socket_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 
 #include <sys/types.h>
 
@@ -9,11 +9,11 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {

@@ -5,7 +5,7 @@
 #include "envoy/common/resource.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/types/optional.h"
 

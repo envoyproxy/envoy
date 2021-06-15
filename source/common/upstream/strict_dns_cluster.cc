@@ -1,4 +1,4 @@
-#include "common/upstream/strict_dns_cluster.h"
+#include "source/common/upstream/strict_dns_cluster.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"

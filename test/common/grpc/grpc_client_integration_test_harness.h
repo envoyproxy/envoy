@@ -7,26 +7,26 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/api_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/grpc/async_client_impl.h"
-#include "common/grpc/context_impl.h"
-#include "common/http/context_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/context_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 #endif
 
-#include "common/http/async_client_impl.h"
-#include "common/http/codes.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/network/connection_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/router/context_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/context_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"

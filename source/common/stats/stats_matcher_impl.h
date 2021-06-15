@@ -5,8 +5,8 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/stats_matcher.h"
 
-#include "common/common/matchers.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/matchers.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
 

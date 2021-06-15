@@ -1,4 +1,4 @@
-#include "common/common/matchers.h"
+#include "source/common/common/matchers.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
@@ -6,10 +6,10 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
-#include "common/common/macros.h"
-#include "common/common/regex.h"
-#include "common/config/metadata.h"
-#include "common/http/path_utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/regex.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/path_utility.h"
 
 #include "absl/strings/match.h"
 

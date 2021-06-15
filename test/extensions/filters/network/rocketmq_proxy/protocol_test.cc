@@ -1,6 +1,5 @@
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/rocketmq_proxy/protocol.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/protocol.h"
 
 #include "gtest/gtest.h"
 

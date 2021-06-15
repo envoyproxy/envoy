@@ -2,7 +2,7 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/thread_aware_lb_impl.h"
+#include "source/common/upstream/thread_aware_lb_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"

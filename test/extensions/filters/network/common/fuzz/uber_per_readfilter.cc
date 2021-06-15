@@ -2,9 +2,9 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
-#include "extensions/filters/network/common/utility.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/network/common/utility.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"

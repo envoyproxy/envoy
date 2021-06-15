@@ -1,8 +1,7 @@
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/message.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message.h"
 
 namespace Envoy {
 namespace Extensions {
