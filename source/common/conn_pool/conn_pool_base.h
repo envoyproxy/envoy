@@ -331,7 +331,8 @@ private:
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
 
-  // Whether the connection pool is currently in a draining state
+  // Whether the connection pool is currently in the process of closing
+  // all connections so that it can be gracefully deleted.
   bool is_draining_{false};
 
   void onUpstreamReady();
