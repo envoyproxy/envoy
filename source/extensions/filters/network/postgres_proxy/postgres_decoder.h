@@ -119,7 +119,7 @@ protected:
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).
-    std::string direction_;
+    absl::string_view direction_;
     // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
     absl::flat_hash_map<char, MessageProcessor> messages_;
     // Handler used for processing messages not found in hash map.
