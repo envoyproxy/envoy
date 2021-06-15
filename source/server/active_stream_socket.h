@@ -32,14 +32,14 @@ class ActiveStreamListenerBase;
 /**
  * Wrapper for an active accepted socket owned by the active tcp listener.
  */
-struct ActiveStreamSocket : public Network::ListenerFilterManager,
-                            public Network::ListenerFilterCallbacks,
-                            LinkedObject<ActiveStreamSocket>,
-                            public Event::DeferredDeletable,
-                            Logger::Loggable<Logger::Id::conn_handler> {
-  ActiveStreamSocket(ActiveStreamListenerBase& listener, Network::ConnectionSocketPtr&& socket,
-                     bool hand_off_restored_destination_connections);
-  ~ActiveStreamSocket() override;
+struct ActiveTcpSocket : public Network::ListenerFilterManager,
+                         public Network::ListenerFilterCallbacks,
+                         LinkedObject<ActiveTcpSocket>,
+                         public Event::DeferredDeletable,
+                         Logger::Loggable<Logger::Id::conn_handler> {
+  ActiveTcpSocket(ActiveStreamListenerBase& listener, Network::ConnectionSocketPtr&& socket,
+                  bool hand_off_restored_destination_connections);
+  ~ActiveTcpSocket() override;
 
   void onTimeout();
   void startTimer();
@@ -106,8 +106,6 @@ struct ActiveStreamSocket : public Network::ListenerFilterManager,
   bool connected_{false};
 };
 
-using ActiveInternalSocket = ActiveStreamSocket;
-
 class ActiveStreamListenerBase : public ActiveListenerImplBase {
 public:
   ActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
@@ -116,7 +114,6 @@ public:
 
   virtual void incNumConnections() PURE;
   virtual void decNumConnections() PURE;
-  virtual Event::Dispatcher& dispatcher() PURE;
 
   /**
    * Create a new connection from a socket accepted by the listener.
@@ -127,7 +124,7 @@ public:
   virtual Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
 
-  void onSocketAccepted(std::unique_ptr<ActiveStreamSocket> active_socket) {
+  void onSocketAccepted(std::unique_ptr<ActiveTcpSocket> active_socket) {
     // Create and run the filters
     config_->filterChainFactory().createListenerFilterChain(*active_socket);
     active_socket->continueFilterChain(true);
@@ -141,28 +138,35 @@ public:
       // If active_socket is about to be destructed, emit logs if a connection is not created.
       if (!active_socket->connected_) {
         emitLogs(*config_, *active_socket->stream_info_);
+      } else {
+        // If the active_socket is not connected, this socket is not promoted to active connection.
+        // Thus the stream_info_ is owned by this active socket.
+        ENVOY_BUG(active_socket->stream_info_ != nullptr,
+                  "the unconnected active socket must have stream info.");
       }
     }
   }
+
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   Network::ConnectionHandler& parent_;
   Event::Dispatcher& dispatcher_;
   Network::ListenerPtr listener_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::list<std::unique_ptr<ActiveStreamSocket>> sockets_;
+  std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
 };
 
-template <typename ActiveStreamType,
-          typename ActiveConnectionCollectionType = typename ActiveStreamType::CollectionType>
+template <typename ActiveConnectionType>
 class TypedActiveStreamListenerBase : public ActiveStreamListenerBase {
 
 public:
+  using ActiveConnectionCollectionType = typename ActiveConnectionType::CollectionType;
   TypedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
                                 Network::ListenerPtr&& listener, Network::ListenerConfig& config)
       : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
-  using ActiveGenericConnectionPtr = std::unique_ptr<ActiveStreamType>;
-  using ActiveGenericConnectionsPtr = std::unique_ptr<ActiveConnectionCollectionType>;
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnectionType>;
+  using ActiveConnectionsPtr = std::unique_ptr<ActiveConnectionCollectionType>;
 
   /**
    * Schedule to remove and destroy the active connections which are not tracked by listener
@@ -213,8 +217,7 @@ protected:
     dispatcher().clearDeferredDeleteList();
   }
 
-  absl::node_hash_map<const Network::FilterChain*, ActiveGenericConnectionsPtr>
-      connections_by_context_;
+  absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
   bool is_deleting_{false};
 };
 

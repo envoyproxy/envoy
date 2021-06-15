@@ -95,7 +95,6 @@ public:
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
 

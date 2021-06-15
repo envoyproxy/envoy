@@ -112,8 +112,8 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
     }
   }
 
-  auto active_socket = std::make_unique<ActiveStreamSocket>(
-      *this, std::move(socket), hand_off_restored_destination_connections);
+  auto active_socket = std::make_unique<ActiveTcpSocket>(*this, std::move(socket),
+                                                         hand_off_restored_destination_connections);
 
   onSocketAccepted(std::move(active_socket));
 }

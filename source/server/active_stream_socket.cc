@@ -8,9 +8,9 @@
 namespace Envoy {
 namespace Server {
 
-ActiveStreamSocket::ActiveStreamSocket(ActiveStreamListenerBase& listener,
-                                       Network::ConnectionSocketPtr&& socket,
-                                       bool hand_off_restored_destination_connections)
+ActiveTcpSocket::ActiveTcpSocket(ActiveStreamListenerBase& listener,
+                                 Network::ConnectionSocketPtr&& socket,
+                                 bool hand_off_restored_destination_connections)
     : listener_(listener), socket_(std::move(socket)),
       hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
       iter_(accept_filters_.end()),
@@ -19,7 +19,8 @@ ActiveStreamSocket::ActiveStreamSocket(ActiveStreamListenerBase& listener,
           StreamInfo::FilterState::LifeSpan::Connection)) {
   listener_.stats_.downstream_pre_cx_active_.inc();
 }
-ActiveStreamSocket::~ActiveStreamSocket() {
+
+ActiveTcpSocket::~ActiveTcpSocket() {
   accept_filters_.clear();
   listener_.stats_.downstream_pre_cx_active_.dec();
 
@@ -34,7 +35,8 @@ ActiveStreamSocket::~ActiveStreamSocket() {
     listener_.decNumConnections();
   }
 }
-Event::Dispatcher& ActiveStreamSocket::dispatcher() { return listener_.dispatcher(); }
+
+Event::Dispatcher& ActiveTcpSocket::dispatcher() { return listener_.dispatcher(); }
 
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
@@ -52,7 +54,7 @@ void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
   }
 }
 
-void ActiveStreamSocket::onTimeout() {
+void ActiveTcpSocket::onTimeout() {
   listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());
   ENVOY_LOG(debug, "listener filter times out after {} ms",
@@ -65,14 +67,14 @@ void ActiveStreamSocket::onTimeout() {
   unlink();
 }
 
-void ActiveStreamSocket::startTimer() {
+void ActiveTcpSocket::startTimer() {
   if (listener_.listener_filters_timeout_.count() > 0) {
     timer_ = listener_.dispatcher().createTimer([this]() -> void { onTimeout(); });
     timer_->enableTimer(listener_.listener_filters_timeout_);
   }
 }
 
-void ActiveStreamSocket::unlink() {
+void ActiveTcpSocket::unlink() {
   auto removed = removeFromList(listener_.sockets_);
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
@@ -84,7 +86,7 @@ void ActiveStreamSocket::unlink() {
   listener_.dispatcher().deferredDelete(std::move(removed));
 }
 
-void ActiveStreamSocket::continueFilterChain(bool success) {
+void ActiveTcpSocket::continueFilterChain(bool success) {
   if (success) {
     bool no_error = true;
     if (iter_ == accept_filters_.end()) {
@@ -123,12 +125,12 @@ void ActiveStreamSocket::continueFilterChain(bool success) {
   }
 }
 
-void ActiveStreamSocket::setDynamicMetadata(const std::string& name,
-                                            const ProtobufWkt::Struct& value) {
+void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
+                                         const ProtobufWkt::Struct& value) {
   stream_info_->setDynamicMetadata(name, value);
 }
 
-void ActiveStreamSocket::newConnection() {
+void ActiveTcpSocket::newConnection() {
   connected_ = true;
 
   // Check if the socket may need to be redirected to another listener.
