@@ -985,8 +985,9 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     }
     break;
 
-  case NGHTTP2_ERR_FLOW_CONTROL:
-  case NGHTTP2_ERR_PROTO:
+  default:
+    ASSERT(error_code == NGHTTP2_ERR_FLOW_CONTROL || error_code == NGHTTP2_ERR_PROTO,
+         absl::StrCat("Unexpected error_code: ", error_code));
     break;
   }
 
