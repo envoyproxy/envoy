@@ -422,6 +422,7 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
     // Notify the grid the second pool has been drained. This should not be
     // passed up to the original callers.
     EXPECT_FALSE(drain_received);
+    EXPECT_CALL(*grid_.second(), isIdle()).WillRepeatedly(Return(true));
     grid_.second()->idle_cb_();
     EXPECT_FALSE(drain_received);
   }
@@ -430,6 +431,7 @@ TEST_F(ConnectivityGridTest, DrainCallbacks) {
     // Notify the grid that another pool has been drained. Now that all pools are
     // drained, the original callers should be informed.
     EXPECT_FALSE(drain_received);
+    EXPECT_CALL(*grid_.first(), isIdle()).WillRepeatedly(Return(true));
     grid_.first()->idle_cb_();
     EXPECT_TRUE(drain_received);
   }

@@ -203,10 +203,9 @@ private:
   // TODO(RyanTheOptimist): Make the alternate_protocols_ member non-optional.
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
 
-  // Tracks how many drains are needed before calling drain callbacks. This is
-  // set to the number of pools when the first drain callbacks are added, and
-  // decremented as various pools drain.
-  uint32_t drains_needed_ = 0;
+  // True iff this pool is draining. No new streams or connections should be created
+  // in this state.
+  bool draining_{false};
 
   // Tracks the callbacks to be called on drain completion.
   std::list<Instance::IdleCb> idle_callbacks_;

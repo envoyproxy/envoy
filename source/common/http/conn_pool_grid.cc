@@ -223,9 +223,9 @@ void ConnectivityGrid::deleteIsPending() {
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
   ASSERT(!deferred_deleting_);
   // Pools are created by newStream, which should not be called during draining.
-  ASSERT(drains_needed_ == 0);
+  ASSERT(!draining_);
   // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
-  if (pools_.size() == 2 || drains_needed_ != 0) {
+  if (pools_.size() == 2 || draining_) {
     return absl::nullopt;
   }
 
@@ -264,7 +264,7 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   ASSERT(!deferred_deleting_);
 
   // New streams should not be created during draining.
-  ASSERT(drains_needed_ == 0);
+  ASSERT(!draining_);
 
   if (pools_.empty()) {
     createNextPool();
@@ -294,16 +294,14 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
 }
 
 void ConnectivityGrid::startDrain() {
-  if (drains_needed_ > 0) {
+  if (draining_) {
     // A drain callback has already been set, and only needs to happen once.
     return;
   }
 
-  // If this is the first time an idle callback has been added, track the
-  // number of pools which need to be drained in order to pass drain-completion
-  // up to the callers. Note that no new pools can be created from this point on
-  // as createNextPool fast-fails if `drains_needed_` is non-zero.
-  drains_needed_ = pools_.size();
+  // Note that no new pools can be created from this point on
+  // as createNextPool fast-fails if `draining_` is true.
+  draining_ = true;
 
   for (auto& pool : pools_) {
     pool->startDrain();
@@ -355,15 +353,7 @@ void ConnectivityGrid::onIdleReceived() {
     return;
   }
 
-  bool drained = false;
-  if (drains_needed_ > 0) {
-    if (--drains_needed_ == 0) {
-      // All the pools have drained. Notify drain subscribers.
-      drained = true;
-    }
-  }
-
-  if (drained || isIdle()) {
+  if (isIdle()) {
     for (auto& callback : idle_callbacks_) {
       callback();
     }
