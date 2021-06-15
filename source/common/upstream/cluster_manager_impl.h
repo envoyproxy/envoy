@@ -360,6 +360,9 @@ private:
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
       bool draining_{false};
+
+      // Protect from deletion while iterating through pools_. See comments and usage
+      // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
       bool do_not_delete_{false};
     };
 
