@@ -18,8 +18,10 @@ public:
   /**
    * Create a gRPC::RawAsyncClient.
    * Prefer AsyncClientManager::getOrCreateRawAsyncClient() to creating uncached raw async client
-   * from factory. Only call this method when the raw async client is expected to be owned
-   * exclusively.
+   * from factory. Only call this method when the raw async client must be owned
+   * exclusively. For example, some filters pass *this reference to raw client. In this case, raw
+   * client must be destroyed before the filter instance. In this case, the grpc client must be
+   * owned by the filter instance exclusively.
    * @return RawAsyncClientPtr async client.
    */
   virtual RawAsyncClientPtr createUncachedRawAsyncClient() PURE;

@@ -154,25 +154,9 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
-uint64_t AsyncClientManagerImpl::RawAsyncClientCache::hashByType(
-    const envoy::config::core::v3::GrpcService& config) const {
-  uint64_t key = 0;
-  switch (config.target_specifier_case()) {
-  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
-    key = MessageUtil::hash(config.envoy_grpc());
-    break;
-  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
-    key = MessageUtil::hash(config.google_grpc());
-    break;
-  case envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-  return key;
-}
-
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) const {
-  uint64_t key = hashByType(config);
+  uint64_t key = MessageUtil::hash(config);
   auto it = cache_.find(key);
   if (it == cache_.end()) {
     return nullptr;
@@ -182,7 +166,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  uint64_t key = hashByType(config);
+  uint64_t key = MessageUtil::hash(config);
   cache_[key] = client;
 }
 
