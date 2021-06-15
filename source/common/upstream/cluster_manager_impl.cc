@@ -1415,6 +1415,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
+
         pool->addIdleCallback([this, host, priority, hash_key]() {
           if (parent_.destroying_) {
             // If the Cluster is being destroyed, this pool will be cleaned up by that
@@ -1422,26 +1423,30 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
             return;
           }
 
-          ConnPoolsContainer* container = parent_.getHttpConnPoolsContainer(host, false);
-          if (container != nullptr) {
-            if (container->draining_ ||
-                Runtime::runtimeFeatureEnabled(
-                    "envoy.reloadable_features.conn_pool_delete_when_idle")) {
+          ConnPoolsContainer* container = parent_.getHttpConnPoolsContainer(host);
+          if (container == nullptr) {
+            // This could happen if we have cleaned out the host before iterating through every
+            // connection pool. Handle it by just continuing.
+            return;
+          }
 
-              ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
-              container->pools_->erasePool(priority, hash_key);
+          if (container->draining_ || Runtime::runtimeFeatureEnabled(
+                                          "envoy.reloadable_features.conn_pool_delete_when_idle")) {
 
-              // Guard deletion of the container with `do_not_delete_` to avoid deletion while
-              // iterating through the container in `container->pools_->startDrain()`. See
-              // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-              if (!container->do_not_delete_ && container->pools_->size() == 0) {
-                ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
-                parent_.host_http_conn_pool_map_.erase(
-                    host); // NOTE: `container` is erased after this point in the lambda.
-              }
+            ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+            container->pools_->erasePool(priority, hash_key);
+
+            // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+            // iterating through the container in `container->pools_->startDrain()`. See
+            // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+            if (!container->do_not_delete_ && container->pools_->size() == 0) {
+              ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+              parent_.host_http_conn_pool_map_.erase(
+                  host); // NOTE: `container` is erased after this point in the lambda.
             }
           }
         });
+
         return pool;
       });
 
