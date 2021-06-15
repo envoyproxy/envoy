@@ -987,7 +987,7 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 
   default:
     ASSERT(error_code == NGHTTP2_ERR_FLOW_CONTROL || error_code == NGHTTP2_ERR_PROTO,
-         absl::StrCat("Unexpected error_code: ", error_code));
+           absl::StrCat("Unexpected error_code: ", error_code));
     break;
   }
 
