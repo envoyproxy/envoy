@@ -214,9 +214,11 @@ TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggered) {
   EXPECT_CALL(pool_, onPoolReady);
   clients_.back()->onEvent(Network::ConnectionEvent::Connected);
 
+  // The pool now has no requests/streams, but has an open connection, so it is not yet idle.
   clients_.back()->active_streams_ = 0;
   pool_.onStreamClosed(*clients_.back(), false);
 
+  // Now that the last connection is closed, while there are no requests, the pool becomes idle.
   testing::MockFunction<void()> idle_pool_callback;
   EXPECT_CALL(idle_pool_callback, Call());
   pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());

@@ -447,6 +447,15 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.releaseResources();
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
+
+    // Avoid calling the idle callbacks more than neccessary with these checks. `checkForIdle()` is
+    // called elsewhere except when there is an incomplete stream (this event causes the stream to
+    // be closed), or when we're not draining, there are no requests/streams, and an otherwise idle
+    // connection is closed (which can leave the pool idle). If we were draining, the idle
+    // connections would have already been closed earlier.
+    //
+    // It should be harmless to call the idle callbacks more than once for a single idle event,
+    // but it makes test expectations more difficult.
     if (incomplete_stream || !is_draining_) {
       checkForIdle();
     }
