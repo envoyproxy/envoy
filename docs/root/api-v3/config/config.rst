@@ -29,3 +29,4 @@ Extensions
   http/header_formatters
   http/original_ip_detection
   quic/quic_extensions
+  formatter/formatter
