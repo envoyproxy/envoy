@@ -194,11 +194,6 @@ public:
                                                std::move(client_transport_socket), nullptr);
   }
 
-  void verifyActualFrameSizeToUse() {
-    EXPECT_NE(client_tsi_socket_, nullptr);
-    EXPECT_EQ(client_tsi_socket_->actualFrameSizeToUse(), 16384);
-  }
-
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
     if (connect_to_handshaker) {
       return absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
@@ -251,7 +246,6 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-  verifyActualFrameSizeToUse();
 }
 
 TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
@@ -267,7 +261,6 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
                                 "Eep: baz\r\n\r\n",
                                 &response, true, makeAltsTransportSocket());
   EXPECT_THAT(response, testing::StartsWith("HTTP/1.1 200 OK\r\n"));
-  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -289,7 +282,6 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
