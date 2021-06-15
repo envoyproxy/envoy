@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.RouteConfiguration";
@@ -120,6 +120,14 @@ message RouteConfiguration {
   //   is not subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
+
+  // [#not-implemented-hide:]
+  // Additional clusters which are not referenced directly by a RouteAction
+  // cluster_specifier, but may be selected by a cluster_specifier_plugin.
+  // This is provided for xDS clients like gRPC that fetch the set of cluster
+  // resources referenced by the RouteConfiguration, and not by a wildcard CDS
+  // subscription.
+  repeated string additional_clusters = 12;
 }
 
 message Vhds {

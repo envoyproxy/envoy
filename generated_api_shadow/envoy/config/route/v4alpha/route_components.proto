@@ -201,7 +201,7 @@ message FilterAction {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 20]
+// [#next-free-field: 19]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.Route";
 
@@ -299,11 +299,6 @@ message Route {
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
-
-  // [#not-implemented-hide:]
-  // Additional clusters which are not referenced directly by a RouteAction
-  // cluster_specifier, but may be selected by a cluster_specifier_plugin.
-  repeated string additional_clusters = 19;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
