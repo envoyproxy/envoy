@@ -230,22 +230,19 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   }
 
   // HTTP/3 is hard-coded as higher priority, H2 as secondary.
-  ConnectivityGrid::PoolIterator pool;
+  ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
-    pools_.push_back(Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_,
-                                             options_, transport_socket_options_, state_,
-                                             time_source_));
-    pool = pools_.begin();
+    pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
+                                   transport_socket_options_, state_, time_source_);
   } else {
-    pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
-                                                             priority_, options_,
-                                                             transport_socket_options_, state_));
-    pool = std::next(pools_.begin());
+    pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
+                                                   options_, transport_socket_options_, state_);
   }
 
-  setupPool(**pool);
+  setupPool(*pool);
+  pools_.push_back(std::move(pool));
 
-  return pool;
+  return --pools_.end();
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
