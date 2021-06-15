@@ -7,7 +7,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/ratelimit/ratelimit.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -177,7 +176,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_CALL(stream_info, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
-        EXPECT_EQ(ns, NetworkFilterNames::get().RateLimit);
+        EXPECT_EQ(ns, "envoy.filters.network.rate_limit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
 

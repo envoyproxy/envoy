@@ -42,8 +42,8 @@ Network::FilterFactoryCb RateLimitConfigFactory::createFilterFactoryFromProtoTyp
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RateLimitConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.ratelimit"};
+REGISTER_FACTORY(RateLimitConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory){
+    "envoy.filters.network.rate_limit"};
 
 } // namespace RateLimitFilter
 } // namespace NetworkFilters

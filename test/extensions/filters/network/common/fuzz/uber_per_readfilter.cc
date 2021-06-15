@@ -29,7 +29,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
+        "envoy.filters.network.rate_limit", NetworkFilterNames::get().Rbac,
         // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
         // NetworkFilterNames::get().TcpProxy,
     };
@@ -89,7 +89,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().RateLimit) {
+  } else if (filter_name == "envoy.filters.network.rate_limit") {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
     // TODO(jianwendong): consider testing on different kinds of responses.
