@@ -47,8 +47,8 @@ def generate_protobufs(targets, output, api_repo):
         #
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
-        stripped_path = rule.decode().rsplit('//', 1) # envoy/config/bootstrap/v3:pkg_go_proto
-        rule_dir, proto = strippped_path.rsplit(':', 1)
+        _, stripped_path = rule.decode().rsplit('//', 1) # envoy/config/bootstrap/v3:pkg_go_proto
+        rule_dir, proto = stripped_path.rsplit(':', 1)
     
         if len(api_repo) == 0:
             prefix = ''
@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
     output = os.path.join(workspace, args.output_base)
-    generate_protobufs(args.targets, output, parser.api_repo)
+    generate_protobufs(args.targets, output, args.api_repo)
     if not args.sync:
         print('Skipping sync with go-control-plane')
         sys.exit()
