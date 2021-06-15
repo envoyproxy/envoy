@@ -15,6 +15,7 @@ bool MainThread::isMainThread() {
 
 bool MainThread::isWorkerThread() {
   auto main_thread_singleton = MainThreadSingleton::getExisting();
+  // Allow worker thread code to be executed in test thread.
   if (main_thread_singleton == nullptr) {
     return true;
   }

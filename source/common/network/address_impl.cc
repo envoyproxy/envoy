@@ -31,9 +31,9 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
-void throwOnError(absl::Status address) {
-  if (!address.ok()) {
-    throw EnvoyException(address.ToString());
+void throwOnError(absl::Status status) {
+  if (!status.ok()) {
+    throw EnvoyException(status.ToString());
   }
 }
 
@@ -41,7 +41,7 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
   if (!address.ok()) {
     throwOnError(address.status());
   }
-  return *address;
+  return *address;git checkout 
 }
 
 } // namespace
@@ -92,6 +92,10 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
 
 Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
                                                            socklen_t ss_len, bool v6only) {
+  // Though we don't have any test coverage where address validation in addressFromSockAddr() fails,
+  // this code is called in worker thread and can throw in theory. In that case, the program will
+  // crash due to uncaught exception. In pratice, we don't expect any address validation in
+  // addressFromSockAddr() to fail in worker thread.
   StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
   return throwOnError(address);
 }
