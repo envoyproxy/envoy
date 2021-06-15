@@ -181,6 +181,7 @@ delay: 0s
 )EOF");
 
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter(config_);
 
   synchronizer().enable();
@@ -189,31 +190,16 @@ delay: 0s
   synchronizer().waitOn("increment_pre_cas");
   std::thread t1([&] {
     EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter.filter_.onNewConnection());
+    EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter.filter_.onData(buffer, false));
   });
   // Wait until the thread is actually waiting.
   synchronizer().barrierOn("increment_pre_cas");
 
   // Increase connection counter to 1, which should cause the CAS to fail on the other thread.
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onData(buffer, false));
   synchronizer().signal("increment_pre_cas");
   t1.join();
-}
-
-// Verify decrement connection counter assert case.
-TEST_F(ConnectionLimitFilterTest, DecrementAssertCase) {
-  initialize(R"EOF(
-stat_prefix: connection_limit_stats
-max_connections: 1
-delay: 0s
-)EOF");
-
-  InSequence s;
-  ActiveFilter active_filter(config_);
-  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
-
-  // Decrement connection counter twice which should never happen in production.
-  config_->decrementConnection();
-  ASSERT_DEATH(config_->decrementConnection(), "");
 }
 
 } // namespace ConnectionLimitFilter
