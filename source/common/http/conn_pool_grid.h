@@ -137,6 +137,9 @@ public:
                    ConnectivityOptions connectivity_options);
   ~ConnectivityGrid() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deferred_deleting_ = true; }
+
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
@@ -211,9 +214,13 @@ private:
   // The connection pools to use to create new streams, ordered in the order of
   // desired use.
   std::list<ConnectionPool::InstancePtr> pools_;
+
   // True iff under the stack of the destructor, to avoid calling drain
   // callbacks on deletion.
   bool destroying_{};
+
+  // True iff this pool is being being defer deleted.
+  bool deferred_deleting_{};
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;

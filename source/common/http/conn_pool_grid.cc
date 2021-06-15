@@ -214,6 +214,7 @@ ConnectivityGrid::~ConnectivityGrid() {
 }
 
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
+  ASSERT(!deferred_deleting_);
   // Pools are created by newStream, which should not be called during draining.
   ASSERT(drains_needed_ == 0);
   // Right now, only H3 and TCP are supported, so if there are 2 pools we're done.
@@ -256,6 +257,8 @@ bool ConnectivityGrid::hasActiveConnections() const {
 
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
                                                          ConnectionPool::Callbacks& callbacks) {
+  ASSERT(!deferred_deleting_);
+
   if (pools_.empty()) {
     createNextPool();
   }

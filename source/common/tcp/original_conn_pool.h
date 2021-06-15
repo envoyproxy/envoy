@@ -28,6 +28,9 @@ public:
 
   ~OriginalConnPoolImpl() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deferred_deleting_ = true; }
+
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb) override;
   bool isIdle() const override;
@@ -168,6 +171,7 @@ protected:
 
   bool upstream_ready_enabled_{false};
   bool is_draining_{false};
+  bool deferred_deleting_{false};
 };
 
 } // namespace Tcp

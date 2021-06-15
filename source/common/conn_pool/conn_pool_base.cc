@@ -34,6 +34,14 @@ ConnPoolImplBase::~ConnPoolImplBase() {
   ASSERT(connecting_stream_capacity_ == 0);
 }
 
+void ConnPoolImplBase::deleteIsPendingImpl() {
+  deferred_deleting_ = true;
+  ASSERT(ready_clients_.empty());
+  ASSERT(busy_clients_.empty());
+  ASSERT(connecting_clients_.empty());
+  ASSERT(connecting_stream_capacity_ == 0);
+}
+
 void ConnPoolImplBase::destructAllConnections() {
   for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_}) {
     while (!list->empty()) {
@@ -229,6 +237,8 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context) {
+  ASSERT(!deferred_deleting_);
+
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
          connectingCapacity(connecting_clients_)); // O(n) debug check.
   if (!ready_clients_.empty()) {
@@ -276,6 +286,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(AttachContext& context)
 }
 
 bool ConnPoolImplBase::maybePreconnect(float global_preconnect_ratio) {
+  ASSERT(!deferred_deleting_);
   return tryCreateNewConnection(global_preconnect_ratio) == ConnectionResult::CreatedNewConnection;
 }
 

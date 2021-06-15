@@ -113,6 +113,8 @@ void OriginalConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable*
 OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
+  ASSERT(!deferred_deleting_);
+
   if (!ready_conns_.empty()) {
     ready_conns_.front()->moveBetweenLists(ready_conns_, busy_conns_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_conns_.front()->conn_);

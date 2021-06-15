@@ -144,6 +144,8 @@ public:
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
+  void deleteIsPendingImpl();
+
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
     ASSERT(dynamic_cast<T*>(&context) != nullptr);
@@ -334,6 +336,9 @@ private:
   // Whether the connection pool is currently in the process of closing
   // all connections so that it can be gracefully deleted.
   bool is_draining_{false};
+
+  // True iff this object is in the deferred delete list.
+  bool deferred_deleting_{false};
 
   void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
