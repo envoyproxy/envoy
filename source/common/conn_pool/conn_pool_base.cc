@@ -28,6 +28,7 @@ ConnPoolImplBase::ConnPoolImplBase(
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
+  ASSERT(pending_streams_.empty());
   ASSERT(ready_clients_.empty());
   ASSERT(busy_clients_.empty());
   ASSERT(connecting_clients_.empty());
@@ -36,6 +37,7 @@ ConnPoolImplBase::~ConnPoolImplBase() {
 
 void ConnPoolImplBase::deleteIsPendingImpl() {
   deferred_deleting_ = true;
+  ASSERT(pending_streams_.empty());
   ASSERT(ready_clients_.empty());
   ASSERT(busy_clients_.empty());
   ASSERT(connecting_clients_.empty());
@@ -459,16 +461,14 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
-    // Avoid calling the idle callbacks more than neccessary with these checks.
-    // `checkForIdleAndCloseIdleConnsIfDraining()` is called elsewhere except when there is an
-    // incomplete stream (this event causes the stream to be closed), or when we're not draining,
-    // there are no requests/streams, and an otherwise idle connection is closed (which can leave
-    // the pool idle). If we were draining, the idle connections would have already been closed
-    // earlier.
+    // Avoid calling the idle callbacks more than once with these checks.
+    // `checkForIdleAndCloseIdleConnsIfDraining()` is called elsewhere except:
     //
-    // It should be harmless to call the idle callbacks more than once for a single idle event,
-    // but it makes test expectations more difficult.
-    if (incomplete_stream || !is_draining_) {
+    // * When there is an incomplete stream (this event causes the stream to be closed)
+    // * When we're not draining, there are no requests/streams, and an otherwise idle connection is
+    //   closed (which can leave pool idle). If we were draining, the idle connections would
+    //   have already been closed.
+    if (incomplete_stream || (!is_draining_ && event == Network::ConnectionEvent::RemoteClose)) {
       checkForIdleAndCloseIdleConnsIfDraining();
     }
 

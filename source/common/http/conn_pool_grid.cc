@@ -213,6 +213,13 @@ ConnectivityGrid::~ConnectivityGrid() {
   pools_.clear();
 }
 
+void ConnectivityGrid::deleteIsPending() {
+  deferred_deleting_ = true;
+  for (const auto& pool : pools_) {
+    pool->deleteIsPending();
+  }
+}
+
 absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool() {
   ASSERT(!deferred_deleting_);
   // Pools are created by newStream, which should not be called during draining.

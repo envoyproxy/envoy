@@ -138,7 +138,7 @@ public:
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
-  void deleteIsPending() override { deferred_deleting_ = true; }
+  void deleteIsPending() override;
 
   // Http::ConnPool::Instance
   bool hasActiveConnections() const override;
