@@ -72,7 +72,7 @@ void OriginalConnPoolImpl::addIdleCallback(IdleCb cb) { idle_callbacks_.push_bac
 
 void OriginalConnPoolImpl::startDrain() {
   is_draining_ = true;
-  checkForIdle();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -89,7 +89,7 @@ bool OriginalConnPoolImpl::isIdle() const {
          ready_conns_.empty();
 }
 
-void OriginalConnPoolImpl::checkForIdle() {
+void OriginalConnPoolImpl::checkForIdleAndCloseIdleConnsIfDraining() {
   if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
       (is_draining_ || ready_conns_.empty())) {
     if (is_draining_) {
@@ -208,7 +208,7 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
     }
 
     if (check_for_drained || !is_draining_) {
-      checkForIdle();
+      checkForIdleAndCloseIdleConnsIfDraining();
     }
   }
 
@@ -243,7 +243,7 @@ void OriginalConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
     pending_conns_.back()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
 
-  checkForIdle();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void OriginalConnPoolImpl::onConnReleased(ActiveConn& conn) {
@@ -324,7 +324,7 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
-  checkForIdle();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 OriginalConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_(parent) {

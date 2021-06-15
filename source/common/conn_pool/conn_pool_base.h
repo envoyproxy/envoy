@@ -198,7 +198,7 @@ public:
   bool isIdleImpl() const;
 
   // See if the pool has gone idle. If we're draining, this will also close idle connections.
-  void checkForIdle();
+  void checkForIdleAndCloseIdleConnsIfDraining();
 
   void scheduleOnUpstreamReady();
   ConnectionPool::Cancellable* newStream(AttachContext& context);

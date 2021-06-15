@@ -330,7 +330,7 @@ void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks
 
 void ConnPoolImplBase::startDrainImpl() {
   is_draining_ = true;
-  checkForIdle();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
@@ -377,7 +377,7 @@ bool ConnPoolImplBase::isIdleImpl() const {
          connecting_clients_.empty();
 }
 
-void ConnPoolImplBase::checkForIdle() {
+void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
   if (is_draining_) {
     closeIdleConnectionsForDrainingPool();
   }
@@ -448,16 +448,17 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
-    // Avoid calling the idle callbacks more than neccessary with these checks. `checkForIdle()` is
-    // called elsewhere except when there is an incomplete stream (this event causes the stream to
-    // be closed), or when we're not draining, there are no requests/streams, and an otherwise idle
-    // connection is closed (which can leave the pool idle). If we were draining, the idle
-    // connections would have already been closed earlier.
+    // Avoid calling the idle callbacks more than neccessary with these checks.
+    // `checkForIdleAndCloseIdleConnsIfDraining()` is called elsewhere except when there is an
+    // incomplete stream (this event causes the stream to be closed), or when we're not draining,
+    // there are no requests/streams, and an otherwise idle connection is closed (which can leave
+    // the pool idle). If we were draining, the idle connections would have already been closed
+    // earlier.
     //
     // It should be harmless to call the idle callbacks more than once for a single idle event,
     // but it makes test expectations more difficult.
     if (incomplete_stream || !is_draining_) {
-      checkForIdle();
+      checkForIdleAndCloseIdleConnsIfDraining();
     }
 
     client.setState(ActiveClient::State::CLOSED);
@@ -476,7 +477,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // refer to client after this point.
     onConnected(client);
     onUpstreamReady();
-    checkForIdle();
+    checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 
@@ -546,7 +547,7 @@ void ConnPoolImplBase::onPendingStreamCancel(PendingStream& stream,
   }
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
-  checkForIdle();
+  checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 namespace {

@@ -150,7 +150,7 @@ protected:
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
-  void checkForIdle();
+  void checkForIdleAndCloseIdleConnsIfDraining();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
