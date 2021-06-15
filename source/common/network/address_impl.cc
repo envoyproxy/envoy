@@ -41,7 +41,7 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
   if (!address.ok()) {
     throwOnError(address.status());
   }
-  return *address;git checkout 
+  return *address;
 }
 
 } // namespace
