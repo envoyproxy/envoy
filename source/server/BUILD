@@ -160,9 +160,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "active_stream_socket",
-    srcs = ["active_stream_socket.cc"],
+    srcs = ["active_tcp_socket.cc"],
     hdrs = [
-        "active_stream_socket.h",
+        "active_tcp_socket.h",
     ],
     deps = [
         ":active_listener_base",

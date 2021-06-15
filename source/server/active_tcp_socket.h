@@ -115,6 +115,8 @@ public:
   virtual void incNumConnections() PURE;
   virtual void decNumConnections() PURE;
 
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+
   /**
    * Create a new connection from a socket accepted by the listener.
    */
@@ -135,19 +137,19 @@ public:
       active_socket->startTimer();
       LinkedList::moveIntoListBack(std::move(active_socket), sockets_);
     } else {
-      // If active_socket is about to be destructed, emit logs if a connection is not created.
       if (!active_socket->connected_) {
-        emitLogs(*config_, *active_socket->stream_info_);
-      } else {
-        // If the active_socket is not connected, this socket is not promoted to active connection.
-        // Thus the stream_info_ is owned by this active socket.
-        ENVOY_BUG(active_socket->stream_info_ != nullptr,
-                  "the unconnected active socket must have stream info.");
+        // If active_socket is about to be destructed, emit logs if a connection is not created.
+        if (active_socket->stream_info_ != nullptr) {
+          emitLogs(*config_, *active_socket->stream_info_);
+        } else {
+          // If the active_socket is not connected, this socket is not promoted to active
+          // connection. Thus the stream_info_ is owned by this active socket.
+          ENVOY_BUG(active_socket->stream_info_ != nullptr,
+                    "the unconnected active socket must have stream info.");
+        }
       }
     }
   }
-
-  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   Network::ConnectionHandler& parent_;
   Event::Dispatcher& dispatcher_;
