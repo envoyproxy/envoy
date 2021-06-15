@@ -6,8 +6,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -29,7 +29,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
@@ -125,9 +125,9 @@ fragments:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the SRDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
@@ -552,7 +552,7 @@ key:
              http_connection_manager) {
         auto* filter = http_connection_manager.mutable_http_filters()->Add();
         filter->set_name("filter.unknown");
-        filter->set_is_optional("true");
+        filter->set_is_optional(true);
         // keep router the last
         auto size = http_connection_manager.http_filters_size();
         http_connection_manager.mutable_http_filters()->SwapElements(size - 2, size - 1);

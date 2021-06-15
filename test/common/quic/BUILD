@@ -55,6 +55,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_stat_names_test",
+    srcs = ["quic_stat_names_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_stat_names_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "envoy_quic_session_cache_test",
     srcs = ["envoy_quic_session_cache_test.cc"],
     external_deps = ["quiche_quic_platform"],
@@ -129,7 +141,7 @@ envoy_cc_test(
         ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:codec_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
@@ -157,12 +169,13 @@ envoy_cc_test(
     deps = [
         ":quic_test_utils_for_envoy_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:codec_lib",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
@@ -184,6 +197,8 @@ envoy_cc_test(
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:envoy_quic_utils_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
+        "//source/extensions/quic/proof_source:envoy_quic_proof_source_factory_impl_lib",
         "//source/server:configuration_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
@@ -202,12 +217,13 @@ envoy_cc_test(
         ":quic_test_utils_for_envoy_lib",
         ":test_proof_source_lib",
         ":test_utils_lib",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/stats:stats_macros",
         "//source/common/quic:envoy_quic_alarm_factory_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_dispatcher_lib",
         "//source/common/quic:envoy_quic_proof_source_lib",
         "//source/common/quic:envoy_quic_server_session_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
         "//source/server:configuration_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",

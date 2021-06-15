@@ -1,10 +1,8 @@
-#include "common/crypto/utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
 
 #include "test/integration/http_integration.h"
 
@@ -20,7 +18,7 @@ namespace {
 class OauthIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   OauthIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {
     enableHalfClose(true);
   }
 
@@ -38,7 +36,7 @@ public:
   }
 
   void initialize() override {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     TestEnvironment::writeStringToFileForTest("token_secret.yaml", R"EOF(
 resources:

@@ -1,4 +1,4 @@
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include <cstdint>
 #include <list>
@@ -13,16 +13,17 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -421,7 +422,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find("-") != std::string::npos) {
+    if (s.find('-') != std::string::npos) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -576,16 +577,16 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time, bool prefer_gro,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (prefer_gro && handle.supportsUdpGro()) {
+  if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
     const uint64_t max_rx_datagram_size_with_gro =
-        NUM_DATAGRAMS_PER_GRO_RECEIVE * udp_packet_processor.maxDatagramSize();
+        NUM_DATAGRAMS_PER_RECEIVE * udp_packet_processor.maxDatagramSize();
     ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
     Api::IoCallUint64Result result =
@@ -635,17 +636,17 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       Buffer::ReservationSingleSlice reservation_;
     };
     constexpr uint32_t num_slices_per_packet = 1u;
-    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_MMSG_RECEIVE> buffers;
-    RawSliceArrays slices(NUM_DATAGRAMS_PER_MMSG_RECEIVE,
+    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_RECEIVE> buffers;
+    RawSliceArrays slices(NUM_DATAGRAMS_PER_RECEIVE,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_MMSG_RECEIVE; i++) {
+    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_RECEIVE; i++) {
       buffers.push_back(max_rx_datagram_size);
       slices[i][0] = buffers[i].reservation_.slice();
     }
 
-    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_MMSG_RECEIVE, packets_dropped);
-    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}",
-                   NUM_DATAGRAMS_PER_MMSG_RECEIVE, max_rx_datagram_size);
+    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_RECEIVE, packets_dropped);
+    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", NUM_DATAGRAMS_PER_RECEIVE,
+                   max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;
@@ -696,11 +697,24 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool prefer_gro,
                                                uint32_t& packets_dropped) {
+  // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
+  // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
+  size_t num_packets_to_read = std::min<size_t>(
+      MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
+  const bool use_gro = prefer_gro && handle.supportsUdpGro();
+  size_t num_reads =
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
+                                       : num_packets_to_read);
+  // Make sure to read at least once.
+  num_reads = std::max<size_t>(1, num_reads);
+  bool honor_read_limit =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, prefer_gro, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -722,6 +736,12 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           "max datagram size.",
           delta);
       udp_packet_processor.onDatagramsDropped(delta);
+    }
+    if (honor_read_limit) {
+      --num_reads;
+    }
+    if (num_reads == 0) {
+      return std::move(result.err_);
     }
   } while (true);
 }

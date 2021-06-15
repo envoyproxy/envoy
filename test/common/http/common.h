@@ -4,7 +4,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -17,7 +17,7 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   using DestroyCb = std::function<void(CodecClient*)>;
-  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+  CodecClientForTest(Http::CodecType type, Network::ClientConnectionPtr&& connection,
                      Http::ClientConnection* codec, DestroyCb destroy_cb,
                      Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
       : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {

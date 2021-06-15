@@ -12,9 +12,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/network/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/utility.h"
 
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"

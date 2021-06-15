@@ -4,9 +4,9 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

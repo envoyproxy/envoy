@@ -1,4 +1,4 @@
-#include "common/profiler/profiler.h"
+#include "source/common/profiler/profiler.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"

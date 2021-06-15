@@ -32,7 +32,7 @@ envoy_cc_test_library(
     name = "empty_http_filter_config_lib",
     hdrs = ["empty_http_filter_config.h"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
     ],
 )
 
@@ -56,7 +56,7 @@ envoy_cc_test(
     name = "stream_rate_limiter_test",
     srcs = ["stream_rate_limiter_test.cc"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",

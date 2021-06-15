@@ -1,8 +1,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/async_client_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_impl.h"
+#include "source/common/grpc/async_client_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/tracing/mocks.h"

@@ -28,8 +28,8 @@
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_protos.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Quic {

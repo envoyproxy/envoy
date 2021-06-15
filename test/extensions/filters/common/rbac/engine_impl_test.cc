@@ -2,9 +2,8 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/config/rbac/v3/rbac.pb.validate.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/rbac/engine_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/rbac/engine_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"

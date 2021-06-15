@@ -186,6 +186,7 @@ def envoy_dependencies(skip_targets = []):
     _kafka_deps()
 
     _org_llvm_llvm()
+    _com_github_wamr()
     _com_github_wavm_wavm()
     _com_github_wasmtime()
     _com_github_wasm_c_api()
@@ -515,7 +516,11 @@ def _com_google_googletest():
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
 def _com_google_absl():
-    external_http_archive("com_google_absl")
+    external_http_archive(
+        name = "com_google_absl",
+        patches = ["@envoy//bazel:abseil.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "abseil_any",
         actual = "@com_google_absl//absl/types:any",
@@ -842,10 +847,7 @@ def _proxy_wasm_cpp_sdk():
     external_http_archive(name = "proxy_wasm_cpp_sdk")
 
 def _proxy_wasm_cpp_host():
-    external_http_archive(
-        name = "proxy_wasm_cpp_host",
-        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
-    )
+    external_http_archive(name = "proxy_wasm_cpp_host")
 
 def _emscripten_toolchain():
     external_http_archive(
@@ -927,6 +929,16 @@ def _org_llvm_llvm():
         actual = "@envoy//bazel/foreign_cc:llvm",
     )
 
+def _com_github_wamr():
+    external_http_archive(
+        name = "com_github_wamr",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "wamr",
+        actual = "@envoy//bazel/foreign_cc:wamr",
+    )
+
 def _com_github_wavm_wavm():
     external_http_archive(
         name = "com_github_wavm_wavm",
@@ -947,6 +959,10 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+    native.bind(
+        name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 
 def _rules_fuzzing():

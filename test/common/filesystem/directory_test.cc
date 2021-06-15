@@ -3,7 +3,7 @@
 #include <stack>
 #include <string>
 
-#include "common/filesystem/directory.h"
+#include "source/common/filesystem/directory.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"

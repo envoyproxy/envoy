@@ -1,9 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/postgres_proxy/postgres_message.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_message.h"
 
 #include "fmt/printf.h"
 

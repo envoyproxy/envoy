@@ -13,11 +13,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/config_provider_impl.h"
-#include "common/config/subscription_base.h"
-#include "common/init/manager_impl.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_config_impl.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/config/subscription_base.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_config_impl.h"
 
 namespace Envoy {
 namespace Router {
