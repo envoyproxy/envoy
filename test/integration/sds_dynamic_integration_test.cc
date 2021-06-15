@@ -61,13 +61,15 @@ std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p)
       p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
-std::vector<TestParams> getSdsTestsParams() {
+std::vector<TestParams> getSdsTestsParams(bool disable_quic = false) {
   std::vector<TestParams> ret;
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     for (auto sds_grpc_type : TestEnvironment::getsGrpcVersionsForTest()) {
       ret.push_back(TestParams{ip_version, sds_grpc_type, false});
 #ifdef ENVOY_ENABLE_QUIC
-      ret.push_back(TestParams{ip_version, sds_grpc_type, true});
+      if (!disable_quic) {
+        ret.push_back(TestParams{ip_version, sds_grpc_type, true});
+      }
 #else
       ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
 #endif
@@ -515,7 +517,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // Validate that a basic SDS updates work with a private key provider.
 TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
