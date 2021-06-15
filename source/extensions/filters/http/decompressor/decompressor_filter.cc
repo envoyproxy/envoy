@@ -1,8 +1,8 @@
-#include "extensions/filters/http/decompressor/decompressor_filter.h"
+#include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/common/macros.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {

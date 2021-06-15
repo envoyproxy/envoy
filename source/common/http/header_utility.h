@@ -9,8 +9,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
-#include "common/http/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/http/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -66,6 +66,7 @@ public:
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
     const bool invert_match_;
+    bool present_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {
@@ -197,13 +198,20 @@ public:
    */
   static absl::string_view::size_type getPortStart(absl::string_view host);
 
-  /* Does a common header check ensuring required headers are present.
+  /* Does a common header check ensuring required request headers are present.
    * Required request headers include :method header, :path for non-CONNECT requests, and
    * host/authority for HTTP/1.1 or CONNECT requests.
    * @return Status containing the result. If failed, message includes details on which header was
    * missing.
    */
-  static Http::Status checkRequiredHeaders(const Http::RequestHeaderMap& headers);
+  static Http::Status checkRequiredRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /* Does a common header check ensuring required response headers are present.
+   * Current required response headers only includes :status.
+   * @return Status containing the result. If failed, message includes details on which header was
+   * missing.
+   */
+  static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional

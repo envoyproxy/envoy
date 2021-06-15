@@ -1,16 +1,16 @@
-#include "extensions/filters/http/lua/lua_filter.h"
+#include "source/extensions/filters/http/lua/lua_filter.h"
 
 #include <atomic>
 #include <memory>
 
 #include "envoy/http/codes.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/config/datasource.h"
-#include "common/crypto/utility.h"
-#include "common/http/message_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/datasource.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
 
 #include "absl/strings/escaping.h"
 
@@ -40,7 +40,7 @@ bool allowDeprecatedMetadataName() {
   if (!deprecatedNameLogged().exchange(true)) {
     // Have not logged yet, so use the logging test.
     return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-        "http filter", DEPRECATED_LUA_NAME, Extensions::HttpFilters::HttpFilterNames::get().Lua);
+        "http filter", DEPRECATED_LUA_NAME, "envoy.filters.http.lua");
   }
 
   // We have logged (or another thread will do so momentarily), so just check whether the
@@ -56,7 +56,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   const auto& metadata = callbacks->route()->routeEntry()->metadata();
 
   {
-    const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
+    const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
     }

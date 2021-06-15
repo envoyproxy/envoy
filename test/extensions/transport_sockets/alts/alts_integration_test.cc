@@ -1,10 +1,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 
-#include "common/common/thread.h"
-
-#include "extensions/transport_sockets/alts/config.h"
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/common/common/thread.h"
+#include "source/extensions/transport_sockets/alts/config.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #ifdef major
 #undef major
@@ -94,7 +93,7 @@ public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
                           bool client_connect_handshaker, bool capturing_handshaker = false)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
         server_connect_handshaker_(server_connect_handshaker),
         client_connect_handshaker_(client_connect_handshaker),

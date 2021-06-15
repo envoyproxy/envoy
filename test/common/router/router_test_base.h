@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/context_impl.h"
-#include "common/router/router.h"
-#include "common/stream_info/uint32_accessor_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -51,6 +51,7 @@ public:
 class RouterTestBase : public testing::Test {
 public:
   RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                 bool suppress_grpc_request_failure_code_stats,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
 
   void expectResponseTimerCreate();

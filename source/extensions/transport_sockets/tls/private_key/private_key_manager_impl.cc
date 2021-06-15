@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/registry/registry.h"

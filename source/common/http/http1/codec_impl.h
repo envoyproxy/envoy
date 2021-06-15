@@ -12,16 +12,16 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/assert.h"
-#include "common/common/statusor.h"
-#include "common/http/codec_helper.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/parser.h"
-#include "common/http/status.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/statusor.h"
+#include "source/common/http/codec_helper.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/parser.h"
+#include "source/common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -67,6 +67,10 @@ public:
     // HTTP/1 has one stream per connection, thus any data encoded is immediately written to the
     // connection, invoking any watermarks as necessary. There is no internal buffering that would
     // require a flush timeout not already covered by other timeouts.
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for H1.
   }
 
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
@@ -229,7 +233,7 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool sendStrict1xxAnd204Headers() { return send_strict_1xx_and_204_headers_; }
+  bool sendStrict1xxAnd204Headers() const { return send_strict_1xx_and_204_headers_; }
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -237,6 +241,8 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
@@ -284,6 +290,7 @@ protected:
   const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
+  const bool no_chunked_encoding_header_for_304_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };

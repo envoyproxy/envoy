@@ -2,11 +2,11 @@
 #include <memory>
 #include <vector>
 
-#include "common/event/dispatcher_impl.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -131,7 +131,7 @@ public:
       auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
       Network::ClientConnectionPtr connection{test_client.connection_};
       test_client.codec_client_ = new CodecClientForTest(
-          CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
+          CodecType::HTTP1, std::move(connection), test_client.codec_,
           [this](CodecClient*) -> void { onClientDestroy(); },
           Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
           *test_client.client_dispatcher_);

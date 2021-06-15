@@ -2,8 +2,8 @@
 
 #include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
 
-#include "extensions/filters/http/cdn_loop/config.h"
-#include "extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/config.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"

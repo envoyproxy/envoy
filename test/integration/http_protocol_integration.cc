@@ -4,8 +4,8 @@
 
 namespace Envoy {
 std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTestParams(
-    const std::vector<Http::CodecClient::Type>& downstream_protocols,
-    const std::vector<FakeHttpConnection::Type>& upstream_protocols) {
+    const std::vector<Http::CodecType>& downstream_protocols,
+    const std::vector<Http::CodecType>& upstream_protocols) {
   std::vector<HttpProtocolTestParams> ret;
 
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
@@ -14,8 +14,8 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 #ifdef ENVOY_ENABLE_QUIC
         ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
 #else
-        if (downstream_protocol == Http::CodecClient::Type::HTTP3 ||
-            upstream_protocol == FakeHttpConnection::Type::HTTP3) {
+        if (downstream_protocol == Http::CodecType::HTTP3 ||
+            upstream_protocol == Http::CodecType::HTTP3) {
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
           ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
@@ -27,25 +27,25 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
   return ret;
 }
 
-absl::string_view upstreamToString(FakeHttpConnection::Type type) {
+absl::string_view upstreamToString(Http::CodecType type) {
   switch (type) {
-  case FakeHttpConnection::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     return "HttpUpstream";
-  case FakeHttpConnection::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     return "Http2Upstream";
-  case FakeHttpConnection::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     return "Http3Upstream";
   }
   return "UnknownUpstream";
 }
 
-absl::string_view downstreamToString(Http::CodecClient::Type type) {
+absl::string_view downstreamToString(Http::CodecType type) {
   switch (type) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     return "HttpDownstream_";
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     return "Http2Downstream_";
-  case Http::CodecClient::Type::HTTP3:
+  case Http::CodecType::HTTP3:
     return "Http3Downstream_";
   }
   return "UnknownDownstream";

@@ -7,11 +7,11 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/filters/process_context_filter.h"
@@ -369,7 +369,9 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  concurrency_ = 2;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
+
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:
@@ -405,18 +407,30 @@ typed_config:
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
   }
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+    auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  }
+
+  auto second_codec = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+      {":method", "POST"},    {":path", "/test/long/url"},   {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "not-match"}, {"content-type", "application/grpc"}};
+  auto response = second_codec->makeRequestWithBody(request_headers, 1024);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 
   codec_client_->close();
+  second_codec->close();
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -638,7 +652,7 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
-    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_explicit_http_config()
           ->mutable_http_protocol_options()

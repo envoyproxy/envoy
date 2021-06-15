@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/protocol.pb.h"
@@ -15,20 +16,21 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/common/statusor.h"
-#include "common/common/thread.h"
-#include "common/http/codec_helper.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/http2/metadata_decoder.h"
-#include "common/http/http2/metadata_encoder.h"
-#include "common/http/http2/protocol_constraints.h"
-#include "common/http/status.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/codec_helper.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http2/metadata_decoder.h"
+#include "source/common/http/http2/metadata_encoder.h"
+#include "source/common/http/http2/protocol_constraints.h"
+#include "source/common/http/status.h"
+#include "source/common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -229,7 +231,7 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.addressProvider().localAddress();
     }
@@ -237,6 +239,7 @@ protected:
     void setFlushTimeout(std::chrono::milliseconds timeout) override {
       stream_idle_timeout_ = timeout;
     }
+    void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
@@ -258,8 +261,8 @@ protected:
     }
 
     void setWriteBufferWatermarks(uint32_t high_watermark) {
-      pending_recv_data_.setWatermarks(high_watermark);
-      pending_send_data_.setWatermarks(high_watermark);
+      pending_recv_data_->setWatermarks(high_watermark);
+      pending_send_data_->setWatermarks(high_watermark);
     }
 
     // If the receive buffer encounters watermark callbacks, enable/disable reads on this stream.
@@ -293,19 +296,14 @@ protected:
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
 
+    Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
     // window without triggering protocol error and this buffer is drained after each DATA frame was
     // dispatched through the filter chain. See source/docs/flow_control.md for more information.
-    Buffer::WatermarkBuffer pending_recv_data_{
-        [this]() -> void { this->pendingRecvBufferLowWatermark(); },
-        [this]() -> void { this->pendingRecvBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
-    Buffer::WatermarkBuffer pending_send_data_{
-        [this]() -> void { this->pendingSendBufferLowWatermark(); },
-        [this]() -> void { this->pendingSendBufferHighWatermark(); },
-        []() -> void { /* TODO(adisuissa): Handle overflow watermark */ }};
+    Buffer::InstancePtr pending_recv_data_;
+    Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<MetadataEncoder> metadata_encoder_;
@@ -535,6 +533,11 @@ protected:
   // dumpState helper method.
   virtual void dumpStreams(std::ostream& os, int indent_level) const;
 
+  // Send a keepalive ping, and set the idle timer for ping timeout.
+  void sendKeepalive();
+
+  const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
+
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
@@ -556,7 +559,6 @@ private:
   virtual ProtocolConstraints::ReleasorProc
   trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  void sendKeepalive();
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
@@ -568,6 +570,7 @@ private:
   bool pending_deferred_reset_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
+  MonotonicTime last_received_data_time_{};
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
   std::chrono::milliseconds keepalive_interval_;
@@ -606,6 +609,7 @@ private:
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
+  std::chrono::milliseconds idle_session_requires_ping_interval_;
   // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
   bool enable_upstream_http2_flood_checks_;
 };

@@ -8,10 +8,9 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -64,7 +63,7 @@ public:
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
-  void setUpstreamProtocol(FakeHttpConnection::Type protocol);
+  void setUpstreamProtocol(Http::CodecType protocol);
   // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
@@ -73,7 +72,7 @@ public:
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
 
-  FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
+  Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
@@ -309,23 +308,23 @@ public:
                                                  *dispatcher_, std::move(transport_socket));
   }
 
-  FakeUpstreamConfig configWithType(FakeHttpConnection::Type type) const {
+  FakeUpstreamConfig configWithType(Http::CodecType type) const {
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
-    if (type != FakeHttpConnection::Type::HTTP3) {
+    if (type != Http::CodecType::HTTP3) {
       config.udp_fake_upstream_ = absl::nullopt;
     }
     return config;
   }
 
-  FakeUpstream& addFakeUpstream(FakeHttpConnection::Type type) {
+  FakeUpstream& addFakeUpstream(Http::CodecType type) {
     auto config = configWithType(type);
     fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
     return *fake_upstreams_.back();
   }
 
   FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                                FakeHttpConnection::Type type) {
+                                Http::CodecType type) {
     auto config = configWithType(type);
     fake_upstreams_.emplace_back(
         std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));

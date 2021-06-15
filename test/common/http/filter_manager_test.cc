@@ -4,12 +4,12 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/http/filter_manager.h"
-#include "common/http/matching/inputs.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/matcher.h"
-#include "common/stream_info/filter_state_impl.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/matching/inputs.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -28,8 +28,8 @@ class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
     filter_manager_ = std::make_unique<FilterManager>(
-        filter_manager_callbacks_, dispatcher_, connection_, 0, true, 10000, filter_factory_,
-        local_reply_, protocol_, time_source_, filter_state_,
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
+        filter_factory_, local_reply_, protocol_, time_source_, filter_state_,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 

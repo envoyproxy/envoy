@@ -1,12 +1,11 @@
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 
-#include "common/common/base64.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/config.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/config.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
