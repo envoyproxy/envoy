@@ -161,6 +161,8 @@ message RateLimitResponse {
     //    :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
     //
     // When quota expires due to timeout, a new RLS request will also be made.
+    // The implementation may choose to preemptively query the rate limit server for more quota on or
+    // before expiration or before the available quota runs out.
     // [#not-implemented-hide:]
     Quota quota = 5;
   }
