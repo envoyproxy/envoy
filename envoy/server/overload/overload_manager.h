@@ -34,6 +34,9 @@ public:
 
   // Overload action to reduce some subset of configured timeouts.
   const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
+
+  // Overload action to reset streams using excessive memory.
+  const std::string ResetStreams = "envoy.overload_actions.reset_streams";
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;

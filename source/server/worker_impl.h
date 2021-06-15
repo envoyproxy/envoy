@@ -58,6 +58,7 @@ private:
   void threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb);
   void stopAcceptingConnectionsCb(OverloadActionState state);
   void rejectIncomingConnectionsCb(OverloadActionState state);
+  void resetStreamsUsingExcessiveMemory(OverloadActionState state);
 
   ThreadLocal::Instance& tls_;
   ListenerHooks& hooks_;

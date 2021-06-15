@@ -35,6 +35,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
       [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().ResetStreams, *dispatcher_,
+      [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -146,6 +149,12 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
 
 void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
   handler_->setListenerRejectFraction(state.value());
+}
+
+void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState /*state*/) {
+  // TODO(kbaichoo): Implement likely just forward to dispatcher's buffer
+  // factory, having it do the heavy lifting.
+  std::cout << "resetStreamsUsingExcessiveMemory called!\n";
 }
 
 } // namespace Server
