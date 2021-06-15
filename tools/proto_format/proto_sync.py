@@ -95,6 +95,7 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/rate_limit/v2",
     "envoy/config/filter/network/rbac/v2",
     "envoy/config/filter/network/sni_cluster/v2",
+    "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
 ]
 
 IMPORT_REGEX = re.compile('import "(.*)";')

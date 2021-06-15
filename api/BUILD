@@ -35,7 +35,6 @@ proto_library(
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
-        "//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg",
         "//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",
         "//envoy/config/filter/udp/udp_proxy/v2alpha:pkg",
