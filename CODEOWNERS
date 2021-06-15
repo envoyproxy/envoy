@@ -126,6 +126,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
 /*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 # webassembly stat-sink extensions

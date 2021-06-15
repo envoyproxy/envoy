@@ -554,6 +554,11 @@ envoy.stat_sinks.dog_statsd:
   - envoy.stats_sinks
   security_posture: data_plane_agnostic
   status: stable
+envoy.stat_sinks.graphite_statsd:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
 envoy.stat_sinks.hystrix:
   categories:
   - envoy.stats_sinks
