@@ -1177,7 +1177,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
   }
 
   int res = cert_validator_->doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
-  if (res <= 0) {
+  if (res <= 0 && SSL_CTX_get_verify_mode(tls_contexts_[0].ssl_ctx_.get()) != SSL_VERIFY_NONE) {
     const int n = X509_STORE_CTX_get_error(ctx.get());
     const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
     error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",
