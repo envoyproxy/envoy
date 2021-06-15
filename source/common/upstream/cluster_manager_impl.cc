@@ -1130,14 +1130,16 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   // Make a copy to protect against erasure in the callback.
   std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
   container.draining_ = true;
-  container.do_not_delete_ = true;
-  pools->startDrain();
-  container.do_not_delete_ = false;
 
   // We need to hold off on actually emptying out the container until we have finished processing
   // `addIdleCallback`. If we do not, then it's possible that the container could be erased in
   // the middle of its iteration, which leads to undefined behaviour. We handle that case by
-  // guarding deletion with `do_not_delete_` and then checking again here.
+  // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
+  // afterwards whether it is empty and deleting it if neccessary.
+  container.do_not_delete_ = true;
+  pools->startDrain();
+  container.do_not_delete_ = false;
+
   if (container.pools_->size() == 0) {
     host_http_conn_pool_map_.erase(old_host);
   }
@@ -1426,6 +1428,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
               ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
               container->pools_->erasePool(priority, hash_key);
 
+              // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+              // iterating through the container in `container->pools_->startDrain()`. See
+              // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
               if (!container->do_not_delete_ && container->pools_->size() == 0) {
                 ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
                 parent_.host_http_conn_pool_map_.erase(
