@@ -475,79 +475,6 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   }
 }
 
-class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
-public:
-  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    ProtobufWkt::Struct val;
-    (*val.mutable_fields())["private_key_file"].set_string_value(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
-    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
-
-    // check the key type and set the mode accordingly
-    std::string mode;
-    std::string private_key = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-
-    EXPECT_TRUE(pkey != nullptr);
-
-    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-      mode = "rsa";
-    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
-      mode = "ecdsa";
-    }
-    (*val.mutable_fields())["mode"].set_string_value(mode);
-
-    secret.set_name(server_cert_rsa_);
-    auto* tls_certificate = secret.mutable_tls_certificate();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::temporaryPath("root/current/servercert.pem"));
-    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
-        "type.googleapis.com/google.protobuf.Struct");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
-    auto* watched_directory = tls_certificate->mutable_watched_directory();
-    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
-    return secret;
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
-                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
-
-// Validate that a basic SDS updates work with a private key provider.
-TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
-  v3_resource_api_ = true;
-
-  TestEnvironment::exec(
-      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
-
-  // Set up the private key provider.
-  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
-  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
-      test_private_key_method_factory(test_factory);
-
-  on_server_init_function_ = [this]() {
-    createSdsStream(*(fake_upstreams_[1]));
-    sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
-  };
-  initialize();
-
-  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
-
-  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-    return makeSslClientConnection();
-  };
-  testRouterHeaderOnlyRequestAndResponse(&creator);
-
-  cleanupUpstreamAndDownstream();
-}
-
 // A test that SDS server send a bad secret for a static listener,
 // The first ssl request should fail at connecting.
 // then SDS send a good server secret,  the second request should be OK.
@@ -1051,5 +978,168 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
 
+class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {
+public:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    ProtobufWkt::Struct val;
+    (*val.mutable_fields())["private_key_file"].set_string_value(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
+    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
+
+    // check the key type and set the mode accordingly
+    std::string mode;
+    std::string private_key = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+
+    EXPECT_TRUE(pkey != nullptr);
+
+    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
+      mode = "rsa";
+    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
+      mode = "ecdsa";
+    }
+    (*val.mutable_fields())["mode"].set_string_value(mode);
+
+    secret.set_name(server_cert_rsa_);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::temporaryPath("root/current/servercert.pem"));
+    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
+    auto* watched_directory = tls_certificate->mutable_watched_directory();
+    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
+    return secret;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+
+// Validate that a basic SDS updates work with a private key provider.
+TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
+  v3_resource_api_ = true;
+
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
+
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
+  };
+  initialize();
+
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+
+  cleanupUpstreamAndDownstream();
+}
+
+class SdsCdsPrivateKeyIntegrationTest : public SdsCdsIntegrationTest {
+public:
+  envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    ProtobufWkt::Struct val;
+    (*val.mutable_fields())["private_key_file"].set_string_value(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
+    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
+
+    // check the key type and set the mode accordingly
+    std::string mode;
+    std::string private_key = TestEnvironment::readFileToStringForTest(
+        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+
+    EXPECT_TRUE(pkey != nullptr);
+
+    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
+      mode = "rsa";
+    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
+      mode = "ecdsa";
+    }
+    (*val.mutable_fields())["mode"].set_string_value(mode);
+
+    secret.set_name(client_cert_);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::temporaryPath("root/current/servercert.pem"));
+    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/google.protobuf.Struct");
+    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
+    auto* watched_directory = tls_certificate->mutable_watched_directory();
+    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
+    return secret;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+
+TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
+  v3_resource_api_ = true;
+
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
+
+  on_server_init_function_ = [this]() {
+    {
+      // CDS.
+      AssertionResult result =
+          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+    {
+      // SDS.
+      AssertionResult result =
+          fake_upstreams_[2]->waitForHttpConnection(*dispatcher_, sds_connection_);
+      RELEASE_ASSERT(result, result.message());
+
+      result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      sds_stream_->startGrpcStream();
+      sendSdsResponse2(getCurrentServerPrivateKeyProviderSecret(), *sds_stream_);
+    }
+  };
+  initialize();
+
+  test_server_->waitForCounterGe(
+      "cluster.dynamic.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
 } // namespace Ssl
 } // namespace Envoy
