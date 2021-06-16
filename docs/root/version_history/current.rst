@@ -23,6 +23,7 @@ Minor Behavior Changes
   be now be disabled in favor of using unsigned payloads with compatible services via the new
   `use_unsigned_payload` filter option (default false).
 * cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
+* cookie parsing: the order in which cookie values are parsed for a given key has changed. It happens when there are multiple values for that key in the last cookie header (e.g.: ``Cookie: mykey=v0; mykey=v1; mykey=v2``). In this case, envoy used to consider the first value (``v0``), it now considers the last one (``v2``). This behavior can be reverted by setting ``envoy.reloadable_features.cookies_get_last_value_header`` to false.
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   ``envoy.reloadable_features.experimental_matching_api`` to true.
@@ -39,7 +40,6 @@ Minor Behavior Changes
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
-* cookie parsing: the order in which cookie values are parsed for a given key has changed. It happens when there are multiple values for that key in the last cookie header (e.g.: ``Cookie: mykey=v0; mykey=v1; mykey=v2``). In this case, envoy used to consider the first value (``v0``), it now considers the last one (``v2``). This behavior can be reverted by setting ``envoy.reloadable_features.cookies_get_last_value_header`` to false.
 
 Bug Fixes
 ---------
