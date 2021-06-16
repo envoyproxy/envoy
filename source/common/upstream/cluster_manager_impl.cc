@@ -1138,7 +1138,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   // `addIdleCallback`. If we do not, then it's possible that the container could be erased in
   // the middle of its iteration, which leads to undefined behaviour. We handle that case by
   // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
-  // afterwards whether it is empty and deleting it if neccessary.
+  // afterwards whether it is empty and deleting it if necessary.
   container.do_not_delete_ = true;
   pools->startDrain();
   container.do_not_delete_ = false;
