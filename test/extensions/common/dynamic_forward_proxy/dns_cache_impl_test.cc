@@ -32,7 +32,7 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
-    if (preresolve_hostnames.size() != 0) {
+    if (!preresolve_hostnames.empty()) {
       for (const auto& hostname : preresolve_hostnames) {
         envoy::config::core::v3::SocketAddress* address = config_.add_preresolve_hostnames();
         address->set_address(hostname);
