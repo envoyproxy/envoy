@@ -845,12 +845,14 @@ TEST_F(ReverseBridgeTest, WithholdGrpcStreamResponse) {
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
   }
 
-  Http::TestResponseHeaderMapImpl headers({{":status", "200"},
-                                           {"custom-content-length", "30"},
-                                           {"content-type", "application/x-protobuf"}});
+  Http::TestResponseHeaderMapImpl headers(
+      {{":status", "200"},
+       // This is the total length of the 2 buffers encoded separately below.
+       {"custom-content-length", "8"},
+       {"content-type", "application/x-protobuf"}});
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
-  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "35"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "13"));
 
   {
     // The response data should be streamed to the client instead of buffered. Additionally, the
@@ -912,13 +914,87 @@ TEST_F(ReverseBridgeTest, WithholdGrpcStreamResponseNoContentLength) {
 
   Http::TestResponseHeaderMapImpl headers(
       {{":status", "200"}, {"content-type", "application/x-protobuf"}});
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(
-                  Http::Code::OK, "envoy reverse bridge: upstream did not set content length", _,
-                  absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Unknown)),
-                  _));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK, "envoy reverse bridge: upstream did not set content length", _,
+          absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
+}
+
+// Verifies that the filter returns a useful error message when it's configured to set the content
+// length based on a header returned from the upstream that indicates the wrong content length.
+TEST_F(ReverseBridgeTest, WithholdGrpcStreamResponseWrongContentLength) {
+  initialize(true, "custom-content-length");
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(testing::Return(nullptr));
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestRequestHeaderMapImpl headers(
+        {{"content-type", "application/grpc"}, {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers,
+                HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
+  }
+
+  {
+    // We should remove the first five bytes.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("fgh", buffer.toString());
+  }
+
+  {
+    // Subsequent calls to decodeData should do nothing.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abcdefgh", 8);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
+    EXPECT_EQ("abcdefgh", buffer.toString());
+  }
+
+  Http::TestRequestTrailerMapImpl trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+
+  Http::TestResponseHeaderMapImpl headers(
+      {{":status", "200"},
+       // This is not the correct size of the upstream response payload, since we only send 8 bytes
+       // before ending the stream below.
+       {"custom-content-length", "30"},
+       {"content-type", "application/x-protobuf"}});
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "35"));
+
+  {
+    // The response data should be streamed to the client instead of buffered. Additionally, the
+    // first call should prefix the buffer with the size.
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("abc", 4);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, false));
+    EXPECT_EQ(9, buffer.length());
+  }
+  {
+    // The last call should insert the gRPC status into trailers. We've already sent the gRPC frame
+    // header, so the buffer should only contain the upstream response payload.
+    Http::TestResponseTrailerMapImpl trailers;
+    EXPECT_CALL(encoder_callbacks_, addEncodedTrailers()).WillOnce(ReturnRef(trailers));
+
+    Envoy::Buffer::OwnedImpl buffer;
+    buffer.add("ghj", 4);
+      EXPECT_CALL(
+      encoder_callbacks_,
+      sendLocalReply(
+          Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length", _,
+          absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(buffer, true));
+    EXPECT_EQ(4, buffer.length());
+    EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  }
 }
 } // namespace
 } // namespace GrpcHttp1ReverseBridge

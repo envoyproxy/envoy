@@ -28,7 +28,11 @@ struct RcDetailsValues {
   const std::string GrpcBridgeFailedContentType = "grpc_bridge_content_type_wrong";
   // The gRPC HTTP/1 bridge expected the upstream to set a header indicating
   // the content length, but it did not.
-  const std::string GrpcBridgeFailedContentLength = "grpc_bridge_content_length_missing";
+  const std::string GrpcBridgeFailedMissingContentLength = "grpc_bridge_content_length_missing";
+  // The gRPC HTTP/1 bridge expected the upstream to set a header indicating
+  // the content length, but it sent a value different than the actual response
+  // payload size.
+  const std::string GrpcBridgeFailedWrongContentLength = "grpc_bridge_content_length_wrong";
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
@@ -154,19 +158,19 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       // If the upstream should set a header indicating the response size, use that.
       if (response_size_header_) {
         auto length_headers = headers.get(*response_size_header_);
-        if (!length_headers.empty() && absl::SimpleAtoi(length_headers[0]->value().getStringView(),
-                                                        &response_message_length_)) {
+        if (!length_headers.empty() &&
+            // In the case of repeated inline headers, we only use the first value.
+            absl::SimpleAtoi(length_headers[0]->value().getStringView().substr(
+                                 0, length_headers[0]->value().getStringView().find(',')),
+                             &response_message_length_)) {
           headers.setContentLength(response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE);
-          adjustContentLength(headers, [this](auto) {
-            return response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE;
-          });
         } else {
           // If the response from upstream does not specify the content length, stand in an error
           // message.
           decoder_callbacks_->sendLocalReply(
               Http::Code::OK, "envoy reverse bridge: upstream did not set content length", nullptr,
-              Grpc::Status::WellKnownGrpcStatus::Unknown,
-              RcDetails::get().GrpcBridgeFailedContentLength);
+              Grpc::Status::WellKnownGrpcStatus::Internal,
+              RcDetails::get().GrpcBridgeFailedMissingContentLength);
           return Http::FilterHeadersStatus::StopIteration;
         }
       } else {
@@ -185,6 +189,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_stream) {
+  upstream_response_bytes_ += buffer.length();
   if (!enabled_) {
     return Http::FilterDataStatus::Continue;
   }
@@ -194,9 +199,20 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     auto& trailers = encoder_callbacks_->addEncodedTrailers();
     trailers.setGrpcStatus(grpc_status_);
 
-    if (withhold_grpc_frames_ && !response_size_header_) {
-      buffer.prepend(buffer_);
-      buildGrpcFrameHeader(buffer, buffer.length());
+    if (withhold_grpc_frames_) {
+      if (response_size_header_) {
+        if (upstream_response_bytes_ != response_message_length_) {
+          std::cout << "actual: " << upstream_response_bytes_ << " expected: " << response_message_length_ << std::endl;
+          encoder_callbacks_->sendLocalReply(
+              Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length", nullptr,
+              Grpc::Status::WellKnownGrpcStatus::Internal,
+              RcDetails::get().GrpcBridgeFailedWrongContentLength);
+              return Http::FilterDataStatus::StopIterationNoBuffer;
+        }
+      } else {
+        buffer.prepend(buffer_);
+        buildGrpcFrameHeader(buffer, buffer.length());
+      }
     }
 
     return Http::FilterDataStatus::Continue;

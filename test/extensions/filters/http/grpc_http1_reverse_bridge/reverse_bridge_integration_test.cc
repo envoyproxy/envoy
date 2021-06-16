@@ -35,14 +35,14 @@ public:
   void initialize(const absl::optional<std::string> response_size_header) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
-    const std::string filter = fmt::sprintf(
+    const std::string filter = fmt::format(
         R"EOF(
 name: grpc_http1_reverse_bridge
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
-  response_size_header: "%s"
+  response_size_header: "{}"
             )EOF",
         response_size_header ? *response_size_header : "");
     config_helper_.addFilter(filter);
@@ -243,8 +243,6 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
   response_headers.setContentType("application/x-protobuf");
-  // Trust the response size reported from the upstream. The content-length header won't be present
-  // on responses using chunked encoding, for a real-world example.
   const uint32_t upstream_response_size = 10;
   response_headers.addCopy(Http::LowerCaseString("custom-response-size-header"),
                            std::to_string(upstream_response_size));
