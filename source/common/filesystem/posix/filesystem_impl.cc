@@ -11,11 +11,11 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"

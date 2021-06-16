@@ -3,11 +3,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/crypto/utility.h"
-
-#include "extensions/common/crypto/crypto_impl.h"
-#include "extensions/filters/common/lua/lua.h"
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/crypto/crypto_impl.h"
+#include "source/extensions/filters/common/lua/lua.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include "openssl/evp.h"
 

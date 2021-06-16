@@ -15,10 +15,10 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/http/conn_manager_config.h"
-#include "common/http/filter_manager.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -270,12 +270,13 @@ public:
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
@@ -327,7 +328,7 @@ public:
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {

@@ -9,10 +9,10 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/event/libevent.h"
-#include "common/network/connection_impl_base.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 

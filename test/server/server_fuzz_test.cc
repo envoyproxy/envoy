@@ -3,12 +3,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/network/address_impl.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/listener_hooks.h"
-#include "server/server.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/server.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -63,10 +62,6 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
           envoy::type::v3::CodecClientType::HTTP3) {
         health_check.mutable_http_health_check()->clear_codec_client_type();
       }
-    }
-    // We may have both deprecated hosts() or load_assignment().
-    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
-      makePortHermetic(test_env, host);
     }
     for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);

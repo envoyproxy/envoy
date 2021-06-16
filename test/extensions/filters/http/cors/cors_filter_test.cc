@@ -1,9 +1,8 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/matchers.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/cors/cors_filter.h"
+#include "source/common/common/matchers.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/cors/cors_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -31,7 +30,7 @@ Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
   envoy::type::matcher::v3::StringMatcher config;
-  config.set_hidden_envoy_deprecated_regex(regex);
+  config.MergeFrom(TestUtility::createRegexMatcher(regex));
   return std::make_unique<Matchers::StringMatcherImpl>(config);
 }
 

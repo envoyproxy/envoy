@@ -8,10 +8,10 @@
 
 #include <fstream>
 
-#include "common/memory/stats.h"
-#include "common/network/socket_impl.h"
-#include "common/network/utility.h"
-#include "common/quic/platform/quiche_flags_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/common/quic/platform/quic_epoll_clock.h"
@@ -139,24 +139,6 @@ TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
 }
 
-TEST_F(QuicPlatformTest, QuicUnorderedMap) {
-  QuicUnorderedMap<std::string, int> umap;
-  umap.insert({"foo", 2});
-  EXPECT_EQ(2, umap["foo"]);
-}
-
-TEST_F(QuicPlatformTest, QuicUnorderedSet) {
-  QuicUnorderedSet<std::string> uset({"foo", "bar"});
-  EXPECT_EQ(1, uset.count("bar"));
-  EXPECT_EQ(0, uset.count("qux"));
-}
-
-TEST_F(QuicPlatformTest, QuicQueue) {
-  QuicQueue<int> queue;
-  queue.push(10);
-  EXPECT_EQ(10, queue.back());
-}
-
 TEST_F(QuicPlatformTest, QuicInlinedVector) {
   QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
@@ -173,14 +155,6 @@ TEST_F(QuicPlatformTest, QuicMapUtil) {
   std::map<std::string, int> stdmap = {{"one", 1}, {"two", 2}, {"three", 3}};
   EXPECT_TRUE(QuicContainsKey(stdmap, "one"));
   EXPECT_FALSE(QuicContainsKey(stdmap, "zero"));
-
-  QuicUnorderedMap<int, int> umap = {{1, 1}, {2, 4}, {3, 9}};
-  EXPECT_TRUE(QuicContainsKey(umap, 2));
-  EXPECT_FALSE(QuicContainsKey(umap, 10));
-
-  QuicUnorderedSet<std::string> uset({"foo", "bar"});
-  EXPECT_TRUE(QuicContainsKey(uset, "foo"));
-  EXPECT_FALSE(QuicContainsKey(uset, "abc"));
 
   std::vector<int> stdvec = {1, 2, 3};
   EXPECT_TRUE(QuicContainsValue(stdvec, 1));

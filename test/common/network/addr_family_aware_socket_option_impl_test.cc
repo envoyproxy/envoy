@@ -1,10 +1,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/addr_family_aware_socket_option_impl.h"
-#include "common/network/io_socket_handle_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
+#include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/network/socket_option_test.h"
 

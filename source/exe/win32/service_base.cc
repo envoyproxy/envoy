@@ -1,13 +1,12 @@
 #include <codecvt>
 #include <locale>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/thread.h"
-#include "common/event/signal_impl.h"
-
-#include "exe/main_common.h"
-#include "exe/service_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/signal_impl.h"
+#include "source/exe/main_common.h"
+#include "source/exe/service_base.h"
 
 #include "absl/debugging/symbolize.h"
 

@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_proof_source_base.h"
+#include "source/common/quic/envoy_quic_proof_source_base.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -11,7 +11,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

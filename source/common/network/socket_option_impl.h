@@ -5,8 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Network {

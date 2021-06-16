@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "common/stats/stat_merger.h"
+#include "source/common/stats/stat_merger.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"

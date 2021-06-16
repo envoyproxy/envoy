@@ -7,11 +7,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/eds.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/eds.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
