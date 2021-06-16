@@ -444,6 +444,7 @@ def should_sync(path, api_proto_modified_files, py_tools_modified_files):
 
 
 def sync(api_root, mode, is_ci, labels, shadow):
+    print(f"SYNC: {api_root}")
     api_proto_modified_files = git_modified_files('api', 'proto')
     py_tools_modified_files = git_modified_files('tools', 'py')
     with tempfile.TemporaryDirectory() as tmp:
@@ -459,6 +460,7 @@ def sync(api_root, mode, is_ci, labels, shadow):
         for path in paths:
             if os.path.exists(path) and os.stat(path).st_size > 0:
                 abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
+                print(f"CHECK SHOULD SYNC {path}")
                 if should_sync(path, api_proto_modified_files, py_tools_modified_files):
                     dst_src_paths[abs_dst_path].append(path)
                 else:
