@@ -630,6 +630,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
   EXPECT_EQ("FieldMask paths: \"cluster.transport_socket_matches.name\"\n could not be "
             "successfully used.",
             response.toString());
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(), "text/plain");
 }
 
 TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
@@ -647,6 +648,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   EXPECT_EQ("FieldMask paths: \"bootstrap.node.extensions.name\"\n could not be "
             "successfully used.",
             response.toString());
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(), "text/plain");
 }
 
 } // namespace Server
