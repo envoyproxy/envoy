@@ -807,31 +807,36 @@ TEST_P(WasmCommonTest, RemoteCode) {
   auto vm_configuration = "vm_cache";
   auto plugin_configuration = "done";
 
-  envoy::extensions::wasm::v3::PluginConfig plugin_config;
-  *plugin_config.mutable_vm_config()->mutable_runtime() =
-      absl::StrCat("envoy.wasm.runtime.", GetParam());
-  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
-  plugin_config.mutable_configuration()->set_value(plugin_configuration);
-
+  Extensions::Common::Wasm::PluginSharedPtr plugin;
   std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  {
+    // plugin_config is only valid in this scope.
+    // test that the proto_config parameter is released after the factory is created
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_vm_config()->mutable_runtime() =
+        absl::StrCat("envoy.wasm.runtime.", GetParam());
+    plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration);
 
-  auto vm_config = plugin_config.mutable_vm_config();
-  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
-  ProtobufWkt::BytesValue vm_configuration_bytes;
-  vm_configuration_bytes.set_value(vm_configuration);
-  vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
-  std::string sha256 = Extensions::Common::Wasm::sha256(code);
-  std::string sha256Hex =
-      Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
-  vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
-  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
-      "http://example.com/test.wasm");
-  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
-  vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(
-      5);
-  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+    auto vm_config = plugin_config.mutable_vm_config();
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", GetParam()));
+    ProtobufWkt::BytesValue vm_configuration_bytes;
+    vm_configuration_bytes.set_value(vm_configuration);
+    vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
+    std::string sha256 = Extensions::Common::Wasm::sha256(code);
+    std::string sha256Hex =
+        Hex::encode(reinterpret_cast<const uint8_t*>(&*sha256.begin()), sha256.size());
+    vm_config->mutable_code()->mutable_remote()->set_sha256(sha256Hex);
+    vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
+        "http://example.com/test.wasm");
+    vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_cluster("example_com");
+    vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->mutable_timeout()->set_seconds(
+        5);
+
+    plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+  }
 
   WasmHandleSharedPtr wasm_handle;
   NiceMock<Http::MockAsyncClient> client;
