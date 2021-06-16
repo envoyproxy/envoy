@@ -130,6 +130,7 @@ message Config {
   // The list of rules to apply to responses.
   repeated Rule response_rules = 2;
 
-  // Configure max_header_value_len.
+  // Configures maximum length for :ref:`header value <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.KeyValuePair.value>`
+  // to be added in the metadata. If this value exceeds, no metadata will be added. If not specified, the default is 8KiB.
   uint32 max_header_value_len = 3;
 }
