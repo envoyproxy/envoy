@@ -127,6 +127,14 @@ protected:
   bool dynamic_context_changed_{};
 };
 
+template <class T> class SubscriptionStateFactory {
+public:
+  virtual ~SubscriptionStateFactory() = default;
+  // Note that, outside of tests, we expect callbacks to always be a WatchMap.
+  virtual std::unique_ptr<T> makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        std::chrono::milliseconds init_fetch_timeout, OpaqueResourceDecoder& resource_decoder, const bool wildcard) PURE;
+};
+
 } // namespace UnifiedMux
 } // namespace Config
 } // namespace Envoy
