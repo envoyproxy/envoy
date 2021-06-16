@@ -24,6 +24,13 @@ trap_errors () {
             FAILED+=("  > ${sub}@ ${file} :${line}")
         else
             FAILED+=("${sub}@ ${file} :${line}${command}")
+            if [[ "$CURRENT" == "glint" ]]; then
+                FAILED+=(
+                    "    Please fix your editor to ensure:"
+                    "      - no trailing whitespace"
+                    "      - no mixed tabs/spaces"
+                    "      - all files end with a newline")
+            fi
         fi
         ((frame++))
     done
