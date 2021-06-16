@@ -694,6 +694,20 @@ TEST_F(StatNameTest, StatNameEmptyEquivalent) {
   EXPECT_NE(empty2.hash(), non_empty.hash());
 }
 
+TEST_F(StatNameTest, StartsWith) {
+  StatName prefix = makeStat("prefix");
+  EXPECT_TRUE(prefix.startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix").startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix.foo").startsWith(prefix));
+  EXPECT_TRUE(makeStat("prefix.foo.bar").startsWith(prefix));
+  EXPECT_FALSE(makeStat("").startsWith(prefix));
+  EXPECT_FALSE(makeStat("foo").startsWith(prefix));
+  StatNameDynamicPool dynamic(table_);
+  StatName dynamic_prefix = dynamic.add("prefix");
+  EXPECT_FALSE(dynamic_prefix.startsWith(prefix));
+  EXPECT_FALSE(dynamic_prefix.startsWith(dynamic_prefix));
+}
+
 TEST_F(StatNameTest, SupportsAbslHash) {
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       StatName(),
