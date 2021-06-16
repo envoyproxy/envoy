@@ -1231,8 +1231,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // active connections.
     const auto& container = host_tcp_conn_pool_map_.find(host);
     if (container != host_tcp_conn_pool_map_.end()) {
+      // Draining pools or closing connections can cause pool deletion if it becomes
+      // idle. Copy `pools_` so that we aren't iterating through a container that
+      // gets mutated by callbacks deleting from it.
+      std::vector<Tcp::ConnectionPool::Instance*> pools;
       for (const auto& pair : container->second.pools_) {
-        const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
+        pools.push_back(pair.second.get());
+      }
+
+      for (auto* pool : pools) {
         if (host->cluster().features() &
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();
