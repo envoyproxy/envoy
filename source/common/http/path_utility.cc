@@ -107,6 +107,24 @@ absl::optional<std::string> PathTransformer::rfcNormalize(absl::string_view orig
   return normalized_path;
 }
 
+absl::optional<std::string> PathTransformer::unescapeSlashes(absl::string_view original_path) {
+  // Only operate on path component in URL.
+  const absl::string_view::size_type query_start = original_path.find('?');
+  const absl::string_view path = original_path.substr(0, query_start);
+  if (path.find('%') == absl::string_view::npos) {
+    return std::string(original_path);
+  }
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
+
+  // TODO(yanavlasov): optimize this by adding case insensitive matcher
+  std::string decoded_path{path};
+  unescapeInPath(decoded_path, "%2F", "/");
+  unescapeInPath(decoded_path, "%2f", "/");
+  unescapeInPath(decoded_path, "%5C", "\\");
+  unescapeInPath(decoded_path, "%5c", "\\");
+  return absl::StrCat(decoded_path, query);
+}
+
 PathTransformer::PathTransformer(const bool should_normalize_path,
                                  const bool should_merge_slashes) {
   if (should_normalize_path) {

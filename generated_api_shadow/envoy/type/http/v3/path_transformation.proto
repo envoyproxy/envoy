@@ -28,6 +28,7 @@ message PathTransformation {
   }
 
   // A type of operation to alter text.
+  // [#next-free-field: 12]
   message Operation {
     // Should text be normalized according to RFC 3986? This typically is used for path headers
     // before any processing of requests by HTTP filters or routing. This applies percent-encoded
@@ -48,6 +49,9 @@ message PathTransformation {
     message MergeSlashes {
     }
 
+    message UnescapeSlashes {
+    }
+
     oneof operation_specifier {
       option (validate.required) = true;
 
@@ -56,9 +60,12 @@ message PathTransformation {
 
       // Enable merging adjacent slashes.
       MergeSlashes merge_slashes = 3;
+
+      // Enable unescaping escaped slashes.
+      UnescapeSlashes unescape_slashes = 4;
     }
 
-    NormalizePathAction normalize_path_action = 4;
+    NormalizePathAction normalize_path_action = 11;
   }
 
   // A list of operations to apply. Transformations will be performed in the order that they appear.

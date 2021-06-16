@@ -62,6 +62,8 @@ public:
 
   static absl::optional<std::string> rfcNormalize(absl::string_view original_path);
 
+  static absl::optional<std::string> unescapeSlashes(absl::string_view original_path);
+
 private:
   using Transformation = std::function<absl::optional<std::string>(absl::string_view)>;
   // A sequence of transformations specified by path_transformation.operations()
