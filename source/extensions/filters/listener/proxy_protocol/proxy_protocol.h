@@ -83,7 +83,11 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr& config) : config_(config) {}
-
+  ~Filter() override {
+    if (cb_) {
+      cb_->socket().ioHandle().resetFileEvents();
+    }
+  }
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
@@ -118,7 +122,7 @@ private:
   bool parseV2Header(char* buf);
   absl::optional<size_t> lenV2Address(char* buf);
 
-  Network::ListenerFilterCallbacks* cb_{};
+  Network::ListenerFilterCallbacks* cb_{nullptr};
 
   // The offset in buf_ that has been fully read
   size_t buf_off_{};
