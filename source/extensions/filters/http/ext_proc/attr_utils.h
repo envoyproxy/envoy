@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 
+#include "client.h"
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
@@ -41,18 +42,22 @@ public:
   static const Value nullValue();
 };
 
-class AttrUtils : public Logger::Loggable<Logger::Id::filter> {
+class AttrUtils {
 public:
-  AttrUtils(StreamInfo::StreamInfo& info,
-            const google::protobuf::RepeatedPtrField<std::string>& specified,
-            ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attributes)
-      : info_(info), specified_(specified), attributes_(attributes){};
-  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& build();
+  std::vector<std::tuple<absl::string_view, absl::string_view>>
+  tokenizeAttrs(const google::protobuf::RepeatedPtrField<std::string> attrs);
+  static std::tuple<absl::string_view, absl::string_view> tokenizeAttrPath(absl::string_view path);
+}
 
-  void setRequestHeaders(Envoy::Http::RequestHeaderMap* request_headers);
-  void setRequestTrailers(Envoy::Http::RequestTrailerMap* request_trailers);
-  void setResponseHeaders(Envoy::Http::ResponseHeaderMap* response_headers);
-  void setResponseTrailers(Envoy::Http::ResponseTrailerMap* response_trailers);
+class AttrState : public Logger::Loggable<Logger::Id::filter> {
+public:
+  AttrState(StreamInfo::StreamInfo& stream_info,
+            std::vector<std::tuple<absl::string_view, absl::string_view>>& specified)
+      : stream_info_(info), specified_(specified){};
+  void populateRequestAttributes(Envoy::Http::RequestHeaderMap& headers,
+                                 ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attrs);
+  void populateResponseAttributes(Envoy::Http::ResponseHeaderMap& headers,
+                                  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attrs);
 
 private:
   absl::optional<Value> findValue(absl::string_view root_tok, absl::string_view sub_tok);
@@ -65,20 +70,13 @@ private:
   absl::optional<Value> metadataSet();
   absl::optional<Value> filterStateSet();
 
-  std::tuple<absl::string_view, absl::string_view> tokenizePath(absl::string_view path);
   ProtobufWkt::Map<std::string, ProtobufWkt::Value>& getOrInsert(std::string key);
   std::string getTs();
   std::string formatDuration(absl::Duration duration);
   absl::optional<Value> getGrpcStatus();
 
-  StreamInfo::StreamInfo& info_;
-  const google::protobuf::RepeatedPtrField<std::string>& specified_;
-  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attributes_;
-
-  Envoy::Http::RequestHeaderMap* request_headers_;
-  Envoy::Http::RequestTrailerMap* request_trailers_;
-  Envoy::Http::ResponseHeaderMap* response_headers_;
-  Envoy::Http::ResponseTrailerMap* response_trailers_;
+  StreamInfo::StreamInfo& stream_info_;
+  std::vector<std::tuple<absl::string_view, absl::string_view>> specified_;
 };
 
 } // namespace ExternalProcessing

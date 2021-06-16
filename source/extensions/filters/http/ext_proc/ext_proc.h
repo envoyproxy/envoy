@@ -16,6 +16,7 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
+#include "source/extensions/filters/http/ext_proc/attr_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,7 +45,8 @@ public:
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()),
-        request_attributes_(config.request_attributes()) {}
+        request_attributes_(AttrUtils::tokenizeAttrs(config.request_attributes())),
+        response_attributes_(AttrUtils::tokenizeAttrs(config.response_attributes())) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -52,10 +54,12 @@ public:
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
-  const google::protobuf::RepeatedPtrField<std::string>& requestAttributesSpecified() const {
+  const std::vector<std::tuple<absl::string_view, absl::string_view>>
+  requestAttributesSpecified() const {
     return request_attributes_;
   }
-  const google::protobuf::RepeatedPtrField<std::string>& responseAttributesSpecified() const {
+  const std::vector<std::tuple<absl::string_view, absl::string_view>>
+  responseAttributesSpecified() const {
     return response_attributes_;
   }
 
@@ -76,8 +80,8 @@ private:
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
-  const google::protobuf::RepeatedPtrField<std::string> request_attributes_;
-  const google::protobuf::RepeatedPtrField<std::string> response_attributes_;
+  const std::vector<std::tuple<absl::string_view, absl::string_view>> request_attributes_;
+  const std::vector<std::tuple<absl::string_view, absl::string_view>> response_attributes_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -128,6 +132,8 @@ public:
 
   void onMessageTimeout();
 
+  void sendHeaders(ProcessorState& state, const Http::RequestOrResponseHeaderMap& headers,
+                   bool end_stream);
   void sendBufferedData(ProcessorState& state, bool end_stream) {
     sendBodyChunk(state, *state.bufferedData(), end_stream);
   }

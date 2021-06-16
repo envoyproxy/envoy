@@ -75,24 +75,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   }
 
   state.setHeaders(&headers);
-  ProcessingRequest req;
-  auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
-
-  auto attr_utils =
-      AttrUtils(decoder_callbacks_->streamInfo(), config_->requestAttributesSpecified(),
-                *headers_req->mutable_attributes());
-  // todo(eas): set headers in attr_utils
-  attr_utils.build();
-
-  ENVOY_LOG(debug, "done in initRequestAttributes");
-
-  headers_req->set_end_of_stream(end_stream);
-  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
-  ENVOY_LOG(debug, "Sending headers message");
-  stream_->send(std::move(req), false);
-  stats_.stream_msgs_sent_.inc();
+  sendHeaders(state, headers, end_stream);
   return FilterHeadersStatus::StopIteration;
 }
 
@@ -297,6 +280,22 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   const auto status = onTrailers(encoding_state_, trailers);
   ENVOY_LOG(trace, "encodeTrailers returning {}", status);
   return status;
+}
+
+void Filter::sendHeaders(ProcessorState& state, const Http::RequestOrResponseHeaderMap& headers,
+                         bool end_stream) {
+  ProcessingRequest req;
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  AttrUtils::attrsToProto(config_->requestAttributesSpecified(), &state,
+                          *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+
+  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
+  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  ENVOY_LOG(debug, "Sending headers message");
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
 }
 
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream) {

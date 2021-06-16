@@ -24,12 +24,13 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/header_map_impl.h"
 
-#include "source/extensions/filters/http/ext_proc/attr_utils.h"
+#include "source/extensions/filters/common/attributes/attributes.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace HttpFilters {
-namespace ExternalProcessing {
+namespace Filters {
+namespace Common {
+namespace Attributes {
 
 using google::api::expr::v1alpha1::MapValue;
 using google::api::expr::v1alpha1::MapValue_Entry;
@@ -536,8 +537,3 @@ void AttrState::setRequestHeaders(Http::RequestHeaderMap* request_headers) {
 void AttrState::setResponseHeaders(Http::ResponseHeaderMap* response_headers) {
   response_headers_ = response_headers;
 }
-
-} // namespace ExternalProcessing
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
