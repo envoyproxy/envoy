@@ -128,8 +128,8 @@ message ExtAuthz {
   // When this field is true, Envoy's HTTP response to gRPC calls which receive
   // a DENIED response will retain the status code from the called service's
   // HTTP headers. For example: if true the 'Permission Denied' message for a
-  // call rejected by OPA policy would have an HTTP 403 status rather than
-  // the gRPC default of 200.
+  // call rejected by Open Policy Agent would have an HTTP 403 status rather
+  // than the gRPC default of 200.
   bool retain_http_status_on_grpc_deny = 15;
 
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
