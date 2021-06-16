@@ -807,9 +807,10 @@ TEST_P(WasmCommonTest, RemoteCode) {
   auto vm_configuration = "vm_cache";
   auto plugin_configuration = "done";
 
-  Extensions::Common::Wasm::PluginSharedPtr plugin;
   std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+
+  Extensions::Common::Wasm::PluginSharedPtr plugin;
   {
     // plugin_config is only valid in this scope.
     // test that the proto_config parameter is released after the factory is created
