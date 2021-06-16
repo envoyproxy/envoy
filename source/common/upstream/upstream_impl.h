@@ -105,10 +105,13 @@ public:
     return metadata_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
-    absl::WriterMutexLock lock(&metadata_mutex_);
-    metadata_ = new_metadata;
-    // Update data members dependent on metadata.
-    socket_factory_ = resolveTransportSocketFactory(address_, metadata_.get());
+    auto& new_socket_factory = resolveTransportSocketFactory(address_, new_metadata.get());
+    {
+      absl::WriterMutexLock lock(&metadata_mutex_);
+      metadata_ = new_metadata;
+      // Update data members dependent on metadata.
+      socket_factory_ = new_socket_factory;
+    }
   }
 
   const ClusterInfo& cluster() const override { return *cluster_; }
