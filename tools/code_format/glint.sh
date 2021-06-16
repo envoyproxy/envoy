@@ -71,4 +71,3 @@ if [[ -n "$ERRORS" ]]; then
     echo >&2
     exit 1
 fi
-  
