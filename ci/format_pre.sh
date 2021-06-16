@@ -7,6 +7,7 @@
 
 FAILED=()
 CURRENT=""
+# AZP appears to make lines with this prefix red
 BASH_ERR_PREFIX="##[error]: "
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
