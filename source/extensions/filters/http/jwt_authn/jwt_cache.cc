@@ -14,6 +14,8 @@ namespace {
 
 // The default number of entries in JWT cache is 100.
 constexpr int kJwtCacheDefaultSize = 100;
+// The maximum size of JWT to be cached.
+constexpr int MAX_JWT_SIZE = 4 * 1024; // 4KiB
 
 class JwtCacheImpl : public JwtCache {
 public:
@@ -55,7 +57,7 @@ public:
   }
 
   void insert(const std::string& token, std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) override {
-    if (jwt_lru_cache_) {
+    if (jwt_lru_cache_ && token.size() <= MAX_JWT_SIZE) {
       // pass the ownership of jwt to cache
       jwt_lru_cache_->insert(token, jwt.release(), 1);
     }
