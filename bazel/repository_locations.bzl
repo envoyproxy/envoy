@@ -247,6 +247,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-07",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
+
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",
@@ -302,6 +303,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.tracers.lightstep",
         ],
         release_date = "2019-01-16",
+        cpe = "N/A",
+    ),
+    libsxg = dict(
+        project_name = "libsxg",
+        project_desc = "Signed HTTP Exchange library",
+        project_url = "https://github.com/google/libsxg",
+        version = "8beb4dea2c7f5db85c24290bfb2c2924a3cc1c60",
+        sha256 = "834996b69830a11bba7cf157d82d37a58900e2cabdc47fa5e046b9040cbaa4b2",
+        strip_prefix = "libsxg-{version}",
+        urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        extensions = ["envoy.extensions.filters.http.sxg"],
+        release_date = "2021-06-23",
         cpe = "N/A",
     ),
     com_lightstep_tracer_cpp = dict(

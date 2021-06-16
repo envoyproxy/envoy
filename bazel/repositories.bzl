@@ -186,6 +186,8 @@ def envoy_dependencies(skip_targets = []):
     _rust_deps()
     _kafka_deps()
 
+    _libsxg()
+    
     _org_llvm_llvm()
     _com_github_wamr()
     _com_github_wavm_wavm()
@@ -926,6 +928,12 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _libsxg():
+    external_http_archive(
+        name = "libsxg",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _org_llvm_llvm():

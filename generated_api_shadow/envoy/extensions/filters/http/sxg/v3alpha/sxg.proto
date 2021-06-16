@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.sxg.v3alpha;
+
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.sxg.v3alpha";
+option java_outer_classname = "SxgProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Signed HTTP Exchange Filter]
+// SXG :ref:`configuration overview <config_http_filters_sxg>`.
+// [#extension: envoy.filters.http.sxg]
+
+// [#next-free-field: 10]
+message SXG {
+  // SDS key for x509 certificate data
+  transport_sockets.tls.v3.SdsSecretConfig certificate = 1;
+
+  // SDS key for private key data.
+  transport_sockets.tls.v3.SdsSecretConfig private_key = 2;
+
+  // Duration for which the generated SXG package will be valid. Default is 604800 (7 days in seconds).
+  // Note that in order to account for clock skew, the timestamp will be backdated by a day. So, if
+  // duration is set to 7 days, that will be 7 days from 24 hours ago (6 days from now).
+  google.protobuf.Duration duration = 3;
+
+  // The record size of Merkle Integrity Content Encoding. Default is 4096.
+  uint64 mi_record_size = 4;
+
+  // The URI of certificate cbor file published. Since it is required that the certificate CBOR file
+  // be served from the same domain as the SXG document, this should be a relative URI
+  string cbor_url = 5;
+
+  // URL to retrieve "validity data" for signature, a CBOR map.
+  // See: https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-00#section-3.6
+  string validity_url = 6;
+
+  // TODO: comment
+  string client_can_accept_sxg_header = 7;
+
+  // TODO: comment
+  string should_encode_sxg_header = 8;
+
+  // TODO: comment
+  repeated string header_prefix_filters = 9;
+}
