@@ -762,7 +762,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
 }
 
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
-                                      const uint32_t max_path_length) {
+                                      const absl::optional<uint32_t> max_path_length) {
   if (!request_headers.Path()) {
     return "";
   }
@@ -770,8 +770,8 @@ std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_head
                              ? request_headers.getEnvoyOriginalPathValue()
                              : request_headers.getPathValue());
 
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
+  if (max_path_length.has_value() && path.length() > max_path_length) {
+    path = path.substr(0, max_path_length.value());
   }
 
   return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
