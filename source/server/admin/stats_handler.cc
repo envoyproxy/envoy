@@ -165,7 +165,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::regex> regex,
+                               bool used_only, const absl::optional<std::regex>& regex,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
@@ -191,7 +191,7 @@ std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only, const absl::optional<std::regex> regex,
+                          const bool used_only, const absl::optional<std::regex>& regex,
                           const bool pretty_print) {
 
   ProtobufWkt::Struct document;

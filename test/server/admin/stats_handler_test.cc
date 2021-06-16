@@ -139,23 +139,97 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
   Stats::TextReadout& t = store_->textReadoutFromString("t");
   t.set("hello world");
 
-  Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
-  Stats::Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram& h = store_->histogramFromString("h", Stats::Histogram::Unit::Unspecified);
 
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
-  h1.recordValue(200);
-
-  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
-  h2.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h), 200));
+  h.recordValue(200);
 
   store_->mergeHistograms([]() -> void {});
 
   Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
   EXPECT_EQ(Http::Code::OK, code);
 
-  const std::string expected_json =
-      R"EOF({"stats":[{"value":"hello world","name":"t"},{"value":10,"name":"c1"},{"name":"c2","value":20},{"histograms":{"computed_quantiles":[{"name":"h1","values":[{"cumulative":200,"interval":200},{"cumulative":202.5,"interval":202.5},{"interval":205,"cumulative":205},{"interval":207.5,"cumulative":207.5},{"cumulative":209,"interval":209},{"interval":209.5,"cumulative":209.5},{"interval":209.9,"cumulative":209.9},{"cumulative":209.95,"interval":209.95},{"cumulative":209.99,"interval":209.99},{"cumulative":210,"interval":210}]},{"name":"h2","values":[{"interval":100,"cumulative":100},{"cumulative":102.5,"interval":102.5},{"cumulative":105,"interval":105},{"cumulative":107.5,"interval":107.5},{"interval":109,"cumulative":109},{"cumulative":109.5,"interval":109.5},{"interval":109.9,"cumulative":109.9},{"cumulative":109.95,"interval":109.95},{"interval":109.99,"cumulative":109.99},{"cumulative":110,"interval":110}]}],"supported_quantiles":[0,25,50,75,90,95,99,99.5,99.9,100]}}]})EOF";
-  EXPECT_THAT(expected_json, JsonStringEq(data.toString()));
+  const std::string expected_json_old = R"EOF({
+    "stats": [
+        {
+            "name":"t",
+            "value":"hello world"
+        },
+        {
+            "name":"c1",
+            "value":10,
+        },
+        {
+            "name":"c2",
+            "value":20
+        },
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.5,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
+                    {
+                        "name":"h",
+                        "values": [
+                            {
+                                "cumulative":200,
+                                "interval":200
+                            },
+                            {
+                                "cumulative":202.5,
+                                "interval":202.5
+                            },
+                            {
+                                "cumulative":205,
+                                "interval":205
+                            },
+                            {
+                                "cumulative":207.5,
+                                "interval":207.5
+                            },
+                            {
+                                "cumulative":209,
+                                "interval":209
+                            },
+                            {
+                                "cumulative":209.5,
+                                "interval":209.5
+                            },
+                            {
+                                "cumulative":209.9,
+                                "interval":209.9
+                            },
+                            {
+                                "cumulative":209.95,
+                                "interval":209.95
+                            },
+                            {
+                                "cumulative":209.99,
+                                "interval":209.99
+                            },
+                            {
+                                "cumulative":210,
+                                "interval":210
+                            }
+                        ]
+                    },
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_THAT(expected_json_old, JsonStringEq(data.toString()));
 
   shutdownThreading();
 }
