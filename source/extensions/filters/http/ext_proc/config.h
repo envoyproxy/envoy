@@ -6,7 +6,6 @@
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class ExternalProcessingFilterConfig
           envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor> {
 
 public:
-  ExternalProcessingFilterConfig() : FactoryBase(HttpFilterNames::get().ExternalProcessing) {}
+  ExternalProcessingFilterConfig() : FactoryBase("envoy.filters.http.ext_proc") {}
 
 private:
   static constexpr uint64_t kDefaultMessageTimeoutMs = 200;

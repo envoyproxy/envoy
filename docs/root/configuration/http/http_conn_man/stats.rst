@@ -165,6 +165,7 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
+   stream_refused_errors, Counter, Total number of invalid frames received by Envoy with a `REFUSED_STREAM` error code
    trailers, Counter, Total number of trailers seen on requests coming from downstream
    tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy

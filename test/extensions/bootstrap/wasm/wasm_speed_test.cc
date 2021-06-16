@@ -79,25 +79,25 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   }
 }
 
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("v8"));
-#elif defined(ENVOY_WASM_WAMR)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WAMR)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wamr"));
-#elif defined(ENVOY_WASM_WAVM)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WAVM)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wavm"));
-#elif defined(ENVOY_WASM_WASMTIME)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \

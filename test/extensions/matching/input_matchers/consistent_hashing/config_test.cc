@@ -27,8 +27,9 @@ TEST(ConfigTest, TestConfig) {
   ConsistentHashingConfig factory;
   auto message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  auto matcher = factory.createInputMatcher(*message, context);
-  EXPECT_NE(nullptr, matcher);
+  auto matcher = factory.createInputMatcherFactoryCb(*message, context);
+  ASSERT_NE(nullptr, matcher);
+  matcher();
 }
 
 TEST(ConfigTest, InvalidConfig) {
@@ -48,7 +49,7 @@ TEST(ConfigTest, InvalidConfig) {
   ConsistentHashingConfig factory;
   auto message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_MESSAGE(factory.createInputMatcher(*message, context), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.createInputMatcherFactoryCb(*message, context), EnvoyException,
                             "threshold cannot be greater than modulo: 200 > 100");
 }
 } // namespace ConsistentHashing

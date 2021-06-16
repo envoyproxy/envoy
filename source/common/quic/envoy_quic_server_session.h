@@ -23,6 +23,7 @@
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
@@ -43,7 +44,8 @@ public:
                          const quic::QuicCryptoServerConfig* crypto_config,
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                         QuicStatNames& quic_stat_names, Stats::Scope& listener_scope);
+                         QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -114,6 +116,8 @@ private:
 
   QuicStatNames& quic_stat_names_;
   Stats::Scope& listener_scope_;
+
+  EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
 };
 
 } // namespace Quic

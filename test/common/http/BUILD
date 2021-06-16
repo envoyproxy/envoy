@@ -436,6 +436,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",

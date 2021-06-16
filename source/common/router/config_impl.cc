@@ -38,7 +38,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/http/common/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/match.h"
 
@@ -834,8 +833,7 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
-    auto filter_metadata = route.metadata().filter_metadata().find(
-        Extensions::HttpFilters::HttpFilterNames::get().Router);
+    auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
       filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
@@ -844,8 +842,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       }
 
       Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME,
-          Extensions::HttpFilters::HttpFilterNames::get().Router);
+          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {

@@ -21,7 +21,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",
     ],
 )
@@ -32,7 +31,6 @@ envoy_cc_extension(
     hdrs = ["kill_request_config.h"],
     deps = [
         "//envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/kill_request:kill_request_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/kill_request/v3:pkg_cc_proto",

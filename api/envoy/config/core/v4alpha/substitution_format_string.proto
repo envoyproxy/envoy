@@ -96,5 +96,6 @@ message SubstitutionFormatString {
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
   repeated TypedExtensionConfig formatters = 6;
 }

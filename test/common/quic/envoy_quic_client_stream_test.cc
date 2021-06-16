@@ -19,6 +19,11 @@ namespace Quic {
 using testing::_;
 using testing::Invoke;
 
+class MockDelegate : public PacketsToReadDelegate {
+public:
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+};
+
 class EnvoyQuicClientStreamTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientStreamTest()
@@ -68,7 +73,7 @@ public:
     quic_connection_->setEnvoyConnection(quic_session_);
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket();
+    quic_connection_->setUpConnectionSocket(delegate_);
     response_headers_.OnHeaderBlockStart();
     response_headers_.OnHeader(":status", "200");
     response_headers_.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0,
@@ -138,6 +143,7 @@ protected:
   quic::QuicConfig quic_config_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  MockDelegate delegate_;
   EnvoyQuicClientConnection* quic_connection_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
