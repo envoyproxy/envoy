@@ -57,7 +57,7 @@ CURRENT=extensions
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
-    echo "#[error]: TESTS FAILED:" >&2
+    echo "##[error]: TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do
         echo "##[error]:  $failed" >&2
     done
