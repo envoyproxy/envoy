@@ -417,6 +417,8 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_PORT%
     Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
+.. _config_access_log_format_req:
+
 %REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an

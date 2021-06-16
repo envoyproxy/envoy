@@ -7,6 +7,17 @@
 
 set -e
 
+if [[ ! $(command -v bazel) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+if [[ ! $(command -v jq) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: jq must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
@@ -72,6 +83,19 @@ bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
 
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
 tar -xf bazel-bin/docs/rst.tar -C "${GENERATED_RST_DIR}"
+
+# TODO(phlax): these will move to python
+ENVOY_DOCS_BUILD_CONFIG="${GENERATED_RST_DIR}/build.yaml"
+{
+    echo "blob_sha: ${ENVOY_BLOB_SHA}"
+    echo "release_level: ${ENVOY_DOCS_RELEASE_LEVEL}"
+    echo "version_string: ${ENVOY_DOCS_VERSION_STRING}"
+    echo "docker_image_tag_name: ${DOCKER_IMAGE_TAG_NAME}"
+} > "$ENVOY_DOCS_BUILD_CONFIG"
+if [[ -n "$SPHINX_SKIP_CONFIG_VALIDATION" ]]; then
+    echo "skip_validation: true" >> "$ENVOY_DOCS_BUILD_CONFIG"
+fi
+export ENVOY_DOCS_BUILD_CONFIG
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

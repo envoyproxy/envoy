@@ -381,6 +381,13 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
+std::string Utility::stripQueryString(const HeaderString& path) {
+  absl::string_view path_str = path.getStringView();
+  size_t query_offset = path_str.find('?');
+  return std::string(path_str.data(),
+                     query_offset != path_str.npos ? query_offset : path_str.size());
+}
+
 static absl::InlinedVector<absl::string_view, 2>
 parseCookieValuesImpl(const HeaderMap& headers, const absl::string_view key, size_t max_vals,
                       bool reversed_order, bool reversed_order_in_header,
@@ -454,6 +461,7 @@ static absl::string_view parseCookie(const HeaderMap& headers, const absl::strin
   }
   return {};
 }
+
 
 absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl::string_view key) {
   return parseCookie(headers, key, Http::Headers::get().Cookie.get());

@@ -14,7 +14,7 @@ envoy_cc_library(
         "wasm_runtime_factory.h",
     ],
     deps = [
-        "@proxy_wasm_cpp_host//:include",
+        "@proxy_wasm_cpp_host//:wasm_vm_headers",
     ],
 )
 
@@ -44,7 +44,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@com_google_cel_cpp//eval/public:activation",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:include",
+        "@proxy_wasm_cpp_host//:headers",
         "@proxy_wasm_cpp_sdk//:common_lib",
     ],
 )
@@ -71,6 +71,7 @@ envoy_cc_library(
         ":wasm_runtime_factory_interface",
         "//external:abseil_base",
         "//external:abseil_node_hash_map",
+        "//external:zlib",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
@@ -91,7 +92,7 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:value_export_util",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
-        "@proxy_wasm_cpp_host//:common_lib",
+        "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//:null_lib",
     ] + select(
         {

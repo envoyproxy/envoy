@@ -962,9 +962,18 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     stream->setDetails(Http2ResponseCodeDetails::get().errorDetails(error_code));
   }
 
-  if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
-    stats_.rx_messaging_error_.inc();
+  switch (error_code) {
+  case NGHTTP2_ERR_REFUSED_STREAM:
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http2_consume_stream_refused_errors")) {
+      stats_.stream_refused_errors_.inc();
+      return 0;
+    }
+    break;
 
+  case NGHTTP2_ERR_HTTP_HEADER:
+  case NGHTTP2_ERR_HTTP_MESSAGING:
+    stats_.rx_messaging_error_.inc();
     if (stream_error_on_invalid_http_messaging_) {
       // The stream is about to be closed due to an invalid header or messaging. Don't kill the
       // entire connection if one stream has bad headers or messaging.
@@ -974,6 +983,12 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
       }
       return 0;
     }
+    break;
+
+  default:
+    ASSERT(error_code == NGHTTP2_ERR_FLOW_CONTROL || error_code == NGHTTP2_ERR_PROTO,
+           absl::StrCat("Unexpected error_code: ", error_code));
+    break;
   }
 
   // Cause dispatch to return with an error code.
