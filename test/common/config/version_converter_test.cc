@@ -32,7 +32,6 @@ bool hasOriginalTypeInformation(const Protobuf::Message& message) {
 TEST(VersionConverterTest, Upgrade) {
   // Create a v2 Cluster message with some fields set.
   API_NO_BOOST(envoy::api::v2::Cluster) source;
-  source.add_hosts();
   source.mutable_load_assignment()->set_cluster_name("bar");
   source.mutable_eds_cluster_config()->set_service_name("foo");
   source.set_drain_connections_on_host_removal(true);
@@ -41,8 +40,6 @@ TEST(VersionConverterTest, Upgrade) {
   VersionConverter::upgrade(source, dst);
   // Verify fields in v3 Cluster.
   EXPECT_TRUE(hasOriginalTypeInformation(dst));
-  EXPECT_FALSE(dst.hidden_envoy_deprecated_hosts().empty());
-  EXPECT_FALSE(hasOriginalTypeInformation(dst.hidden_envoy_deprecated_hosts(0)));
   EXPECT_EQ("bar", dst.load_assignment().cluster_name());
   EXPECT_FALSE(hasOriginalTypeInformation(dst.load_assignment()));
   EXPECT_EQ("foo", dst.eds_cluster_config().service_name());

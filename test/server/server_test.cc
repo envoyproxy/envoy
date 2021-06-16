@@ -35,6 +35,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 
 using testing::_;
 using testing::Assign;
@@ -376,6 +377,13 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
+}
+
+// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
+// mode of the underlying BoringSSL build.
+TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
+  bool isFIPS = (FIPS_mode() != 0);
+  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {

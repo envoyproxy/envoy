@@ -35,7 +35,7 @@ public:
         global_store_,      cluster_scope_,        prefix_, code,  internal_request,
         request_vhost_name, request_vcluster_name, from_az, to_az, canary};
 
-    code_stats_.chargeResponseStat(info);
+    code_stats_.chargeResponseStat(info, false);
   }
 
   void addResponses() {

@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.router.v3.Router";
@@ -78,4 +78,14 @@ message Router {
   // :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress
   // Envoy, when deriving timeout for upstream cluster.
   bool respect_expected_rq_timeout = 6;
+
+  // If set, Envoy will avoid incrementing HTTP failure code stats
+  // on gRPC requests. This includes the individual status code value
+  // (e.g. upstream_rq_504) and group stats (e.g. upstream_rq_5xx).
+  // This field is useful if interested in relying only on the gRPC
+  // stats filter to define success and failure metrics for gRPC requests
+  // as not all failed gRPC requests charge HTTP status code metrics. See
+  // :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
+  // for more details.
+  bool suppress_grpc_request_failure_code_stats = 7;
 }

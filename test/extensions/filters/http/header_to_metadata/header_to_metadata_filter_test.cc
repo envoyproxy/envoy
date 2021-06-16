@@ -6,7 +6,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -137,7 +136,7 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
   Config per_route_config(config_proto, true);
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
-              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
+              perFilterConfig("envoy.filters.http.header_to_metadata"))
       .WillOnce(Return(&per_route_config));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -163,7 +162,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
   Config per_route_config(config_proto, true);
   EXPECT_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
-              perFilterConfig(HttpFilterNames::get().HeaderToMetadata))
+              perFilterConfig("envoy.filters.http.header_to_metadata"))
       .WillOnce(Return(&per_route_config));
 
   EXPECT_TRUE(getConfig()->doRequest());
@@ -202,7 +201,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->encode100ContinueHeaders(continue_response));
@@ -234,7 +233,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEqNum(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqNum(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -259,7 +258,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -296,7 +295,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEqValue(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqValue(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -437,7 +436,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
 }
@@ -678,7 +677,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
@@ -701,7 +700,7 @@ response_rules:
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
-              setDynamicMetadata(HttpFilterNames::get().HeaderToMetadata, MapEq(expected)));
+              setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
 }
 
