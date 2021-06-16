@@ -12,6 +12,7 @@ ERRORS=
 MISSING_NEWLINE=0
 MIXED_TABS_AND_SPACES=0
 TRAILING_WHITESPACE=0
+# AZP appears to make lines with this prefix red
 BASH_ERR_PREFIX="##[error]: "
 
 
