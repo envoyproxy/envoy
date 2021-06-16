@@ -462,7 +462,6 @@ static absl::string_view parseCookie(const HeaderMap& headers, const absl::strin
   return {};
 }
 
-
 absl::string_view Utility::parseCookieValue(const HeaderMap& headers, const absl::string_view key) {
   return parseCookie(headers, key, Http::Headers::get().Cookie.get());
 }
