@@ -323,6 +323,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   // If the path normalization options has been set.
   if (config.has_path_normalization_options()) {
+    // path_with_escaped_slashes_action can't be configured when path_normalization_options is set.
+    if (path_with_escaped_slashes_action_ !=
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED &&
+        path_with_escaped_slashes_action_ !=
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT) {
+      throw EnvoyException("Configure path_with_escaped_slashes_action and path_normalization "
+                           "options at the same time.");
+    }
+    path_with_escaped_slashes_action_ = envoy::extensions::filters::network::
+        http_connection_manager::v3::HttpConnectionManager::KEEP_UNCHANGED;
     forwarding_path_transformer_ =
         Http::PathTransformer(config.path_normalization_options().forwarding_transformation());
     filter_path_transformer_ =

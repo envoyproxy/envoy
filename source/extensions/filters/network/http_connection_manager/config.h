@@ -290,7 +290,7 @@ private:
   static const uint64_t RequestHeaderTimeoutMs = 0;
   Http::PathTransformer forwarding_path_transformer_;
   Http::PathTransformer filter_path_transformer_;
-  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_;
   const bool strip_trailing_host_dot_;
 };

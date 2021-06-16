@@ -1243,8 +1243,6 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
 
 // Validates that Envoy by default does not modify escaped slashes.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
   forwarding_transformation_ = std::string(
       R"EOF(
       operations:
@@ -1273,6 +1271,19 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
           {"x-unmodified", "response"},
           {":status", "200"},
       });
+}
+
+// Configure both the path_with_escaped_slashes_action and path_normalization_options will trigger
+// exception.
+TEST_P(HeaderIntegrationTest, EscapedSlashesAndPathTransformationConfigurationConflict) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::REJECT_REQUEST;
+  forwarding_transformation_ = std::string(
+      R"EOF(
+      operations:
+      - normalize_path_rfc_3986: {}
+              )EOF");
+  EXPECT_DEATH(initializeFilter(HeaderMode::Append, false), "Details: Lds update failed.");
 }
 
 // Validates that default action can be overridden through runtime.
@@ -1325,8 +1336,6 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRejected) {
 
 // Normalizing the path trigger reject action.
 TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
   forwarding_transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1353,8 +1362,6 @@ TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
 
 // Validates that Envoy does not modify escaped slashes when configured.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::KEEP_UNCHANGED;
   forwarding_transformation_ = std::string(
       R"EOF(
       operations:
@@ -1387,10 +1394,9 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
 
 // Validates that Envoy forwards unescaped slashes when configured.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
-  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
-      v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
   forwarding_transformation_ = R"EOF(
       operations:
+      - unescape_slashes: {}
       - normalize_path_rfc_3986: {}
       - merge_slashes: {}
 )EOF";
