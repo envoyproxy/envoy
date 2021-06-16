@@ -154,6 +154,8 @@ PathTransformer::PathTransformer(
       transformations_.emplace_back(PathTransformer::rfcNormalize);
     } else if (operation.has_merge_slashes()) {
       transformations_.emplace_back(PathTransformer::mergeSlashes);
+    } else if (operation.has_unescape_slashes()) {
+      transformations_.emplace_back(PathTransformer::unescapeSlashes);
     }
     // The action to be performed if the transformation changed the path.
     switch (operation.normalize_path_action()) {

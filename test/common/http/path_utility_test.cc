@@ -295,48 +295,39 @@ TEST_F(PathTransformerTest, RfcNormalize) {
 }
 
 TEST_F(PathTransformerTest, UnescapeSlashes) {
-  EXPECT_EQ("",
-            PathTransformer::unescapeSlashes("").value()); // empty
-  EXPECT_EQ("//",
-            PathTransformer::unescapeSlashes("%2f%2F").value()); // case-insensitive
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - unescape_slashes: {}
+)EOF";
+  setPathTransformer(path_transformation_config);
+  PathTransformer const& path_transformer = pathTransformer();
+  EXPECT_EQ("", path_transformer.transform("", action_).value());         // empty
+  EXPECT_EQ("//", path_transformer.transform("%2f%2F", action_).value()); // case-insensitive
   EXPECT_EQ("/a/b/c/",
-            PathTransformer::unescapeSlashes("/a%2Fb%2fc/").value()); // between other characters
-  EXPECT_EQ("%2b",
-            PathTransformer::unescapeSlashes("%2b").value()); // not %2f
-  EXPECT_EQ("/a/b/c",
-            PathTransformer::unescapeSlashes("/a/b/c").value()); // not %2f
-  EXPECT_EQ("%2",
-            PathTransformer::unescapeSlashes("%2").value()); // incomplete
-  EXPECT_EQ("%",
-            PathTransformer::unescapeSlashes("%").value()); // incomplete
-  EXPECT_EQ("/abc%2",
-            PathTransformer::unescapeSlashes("/abc%2").value()); // incomplete
-  EXPECT_EQ("foo%",
-            PathTransformer::unescapeSlashes("foo%").value()); // incomplete
-  EXPECT_EQ("/a/",
-            PathTransformer::unescapeSlashes("/a%2F").value()); // prefixed
-  EXPECT_EQ("/a/",
-            PathTransformer::unescapeSlashes("%2fa/").value()); // suffixed
-  EXPECT_EQ("%/a/",
-            PathTransformer::unescapeSlashes("%%2fa/").value()); // double escape
-  EXPECT_EQ("%2/a/",
-            PathTransformer::unescapeSlashes("%2%2fa/").value()); // incomplete escape
+            path_transformer.transform("/a%2Fb%2fc/", action_).value()); // between other characters
+  EXPECT_EQ("%2b", path_transformer.transform("%2b", action_).value());  // not %2f
+  EXPECT_EQ("/a/b/c", path_transformer.transform("/a/b/c", action_).value()); // not %2f
+  EXPECT_EQ("%2", path_transformer.transform("%2", action_).value());         // incomplete
+  EXPECT_EQ("%", path_transformer.transform("%", action_).value());           // incomplete
+  EXPECT_EQ("/abc%2", path_transformer.transform("/abc%2", action_).value()); // incomplete
+  EXPECT_EQ("foo%", path_transformer.transform("foo%", action_).value());     // incomplete
+  EXPECT_EQ("/a/", path_transformer.transform("/a%2F", action_).value());     // prefixed
+  EXPECT_EQ("/a/", path_transformer.transform("%2fa/", action_).value());     // suffixed
+  EXPECT_EQ("%/a/", path_transformer.transform("%%2fa/", action_).value());   // double escape
+  EXPECT_EQ("%2/a/", path_transformer.transform("%2%2fa/", action_).value()); // incomplete escape
 
-  EXPECT_EQ("\\\\",
-            PathTransformer::unescapeSlashes("%5c%5C").value()); // case-insensitive
+  EXPECT_EQ("\\\\", path_transformer.transform("%5c%5C", action_).value()); // case-insensitive
   EXPECT_EQ("/a\\b\\c/",
-            PathTransformer::unescapeSlashes("/a%5Cb%5cc/").value()); // between other characters
-  EXPECT_EQ("/a\\",
-            PathTransformer::unescapeSlashes("/a%5C").value()); // prefixed
-  EXPECT_EQ("\\a/",
-            PathTransformer::unescapeSlashes("%5ca/").value()); // suffixed
+            path_transformer.transform("/a%5Cb%5cc/", action_).value()); // between other characters
+  EXPECT_EQ("/a\\", path_transformer.transform("/a%5C", action_).value()); // prefixed
+  EXPECT_EQ("\\a/", path_transformer.transform("%5ca/", action_).value()); // suffixed
   EXPECT_EQ("/x/%2E%2e/z//abc\\../def",
-            PathTransformer::unescapeSlashes("/x/%2E%2e/z%2f%2Fabc%5C../def").value());
+            path_transformer.transform("/x/%2E%2e/z%2f%2Fabc%5C../def", action_).value());
 
   EXPECT_EQ("/a\\b/c\\",
-            PathTransformer::unescapeSlashes("%2fa%5Cb%2fc%5c").value()); // %5c and %2f together
+            path_transformer.transform("%2fa%5Cb%2fc%5c", action_).value()); // %5c and %2f together
   EXPECT_EQ("/a\\b/c\\?%2fabcd%5C%%2f%",
-            PathTransformer::unescapeSlashes("%2fa%5Cb%2fc%5c?%2fabcd%5C%%2f%")
+            path_transformer.transform("%2fa%5Cb%2fc%5c?%2fabcd%5C%%2f%", action_)
                 .value()); // query is untouched
 }
 
