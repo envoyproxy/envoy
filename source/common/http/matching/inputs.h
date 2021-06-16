@@ -155,21 +155,20 @@ class HttpRequestCookiesDataInputFactory : public Matcher::DataInputFactory<Http
 public:
   std::string name() const override { return "cookies"; }
 
-  Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& factory_context) override {
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           Server::Configuration::FactoryContext& factory_context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::type::matcher::v3::HttpRequestCookieMatchInput&>(
         config, factory_context.messageValidationVisitor());
 
-    return std::make_unique<HttpRequestCookiesDataInput>(typed_config.cookie_name());
-  };
+    return [cookie_name = typed_config.cookie_name()] {
+      return std::make_unique<HttpRequestCookiesDataInput>(cookie_name);
+    };
+  }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::type::matcher::v3::HttpRequestCookieMatchInput>();
   }
-
-private:
-  const std::string name_;
 };
 
 } // namespace Matching
