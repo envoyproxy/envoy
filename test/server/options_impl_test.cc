@@ -177,7 +177,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
-  options->setAllowUnkownFields(true);
+  options->setAllowUnknownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
   options->setSocketPath("/foo/envoy_domain_socket");
   options->setSocketMode(0644);
