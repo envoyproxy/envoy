@@ -212,9 +212,8 @@ message JwtProvider {
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
 
-  // Cache is a LRU cache, its size is specified by *jwt_cache_size*.
+  // Enables JWT cache, its size is specified by *jwt_cache_size*.
   // Only valid JWT tokens are cached.
-  // Cached tokens are removed when they are expired or by LRU purge.
   bool enable_jwt_cache = 11;
 
   // The unit is number of JWT tokens, default to 100.
