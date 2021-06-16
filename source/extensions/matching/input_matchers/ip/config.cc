@@ -6,9 +6,9 @@ namespace Matching {
 namespace InputMatchers {
 namespace IP {
 
-Envoy::Matcher::InputMatcherPtr
-Config::createInputMatcher(const Protobuf::Message& config,
-                           Server::Configuration::FactoryContext& context) {
+Envoy::Matcher::InputMatcherFactoryCb
+Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
+                                    Server::Configuration::FactoryContext& context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
       config, context.messageValidationVisitor());
@@ -26,8 +26,11 @@ Config::createInputMatcher(const Protobuf::Message& config,
     ranges.emplace_back(std::move(range));
   }
 
-  const absl::string_view stat_prefix = ip_config.stat_prefix();
-  return std::make_unique<Matcher>(std::move(ranges), stat_prefix, context.scope());
+  const std::string stat_prefix = ip_config.stat_prefix();
+  Stats::Scope& scope = context.scope();
+  return [ranges, stat_prefix, &scope]() {
+    return std::make_unique<Matcher>(ranges, stat_prefix, scope);
+  };
 }
 /**
  * Static registration for the consistent hashing matcher. @see RegisterFactory.

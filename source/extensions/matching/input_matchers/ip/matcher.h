@@ -22,7 +22,7 @@ struct MatcherStats {
 
 class Matcher : public Envoy::Matcher::InputMatcher, Logger::Loggable<Logger::Id::filter> {
 public:
-  Matcher(std::vector<Network::Address::CidrRange>&& ranges, absl::string_view stat_prefix,
+  Matcher(std::vector<Network::Address::CidrRange> const& ranges, absl::string_view stat_prefix,
           Stats::Scope& stat_scope);
   bool match(absl::optional<absl::string_view> input) override;
   absl::optional<const MatcherStats> stats() const { return stats_; }

@@ -29,8 +29,8 @@ TEST(ConfigTest, TestConfig) {
   Config factory;
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  auto matcher = factory.createInputMatcher(*message, context);
-  EXPECT_NE(nullptr, matcher);
+  auto matcher = factory.createInputMatcherFactoryCb(*message, context);
+  EXPECT_NE(nullptr, matcher());
 }
 
 TEST(ConfigTest, InvalidConfigIP) {
@@ -52,7 +52,7 @@ TEST(ConfigTest, InvalidConfigIP) {
   Config factory;
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_MESSAGE(factory.createInputMatcher(*message, context), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(factory.createInputMatcherFactoryCb(*message, context), EnvoyException,
                             "malformed IP address: foo");
 }
 
@@ -74,7 +74,7 @@ TEST(ConfigTest, InvalidConfigStats) {
   Config factory;
   auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  EXPECT_THROW_WITH_REGEX(factory.createInputMatcher(*message, context), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(factory.createInputMatcherFactoryCb(*message, context), EnvoyException,
                           "Proto constraint validation failed.*StatPrefix");
 }
 

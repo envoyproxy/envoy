@@ -16,13 +16,14 @@ MatcherStats generateStats(absl::string_view prefix, Stats::Scope& scope) {
 
 } // namespace
 
-Matcher::Matcher(std::vector<Network::Address::CidrRange>&& ranges, absl::string_view stat_prefix,
+Matcher::Matcher(std::vector<Network::Address::CidrRange> const& ranges,
+                 absl::string_view stat_prefix,
                  Stats::Scope& stat_scope)
     : // We could put "false" instead of "true". What matters is that the IP
       // belongs to the trie. We could further optimize the storage of LcTrie in
       // this case by implementing an LcTrie<void> specialization that doesn't
       // store any associated data.
-      trie_({{true, std::move(ranges)}}), stats_(generateStats(stat_prefix, stat_scope)) {}
+      trie_({{true, ranges}}), stats_(generateStats(stat_prefix, stat_scope)) {}
 
 bool Matcher::match(absl::optional<absl::string_view> input) {
   if (!input) {
