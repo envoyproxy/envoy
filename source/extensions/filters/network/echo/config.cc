@@ -5,7 +5,6 @@
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/echo/echo.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ namespace Echo {
 class EchoConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
-  EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
+  EchoConfigFactory() : FactoryBase(EchoName) {}
 
 private:
   Network::FilterFactoryCb

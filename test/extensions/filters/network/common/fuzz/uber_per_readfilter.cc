@@ -3,8 +3,13 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/network/client_ssl_auth/config.h"
 #include "source/extensions/filters/network/common/utility.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/ext_authz/config.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/local_ratelimit/config.h"
+#include "source/extensions/filters/network/ratelimit/config.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
@@ -25,13 +30,12 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
+        ClientSslAuth, ExtAuthz::ExtAuthorizationName,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
+        HttpConnectionManagerName, LocalRateLimitName, RateLimitFilter::RateLimitName, RBACName,
         // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-        // NetworkFilterNames::get().TcpProxy,
+        // "envoy.filters.network.tcp_proxy",
     };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
@@ -49,7 +53,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
 
 void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
   // Set up response for ext_authz filter
-  if (filter_name == NetworkFilterNames::get().ExtAuthorization) {
+  if (filter_name == ExtAuthorizationName) {
 
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
@@ -80,12 +84,12 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+  } else if (filter_name == HttpConnectionManagerName) {
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().RateLimit) {
+  } else if (filter_name == RateLimitName) {
     async_client_factory_ = std::make_unique<Grpc::MockAsyncClientFactory>();
     async_client_ = std::make_unique<Grpc::MockAsyncClient>();
     // TODO(jianwendong): consider testing on different kinds of responses.
@@ -119,7 +123,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // HttpConnectionManager} on which we have constraints.
   const std::string name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(
       std::string(filter_name));
-  if (filter_name == NetworkFilterNames::get().DirectResponse) {
+  if (filter_name == "envoy.filters.network.direct_response") {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
         dynamic_cast<envoy::extensions::filters::network::direct_response::v3::Config&>(
             *config_message);
@@ -128,7 +132,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(
           absl::StrCat("direct_response trying to open a file. Config:\n{}", config.DebugString()));
     }
-  } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
+  } else if (filter_name == LocalRateLimitName) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
         dynamic_cast<envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit&>(
             *config_message);
@@ -140,7 +144,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
           absl::StrCat("local_ratelimit trying to set a large fill_interval. Config:\n{}",
                        config.DebugString()));
     }
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+  } else if (filter_name == HttpConnectionManagerName) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager&>(*config_message);

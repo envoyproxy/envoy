@@ -68,7 +68,7 @@ def test_extensions_fuzzed_count(patches):
         data = m_path.Path.return_value.read_text.return_value
         data.splitlines.return_value.__getitem__.return_value = ["FOO", "BAR", "BAZ"]
         m_re.findall.return_value = "X" * 23
-        assert checker.fuzzed_count == 23
+        assert checker.fuzzed_count == 24
 
     assert (
         list(m_path.Path.call_args)

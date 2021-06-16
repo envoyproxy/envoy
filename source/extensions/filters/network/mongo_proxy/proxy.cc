@@ -14,7 +14,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/mongo_proxy/config.h"
 
 #include "absl/strings/str_split.h"
 
@@ -73,18 +73,16 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
-  ProtobufWkt::Struct metadata(
-      (*read_callbacks_->connection()
-            .streamInfo()
-            .dynamicMetadata()
-            .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]);
+  ProtobufWkt::Struct metadata((*read_callbacks_->connection()
+                                     .streamInfo()
+                                     .dynamicMetadata()
+                                     .mutable_filter_metadata())[MongoProxyName]);
   auto& fields = *metadata.mutable_fields();
   // TODO(rshriram): reverse the resource string (table.db)
   auto& operations = *fields[resource].mutable_list_value();
   operations.add_values()->set_string_value(operation);
 
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().MongoProxy, metadata);
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(MongoProxyName, metadata);
 }
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
@@ -327,7 +325,7 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     auto& metadata = (*read_callbacks_->connection()
                            .streamInfo()
                            .dynamicMetadata()
-                           .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy];
+                           .mutable_filter_metadata())[MongoProxyName];
     metadata.mutable_fields()->clear();
   }
 

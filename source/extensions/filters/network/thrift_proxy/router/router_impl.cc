@@ -7,9 +7,10 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
 
 #include "absl/strings/match.h"
 
@@ -262,8 +263,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
-      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
-          NetworkFilterNames::get().ThriftProxy);
+      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(ThriftProxyName);
 
   const TransportType transport = options
                                       ? options->transport(callbacks_->downstreamTransportType())

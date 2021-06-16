@@ -6,12 +6,13 @@
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
+
+constexpr char MongoProxyName[] = "envoy.filters.network.mongo_proxy";
 
 /**
  * Config registration for the mongo proxy filter. @see NamedNetworkFilterConfigFactory.
@@ -19,7 +20,7 @@ namespace MongoProxy {
 class MongoProxyFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy> {
 public:
-  MongoProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().MongoProxy) {}
+  MongoProxyFilterConfigFactory() : FactoryBase(MongoProxyName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

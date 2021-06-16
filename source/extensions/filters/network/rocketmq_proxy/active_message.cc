@@ -5,10 +5,10 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/rocketmq_proxy/config.h"
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "source/extensions/filters/network/rocketmq_proxy/topic_route.h"
 #include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"
 
@@ -162,7 +162,7 @@ void ActiveMessage::onQueryTopicRoute() {
       for (const auto& host : host_set->hosts()) {
         std::string broker_address = host->address()->asString();
         auto& filter_metadata = host->metadata()->filter_metadata();
-        const auto filter_it = filter_metadata.find(NetworkFilterNames::get().RocketmqProxy);
+        const auto filter_it = filter_metadata.find(RocketmqProxyName);
         ASSERT(filter_it != filter_metadata.end());
         const auto& metadata_fields = filter_it->second.fields();
         ASSERT(metadata_fields.contains(RocketmqConstants::get().BrokerName));
@@ -262,7 +262,7 @@ void ActiveMessage::recordPopRouteInfo(Upstream::HostDescriptionConstSharedPtr h
   if (host_description) {
     auto host_metadata = host_description->metadata();
     auto filter_metadata = host_metadata->filter_metadata();
-    const auto filter_it = filter_metadata.find(NetworkFilterNames::get().RocketmqProxy);
+    const auto filter_it = filter_metadata.find(RocketmqProxyName);
     ASSERT(filter_it != filter_metadata.end());
     const auto& metadata_fields = filter_it->second.fields();
     ASSERT(metadata_fields.contains(RocketmqConstants::get().BrokerName));

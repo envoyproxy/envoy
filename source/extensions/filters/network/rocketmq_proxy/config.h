@@ -10,18 +10,19 @@
 #include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
 #include "source/extensions/filters/network/rocketmq_proxy/router/route_matcher.h"
 #include "source/extensions/filters/network/rocketmq_proxy/router/router_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RocketmqProxy {
 
+constexpr char RocketmqProxyName[] = "envoy.filters.network.rocketmq_proxy";
+
 class RocketmqProxyFilterConfigFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::network::rocketmq_proxy::v3::RocketmqProxy> {
 public:
-  RocketmqProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RocketmqProxy, true) {}
+  RocketmqProxyFilterConfigFactory() : FactoryBase(RocketmqProxyName, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

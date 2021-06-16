@@ -103,7 +103,6 @@ envoy_cc_extension(
         "//envoy/stats:stats_macros",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:config",

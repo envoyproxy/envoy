@@ -5,12 +5,13 @@
 
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RateLimitFilter {
+
+constexpr char RateLimitName[] = "envoy.filters.network.ratelimit";
 
 /**
  * Config registration for the rate limit filter. @see NamedNetworkFilterConfigFactory.
@@ -18,7 +19,7 @@ namespace RateLimitFilter {
 class RateLimitConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::ratelimit::v3::RateLimit> {
 public:
-  RateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().RateLimit) {}
+  RateLimitConfigFactory() : FactoryBase(RateLimitName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

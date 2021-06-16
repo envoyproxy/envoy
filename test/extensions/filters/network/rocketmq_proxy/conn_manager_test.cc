@@ -371,8 +371,8 @@ route_config:
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-      NetworkFilterNames::get().RocketmqProxy, topic_route_data));
+  metadata->mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(RocketmqProxyName, topic_route_data));
   host_->metadata(metadata);
   initializeCluster();
 
@@ -470,8 +470,8 @@ route_config:
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-      NetworkFilterNames::get().RocketmqProxy, topic_route_data));
+  metadata->mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(RocketmqProxyName, topic_route_data));
   host_->metadata(metadata);
   initializeCluster();
 

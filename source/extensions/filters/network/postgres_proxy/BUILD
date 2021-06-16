@@ -36,7 +36,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/common/sqlutils:sqlutils_lib",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )
 
@@ -47,7 +46,6 @@ envoy_cc_extension(
     repository = "@envoy",
     deps = [
         ":filter",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],

@@ -28,7 +28,6 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/network:filter_lib",
-        "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -88,7 +87,6 @@ envoy_cc_library(
     name = "config_interface",
     hdrs = ["mysql_config.h"],
     deps = [
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],
@@ -109,7 +107,6 @@ envoy_cc_extension(
     hdrs = ["mysql_config.h"],
     deps = [
         ":filter_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/mysql_proxy/v3:pkg_cc_proto",
     ],

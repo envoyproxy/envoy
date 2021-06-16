@@ -9,6 +9,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Echo {
 
+constexpr char EchoName[] = "envoy.filters.network.echo";
+
 /**
  * Implementation of a basic echo filter.
  */

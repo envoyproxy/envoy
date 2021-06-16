@@ -5,12 +5,13 @@
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
+
+constexpr char MySQLProxyName[] = "envoy.filters.network.mysql_proxy";
 
 /**
  * Config registration for the MySQL proxy filter.
@@ -18,7 +19,7 @@ namespace MySQLProxy {
 class MySQLConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::mysql_proxy::v3::MySQLProxy> {
 public:
-  MySQLConfigFactory() : FactoryBase(NetworkFilterNames::get().MySQLProxy) {}
+  MySQLConfigFactory() : FactoryBase(MySQLProxyName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

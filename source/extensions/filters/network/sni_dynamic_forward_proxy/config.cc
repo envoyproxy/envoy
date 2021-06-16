@@ -12,7 +12,7 @@ namespace NetworkFilters {
 namespace SniDynamicForwardProxy {
 
 SniDynamicForwardProxyNetworkFilterConfigFactory::SniDynamicForwardProxyNetworkFilterConfigFactory()
-    : FactoryBase(NetworkFilterNames::get().SniDynamicForwardProxy) {}
+    : FactoryBase(SniDynamicForwardProxyName) {}
 
 Network::FilterFactoryCb
 SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(

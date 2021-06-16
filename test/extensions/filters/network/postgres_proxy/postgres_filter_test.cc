@@ -3,8 +3,8 @@
 
 #include <tuple>
 
+#include "source/extensions/filters/network/postgres_proxy/config.h"
 #include "source/extensions/filters/network/postgres_proxy/postgres_filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/network/postgres_proxy/postgres_test_utils.h"
 #include "test/mocks/network/mocks.h"
@@ -43,11 +43,10 @@ public:
   void setMetadata() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
     EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-    ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, _))
+    ON_CALL(stream_info_, setDynamicMetadata(PostgresProxyName, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-                  NetworkFilterNames::get().PostgresProxy, obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(PostgresProxyName, obj));
         }));
   }
 
@@ -312,7 +311,7 @@ TEST_F(PostgresFilterTest, MetadataIncorrectSQL) {
 
   // SQL statement was wrong. No metadata should have been created.
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
-                  NetworkFilterNames::get().PostgresProxy),
+                  PostgresProxyName),
               false);
   ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 1);
   ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
@@ -331,7 +330,7 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
   ASSERT_THAT(filter_->connection().streamInfo().dynamicMetadata().filter_metadata().contains(
-                  NetworkFilterNames::get().PostgresProxy),
+                  PostgresProxyName),
               false);
   ASSERT_THAT(filter_->getStats().statements_parse_error_.value(), 0);
   ASSERT_THAT(filter_->getStats().statements_parsed_.value(), 0);
@@ -340,8 +339,8 @@ TEST_F(PostgresFilterTest, QueryMessageMetadata) {
   filter_->getConfig()->enable_sql_parsing_ = true;
   ASSERT_THAT(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
-  auto& filter_meta = filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(
-      NetworkFilterNames::get().PostgresProxy);
+  auto& filter_meta =
+      filter_->connection().streamInfo().dynamicMetadata().filter_metadata().at(PostgresProxyName);
   auto& fields = filter_meta.fields();
 
   ASSERT_THAT(fields.size(), 1);

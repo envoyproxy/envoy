@@ -32,12 +32,13 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/http_connection_manager/dependency_manager.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
+
+constexpr char HttpConnectionManagerName[] = "envoy.filters.network.http_connection_manager";
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
@@ -47,8 +48,7 @@ class HttpConnectionManagerFilterConfigFactory
       public Common::FactoryBase<
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager> {
 public:
-  HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+  HttpConnectionManagerFilterConfigFactory() : FactoryBase(HttpConnectionManagerName, true) {}
 
   static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

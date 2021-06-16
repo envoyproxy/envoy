@@ -11,12 +11,13 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
+
+constexpr char RedisProxyName[] = "envoy.filters.network.redis_proxy";
 
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
@@ -36,8 +37,7 @@ public:
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(RedisProxyName);
     if (options) {
       return options->authUsername(api);
     }
@@ -46,8 +46,7 @@ public:
 
   static const std::string authPassword(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(RedisProxyName);
     if (options) {
       return options->authPassword(api);
     }
@@ -67,7 +66,7 @@ class RedisProxyFilterConfigFactory
           envoy::extensions::filters::network::redis_proxy::v3::RedisProxy,
           envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions> {
 public:
-  RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy, true) {}
+  RedisProxyFilterConfigFactory() : FactoryBase(RedisProxyName, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

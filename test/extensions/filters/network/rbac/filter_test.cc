@@ -5,8 +5,8 @@
 
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/utility.h"
+#include "source/extensions/filters/network/rbac/config.h"
 #include "source/extensions/filters/network/rbac/rbac_filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -84,11 +84,10 @@ public:
   }
 
   void setMetadata() {
-    ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
+    ON_CALL(stream_info_, setDynamicMetadata(RBACName, _))
         .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(NetworkFilterNames::get().Rbac,
-                                                                  obj));
+              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(RBACName, obj));
         }));
 
     ON_CALL(stream_info_,
@@ -207,8 +206,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   EXPECT_EQ("tcp.rbac.prefix_.shadow_allowed", config_->stats().shadow_allowed_.name());
   EXPECT_EQ("tcp.rbac.prefix_.shadow_denied", config_->stats().shadow_denied_.name());
 
-  auto filter_meta =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().Rbac);
+  auto filter_meta = stream_info_.dynamicMetadata().filter_metadata().at(RBACName);
   EXPECT_EQ("bar", filter_meta.fields().at("prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("allowed", filter_meta.fields().at("prefix_shadow_engine_result").string_value());
 }

@@ -4,12 +4,13 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
+
+constexpr char ExtAuthorizationName[] = "envoy.filters.network.ext_authz";
 
 /**
  * Config registration for the  external authorization filter. @see NamedNetworkFilterConfigFactory.
@@ -17,7 +18,7 @@ namespace ExtAuthz {
 class ExtAuthzConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::ext_authz::v3::ExtAuthz> {
 public:
-  ExtAuthzConfigFactory() : FactoryBase(NetworkFilterNames::get().ExtAuthorization) {}
+  ExtAuthzConfigFactory() : FactoryBase(ExtAuthorizationName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

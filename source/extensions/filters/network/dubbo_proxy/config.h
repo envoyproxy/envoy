@@ -10,12 +10,13 @@
 #include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
+
+constexpr char DubboProxyName[] = "envoy.filters.network.dubbo_proxy";
 
 /**
  * Config registration for the dubbo proxy filter. @see NamedNetworkFilterConfigFactory.
@@ -23,7 +24,7 @@ namespace DubboProxy {
 class DubboProxyFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy> {
 public:
-  DubboProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().DubboProxy, true) {}
+  DubboProxyFilterConfigFactory() : FactoryBase(DubboProxyName, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

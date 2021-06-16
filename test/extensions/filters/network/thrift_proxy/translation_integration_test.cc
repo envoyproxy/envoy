@@ -1,7 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/thrift_proxy/config.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -58,7 +58,7 @@ public:
       auto* opts = bootstrap.mutable_static_resources()
                        ->mutable_clusters(0)
                        ->mutable_typed_extension_protocol_options();
-      (*opts)[NetworkFilterNames::get().ThriftProxy].PackFrom(proto_opts);
+      (*opts)[ThriftProxyName].PackFrom(proto_opts);
     });
 
     // Invent some varying, but deterministic, values to add. We use the add method instead of

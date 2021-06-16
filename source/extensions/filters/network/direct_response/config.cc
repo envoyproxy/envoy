@@ -6,7 +6,6 @@
 #include "source/common/config/datasource.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/direct_response/filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,7 @@ namespace DirectResponse {
 class DirectResponseConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::direct_response::v3::Config> {
 public:
-  DirectResponseConfigFactory() : FactoryBase(NetworkFilterNames::get().DirectResponse) {}
+  DirectResponseConfigFactory() : FactoryBase(DirectResponseName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

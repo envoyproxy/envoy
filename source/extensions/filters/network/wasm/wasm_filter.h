@@ -8,7 +8,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/extensions/common/wasm/wasm.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

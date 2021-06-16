@@ -1,5 +1,4 @@
 #include "source/extensions/filters/network/common/utility.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
@@ -21,8 +20,8 @@ namespace {
 TEST(FilterNameUtilTest, TestIgnoreCanonicalName) {
   NiceMock<Runtime::MockLoader> runtime;
 
-  EXPECT_EQ(NetworkFilterNames::get().RedisProxy,
-            FilterNameUtil::canonicalFilterName(NetworkFilterNames::get().RedisProxy, &runtime));
+  EXPECT_EQ("envoy.filters.network.redis_proxy",
+            FilterNameUtil::canonicalFilterName("envoy.filters.network.redis_proxy", &runtime));
   EXPECT_EQ("canonical.name", FilterNameUtil::canonicalFilterName("canonical.name", &runtime));
 }
 
@@ -35,7 +34,7 @@ TEST(FilterNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedName)) {
       deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
       .WillRepeatedly(Return(true));
 
-  EXPECT_EQ(NetworkFilterNames::get().RedisProxy,
+  EXPECT_EQ("envoy.filters.network.redis_proxy",
             FilterNameUtil::canonicalFilterName("envoy.redis_proxy", &runtime));
 }
 

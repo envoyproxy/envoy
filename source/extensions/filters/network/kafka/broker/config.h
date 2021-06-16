@@ -4,13 +4,14 @@
 #include "envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Broker {
+
+constexpr char KafkaBrokerName[] = "envoy.filters.network.kafka_broker";
 
 using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker::v3::KafkaBroker;
 
@@ -19,7 +20,7 @@ using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker
  */
 class KafkaConfigFactory : public Common::FactoryBase<KafkaBrokerProtoConfig> {
 public:
-  KafkaConfigFactory() : FactoryBase(NetworkFilterNames::get().KafkaBroker) {}
+  KafkaConfigFactory() : FactoryBase(KafkaBrokerName) {}
 
 private:
   // Common::FactoryBase<KafkaBrokerProtoConfig>

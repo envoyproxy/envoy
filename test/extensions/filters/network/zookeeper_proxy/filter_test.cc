@@ -1,4 +1,5 @@
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/zookeeper_proxy/config.h"
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
@@ -424,7 +425,7 @@ public:
 
     for (const auto& value : values) {
       call.WillOnce(Invoke([value](const std::string& key, const ProtobufWkt::Struct& obj) -> void {
-        EXPECT_STREQ(key.c_str(), "envoy.filters.network.zookeeper_proxy");
+        EXPECT_STREQ(key.c_str(), ZooKeeperProxyName);
         protoMapEq(obj, value);
       }));
     }

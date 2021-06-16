@@ -28,6 +28,5 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//source/common/common:macros",
         "//source/extensions/common:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
     ],
 )

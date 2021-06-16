@@ -3,8 +3,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
+#include "source/extensions/filters/network/postgres_proxy/config.h"
 #include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -183,8 +183,7 @@ void PostgresFilter::processQuery(const std::string& sql) {
                    sql.c_str());
 
     // Set dynamic metadata
-    read_callbacks_->connection().streamInfo().setDynamicMetadata(
-        NetworkFilterNames::get().PostgresProxy, metadata);
+    read_callbacks_->connection().streamInfo().setDynamicMetadata(PostgresProxyName, metadata);
   }
 }
 

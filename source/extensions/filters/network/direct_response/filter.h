@@ -10,6 +10,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DirectResponse {
 
+constexpr char DirectResponseName[] = "envoy.filters.network.direct_response";
+
 /**
  * Implementation of a basic direct response filter.
  */

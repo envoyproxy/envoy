@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/mocks/network:network_mocks",

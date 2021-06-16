@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/network/connection_limit/v3/connection_limit.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class ConnectionLimitConfigFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::network::connection_limit::v3::ConnectionLimit> {
 public:
-  ConnectionLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().ConnectionLimit) {}
+  ConnectionLimitConfigFactory() : FactoryBase("envoy.filters.network.connection_limit") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

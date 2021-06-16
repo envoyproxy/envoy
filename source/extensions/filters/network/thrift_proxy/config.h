@@ -10,12 +10,13 @@
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+constexpr char ThriftProxyName[] = "envoy.filters.network.thrift_proxy";
 
 /**
  * Provides Thrift-specific cluster options.
@@ -43,7 +44,7 @@ class ThriftProxyFilterConfigFactory
           envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy,
           envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions> {
 public:
-  ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy, true) {}
+  ThriftProxyFilterConfigFactory() : FactoryBase(ThriftProxyName, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

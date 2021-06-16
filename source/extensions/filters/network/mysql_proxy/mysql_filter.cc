@@ -7,8 +7,8 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin_resp.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_decoder_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,8 +48,7 @@ void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   // Clear dynamic metadata.
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  auto& metadata =
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
+  auto& metadata = (*dynamic_metadata.mutable_filter_metadata())[MySQLProxyName];
   metadata.mutable_fields()->clear();
 
   if (!decoder_) {
@@ -107,8 +106,7 @@ void MySQLFilter::onCommand(Command& command) {
   // Parse a given query
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
+  ProtobufWkt::Struct metadata((*dynamic_metadata.mutable_filter_metadata())[MySQLProxyName]);
 
   auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
                                                         decoder_->getAttributes(), metadata);
@@ -122,8 +120,7 @@ void MySQLFilter::onCommand(Command& command) {
   }
   config_->stats_.queries_parsed_.inc();
 
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().MySQLProxy, metadata);
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(MySQLProxyName, metadata);
 }
 
 Network::FilterStatus MySQLFilter::onNewConnection() {

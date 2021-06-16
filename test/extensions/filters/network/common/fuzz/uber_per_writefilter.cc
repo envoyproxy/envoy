@@ -1,5 +1,8 @@
 #include "source/extensions/filters/network/common/utility.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/kafka/broker/config.h"
+#include "source/extensions/filters/network/mongo_proxy/config.h"
+#include "source/extensions/filters/network/mysql_proxy/mysql_config.h"
+#include "source/extensions/filters/network/zookeeper_proxy/config.h"
 
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
 
@@ -14,8 +17,8 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ZooKeeperProxy, NetworkFilterNames::get().KafkaBroker,
-        NetworkFilterNames::get().MongoProxy, NetworkFilterNames::get().MySQLProxy
+        ZooKeeperProxy::ZooKeeperProxyName, Kafka::Broker::KafkaBrokerName,
+        MongoProxy::MongoProxyName, MySQLProxy::MySQLProxyName
         // TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it supports untrusted
         // data.
     };

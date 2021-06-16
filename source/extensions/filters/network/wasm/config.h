@@ -4,12 +4,13 @@
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Wasm {
+
+constexpr char WasmName[] = "envoy.filters.network.wasm";
 
 /**
  * Config registration for the Wasm filter. @see NamedNetworkFilterConfigFactory.
@@ -17,7 +18,7 @@ namespace Wasm {
 class WasmFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::network::wasm::v3::Wasm> {
 public:
-  WasmFilterConfig() : FactoryBase(NetworkFilterNames::get().Wasm) {}
+  WasmFilterConfig() : FactoryBase(WasmName) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

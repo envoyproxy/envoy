@@ -9,9 +9,9 @@
 
 #include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/config.h"
 #include "source/extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "source/extensions/filters/network/mongo_proxy/proxy.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
@@ -218,8 +218,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   }));
   filter_->onData(fake_data_, false);
 
-  auto& metadata =
-      stream_info_.dynamicMetadata().filter_metadata().at(NetworkFilterNames::get().MongoProxy);
+  auto& metadata = stream_info_.dynamicMetadata().filter_metadata().at(MongoProxyName);
   EXPECT_TRUE(metadata.fields().find("db.test") != metadata.fields().end());
   EXPECT_EQ("query", metadata.fields().at("db.test").list_value().values(0).string_value());
 
@@ -268,8 +267,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
-                   NetworkFilterNames::get().MongoProxy));
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(MongoProxyName));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
@@ -279,8 +277,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
   }));
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
-                   NetworkFilterNames::get().MongoProxy));
+  EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(MongoProxyName));
 }
 
 TEST_F(MongoProxyFilterTest, Stats) {

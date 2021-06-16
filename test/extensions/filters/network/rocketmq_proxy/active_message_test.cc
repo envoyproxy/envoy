@@ -183,8 +183,8 @@ TEST_F(ActiveMessageTest, RecordPopRouteInfo) {
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue(broker_name);
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(broker_id);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-      NetworkFilterNames::get().RocketmqProxy, topic_route_data));
+  metadata->mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(RocketmqProxyName, topic_route_data));
 
   EXPECT_CALL(*host_description, metadata()).WillRepeatedly(Return(metadata));
 

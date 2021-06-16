@@ -2,7 +2,6 @@
 #include "envoy/network/connection.h"
 
 #include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"

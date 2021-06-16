@@ -2,12 +2,12 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "source/extensions/filters/network/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SniCluster {
+
+constexpr char SniClusterName[] = "envoy.filters.network.sni_cluster";
 
 /**
  * Config registration for the sni_cluster filter. @see NamedNetworkFilterConfigFactory.
@@ -19,7 +19,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return NetworkFilterNames::get().SniCluster; }
+  std::string name() const override { return SniClusterName; }
 };
 
 } // namespace SniCluster

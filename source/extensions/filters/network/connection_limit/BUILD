@@ -32,7 +32,6 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/connection_limit:connection_limit_lib",
         "@envoy_api//envoy/extensions/filters/network/connection_limit/v3:pkg_cc_proto",

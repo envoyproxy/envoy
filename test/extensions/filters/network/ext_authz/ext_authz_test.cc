@@ -11,7 +11,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/ext_authz/ext_authz.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -99,7 +98,7 @@ public:
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
         .WillOnce(Invoke([&response](const std::string& ns,
                                      const ProtobufWkt::Struct& returned_dynamic_metadata) {
-          EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+          EXPECT_EQ(ns, "envoy.filters.network.ext_authz");
           EXPECT_TRUE(
               TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
         }));

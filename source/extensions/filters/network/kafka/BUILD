@@ -20,7 +20,6 @@ envoy_cc_extension(
     hdrs = ["broker/config.h"],
     deps = [
         ":kafka_broker_filter_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
     ],

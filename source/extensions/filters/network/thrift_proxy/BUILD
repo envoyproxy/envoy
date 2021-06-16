@@ -51,7 +51,6 @@ envoy_cc_extension(
         ":unframed_transport_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",

@@ -11,7 +11,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/zookeeper_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -99,8 +99,7 @@ void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::stri
 void ZooKeeperFilter::clearDynamicMetadata() {
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  auto& metadata =
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy];
+  auto& metadata = (*dynamic_metadata.mutable_filter_metadata())[ZooKeeperProxyName];
   metadata.mutable_fields()->clear();
 }
 
@@ -108,8 +107,7 @@ void ZooKeeperFilter::setDynamicMetadata(
     const std::vector<std::pair<const std::string, const std::string>>& data) {
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy]);
+  ProtobufWkt::Struct metadata((*dynamic_metadata.mutable_filter_metadata())[ZooKeeperProxyName]);
   auto& fields = *metadata.mutable_fields();
 
   for (const auto& pair : data) {
@@ -118,8 +116,7 @@ void ZooKeeperFilter::setDynamicMetadata(
     fields.insert({pair.first, val});
   }
 
-  read_callbacks_->connection().streamInfo().setDynamicMetadata(
-      NetworkFilterNames::get().ZooKeeperProxy, metadata);
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(ZooKeeperProxyName, metadata);
 }
 
 void ZooKeeperFilter::onConnect(const bool readonly) {

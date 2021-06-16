@@ -33,7 +33,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/common/config:datasource_lib",
-        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
     ],

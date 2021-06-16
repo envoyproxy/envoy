@@ -2,7 +2,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/common/utility.h"
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,11 +42,9 @@ private:
   using DeprecatedNameMap = absl::flat_hash_map<std::string, std::string>;
 
   static const DeprecatedNameMap& deprecatedNameMap() {
-    CONSTRUCT_ON_FIRST_USE(
-        DeprecatedNameMap,
-        {
-            {"envoy.redis_proxy", NetworkFilters::NetworkFilterNames::get().RedisProxy},
-        });
+    CONSTRUCT_ON_FIRST_USE(DeprecatedNameMap, {
+                                                  {"envoy.redis_proxy", RedisProxyName},
+                                              });
   }
 };
 

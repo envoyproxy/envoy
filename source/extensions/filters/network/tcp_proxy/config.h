@@ -4,12 +4,13 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
+
+constexpr char TcpProxyName[] = "envoy.filters.network.tcp_proxy";
 
 /**
  * Config registration for the tcp proxy filter. @see NamedNetworkFilterConfigFactory.
@@ -17,7 +18,7 @@ namespace TcpProxy {
 class ConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy> {
 public:
-  ConfigFactory() : FactoryBase(NetworkFilterNames::get().TcpProxy, true) {}
+  ConfigFactory() : FactoryBase(TcpProxyName, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

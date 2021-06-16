@@ -66,7 +66,7 @@ EXTENSION_STATUS_VALUES = (
     # not intended for production use.
     "wip")
 
-FILTER_NAMES_PATTERN = "NetworkFilterNames::get()"
+FILTER_NAMES_PATTERN = "source/extensions/filters/network/[a-z_]+/config.h"
 
 FUZZ_TEST_PATH = "test/extensions/filters/network/common/fuzz/uber_per_readfilter.cc"
 
@@ -99,7 +99,7 @@ class ExtensionsChecker(checker.Checker):
         data = pathlib.Path(FUZZ_TEST_PATH).read_text()
         # Hack-ish! We only search the first 50 lines to capture the filters
         # in `filterNames()`.
-        return len(re.findall(FILTER_NAMES_PATTERN, "".join(data.splitlines()[:50])))
+        return len(re.findall(FILTER_NAMES_PATTERN, "".join(data.splitlines()[:50]))) + 1
 
     @cached_property
     def metadata(self) -> dict:

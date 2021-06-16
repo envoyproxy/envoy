@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 
-#include "source/extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "absl/strings/str_join.h"
 
@@ -91,7 +91,7 @@ void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_
     *fields[config_->shadowEffectivePolicyIdField()].mutable_string_value() = shadow_policy_id;
   }
   *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_engine_result;
-  callbacks_->connection().streamInfo().setDynamicMetadata(NetworkFilterNames::get().Rbac, metrics);
+  callbacks_->connection().streamInfo().setDynamicMetadata(RBACName, metrics);
 }
 
 Result RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {

@@ -5,12 +5,13 @@
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/postgres_proxy/postgres_filter.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
+
+constexpr char PostgresProxyName[] = "envoy.filters.network.postgres_proxy";
 
 /**
  * Config registration for the Postgres proxy filter.
@@ -19,7 +20,7 @@ class PostgresConfigFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy> {
 public:
-  PostgresConfigFactory() : FactoryBase{NetworkFilterNames::get().PostgresProxy} {}
+  PostgresConfigFactory() : FactoryBase{PostgresProxyName} {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
