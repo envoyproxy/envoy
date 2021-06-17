@@ -104,6 +104,7 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/thrift/rate_limit/v2alpha1",
     "envoy/config/filter/udp/udp_proxy/v2alpha",
     "envoy/config/grpc_credential/v2alpha",
+    "envoy/config/health_checker/redis/v2",
     "envoy/config/ratelimit/v2",
     "envoy/config/rbac/v2",
     "envoy/config/retry/omit_host_metadata/v2",
