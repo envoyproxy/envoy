@@ -332,7 +332,7 @@ TEST_F(SslContextImplTest, TestCertificateVerificationWithSANMatcher) {
 
   auto client_context = std::make_unique<Extensions::TransportSockets::Tls::ClientContextImpl>(
       store_, cfg, Event::GlobalTimeSystem().timeSystem());
-  const std::vector<TlsContext>& tls_contexts = client_context->getTlsContext();
+  const std::vector<TlsContext>& tls_contexts = client_context->getTlsContexts();
   // It is guaranteed that it is always non-empty, with the first context used for all new SSL
   // objects.
   ASSERT_FALSE(tls_contexts.empty());
