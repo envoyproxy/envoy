@@ -59,6 +59,10 @@ stages:
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
+    - script: |
+        docker load -i $(Pipeline.Workspace)/docker/envoy-build-ubuntu.tar
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
       workingDirectory: $(Build.SourcesDirectory)
       env:
