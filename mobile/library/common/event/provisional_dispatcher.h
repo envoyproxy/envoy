@@ -41,7 +41,7 @@ public:
    * @return false before the Event::Dispatcher is running, otherwise the result of the
    * underlying call to Event::Dispatcher::isThreadSafe().
    */
-  virtual bool isThreadSafe();
+  virtual bool isThreadSafe() const;
 
   /**
    * Submits an item for deferred delete. Must be called from context where

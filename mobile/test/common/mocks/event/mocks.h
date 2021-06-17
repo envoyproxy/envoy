@@ -36,7 +36,7 @@ public:
   MOCK_METHOD(void, drain, (Event::Dispatcher & event_dispatcher));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(envoy_status_t, post_, (std::function<void()> callback));
-  MOCK_METHOD(bool, isThreadSafe, ());
+  MOCK_METHOD(bool, isThreadSafe, (), (const));
 
   std::list<DeferredDeletablePtr> to_delete_;
   std::list<std::function<void()>> callbacks_;
