@@ -448,6 +448,10 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
     rejected_name = &(*iter);
   } else {
     if (rejects(name)) {
+      if (!stats_matcher_->hasStringMatchers()) {
+        // Skip recording of cheaply-matched rejections in the caches.
+        return true;
+      }
       auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
       const StatNameStorage& rejected_name_ref = *(insertion.first);
       rejected_name = &rejected_name_ref;

@@ -41,6 +41,10 @@ public:
    *              rejectsAll() returns false, but rejects() is always true.
    */
   virtual bool rejectsAll() const PURE;
+
+  // Determines whether conversion from StatName to string may be necessary to
+  // run a match against this set.
+  virtual bool hasStringMatchers() const PURE;
 };
 
 using StatsMatcherPtr = std::unique_ptr<const StatsMatcher>;

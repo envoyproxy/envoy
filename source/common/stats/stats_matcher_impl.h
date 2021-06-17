@@ -34,10 +34,7 @@ public:
   bool rejectsAll() const override {
     return !is_inclusive_ && matchers_.empty() && prefixes_.empty();
   }
-
-  // Determines whether conversion from StatName to string may be necessary to
-  // run a match against this set.
-  bool hasStringMatchers() const { return !matchers_.empty(); }
+  bool hasStringMatchers() const override { return !matchers_.empty(); }
 
 private:
   void optimizeLastMatcher();

@@ -351,6 +351,7 @@ public:
   MOCK_METHOD(bool, rejects, (StatName name), (const));
   bool acceptsAll() const override { return accepts_all_; }
   bool rejectsAll() const override { return rejects_all_; }
+  bool hasStringMatchers() const override { return true; }
 
   bool accepts_all_{false};
   bool rejects_all_{false};
