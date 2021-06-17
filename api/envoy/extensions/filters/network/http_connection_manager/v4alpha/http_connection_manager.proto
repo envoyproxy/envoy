@@ -12,6 +12,7 @@ import "envoy/config/route/v4alpha/route.proto";
 import "envoy/config/route/v4alpha/scoped_route.proto";
 import "envoy/config/trace/v4alpha/http_tracer.proto";
 import "envoy/type/http/v3/path_transformation.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -878,11 +879,27 @@ message ScopedRoutes {
         }
       }
 
+      message DynamicMetadataValueExtractor {
+        option (udpa.annotations.versioning).previous_message_type =
+            "envoy.extensions.filters.network.http_connection_manager.v3.ScopedRoutes."
+            "ScopeKeyBuilder.FragmentBuilder.DynamicMetadataValueExtractor";
+
+        oneof extract_type {
+          option (validate.required) = true;
+
+          // Extract the entire value for the provided metadata key.
+          type.metadata.v3.MetadataKey metadata_key = 1;
+        }
+      }
+
       oneof type {
         option (validate.required) = true;
 
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
+
+        // Specifies how to extract a value from dynamic metadata.
+        DynamicMetadataValueExtractor metadata_value_extractor = 2;
       }
     }
 
