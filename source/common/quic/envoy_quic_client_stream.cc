@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -9,22 +9,22 @@
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "common/quic/platform/quic_mem_slice_span_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_client_session.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Quic {
@@ -58,7 +58,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
                                                   bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
 
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
   local_end_stream_ = end_stream;
@@ -256,11 +256,15 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 }
 
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
+  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  stats_.rx_reset_.inc();
   quic::QuicSpdyClientStream::OnStreamReset(frame);
   runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
 }
 
 void EnvoyQuicClientStream::Reset(quic::QuicRstStreamErrorCode error) {
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error);
+  stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
   quic::QuicSpdyClientStream::Reset(error);
@@ -282,7 +286,6 @@ void EnvoyQuicClientStream::OnClose() {
     // This is called in the scope of a watermark buffer updater. Clear the
     // buffer accounting afterwards so that the updater doesn't override the
     // result.
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

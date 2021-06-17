@@ -1,4 +1,4 @@
-#include "server/config_validation/admin.h"
+#include "source/server/config_validation/admin.h"
 
 namespace Envoy {
 namespace Server {

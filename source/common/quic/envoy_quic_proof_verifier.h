@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/quic/envoy_quic_proof_verifier_base.h"
-
-#include "extensions/transport_sockets/tls/context_impl.h"
+#include "source/common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -12,7 +11,9 @@ namespace Quic {
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context)
-      : context_(std::move(context)) {}
+      : context_(std::move(context)) {
+    ASSERT(context_.get());
+  }
 
   // EnvoyQuicProofVerifierBase
   quic::QuicAsyncStatus

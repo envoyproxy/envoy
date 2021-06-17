@@ -1,4 +1,4 @@
-#include "common/upstream/static_cluster.h"
+#include "source/common/upstream/static_cluster.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -15,12 +15,8 @@ StaticClusterImpl::StaticClusterImpl(
                       factory_context.dispatcher().timeSource()),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
-  // TODO(dio): Use by-reference when cluster.hosts() is removed.
-  const envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment()
-          ? cluster.load_assignment()
-          : Config::Utility::translateClusterHosts(& hosts));
-
+  const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
+      cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 

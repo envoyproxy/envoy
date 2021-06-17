@@ -1,4 +1,4 @@
-#include "extensions/common/utility.h"
+#include "source/extensions/common/utility.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"

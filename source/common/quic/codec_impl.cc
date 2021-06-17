@@ -1,7 +1,7 @@
-#include "common/quic/codec_impl.h"
+#include "source/common/quic/codec_impl.h"
 
-#include "common/quic/envoy_quic_client_stream.h"
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 namespace Envoy {
 namespace Quic {

@@ -1,5 +1,7 @@
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_grid.h"
+#include "envoy/http/alternate_protocols_cache.h"
+
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_grid.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -98,30 +100,30 @@ class ConnectivityGridTestBase : public Event::TestUsingSimulatedTime, public te
 public:
   ConnectivityGridTestBase(bool use_alternate_protocols)
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(simTime()),
+        alternate_protocols_(maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols)),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols),
-              std::chrono::milliseconds(300), options_),
+              state_, simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_),
         host_(grid_.host()) {
     grid_.info_ = &info_;
     grid_.encoder_ = &encoder_;
   }
 
-  OptRef<AlternateProtocolsCacheImpl>
+  AlternateProtocolsCacheSharedPtr
   maybeCreateAlternateProtocolsCacheImpl(bool use_alternate_protocols) {
+    AlternateProtocolsCacheSharedPtr cache;
     if (!use_alternate_protocols) {
-      return makeOptRefFromPtr<AlternateProtocolsCacheImpl>(nullptr);
+      return nullptr;
     }
-    return alternate_protocols_;
+    return std::make_shared<AlternateProtocolsCacheImpl>(simTime());
   }
 
   void addHttp3AlternateProtocol() {
     AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
     const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-        {"h3-29", "", origin.port_}};
-    alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+        {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+    alternate_protocols_->setAlternatives(origin, protocols);
   }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
@@ -131,7 +133,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
-  AlternateProtocolsCacheImpl alternate_protocols_;
+  AlternateProtocolsCacheSharedPtr alternate_protocols_;
   ConnectivityGridForTest grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -457,7 +459,7 @@ TEST_F(ConnectivityGridTest, NoDrainOnTeardown) {
 }
 
 // Test that when HTTP/3 is broken then the HTTP/3 pool is skipped.
-TEST_F(ConnectivityGridTest, SuccessAfterBroken) {
+TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessAfterBroken) {
   addHttp3AlternateProtocol();
   grid_.markHttp3Broken();
   EXPECT_EQ(grid_.first(), nullptr);
@@ -510,8 +512,8 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3)
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHttp3) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_}};
-  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+      {"h3-29", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin, protocols);
   simTime().setMonotonicTime(simTime().monotonicTime() + Seconds(10));
 
   EXPECT_EQ(grid_.first(), nullptr);
@@ -533,8 +535,8 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithExpiredHt
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingHostname) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "otherhostname", origin.port_}};
-  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+      {"h3-29", "otherhostname", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);
 
@@ -554,8 +556,8 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingPort) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"h3-29", "", origin.port_ + 1}};
-  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+      {"h3-29", "", origin.port_ + 1, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);
 
@@ -574,8 +576,8 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
 TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3NoMatchingAlpn) {
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   const std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
-      {"http/2", "", origin.port_}};
-  alternate_protocols_.setAlternatives(origin, protocols, simTime().monotonicTime() + Seconds(5));
+      {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
+  alternate_protocols_->setAlternatives(origin, protocols);
 
   EXPECT_EQ(grid_.first(), nullptr);
 
@@ -590,12 +592,14 @@ TEST_F(ConnectivityGridWithAlternateProtocolsCacheImplTest, SuccessWithoutHttp3N
   grid_.callbacks()->onPoolReady(encoder_, host_, info_, absl::nullopt);
 }
 
-#ifdef ENVOY_ENABLE_QUICHE
+#ifdef ENVOY_ENABLE_QUIC
 
 } // namespace
 } // namespace Http
 } // namespace Envoy
-#include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
+
+#include "test/mocks/server/transport_socket_factory_context.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 namespace Envoy {
 namespace Http {
 namespace {
@@ -605,18 +609,21 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
-  auto factory = std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config));
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto factory =
+      std::make_unique<Quic::QuicClientTransportSocketFactory>(std::move(config), factory_context);
   factory->initialize();
+  ASSERT_FALSE(factory->usesProxyProtocolOptions());
   auto& matcher =
       static_cast<Upstream::MockTransportSocketMatcher&>(*cluster_->transport_socket_matcher_);
   EXPECT_CALL(matcher, resolve(_))
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), options_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

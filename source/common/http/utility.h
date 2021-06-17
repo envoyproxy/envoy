@@ -13,8 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
-#include "common/http/exception.h"
-#include "common/http/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -241,6 +241,13 @@ QueryParams parseParameters(absl::string_view data, size_t start, bool decode_pa
 absl::string_view findQueryStringStart(const HeaderString& path);
 
 /**
+ * Returns the path without the query string.
+ * @param path supplies a HeaderString& possibly containing a query string.
+ * @return std::string the path without query string.
+ */
+std::string stripQueryString(const HeaderString& path);
+
+/**
  * Parse a particular value out of a cookie
  * @param headers supplies the headers to get the cookie from.
  * @param key the key for the particular cookie value to return
@@ -357,8 +364,8 @@ void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_function
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
   Network::Address::InstanceConstSharedPtr address_;
-  // Whether this is the only address in the XFF header.
-  bool single_address_;
+  // Whether this address can be used to determine if it's an internal request.
+  bool allow_trusted_address_checks_;
 };
 
 /**
@@ -487,9 +494,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  const Router::RouteSpecificFilterConfig* generic_config =
-      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
-  return dynamic_cast<const ConfigType*>(generic_config);
+  if (!route || !route->routeEntry()) {
+    return nullptr;
+  }
+  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
 }
 
 /**

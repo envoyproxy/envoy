@@ -6,12 +6,12 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/core/v3/protocol.pb.validate.h"
 
-#include "common/common/fmt.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/settings.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/settings.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -454,16 +454,16 @@ TEST(HttpUtility, getLastAddressFromXFF) {
         {"x-forwarded-for", "192.0.2.10, 192.0.2.1, 10.0.0.1"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 1);
     EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 2);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
     ret = Utility::getLastAddressFromXFF(request_headers, 3);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     const std::string first_address = "192.0.2.10";
@@ -476,64 +476,64 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     // No space on the left.
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(fourth_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No space on either side.
     ret = Utility::getLastAddressFromXFF(request_headers, 1);
     EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // Exercise rtrim() and ltrim().
     ret = Utility::getLastAddressFromXFF(request_headers, 2);
     EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No space trimming.
     ret = Utility::getLastAddressFromXFF(request_headers, 3);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
 
     // No address found.
     ret = Utility::getLastAddressFromXFF(request_headers, 4);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ""}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ","}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", "}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", ", bad"}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     TestRequestHeaderMapImpl request_headers;
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(nullptr, ret.address_);
-    EXPECT_FALSE(ret.single_address_);
+    EXPECT_FALSE(ret.allow_trusted_address_checks_);
   }
   {
     const std::string first_address = "34.0.0.1";
     TestRequestHeaderMapImpl request_headers{{"x-forwarded-for", first_address}};
     auto ret = Utility::getLastAddressFromXFF(request_headers);
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
-    EXPECT_TRUE(ret.single_address_);
+    EXPECT_TRUE(ret.allow_trusted_address_checks_);
   }
 }
 
@@ -872,37 +872,21 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
 }
 
-// Verify that it resolveMostSpecificPerFilterConfigGeneric works with nil routes.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric("envoy.filter", nullptr));
-}
-
 class TestConfig : public Router::RouteSpecificFilterConfig {
 public:
   int state_;
   void merge(const TestConfig& other) { state_ += other.state_; }
 };
 
-// Verify that resolveMostSpecificPerFilterConfig works and we get back the original type.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
-  TestConfig testConfig;
-
-  const std::string filter_name = "envoy.filter";
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  // make the file callbacks return our test config
-  ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name))
-      .WillByDefault(Return(&testConfig));
-
-  // test the we get the same object back (as this goes through the dynamic_cast)
-  auto resolved_filter_config = Utility::resolveMostSpecificPerFilterConfig<TestConfig>(
-      filter_name, filter_callbacks.route());
-  EXPECT_EQ(&testConfig, resolved_filter_config);
+// Verify that it resolveMostSpecificPerFilterConfig works with nil routes.
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
+  EXPECT_EQ(nullptr,
+            Utility::resolveMostSpecificPerFilterConfig<TestConfig>("envoy.filter", nullptr));
 }
 
-// Verify that resolveMostSpecificPerFilterConfigGeneric indeed returns the most specific per
+// Verify that resolveMostSpecificPerFilterConfig indeed returns the most specific per
 // filter config.
-TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
+TEST(HttpUtility, ResolveMostSpecificPerFilterConfig) {
   const std::string filter_name = "envoy.filter";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
 
@@ -911,28 +895,34 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigGeneric) {
   const Router::RouteSpecificFilterConfig three;
 
   // Test when there's nothing on the route
-  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                        filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 
   // Testing in reverse order, so that the method always returns the last object.
+  // Testing per-virtualhost typed filter config
   ON_CALL(filter_callbacks.route_->route_entry_.virtual_host_, perFilterConfig(filter_name))
       .WillByDefault(Return(&one));
-  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  EXPECT_EQ(&one, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
+  // Testing per-route typed filter config
   ON_CALL(*filter_callbacks.route_, perFilterConfig(filter_name)).WillByDefault(Return(&two));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
+      .WillByDefault(Invoke(
+          [&](const std::string& name) { return filter_callbacks.route_->perFilterConfig(name); }));
+  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                      filter_name, filter_callbacks.route()));
 
+  // Testing per-route entry typed filter config
   ON_CALL(filter_callbacks.route_->route_entry_, perFilterConfig(filter_name))
       .WillByDefault(Return(&three));
-  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                       filter_callbacks.route()));
+  EXPECT_EQ(&three, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                        filter_name, filter_callbacks.route()));
 
   // Cover the case of no route entry
   ON_CALL(*filter_callbacks.route_, routeEntry()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(&two, Utility::resolveMostSpecificPerFilterConfigGeneric(filter_name,
-                                                                     filter_callbacks.route()));
+  EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<Router::RouteSpecificFilterConfig>(
+                         filter_name, filter_callbacks.route()));
 }
 
 // Verify that traversePerFilterConfigGeneric traverses in the order of specificity.
@@ -1475,6 +1465,31 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+}
+
+TEST(CheckRequiredHeaders, Request) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(
+                                  TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}));
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{
+                                  {":method", "CONNECT"}, {":authority", "localhost:1234"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :method"),
+            HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :path"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :authority"),
+      HeaderUtility::checkRequiredRequestHeaders(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
+}
+
+TEST(CheckRequiredHeaders, Response) {
+  EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredResponseHeaders(
+                                  TestResponseHeaderMapImpl{{":status", "200"}}));
+  EXPECT_EQ(absl::InvalidArgumentError("missing required header: :status"),
+            HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{}));
+  EXPECT_EQ(
+      absl::InvalidArgumentError("missing required header: :status"),
+      HeaderUtility::checkRequiredResponseHeaders(TestResponseHeaderMapImpl{{":status", "abcd"}}));
 }
 
 } // namespace Http

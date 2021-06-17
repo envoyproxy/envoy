@@ -431,3 +431,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "scope_tracked_object_stack_test",
+    srcs = ["scope_tracked_object_stack_test.cc"],
+    deps = [
+        "//source/common/common:scope_tracked_object_stack",
+        "//source/common/common:utility_lib",
+    ],
+)

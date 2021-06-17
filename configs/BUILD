@@ -9,6 +9,10 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files([
+    "google-vrp/envoy-edge.yaml",
+])
+
 py_binary(
     name = "configgen",
     srcs = ["configgen.py"],

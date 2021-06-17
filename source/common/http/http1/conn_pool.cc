@@ -1,4 +1,4 @@
-#include "common/http/http1/conn_pool.h"
+#include "source/common/http/http1/conn_pool.h"
 
 #include <cstdint>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
-#include "common/http/codes.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 
@@ -87,6 +87,8 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateC
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
+ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
+
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }
@@ -108,9 +110,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       random_generator, state,
       [](HttpConnPoolImplBase* pool) { return std::make_unique<ActiveClient>(*pool); },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(
-            CodecClient::Type::HTTP1, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP1, std::move(data.connection_),
+                                                 data.host_description_, pool->dispatcher(),
+                                                 pool->randomGenerator())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http11});

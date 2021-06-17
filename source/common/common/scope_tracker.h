@@ -3,27 +3,27 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 
 // A small class for managing the scope of a tracked object which is currently having
 // work done in this thread.
 //
-// When created, it appends the tracked object to the dispatcher's stack of tracked objects, and
-// when destroyed it pops the dispatcher's stack of tracked object, which should be the object it
+// When created, it appends the tracked object to the tracker's stack of tracked objects, and
+// when destroyed it pops the tracker's stack of tracked object, which should be the object it
 // registered.
 class ScopeTrackerScopeState {
 public:
-  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::Dispatcher& dispatcher)
-      : registered_object_(object), dispatcher_(dispatcher) {
-    dispatcher_.pushTrackedObject(registered_object_);
+  ScopeTrackerScopeState(const ScopeTrackedObject* object, Event::ScopeTracker& tracker)
+      : registered_object_(object), tracker_(tracker) {
+    tracker_.pushTrackedObject(registered_object_);
   }
 
   ~ScopeTrackerScopeState() {
     // If ScopeTrackerScopeState is always used for managing tracked objects,
     // then the object popped off should be the object we registered.
-    dispatcher_.popTrackedObject(registered_object_);
+    tracker_.popTrackedObject(registered_object_);
   }
 
   // Make this object stack-only, it doesn't make sense for it
@@ -32,7 +32,7 @@ public:
 
 private:
   const ScopeTrackedObject* registered_object_;
-  Event::Dispatcher& dispatcher_;
+  Event::ScopeTracker& tracker_;
 };
 
 } // namespace Envoy

@@ -504,7 +504,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
 // Starts a request with a header timeout specified, sleeps for longer than the
 // timeout, and ensures that a timeout is received.
 TEST_P(HttpTimeoutIntegrationTest, RequestHeaderTimeout) {
-  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // This test requires that the downstream be using HTTP1.
     return;
   }

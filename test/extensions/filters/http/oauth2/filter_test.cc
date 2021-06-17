@@ -6,13 +6,12 @@
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
-#include "common/common/macros.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/secret_manager_impl.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/secret_manager_impl.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"

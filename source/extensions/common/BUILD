@@ -14,7 +14,7 @@ envoy_cc_library(
     # Legacy.  TODO(#9953) clean up.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/runtime:runtime_interface",
+        "//envoy/runtime:runtime_interface",
         "//source/common/common:documentation_url_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",

@@ -74,6 +74,31 @@ message UpstreamHttpProtocolOptions {
   bool auto_san_validation = 2;
 }
 
+// Configures the alternate protocols cache which tracks alternate protocols that can be used to
+// make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
+// HTTP Alternate Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
+// for the "HTTPS" DNS resource record.
+message AlternateProtocolsCacheOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.AlternateProtocolsCacheOptions";
+
+  // The name of the cache. Multiple named caches allow independent alternate protocols cache
+  // configurations to operate within a single Envoy process using different configurations. All
+  // alternate protocols cache options with the same name *must* be equal in all fields when
+  // referenced from different configuration components. Configuration will fail to load if this is
+  // not the case.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The maximum number of entries that the cache will hold. If not specified defaults to 1024.
+  //
+  // .. note:
+  //
+  //   The implementation is approximate and enforced independently on each worker thread, thus
+  //   it is possible for the maximum entries in the cache to go slightly above the configured
+  //   value depending on timing. This is similar to how other circuit breakers work.
+  google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
+}
+
 // [#next-free-field: 6]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
@@ -228,10 +253,8 @@ message KeepaliveSettings {
       "envoy.config.core.v3.KeepaliveSettings";
 
   // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
-  google.protobuf.Duration interval = 1 [(validate.rules).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  // If this is zero, interval PINGs will not be sent.
+  google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
   // time period, the connection will be aborted.
@@ -244,6 +267,14 @@ message KeepaliveSettings {
   // A value of zero means there will be no jitter.
   // The default value is 15%.
   type.v3.Percent interval_jitter = 3;
+
+  // If the connection has been idle for this duration, send a HTTP/2 ping ahead
+  // of new stream creation, to quickly detect dead connections.
+  // If this is zero, this type of PING will not be sent.
+  // If an interval ping is outstanding, a second ping will not be sent as the
+  // interval ping will determine if the connection is dead.
+  google.protobuf.Duration connection_idle_interval = 4
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
 // [#next-free-field: 16]

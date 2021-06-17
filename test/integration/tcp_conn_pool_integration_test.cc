@@ -24,13 +24,13 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
     UNREFERENCED_PARAMETER(end_stream);
 
-    Tcp::ConnectionPool::Instance* pool =
+    absl::optional<Upstream::TcpPoolData> pool_data =
         cluster_manager_.getThreadLocalCluster("cluster_0")
             ->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
-    ASSERT(pool != nullptr);
+    ASSERT(pool_data.has_value());
 
     requests_.emplace_back(*this, data);
-    pool->newConnection(requests_.back());
+    pool_data.value().newConnection(requests_.back());
 
     ASSERT(data.length() == 0);
     return Network::FilterStatus::StopIteration;

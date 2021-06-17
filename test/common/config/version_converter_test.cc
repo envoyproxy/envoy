@@ -3,9 +3,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/well_known.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/well_known.h"
 
 #include "test/common/config/version_converter.pb.h"
 #include "test/test_common/utility.h"
@@ -32,7 +32,6 @@ bool hasOriginalTypeInformation(const Protobuf::Message& message) {
 TEST(VersionConverterTest, Upgrade) {
   // Create a v2 Cluster message with some fields set.
   API_NO_BOOST(envoy::api::v2::Cluster) source;
-  source.add_hosts();
   source.mutable_load_assignment()->set_cluster_name("bar");
   source.mutable_eds_cluster_config()->set_service_name("foo");
   source.set_drain_connections_on_host_removal(true);

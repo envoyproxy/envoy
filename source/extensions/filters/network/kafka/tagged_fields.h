@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "extensions/filters/network/kafka/serialization.h"
+#include "source/extensions/filters/network/kafka/serialization.h"
 
 /**
  * This header file provides serialization support for tagged fields structure added in 2.4.

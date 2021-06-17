@@ -14,11 +14,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit.h"
-#include "extensions/filters/common/ratelimit/stat_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/common/ratelimit/stat_names.h"
 
 namespace Envoy {
 namespace Extensions {

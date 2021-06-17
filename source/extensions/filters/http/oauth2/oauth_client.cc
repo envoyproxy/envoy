@@ -1,4 +1,4 @@
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include <chrono>
 
@@ -6,13 +6,12 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/oauth2/oauth_response.pb.h"
 
 namespace Envoy {

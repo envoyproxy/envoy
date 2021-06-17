@@ -1,13 +1,13 @@
-#include "extensions/filters/http/cors/cors_filter.h"
+#include "source/extensions/filters/http/cors/cors_filter.h"
 
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {

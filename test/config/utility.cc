@@ -15,9 +15,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/http/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
@@ -610,9 +610,6 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    RELEASE_ASSERT(
-        cluster->hidden_envoy_deprecated_hosts().empty(),
-        "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -696,8 +693,10 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
-  addConfigModifier([use_alpn, http3](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
+                                        bool use_alternate_protocols_cache) {
+  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -726,6 +725,11 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
       if (http3 || old_protocol_options.explicit_http_config().has_http3_protocol_options()) {
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
+      }
+      if (use_alternate_protocols_cache) {
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->set_name("default_alternate_protocols_cache");
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -768,7 +772,8 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    protocol_options.MergeFrom(old_options);
+    old_options.MergeFrom(protocol_options);
+    protocol_options.CopyFrom(old_options);
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -823,9 +828,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.
-      RELEASE_ASSERT(
-          cluster->hidden_envoy_deprecated_hosts().empty(),
-          "Hosts should be specified via load_assignment() in the integration test framework.");
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -1149,8 +1151,7 @@ bool ConfigHelper::setAccessLog(
     if (!formatters.empty()) {
       for (const auto& formatter : formatters) {
         auto* added_formatter = log_format->add_formatters();
-        added_formatter->set_name(formatter.name());
-        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+        added_formatter->CopyFrom(formatter);
       }
     }
   }
@@ -1381,6 +1382,27 @@ void ConfigHelper::adjustUpstreamTimeoutForTsan(
   // QUIC stream processing is slow under TSAN. Use larger timeout to prevent
   // upstream_response_timeout.
   timeout->set_seconds(TSAN_TIMEOUT_FACTOR * timeout_ms / 1000);
+}
+
+envoy::config::core::v3::Http3ProtocolOptions ConfigHelper::http2ToHttp3ProtocolOptions(
+    const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+    size_t http3_max_stream_receive_window) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  if (http2_options.has_initial_stream_window_size() &&
+      http2_options.initial_stream_window_size().value() < http3_max_stream_receive_window) {
+    // Set http3 stream flow control window only if the configured http2 stream flow control
+    // window is smaller than the upper limit of flow control window supported by QUICHE which is
+    // also the default for http3 streams.
+    http3_options.mutable_quic_protocol_options()->mutable_initial_stream_window_size()->set_value(
+        http2_options.initial_stream_window_size().value());
+  }
+  if (http2_options.has_override_stream_error_on_invalid_http_message()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(
+        http2_options.override_stream_error_on_invalid_http_message().value());
+  } else if (http2_options.stream_error_on_invalid_http_messaging()) {
+    http3_options.mutable_override_stream_error_on_invalid_http_message()->set_value(true);
+  }
+  return http3_options;
 }
 
 CdsHelper::CdsHelper() : cds_path_(TestEnvironment::writeStringToFileForTest("cds.pb_text", "")) {}

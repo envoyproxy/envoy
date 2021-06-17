@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/quic/envoy_quic_proof_verifier_base.h"
+#include "source/common/quic/envoy_quic_proof_verifier_base.h"
 
 namespace Envoy {
 namespace Quic {

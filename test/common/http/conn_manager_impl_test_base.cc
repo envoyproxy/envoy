@@ -1,6 +1,8 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
-#include "extensions/request_id/uuid/config.h"
+#include "source/extensions/request_id/uuid/config.h"
+
+#include "test/common/http/xff_extension.h"
 
 using testing::AtLeast;
 using testing::InSequence;
@@ -33,6 +35,8 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
+
+  ip_detection_extensions_.push_back(getXFFExtension(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {

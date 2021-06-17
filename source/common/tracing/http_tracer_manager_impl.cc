@@ -1,6 +1,6 @@
-#include "common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Tracing {
