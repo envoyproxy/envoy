@@ -57,14 +57,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
-<<<<<<< Updated upstream
       load_assignment_(convertPriority(cluster.load_assignment())) {
-=======
-      load_assignment_(
-          cluster.has_load_assignment()
-              ? convertPriority(cluster.load_assignment())
-              : Config::Utility::translateClusterHosts(& hosts)) {
->>>>>>> Stashed changes
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());

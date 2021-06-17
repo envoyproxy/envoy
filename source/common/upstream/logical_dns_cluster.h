@@ -74,7 +74,6 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> hosts;
 };
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
