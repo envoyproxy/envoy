@@ -46,7 +46,7 @@ const char* fake_remote_listener_template = R"(
 const char* fake_remote_cluster_template = R"(
   - name: fake_remote
     connect_timeout: 1.0s
-    type: STATIC
+    type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: fake_remote
