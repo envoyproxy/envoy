@@ -9,6 +9,8 @@
 namespace Envoy {
 namespace Stats {
 
+class StatName;
+
 class StatsMatcher {
 public:
   virtual ~StatsMatcher() = default;
@@ -18,7 +20,7 @@ public:
    * @param the name of a Stats::Metric.
    * @return bool true if that stat should not be instantiated.
    */
-  virtual bool rejects(const std::string& name) const PURE;
+  virtual bool rejects(StatName name) const PURE;
 
   /**
    * Helps determine whether the matcher needs to be called. This can be used

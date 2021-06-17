@@ -111,8 +111,7 @@ bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   // Also note that the elaboration of the stat-name into a string is expensive,
   // so I think it might be better to move the matcher test until after caching,
   // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() ||
-         stats_matcher_->rejects(constSymbolTable().toString(stat_name));
+  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(stat_name);
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {

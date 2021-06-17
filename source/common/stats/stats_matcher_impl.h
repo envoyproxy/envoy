@@ -3,10 +3,12 @@
 #include <string>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/common/optref.h"
 #include "envoy/stats/stats_matcher.h"
 
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -18,22 +20,35 @@ namespace Stats {
  */
 class StatsMatcherImpl : public StatsMatcher {
 public:
-  explicit StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                   SymbolTable& symbol_table);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() = default;
 
   // StatsMatcher
-  bool rejects(const std::string& name) const override;
-  bool acceptsAll() const override { return is_inclusive_ && matchers_.empty(); }
-  bool rejectsAll() const override { return !is_inclusive_ && matchers_.empty(); }
+  bool rejects(StatName name) const override;
+  bool acceptsAll() const override { return is_inclusive_ && matchers_.empty() &&
+        prefixes_.empty(); }
+  bool rejectsAll() const override { return !is_inclusive_ && matchers_.empty() &&
+        prefixes_.empty(); }
+
+  // Determines whether conversion from StatName to string may be necessary to
+  // run a match against this set.
+  bool hasStringMatchers() const { return !matchers_.empty(); }
 
 private:
+  void optimizeLastMatcher();
+
   // Bool indicating whether or not the StatsMatcher is including or excluding stats by default. See
   // StatsMatcherImpl::rejects() for much more detail.
   bool is_inclusive_{true};
 
+  OptRef<SymbolTable> symbol_table_;
+  std::unique_ptr<StatNamePool> stat_name_pool_;
+
   std::vector<Matchers::StringMatcherImpl> matchers_;
+  std::vector<StatName> prefixes_;
 };
 
 } // namespace Stats

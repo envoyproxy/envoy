@@ -80,10 +80,15 @@ class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
   explicit StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher);
 
+  // StringMatcher
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
   const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
+
+  // If the matcher is a case-sensitive prefix match, returns the prefix string.
+  // otherwise, returns an empty string.
+  bool getCaseSensitivePrefixMatch(std::string& prefix) const;
 
 private:
   const envoy::type::matcher::v3::StringMatcher matcher_;
