@@ -53,6 +53,12 @@ class EchoServerHandler(BaseHTTPRequestHandler):
         self.wfile.write(bytes(json.dumps(request_data), charset))
         self.wfile.write(bytes("\r\n" * 2, charset))
 
+    def log_message(self, *args, **kwargs):
+        # we squelch the HTTP server
+        # since these logs aren't actually useful
+        # compared to envoy logs
+        pass
+
 
 if __name__ == "__main__":
     server = HTTPServer(("127.0.0.1", 8080), EchoServerHandler)

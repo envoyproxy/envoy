@@ -2,6 +2,9 @@
 # when implicit_reexport is disabled
 #
 # https://mypy.readthedocs.io/en/stable/config_file.html#confval-implicit_reexport
+from envoy_engine import ErrorCode as ErrorCode
+from envoy_engine import LogLevel as LogLevel
+
 from .response import Response as Response
 from .threading import request as request
 from .threading import delete as delete
