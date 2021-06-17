@@ -51,6 +51,10 @@ licenses(["notice"])  # Apache 2
 api_proto_package($fields)
 """)
 
+KEEP_V2_PROTOS = [
+    "//envoy/config/health_checker/redis/v2:pkg",
+]
+
 IGNORED_V2_PROTOS = [
     "envoy/config/accesslog/v2",
     "envoy/config/cluster/aggregate/v2alpha",
@@ -397,7 +401,8 @@ def generate_current_api_dir(api_dir, dst_dir):
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
     for proto in IGNORED_V2_PROTOS:
-        shutil.rmtree(str(dst.joinpath(proto[6:])))
+        if proto not in KEEP_V2_PROTOS:
+            shutil.rmtree(str(dst.joinpath(proto[6:])))
 
 
 def git_status(path):
