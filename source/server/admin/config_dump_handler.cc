@@ -3,11 +3,12 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
-#include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/server/admin/utils.h"
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Server {
@@ -107,38 +108,15 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
   return Utility::queryParam(params, "mask");
 }
 
-Server::Configuration::MatchingParameters
-getMatchingParams(const Http::Utility::QueryParams& params) {
-  absl::flat_hash_map<std::string, std::string> matchers;
-  const std::string prefix = "match_";
-  for (const auto& [key, val] : params) {
-    if (absl::string_view match_key = absl::StripPrefix(key, prefix); match_key != key) {
-      matchers[match_key] = val;
-    }
-  }
-  return matchers;
-}
-
 // Helper method to get the eds parameter.
 bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
-Configuration::ConfigDumpFilterFactory& getDefaultConfigDumpFactory() {
-  envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.admin.config_dump_filter.default");
-  return Config::Utility::getAndCheckFactory<Configuration::ConfigDumpFilterFactory>(config);
-}
-
-class UniversalStringMatcher : public StringMatcher {
-public:
-  bool match(absl::string_view) const override { return true; }
-};
-
 Matchers::StringMatcherPtr buildNameMatcher(const Http::Utility::QueryParams& params) {
   const auto name_regex = Utility::queryParam(params, "name_regex");
   if (!name_regex.has_value()) {
-    return std::make_unique<UniversalStringMatcher>();
+    return std::make_unique<Matchers::UniversalStringMatcher>();
   }
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
@@ -190,8 +168,8 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& filter) {
-        return dumpEndpointConfigs(*name_matcher);
+      callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
+        return dumpEndpointConfigs(name_matcher);
       });
     }
   }

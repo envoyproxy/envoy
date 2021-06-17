@@ -55,6 +55,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:non_copyable",
         "//source/common/protobuf",
+        "//envoy/common:matchers_interface",
     ],
 )
 

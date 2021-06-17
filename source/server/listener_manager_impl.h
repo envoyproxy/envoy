@@ -11,7 +11,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/api_listener.h"
-#include "envoy/server/config_dump_config.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"

@@ -154,7 +154,7 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecre
 }
 
 ProtobufTypes::MessagePtr
-SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilter& filter) {
+SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
   // TODO(htuch): unlike other config providers, we're recreating the original
   // Secrets below. This makes it hard to support API_RECOVER_ORIGINAL()-style
   // recovery of the original config message. As a result, for now we're
