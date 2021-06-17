@@ -26,7 +26,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
     ranges.emplace_back(std::move(range));
   }
 
-  const std::string stat_prefix = ip_config.stat_prefix();
+  const std::string& stat_prefix = ip_config.stat_prefix();
   Stats::Scope& scope = context.scope();
   return [ranges, stat_prefix, &scope]() {
     return std::make_unique<Matcher>(ranges, stat_prefix, scope);
