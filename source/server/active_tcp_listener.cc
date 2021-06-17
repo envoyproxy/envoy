@@ -151,49 +151,13 @@ void ActiveTcpListener::resumeListening() {
   }
 }
 
-void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
-                                      std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-
-  // Find matching filter chain.
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  if (filter_chain == nullptr) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
-    ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
-              socket->addressProvider().remoteAddress()->asString());
-    stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
-    socket->close();
-    return;
-  }
-
-  stream_info->setFilterChainName(filter_chain->name());
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
-  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  auto server_conn_ptr = dispatcher().createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info);
-  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
-      timeout != std::chrono::milliseconds::zero()) {
-    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
-  }
-
-  ActiveTcpConnectionPtr active_connection(
+void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_chain,
+                                            Network::ServerConnectionPtr server_conn_ptr,
+                                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  auto& active_connections = getOrCreateActiveConnections(filter_chain);
+  ActiveConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               dispatcher().timeSource(), std::move(stream_info)));
-  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
-
-  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr, "");
-
-  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
-      *active_connection->connection_, filter_chain->networkFilterFactories());
-  if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *active_connection->connection_,
-                   active_connection->connection_->addressProvider().remoteAddress()->asString());
-    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
-  }
-
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,

@@ -70,8 +70,7 @@ struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
  */
 class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public TypedActiveStreamListenerBase<ActiveTcpConnection>,
-                                public Network::BalancedConnectionHandler,
-                                Logger::Loggable<Logger::Id::conn_handler> {
+                                public Network::BalancedConnectionHandler {
 public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
@@ -119,10 +118,11 @@ public:
   void removeConnection(ActiveTcpConnection& connection);
 
   /**
-   * Create a new connection from a socket accepted by the listener.
+   * Create active connection from the server connection.
    */
-  void newConnection(Network::ConnectionSocketPtr&& socket,
-                     std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
+  void newActiveConnection(const Network::FilterChain& filter_chain,
+                           Network::ServerConnectionPtr server_conn_ptr,
+                           std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
 
   /**
    * Return the active connections container attached with the given filter chain.
