@@ -121,6 +121,12 @@ public:
   AttributeId(RootToken root, absl::optional<SubToken> sub) : root_token_(root), sub_token_(sub){};
   RootToken root() { return root_token_; };
   absl::optional<SubToken> sub() { return sub_token_; };
+  bool sub(RequestToken& tok);
+  bool sub(ResponseToken& tok);
+  bool sub(SourceToken& tok);
+  bool sub(DestinationToken& tok);
+  bool sub(ConnectionToken& tok);
+  bool sub(UpstreamToken& tok);
 
   static absl::optional<AttributeId> from_path(absl::string_view path);
 

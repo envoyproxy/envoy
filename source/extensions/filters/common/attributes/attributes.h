@@ -32,9 +32,13 @@ namespace Filters {
 namespace Common {
 namespace Attributes {
 
+static const std::string HttpProtocolStrings[] = {"Http 1.0", "Http 1.1", "Http 2", "Http 3"};
+
+using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using MapValue = google::api::expr::v1alpha1::MapValue;
+using MapValue_Entry = google::api::expr::v1alpha1::MapValue_Entry;
 using Value = google::api::expr::v1alpha1::Value;
-using Value = google::api::expr::v1alpha1::Value;
+using NullValue = google::protobuf::NullValue;
 using Any = google::protobuf::Any;
 
 class ValueUtil {
@@ -52,29 +56,29 @@ public:
 
 class Attributes : public Logger::Loggable<Logger::Id::filter> {
 public:
-  AttrState(StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info){};
+  Attributes(StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info){};
 
-  void AttrState::setRequestHeaders(Http::RequestHeaderMap* request_headers);
-  void AttrState::setResponseHeaders(Http::ResponseHeaderMap* response_headers);
+  void setRequestHeaders(Http::RequestHeaderMap* request_headers);
+  void setResponseHeaders(Http::ResponseHeaderMap* response_headers);
+  void setRequestTrailers(Http::RequestTrailerMap* request_trailers);
+  void setResponseTrailers(Http::ResponseTrailerMap* response_trailers);
   absl::optional<Value> getAttribute(AttributeId& attr_id);
 
 private:
-  absl::optional<Value> requestSet(absl::string_view name);
-  absl::optional<Value> responseSet(absl::string_view path);
-  absl::optional<Value> connectionSet(absl::string_view path);
-  absl::optional<Value> upstreamSet(absl::string_view path);
-  absl::optional<Value> sourceSet(absl::string_view path);
-  absl::optional<Value> destinationSet(absl::string_view path);
-  absl::optional<Value> metadataSet();
-  absl::optional<Value> filterStateSet();
+  absl::optional<Value> getRequest(AttributeId& attr_id);
+  absl::optional<Value> getResponse(AttributeId& attr_id);
+  absl::optional<Value> getSource(AttributeId& attr_id);
+  absl::optional<Value> getDestination(AttributeId& attr_id);
+  absl::optional<Value> getConnection(AttributeId& attr_id);
+  absl::optional<Value> getUpstream(AttributeId& attr_id);
+  absl::optional<Value> getMetadata();
+  absl::optional<Value> getFilterState();
 
-  ProtobufWkt::Map<std::string, ProtobufWkt::Value>& getOrInsert(std::string key);
   std::string getTs();
   std::string formatDuration(absl::Duration duration);
   absl::optional<Value> getGrpcStatus();
 
   StreamInfo::StreamInfo& stream_info_;
-  std::vector<std::tuple<absl::string_view, absl::string_view>> specified_;
 
   Envoy::Http::RequestHeaderMap* request_headers_;
   Envoy::Http::ResponseHeaderMap* response_headers_;
@@ -82,155 +86,6 @@ private:
   Envoy::Http::ResponseTrailerMap* response_trailers_;
 };
 
-// using google::api::expr::v1alpha1::Value;
-
-// class RequestPartBroker {
-// public:
-//   RequestPartBroker(const Http::RequestHeaderMap* headers,
-//                     const StreamInfo::StreamInfo& stream_info)
-//       : headers_(headers), stream_info_(stream_info) {}
-//   absl::optional<Value> value() const {
-//     google::api::expr::v1alpha1::MapValue m;
-//     for (const absl::string_view s: request_tokens) {
-//       MapValue_Entry* e = m.add_entries();
-//       e->set_allocated_key(&ExprValueUtil::stringV)
-
-//     }
-//     ExprValueUtil::mapValue(m)
-//   }
-//   absl::optional<Value> operator[](absl::string_view k) const {
-//     auto part_tok = request_tokens.find(k);
-//     if (part_token == request_tokens.end()) {
-//       return absl::nullopt;
-//     }
-
-//     int end;
-//     switch (part_token->second) {
-//     case RequestToken::PATH:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getPathValue()));
-//       }
-//       break;
-//     case RequestToken::URL_PATH:
-//       if (headers_ != nullptr && headers_->Path() != nullptr &&
-//           headers_->Path()->value() != nullptr) {
-//         end = std::max(path.find('\0'), path.find('?'));
-//         return ExprValueUtil::stringValue(
-//             std::string(headers_->Path()->value().getStringView().substr(0, end)));
-//       }
-//       break;
-//     case RequestToken::HOST:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getHostValue()));
-//       }
-//       break;
-//     case RequestToken::SCHEME:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getSchemeValue()));
-//       }
-//       break;
-//     case RequestToken::METHOD:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getMethodValue()));
-//       }
-//       break;
-//     case RequestToken::HEADERS:
-//       ENVOY_LOG(debug, "ignoring unimplemented attribute request.headers");
-//       break;
-//     case RequestToken::REFERER:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(
-//             std::string(headers_->getInlineValue(referer_handle.handle())));
-//       }
-//       break;
-//     case RequestToken::USERAGENT:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getUserAgentValue()));
-//       }
-//       break;
-//     case RequestToken::TIME:
-//       return ExprValueUtil::stringValue(getTs());
-//       break;
-//     case RequestToken::ID:
-//       if (headers_ != nullptr) {
-//         return ExprValueUtil::stringValue(std::string(headers_->getRequestIdValue()));
-//       }
-//       break;
-//     case RequestToken::PROTOCOL:
-//       return ExprValueUtil::optionalStringValue(
-//           HttpProtocolStrings[static_cast<int>(stream_info_.protocol().value())]);
-//     case RequestToken::DURATION:
-//       if (stream_info_.requestComplete().has_value()) {
-//         return ExprValueUtil::stringValue(
-//             formatDuration(absl::FromChrono(stream_info_.requestComplete().value())));
-//       }
-//       break;
-//     case RequestToken::SIZE:
-//       if (headers_ != nullptr && headers_->ContentLength() != nullptr) {
-//         int64_t length;
-//         if (absl::SimpleAtoi(headers_->ContentLength()->value().getStringView(), &length)) {
-//           return ExprValueUtil::uint64Value(length);
-//         }
-//       } else {
-//         return ExprValueUtil::uint64Value(stream_info_.bytesReceived());
-//       }
-//       break;
-//     case RequestToken::TOTAL_SIZE:
-//       return ExprValueUtil::uint64Value(
-//           stream_info_.bytesReceived() + headers_ != nullptr ? headers_->byteSize() : 0);
-//     }
-//     return absl::nullopt;
-//   }
-
-// private:
-//   const Http::RequestHeaderMap* headers_;
-//   const StreamInfo::StreamInfo& stream_info_;
-// }
-
-// class AttributesBroker {
-// public:
-//   AttributesBroker(const StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info) {}
-//   template <typename InputIterator>
-//   absl::optional<Value> getAttribute(InputIterator begin, InputIterator end) {
-//     if (begin == end) {
-//       return absl::nullopt;
-//     }
-//     if std
-//       ::distance(begin, end) == 1 Value value = getTopAttribute(*begin);
-
-//     while (begin != end) {
-//       absl::string_view part = *begin;
-//     }
-//   }
-//   void setRequestHeaders(Http::RequestHeaderMap* headers) { request_headers_ = headers; }
-//   void setResponseHeaders(Http::ResponseHeaderMap* headers) { response_headers_ = headers; }
-
-// private:
-//   const StreamInfo::StreamInfo& stream_info_;
-//   Http::RequestHeaderMap* request_headers_{};
-//   Http::ResponseHeaderMap* response_headers_{};
-// }
-
-// class AttrBroker {
-// public:
-//   AttrBroker(const StreamInfo::StreamInfo& info);
-
-// private:
-//   setRequestHeaders
-
-// }
-
-// class RequestAttrBroker {
-// public:
-//   RequestWrapper(Protobuf::Arena& arena, const Http::RequestHeaderMap* headers,
-//                  const StreamInfo::StreamInfo& info)
-//       : headers_(arena, headers), info_(info) {}
-//   absl::optional<Value> operator[](absl::string_view) const override;
-
-// private:
-//   const HeadersWrapper<Http::RequestHeaderMap> headers_;
-//   const StreamInfo::StreamInfo& info_;
-// };
 } // namespace Attributes
 } // namespace Common
 } // namespace Filters

@@ -7,6 +7,61 @@ namespace Filters {
 namespace Common {
 namespace Attributes {
 
+bool AttributeId::sub(RequestToken& tok) {
+  if (root() == RootToken::REQUEST && sub_token_) {
+    if (auto val = absl::get_if<RequestToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+bool AttributeId::sub(ResponseToken& tok) {
+  if (root() == RootToken::RESPONSE && sub_token_) {
+    if (auto val = absl::get_if<ResponseToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+bool AttributeId::sub(SourceToken& tok) {
+  if (root() == RootToken::SOURCE && sub_token_) {
+    if (auto val = absl::get_if<SourceToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+bool AttributeId::sub(DestinationToken& tok) {
+  if (root() == RootToken::DESTINATION && sub_token_) {
+    if (auto val = absl::get_if<DestinationToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+bool AttributeId::sub(ConnectionToken& tok) {
+  if (root() == RootToken::CONNECTION && sub_token_) {
+    if (auto val = absl::get_if<ConnectionToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+bool AttributeId::sub(UpstreamToken& tok) {
+  if (root() == RootToken::UPSTREAM && sub_token_) {
+    if (auto val = absl::get_if<UpstreamToken>(&*sub_token_)) {
+      tok = *val;
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Returns absl::nullopt if the path was invalid
 absl::optional<AttributeId> AttributeId::from_path(absl::string_view path) {
   RootToken root;

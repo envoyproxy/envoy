@@ -32,12 +32,6 @@ namespace Filters {
 namespace Common {
 namespace Attributes {
 
-using MapValue = google::api::expr::v1alpha1::MapValue;
-using MapValue_Entry = google::api::expr::v1alpha1::MapValue_Entry;
-using Value = google::api::expr::v1alpha1::Value;
-using NullValue = google::protobuf::NullValue;
-using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
-
 Value ValueUtil::mapValue(MapValue* m) {
   Value val;
   val.set_allocated_map_value(m);
@@ -75,68 +69,49 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 absl::optional<Value> Attributes::getAttribute(AttributeId& attr_id) {
   switch (attr_id.root()) {
+  case RootToken::REQUEST:
+    return getRequest(attr_id);
+  case RootToken::RESPONSE:
+    return getResponse(attr_id);
+  case RootToken::SOURCE:
+    return getSource(attr_id);
+  case RootToken::DESTINATION:
+    return getDestination(attr_id);
+  case RootToken::CONNECTION:
+    return getConnection(attr_id);
+  case RootToken::UPSTREAM:
+    return getUpstream(attr_id);
   case RootToken::METADATA:
-    return getMetadata(attr_id);
+    return getMetadata();
+  case RootToken::FILTER_STATE:
+    return getFilterState();
   }
-}
-absl::optional<Value> Attributes::findValue(absl::string_view root_tok, absl::string_view sub_tok) {
-  auto root_id = property_tokens.find(root_tok);
-  if (root_id == property_tokens.end()) {
-    ENVOY_LOG(debug, "The attribute '{}.{}' is not a valid ext_proc attribute", root_tok, sub_tok);
-    return absl::nullopt;
-  }
-
-  switch (root_id->second) {
-  case PropertyToken::REQUEST:
-    return Attributes::requestSet(sub_tok);
-  case PropertyToken::RESPONSE:
-    return Attributes::responseSet(sub_tok);
-  case PropertyToken::CONNECTION:
-    return Attributes::connectionSet(sub_tok);
-  case PropertyToken::UPSTREAM:
-    return Attributes::upstreamSet(sub_tok);
-  case PropertyToken::SOURCE:
-    return Attributes::sourceSet(sub_tok);
-  case PropertyToken::DESTINATION:
-    return Attributes::destinationSet(sub_tok);
-  case PropertyToken::METADATA:
-    if (sub_tok.empty()) {
-      return Attributes::metadataSet();
-    }
-    return ValueUtil::nullValue();
-  case PropertyToken::FILTER_STATE:
-    if (sub_tok.empty()) {
-      return Attributes::filterStateSet();
-    }
-    return ValueUtil::nullValue();
-  }
+  return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::requestSet(absl::string_view path) {
-  //   auto attr_fields = getOrInsert(REQUEST_TOKEN);
-
-  auto part_token = request_tokens.find(path);
-  if (part_token == request_tokens.end()) {
-    ENVOY_LOG(debug, "Unable to find ext_proc request attribute: '{}'", path);
+absl::optional<Value> Attributes::getRequest(AttributeId& attr_id) {
+  RequestToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
     return absl::nullopt;
   }
 
   auto headers = request_headers_;
-  int end;
 
-  switch (part_token->second) {
+  switch (tok) {
   case RequestToken::PATH:
     if (headers != nullptr) {
       return ValueUtil::stringValue(std::string(headers->getPathValue()));
     }
     break;
-  case RequestToken::URL_PATH:
+  case RequestToken::URL_PATH: {
     if (headers != nullptr && headers->Path() != nullptr && headers->Path()->value() != nullptr) {
-      end = std::max(path.find('\0'), path.find('?'));
-      return ValueUtil::stringValue(
-          std::string(headers->Path()->value().getStringView().substr(0, end)));
+      auto path = headers->Path()->value().getStringView();
+      auto end = std::max(path.find('\0'), path.find('?'));
+      return ValueUtil::stringValue(std::string(path.substr(0, end)));
     }
     break;
+  }
   case RequestToken::HOST:
     if (headers != nullptr) {
       return ValueUtil::stringValue(std::string(headers->getHostValue()));
@@ -199,16 +174,13 @@ absl::optional<Value> Attributes::requestSet(absl::string_view path) {
   return ValueUtil::nullValue();
 }
 
-absl::optional<Value> Attributes::responseSet(absl::string_view path) {
-  //   auto attr_fields = getOrInsert(RESPONSE_TOKEN);
-
-  auto part_token = response_tokens.find(path);
-  if (part_token == response_tokens.end()) {
-    ENVOY_LOG(debug, "Unable to find response attribute: '{}'", path);
+absl::optional<Value> Attributes::getResponse(AttributeId& attr_id) {
+  ResponseToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
     return absl::nullopt;
   }
-
-  switch (part_token->second) {
+  switch (tok) {
   case ResponseToken::CODE:
     if (stream_info_.responseCode().has_value()) {
       return ValueUtil::uint64Value(stream_info_.responseCode().value());
@@ -236,27 +208,13 @@ absl::optional<Value> Attributes::responseSet(absl::string_view path) {
   return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::destinationSet(absl::string_view path) {
-  //   auto attr_fields = getOrInsert(DESTINATION_TOKEN);
-
-  auto addr = stream_info_.downstreamAddressProvider().localAddress();
-  if (addr == nullptr) {
-    return ValueUtil::nullValue();
+absl::optional<Value> Attributes::getSource(AttributeId& attr_id) {
+  SourceToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
+    return absl::nullopt;
   }
-  if (path == Address) {
-    return ValueUtil::stringValue(addr->asString());
-  } else if (path == Port) {
-    if (addr->ip() == nullptr) {
-      return ValueUtil::nullValue();
-    }
-    return ValueUtil::uint64Value(addr->ip()->port());
-  } else {
-    ENVOY_LOG(debug, "Unable to find ext_proc destination attribute: '{}'", path);
-  }
-  return absl::nullopt;
-}
 
-absl::optional<Value> Attributes::sourceSet(absl::string_view path) {
   if (stream_info_.upstreamHost() == nullptr) {
     return absl::nullopt;
   }
@@ -264,9 +222,11 @@ absl::optional<Value> Attributes::sourceSet(absl::string_view path) {
   if (addr == nullptr) {
     return ValueUtil::nullValue();
   }
-  if (path == Address) {
+
+  switch (tok) {
+  case SourceToken::ADDRESS:
     return ValueUtil::stringValue(addr->asString());
-  } else if (path == Port) {
+  case SourceToken::PORT:
     if (addr->ip() == nullptr) {
       return ValueUtil::nullValue();
     }
@@ -275,18 +235,41 @@ absl::optional<Value> Attributes::sourceSet(absl::string_view path) {
   return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::upstreamSet(absl::string_view path) {
-  //   auto attr_fields = getOrInsert(UPSTREAM_TOKEN);
+absl::optional<Value> Attributes::getDestination(AttributeId& attr_id) {
+  DestinationToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
+    return absl::nullopt;
+  }
 
-  auto part_token = upstream_tokens.find(path);
-  if (part_token == upstream_tokens.end()) {
-    ENVOY_LOG(debug, "Unable to find ext_proc upstream attribute: '{}'", path);
+  auto addr = stream_info_.downstreamAddressProvider().localAddress();
+  if (addr == nullptr) {
+    return ValueUtil::nullValue();
+  }
+
+  switch (tok) {
+  case DestinationToken::ADDRESS:
+    return ValueUtil::stringValue(addr->asString());
+  case DestinationToken::PORT:
+    if (addr->ip() == nullptr) {
+      return ValueUtil::nullValue();
+    }
+    return ValueUtil::uint64Value(addr->ip()->port());
+  }
+  return absl::nullopt;
+}
+
+absl::optional<Value> Attributes::getUpstream(AttributeId& attr_id) {
+  UpstreamToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
     return absl::nullopt;
   }
 
   auto upstreamHost = stream_info_.upstreamHost();
   auto upstreamSsl = stream_info_.upstreamSslConnection();
-  switch (part_token->second) {
+
+  switch (tok) {
   case UpstreamToken::ADDRESS:
     if (upstreamHost != nullptr && upstreamHost->address() != nullptr) {
       return ValueUtil::stringValue(upstreamHost->address()->asString());
@@ -345,19 +328,17 @@ absl::optional<Value> Attributes::upstreamSet(absl::string_view path) {
   return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::connectionSet(absl::string_view path) {
-  //   auto attr_fields = getOrInsert(CONNECTION_TOKEN);
-
-  auto part_token = connection_tokens.find(path);
-  if (part_token == connection_tokens.end()) {
-    ENVOY_LOG(debug, "Unable to find ext_proc connection attribute: '{}'", path);
+absl::optional<Value> Attributes::getConnection(AttributeId& attr_id) {
+  ConnectionToken tok;
+  bool valid = attr_id.sub(tok);
+  if (!valid) {
     return absl::nullopt;
   }
 
   auto connId = stream_info_.connectionID();
   auto downstreamSsl = stream_info_.downstreamSslConnection();
 
-  switch (part_token->second) {
+  switch (tok) {
   case ConnectionToken::ID:
     if (connId.has_value()) {
       return ValueUtil::uint64Value(connId.value());
@@ -414,24 +395,24 @@ absl::optional<Value> Attributes::connectionSet(absl::string_view path) {
   return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::metadataSet() {
+absl::optional<Value> Attributes::getMetadata() {
   //   if (attributes_.contains(METADATA_TOKEN)) {
-  //   MapValue m;
-  //   for (auto const& [k, v] : stream_info_.dynamicMetadata().filter_metadata()) {
-  //     Value sk = ValueUtil::stringValue(k);
-  //     // todo: convert s to object value (any)
-  //     MapValue_Entry* e = m.add_entries();
-  //     e->set_allocated_key(&sk);
-  //     Value vv;
-  //     Value any_v;
-  //     Any* a = any_v.mutable_object_value();
-  //     a->PackFrom(v);
-  //     vv.set_allocated_object_value(a);
-  //     e->set_allocated_value(&vv);
+  //     MapValue m;
+  //     for (auto const& [k, v] : stream_info_.dynamicMetadata().filter_metadata()) {
+  //       Value sk = ValueUtil::stringValue(k);
+  //       // todo: convert s to object value (any)
+  //       MapValue_Entry* e = m.add_entries();
+  //       e->set_allocated_key(&sk);
+  //       Value vv;
+  //       Value any_v;
+  //       Any* a = any_v.mutable_object_value();
+  //       a->PackFrom(v);
+  //       vv.set_allocated_object_value(a);
+  //       e->set_allocated_value(&vv);
+  //     }
+  //     return absl::make_optional(ValueUtil::mapValue(&m));
   //   }
-  //   return absl::make_optional(ValueUtil::mapValue(&m));
-  //   }
-  //   return absl::nullopt;
+  return absl::nullopt;
 }
 
 // todo(eas): there are two issues here
@@ -445,10 +426,7 @@ absl::optional<Value> Attributes::metadataSet() {
 //   is indicated that the filter state values should be binary data, but `Value` only allows the
 //   following: [null, number, string, bool, struct, list] where struct is simply a `map<string,
 //   value>`.
-absl::optional<Value> Attributes::filterStateSet() {
-  ENVOY_LOG(debug, "ignoring unimplemented attribute filter_state");
-  return absl::nullopt;
-}
+absl::optional<Value> Attributes::getFilterState() { return absl::nullopt; }
 
 std::string Attributes::formatDuration(absl::Duration duration) {
   return absl::FormatDuration(duration);
