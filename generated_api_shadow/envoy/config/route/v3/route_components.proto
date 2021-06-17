@@ -864,8 +864,10 @@ message RouteAction {
     WeightedCluster weighted_clusters = 3;
 
     // [#not-implemented-hide:]
-    // Configuration for a plugin to which cluster selection is delegated.
-    core.v3.TypedExtensionConfig cluster_specifier_plugin = 37;
+    // Name of the cluster specifier plugin to use to determine the cluster for
+    // requests on this route. The plugin name must be defined in the associated
+    // :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration.cluster_specifier_plugins`.
+    string cluster_specifier_plugin = 37;
   }
 
   // The HTTP status code to use when configured cluster is not found.
