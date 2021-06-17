@@ -6,6 +6,7 @@
 #include <string>
 
 #include "absl/strings/str_format.h"
+#include "google/api/expr/v1alpha1/value.pb.h"
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
@@ -23,19 +24,20 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/header_map_impl.h"
-
-#include "source/extensions/filters/common/attributes/attributes.h"
+#include "source/extensions/filters/common/attributes/id.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Attributes {
-using google::api::expr::v1alpha1::MapValue;
-using google::api::expr::v1alpha1::Value;
-using google::protobuf::Any;
 
-class ExprValueUtil {
+using MapValue = google::api::expr::v1alpha1::MapValue;
+using Value = google::api::expr::v1alpha1::Value;
+using Value = google::api::expr::v1alpha1::Value;
+using Any = google::protobuf::Any;
+
+class ValueUtil {
 public:
   static Value optionalStringValue(const absl::optional<std::string>& str);
   static Value stringValue(const std::string& str);
@@ -48,25 +50,15 @@ public:
   static const Value nullValue();
 };
 
-class AttrUtils {
+class Attributes : public Logger::Loggable<Logger::Id::filter> {
 public:
-  std::vector<std::tuple<absl::string_view, absl::string_view>>
-  tokenizeAttrs(const google::protobuf::RepeatedPtrField<std::string> attrs);
-  static std::tuple<absl::string_view, absl::string_view> tokenizeAttrPath(absl::string_view path);
-}
+  AttrState(StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info){};
 
-class AttrState : public Logger::Loggable<Logger::Id::filter> {
-public:
-  AttrState(StreamInfo::StreamInfo& stream_info,
-            std::vector<std::tuple<absl::string_view, absl::string_view>>& specified)
-      : stream_info_(info), specified_(specified){};
-  void populateRequestAttributes(Envoy::Http::RequestHeaderMap& headers,
-                                 ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attrs);
-  void populateResponseAttributes(Envoy::Http::ResponseHeaderMap& headers,
-                                  ProtobufWkt::Map<std::string, ProtobufWkt::Struct>& attrs);
+  void AttrState::setRequestHeaders(Http::RequestHeaderMap* request_headers);
+  void AttrState::setResponseHeaders(Http::ResponseHeaderMap* response_headers);
+  absl::optional<Value> getAttribute(AttributeId& attr_id);
 
 private:
-  absl::optional<Value> findValue(absl::string_view root_tok, absl::string_view sub_tok);
   absl::optional<Value> requestSet(absl::string_view name);
   absl::optional<Value> responseSet(absl::string_view path);
   absl::optional<Value> connectionSet(absl::string_view path);
@@ -83,6 +75,11 @@ private:
 
   StreamInfo::StreamInfo& stream_info_;
   std::vector<std::tuple<absl::string_view, absl::string_view>> specified_;
+
+  Envoy::Http::RequestHeaderMap* request_headers_;
+  Envoy::Http::ResponseHeaderMap* response_headers_;
+  Envoy::Http::RequestTrailerMap* request_trailers_;
+  Envoy::Http::ResponseTrailerMap* response_trailers_;
 };
 
 // using google::api::expr::v1alpha1::Value;
