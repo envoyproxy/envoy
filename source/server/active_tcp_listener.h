@@ -15,7 +15,7 @@ namespace Server {
 struct ActiveTcpConnection;
 using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
 class ActiveConnections;
-using ActiveConnectionsPtr = std::unique_ptr<ActiveConnections>;
+using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
 
 class ActiveTcpListener;
 

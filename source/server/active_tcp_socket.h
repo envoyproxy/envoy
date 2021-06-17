@@ -112,16 +112,36 @@ public:
                            Network::ListenerPtr&& listener, Network::ListenerConfig& config);
   static void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_info);
 
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+
+  /**
+   * Schedule to remove and destroy the active connections which are not tracked by listener
+   * config. Caution: The connection are not destroyed yet when function returns.
+   */
+  void
+  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
+    // Need to recover the original deleting state.
+    const bool was_deleting = is_deleting_;
+    is_deleting_ = true;
+    for (const auto* filter_chain : draining_filter_chains) {
+      deferRemoveFilterChain(filter_chain);
+    }
+    is_deleting_ = was_deleting;
+  }
+
   virtual void incNumConnections() PURE;
   virtual void decNumConnections() PURE;
-
-  Event::Dispatcher& dispatcher() { return dispatcher_; }
 
   /**
    * Create a new connection from a socket accepted by the listener.
    */
   virtual void newConnection(Network::ConnectionSocketPtr&& socket,
                              std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+
+  /**
+   * Schedule to remove and destroy the active connections owned by the filter chain.
+   */
+  virtual void deferRemoveFilterChain(const Network::FilterChain* filter_chain) PURE;
 
   virtual Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
@@ -157,6 +177,7 @@ public:
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
+  bool is_deleting_{false};
 };
 
 template <typename ActiveConnectionType>
@@ -168,59 +189,28 @@ public:
                                 Network::ListenerPtr&& listener, Network::ListenerConfig& config)
       : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
   using ActiveConnectionPtr = std::unique_ptr<ActiveConnectionType>;
-  using ActiveConnectionsPtr = std::unique_ptr<ActiveConnectionCollectionType>;
+  using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnectionCollectionType>;
 
-  /**
-   * Schedule to remove and destroy the active connections which are not tracked by listener
-   * config. Caution: The connection are not destroyed yet when function returns.
-   */
-  void
-  deferredRemoveFilterChains(const std::list<const Network::FilterChain*>& draining_filter_chains) {
-    // Need to recover the original deleting state.
-    const bool was_deleting = is_deleting_;
-    is_deleting_ = true;
-    for (const auto* filter_chain : draining_filter_chains) {
-      auto iter = connections_by_context_.find(filter_chain);
-      if (iter == connections_by_context_.end()) {
-        // It is possible when listener is stopping.
-      } else {
-        auto& connections = iter->second->connections_;
-        while (!connections.empty()) {
-          connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
-        }
-        // Since is_deleting_ is on, we need to manually remove the map value and drive the
-        // iterator. Defer delete connection container to avoid race condition in destroying
-        // connection.
-        dispatcher().deferredDelete(std::move(iter->second));
-        connections_by_context_.erase(iter);
-      }
-    }
-    is_deleting_ = was_deleting;
-  }
-
-protected:
-  void cleanupConnections() {
-    is_deleting_ = true;
-
-    // Purge sockets that have not progressed to connections. This should only happen when
-    // a listener filter stops iteration and never resumes.
-    while (!sockets_.empty()) {
-      auto removed = sockets_.front()->removeFromList(sockets_);
-      dispatcher().deferredDelete(std::move(removed));
-    }
-
-    for (auto& chain_and_connections : connections_by_context_) {
-      ASSERT(chain_and_connections.second != nullptr);
-      auto& connections = chain_and_connections.second->connections_;
+  void deferRemoveFilterChain(const Network::FilterChain* filter_chain) override {
+    auto iter = connections_by_context_.find(filter_chain);
+    if (iter == connections_by_context_.end()) {
+      // It is possible when listener is stopping.
+    } else {
+      auto& connections = iter->second->connections_;
       while (!connections.empty()) {
         connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
       }
+      // Since is_deleting_ is on, we need to manually remove the map value and drive the
+      // iterator. Defer delete connection container to avoid race condition in destroying
+      // connection.
+      dispatcher().deferredDelete(std::move(iter->second));
+      connections_by_context_.erase(iter);
     }
-    dispatcher().clearDeferredDeleteList();
   }
 
-  absl::node_hash_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
-  bool is_deleting_{false};
+protected:
+  absl::node_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
+      connections_by_context_;
 };
 
 } // namespace Server

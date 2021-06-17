@@ -39,7 +39,23 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 ActiveTcpListener::~ActiveTcpListener() {
   config_->connectionBalancer().unregisterHandler(*this);
 
-  cleanupConnections();
+  is_deleting_ = true;
+
+  // Purge sockets that have not progressed to connections. This should only happen when
+  // a listener filter stops iteration and never resumes.
+  while (!sockets_.empty()) {
+    auto removed = sockets_.front()->removeFromList(sockets_);
+    dispatcher().deferredDelete(std::move(removed));
+  }
+
+  for (auto& chain_and_connections : connections_by_context_) {
+    ASSERT(chain_and_connections.second != nullptr);
+    auto& connections = chain_and_connections.second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+  dispatcher().clearDeferredDeleteList();
 
   // By the time a listener is destroyed, in the common case, there should be no connections.
   // However, this is not always true if there is an in flight rebalanced connection that is
@@ -189,7 +205,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
 
 ActiveConnections&
 ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
-  ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
+  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
   if (connections == nullptr) {
     connections = std::make_unique<ActiveConnections>(*this, filter_chain);
   }
@@ -263,7 +279,6 @@ ActiveTcpConnection::~ActiveTcpConnection() {
   listener.parent_.decNumConnections();
 }
 
-// Network::ConnectionCallbacks
 void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(trace, "[C{}] connection on event {}", connection_->id(), static_cast<int>(event));
   // Any event leads to destruction of the connection.
