@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-      - "8002:8000"
-      - "8003:8001"
+    - "8002:8000"
+    - "8003:8001"
 
   backend-service:
     build:

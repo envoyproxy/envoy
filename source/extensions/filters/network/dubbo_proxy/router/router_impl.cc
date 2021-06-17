@@ -117,6 +117,47 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   return upstream_request_->start();
 }
 
+void Router::setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& callbacks) {
+  encoder_callbacks_ = &callbacks;
+}
+
+FilterStatus Router::onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr) {
+  if (!metadata->hasResponseStatus() || upstream_request_ == nullptr) {
+    return FilterStatus::Continue;
+  }
+
+  ENVOY_STREAM_LOG(trace, "dubbo router: response status: {}", *encoder_callbacks_,
+                   metadata->responseStatus());
+
+  switch (metadata->responseStatus()) {
+  case ResponseStatus::Ok:
+    if (metadata->messageType() == MessageType::Exception) {
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
+    } else {
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestSuccess);
+    }
+    break;
+  case ResponseStatus::ServerTimeout:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginTimeout);
+    break;
+  case ResponseStatus::ServiceError:
+    FALLTHRU;
+  case ResponseStatus::ServerError:
+    FALLTHRU;
+  case ResponseStatus::ServerThreadpoolExhaustedError:
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::ExtOriginRequestFailed);
+    break;
+  default:
+    break;
+  }
+
+  return FilterStatus::Continue;
+}
+
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
@@ -168,6 +209,8 @@ void Router::onEvent(Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    upstream_request_->upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginConnectFailed);
     break;
   case Network::ConnectionEvent::LocalClose:
     upstream_request_->onResetStream(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
@@ -254,6 +297,11 @@ void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason re
   if (reason == ConnectionPool::PoolFailureReason::Timeout ||
       reason == ConnectionPool::PoolFailureReason::LocalConnectionFailure ||
       reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+    if (reason == ConnectionPool::PoolFailureReason::Timeout) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+    }
     parent_.callbacks_->continueDecoding();
   }
 }
@@ -266,6 +314,8 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   bool continue_decoding = conn_pool_handle_ != nullptr;
 
   onUpstreamHostSelected(host);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
+
   conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;

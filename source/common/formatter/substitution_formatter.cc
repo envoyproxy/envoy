@@ -415,7 +415,7 @@ FormatterProviderPtr SubstitutionFormatParser::parseBuiltinCommand(const std::st
     }
 
     if (serialize_type.empty()) {
-      serialize_type = TYPED_SERIALIZATION;
+      serialize_type = std::string(TYPED_SERIALIZATION);
     }
     if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
       throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
@@ -1146,9 +1146,15 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
-  truncate(json, max_length_);
-  return json;
+  std::string str;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unquote_log_string_values") &&
+      value.kind_case() == ProtobufWkt::Value::kStringValue) {
+    str = value.string_value();
+  } else {
+    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+  }
+  truncate(str, max_length_);
+  return str;
 }
 
 ProtobufWkt::Value

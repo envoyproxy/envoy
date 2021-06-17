@@ -561,13 +561,13 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
 
-ActiveClient::~ActiveClient() { releaseResources(); }
+ActiveClient::~ActiveClient() { releaseResourcesBase(); }
 
 void ActiveClient::onEvent(Network::ConnectionEvent event) {
   parent_.onConnectionEvent(*this, "", event);
 }
 
-void ActiveClient::releaseResources() {
+void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
     resources_released_ = true;
 

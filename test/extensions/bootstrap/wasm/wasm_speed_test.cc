@@ -32,8 +32,8 @@ public:
       : Envoy::Extensions::Common::Wasm::Context(wasm, plugin) {}
 
   using Envoy::Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {
-    log_(static_cast<spdlog::level::level_enum>(level), message);
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));
     return proxy_wasm::WasmResult::Ok;
   }
   MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
@@ -65,7 +65,8 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
         TestEnvironment::runfilesPath("test/extensions/bootstrap/wasm/test_data/speed_cpp.wasm"));
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr,
       [](Extensions::Common::Wasm::Wasm* wasm,
@@ -78,25 +79,25 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   }
 }
 
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("v8"));
-#elif defined(ENVOY_WASM_WAMR)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WAMR)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wamr"));
-#elif defined(ENVOY_WASM_WAVM)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WAVM)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wavm"));
-#elif defined(ENVOY_WASM_WASMTIME)
+#elif defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \

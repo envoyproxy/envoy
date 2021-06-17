@@ -197,7 +197,6 @@ envoy_cc_test(
         "//envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/buffer:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",

@@ -409,7 +409,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
-        "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

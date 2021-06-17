@@ -2201,7 +2201,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersWithMultipleValues) {
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"bar"}));
 
-    EXPECT_NE(0, generateHash({"bar", "foo"}));
+    EXPECT_NE(0UL, generateHash({"bar", "foo"}));
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"bar", "foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"foo", "bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
@@ -2250,7 +2250,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitutionWithMultipleValu
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"/bar"}));
 
-    EXPECT_NE(0, generateHash({"/bar", "/foo"}));
+    EXPECT_NE(0UL, generateHash({"/bar", "/foo"}));
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/bar", "/foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/foo", "/bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));

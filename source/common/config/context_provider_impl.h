@@ -3,6 +3,7 @@
 #include "envoy/config/context_provider.h"
 
 #include "source/common/common/callback_impl.h"
+#include "source/common/common/stl_helpers.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/xds_context_params.h"
 
@@ -29,13 +30,16 @@ public:
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value) override {
     ASSERT(Thread::MainThread::isMainThread());
-    (*dynamic_context_[resource_type_url].mutable_params())[key] = value;
+    (*dynamic_context_[resource_type_url]
+          .mutable_params())[toStdStringView(key)] = // NOLINT(std::string_view)
+        toStdStringView(value);                      // NOLINT(std::string_view)
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   void unsetDynamicContextParam(absl::string_view resource_type_url,
                                 absl::string_view key) override {
     ASSERT(Thread::MainThread::isMainThread());
-    dynamic_context_[resource_type_url].mutable_params()->erase(key);
+    dynamic_context_[resource_type_url].mutable_params()->erase(
+        toStdStringView(key)); // NOLINT(std::string_view)
     update_cb_helper_.runCallbacks(resource_type_url);
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
