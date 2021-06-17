@@ -5,8 +5,8 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/byte_order.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

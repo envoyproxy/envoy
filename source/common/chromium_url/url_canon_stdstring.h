@@ -14,8 +14,8 @@
 
 #include <string>
 
-#include "common/chromium_url/envoy_shim.h"
-#include "common/chromium_url/url_canon.h"
+#include "source/common/chromium_url/envoy_shim.h"
+#include "source/common/chromium_url/url_canon.h"
 
 #define DISALLOW_COPY_AND_ASSIGN(TypeName)                                                         \
   TypeName(const TypeName&) = delete;                                                              \

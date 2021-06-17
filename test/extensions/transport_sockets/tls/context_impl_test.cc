@@ -6,14 +6,13 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/base64.h"
-#include "common/json/json_loader.h"
-#include "common/secret/sds_api.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/base64.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
@@ -310,6 +309,39 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
+}
+
+TEST_F(SslContextImplTest, TestCertificateVerificationWithSANMatcher) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      match_subject_alt_names:
+        exact: "spiffe://lyft.com/test-team"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext upstream_tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), upstream_tls_context);
+  ClientContextConfigImpl cfg(upstream_tls_context, factory_context_);
+
+  auto client_context = std::make_unique<Extensions::TransportSockets::Tls::ClientContextImpl>(
+      store_, cfg, Event::GlobalTimeSystem().timeSystem());
+  const std::vector<TlsContext>& tls_contexts = client_context->getTlsContext();
+  // It is guaranteed that it is always non-empty, with the first context used for all new SSL
+  // objects.
+  ASSERT_FALSE(tls_contexts.empty());
+  // Use unique_ptr here to make sure that memory allocated by `sk_X509_new_null` get freed at the
+  // end of function.
+  bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
+  std::string error_details;
+  EXPECT_TRUE(
+      client_context->verifyCertChain(*tls_contexts[0].cert_chain_, *intermediates, error_details));
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
@@ -669,13 +701,13 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
   for (const auto& detail : ocsp_text_details) {
     std::string::size_type pos = detail.find(this_update);
     if (pos != std::string::npos) {
-      valid_from = detail.substr(pos + this_update.size());
+      valid_from = std::string(detail.substr(pos + this_update.size()));
       continue;
     }
 
     pos = detail.find(next_update);
     if (pos != std::string::npos) {
-      expiration = detail.substr(pos + next_update.size());
+      expiration = std::string(detail.substr(pos + next_update.size()));
       continue;
     }
   }

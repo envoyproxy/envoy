@@ -27,18 +27,18 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/client_connection_factory_impl.h"
-#include "common/quic/envoy_quic_client_session.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #include "test/common/quic/test_utils.h"
 #include "test/config/integration/certs/clientcert_hash.h"
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -74,6 +74,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
@@ -109,7 +110,8 @@ public:
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
-        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
+        persistent_info.crypto_stream_factory_);
     return session;
   }
 
@@ -382,6 +384,15 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
+                                  : "listener.[__1]_0.http3.downstream.rx.";
+  std::string error_code = GetParam().second == QuicVersionType::Iquic
+                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
+                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {

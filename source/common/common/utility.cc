@@ -1,4 +1,4 @@
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include <array>
 #include <chrono>
@@ -12,10 +12,10 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"

@@ -1,7 +1,7 @@
-#include "extensions/filters/network/rocketmq_proxy/config.h"
-#include "extensions/filters/network/rocketmq_proxy/conn_manager.h"
-#include "extensions/filters/network/rocketmq_proxy/router/router.h"
-#include "extensions/filters/network/rocketmq_proxy/well_known_names.h"
+#include "source/extensions/filters/network/rocketmq_proxy/config.h"
+#include "source/extensions/filters/network/rocketmq_proxy/conn_manager.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router.h"
+#include "source/extensions/filters/network/rocketmq_proxy/well_known_names.h"
 
 #include "test/extensions/filters/network/rocketmq_proxy/mocks.h"
 #include "test/extensions/filters/network/rocketmq_proxy/utility.h"

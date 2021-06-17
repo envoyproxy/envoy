@@ -1,17 +1,17 @@
-#include "common/config/new_grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/backoff_strategy.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_context_params.h"
-#include "common/config/xds_resource.h"
-#include "common/memory/utils.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_context_params.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/memory/utils.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -65,9 +65,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
-  if (message->has_control_plane()) {
-    control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -75,6 +72,16 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
               "subscription {}.",
               message->system_version_info(), message->type_url());
     return;
+  }
+
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
+
+  if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
+    sub->second->control_plane_identifier_ = message->control_plane().identifier();
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
+              sub->second->control_plane_identifier_);
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));

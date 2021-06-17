@@ -12,14 +12,13 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/assert.h"
-#include "common/http/header_map_impl.h"
-#include "common/router/header_parser.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
-#include "extensions/filters/common/ratelimit/ratelimit.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

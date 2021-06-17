@@ -14,13 +14,12 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/matchers.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ocsp/ocsp.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/matchers.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ocsp/ocsp.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -82,6 +81,8 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
+  const std::vector<TlsContext>& getTlsContext() { return tls_contexts_; }
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,

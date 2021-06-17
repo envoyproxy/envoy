@@ -1,4 +1,4 @@
-#include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/skywalking_tracer_impl.h"
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"

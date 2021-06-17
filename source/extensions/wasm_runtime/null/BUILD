@@ -12,8 +12,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
+        "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//:null_lib",
     ],
 )

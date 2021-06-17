@@ -14,8 +14,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        "//include/envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
+        "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
@@ -27,12 +26,11 @@ envoy_cc_library(
     srcs = ["rbac_filter.cc"],
     hdrs = ["rbac_filter.h"],
     deps = [
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/stats:stats_macros",
+        "//envoy/http:filter_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

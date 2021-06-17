@@ -1,4 +1,4 @@
-#include "extensions/upstreams/tcp/generic/config.h"
+#include "source/extensions/upstreams/tcp/generic/config.h"
 
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"

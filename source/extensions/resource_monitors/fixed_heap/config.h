@@ -4,7 +4,7 @@
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 
-#include "extensions/resource_monitors/common/factory_base.h"
+#include "source/extensions/resource_monitors/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {

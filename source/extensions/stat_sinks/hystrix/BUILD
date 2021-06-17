@@ -17,7 +17,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":hystrix_lib",
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/extensions/stat_sinks:well_known_names",
@@ -31,9 +31,9 @@ envoy_cc_library(
     srcs = ["hystrix.cc"],
     hdrs = ["hystrix.h"],
     deps = [
-        "//include/envoy/server:admin_interface",
-        "//include/envoy/server:instance_interface",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:well_known_names",

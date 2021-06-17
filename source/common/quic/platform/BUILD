@@ -117,7 +117,6 @@ envoy_cc_library(
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
-        "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
@@ -137,7 +136,7 @@ envoy_cc_library(
     deps = [
         ":quiche_flags_impl_lib",
         ":string_utils_lib",
-        "//include/envoy/api:io_error_interface",
+        "//envoy/api:io_error_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
@@ -189,7 +188,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "@com_googlesource_quiche//:quic_core_types_lib",
         "@com_googlesource_quiche//:quic_platform_base",
     ],
@@ -233,7 +232,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "@com_googlesource_quiche//:quic_core_clock_lib",
     ],
 )
@@ -243,7 +242,6 @@ envoy_cc_library(
     hdrs = [
         "quiche_flag_utils_impl.h",
         "quiche_logging_impl.h",
-        "quiche_text_utils_impl.h",
     ],
     external_deps = [
         "abseil_hash",

@@ -3,13 +3,11 @@
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/grpc/codec.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/grpc/codec.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -617,7 +615,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
   ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
+          perFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   EXPECT_CALL(decoder_callbacks_, route()).Times(2);
@@ -646,7 +644,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
   ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
+          perFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   {
@@ -734,7 +732,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
 
   ON_CALL(decoder_callbacks_.route_->route_entry_,
-          perFilterConfig(HttpFilterNames::get().GrpcHttp1ReverseBridge))
+          perFilterConfig("envoy.filters.http.grpc_http1_reverse_bridge"))
       .WillByDefault(testing::Return(&filterConfigPerRoute));
 
   {
