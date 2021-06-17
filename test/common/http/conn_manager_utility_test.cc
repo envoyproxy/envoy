@@ -98,8 +98,14 @@ public:
     envoy::type::v3::FractionalPercent percent2;
     percent2.set_numerator(10000);
     percent2.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    tracing_config_ = {
-        Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256, false};
+    tracing_config_ = {Tracing::OperationName::Ingress,
+                       {},
+                       percent1,
+                       percent2,
+                       percent1,
+                       false,
+                       256,
+                       Tracing::TraceRequestIdSampleDecisionPolicy::Default};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
     ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
@@ -1230,7 +1236,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, CheckSamplingDecisionWithBypassSamplingWithRequestId) {
-  tracing_config_.bypass_sampling_with_request_id_ = true;
+  tracing_config_.trace_request_id_sample_decision_policy_ =
+      Tracing::TraceRequestIdSampleDecisionPolicy::ByPass;
 
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};

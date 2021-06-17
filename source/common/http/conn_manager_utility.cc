@@ -281,7 +281,8 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!config.tracingConfig()) {
     return final_reason;
   }
-  if (config.tracingConfig()->bypass_sampling_with_request_id_) {
+  if (config.tracingConfig()->trace_request_id_sample_decision_policy_ ==
+      Tracing::TraceRequestIdSampleDecisionPolicy::ByPass) {
     return Tracing::Reason::Sampling;
   }
 

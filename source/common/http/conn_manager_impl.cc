@@ -1585,8 +1585,9 @@ uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 
-bool ConnectionManagerImpl::ActiveStream::bypassSamplingWithRequestId() const {
-  return connection_manager_.config_.tracingConfig()->bypass_sampling_with_request_id_;
+Tracing::TraceRequestIdSampleDecisionPolicy
+ConnectionManagerImpl::ActiveStream::traceRequestIdSampleDecisionPolicy() const {
+  return connection_manager_.config_.tracingConfig()->trace_request_id_sample_decision_policy_;
 }
 
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {

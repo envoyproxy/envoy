@@ -504,11 +504,25 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
 
+    Tracing::TraceRequestIdSampleDecisionPolicy decision_policy;
+
+    switch (tracing_config.trace_request_id_sample_decision_policy()) {
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        Tracing::DEFAULT:
+      decision_policy = Tracing::TraceRequestIdSampleDecisionPolicy::Default;
+      break;
+    case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        Tracing::BYPASS:
+      decision_policy = Tracing::TraceRequestIdSampleDecisionPolicy::ByPass;
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
             tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
-            tracing_config.verbose(), max_path_tag_length,
-            tracing_config.bypass_sampling_with_request_id()});
+            tracing_config.verbose(), max_path_tag_length, decision_policy});
   }
 
   for (const auto& access_log : config.access_log()) {

@@ -89,7 +89,7 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
                                        percent1,
                                        false,
                                        256,
-                                       false});
+                                       Tracing::TraceRequestIdSampleDecisionPolicy::Default});
   }
 }
 

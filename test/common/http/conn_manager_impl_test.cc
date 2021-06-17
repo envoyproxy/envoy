@@ -1372,9 +1372,9 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
       s.custom_tags.pop_front();
     }
   }
-  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
-      TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
-                                     percent2, percent1, false, 256, false});
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+      Tracing::OperationName::Ingress, conn_tracing_tags, percent1, percent2, percent1, false, 256,
+      Tracing::TraceRequestIdSampleDecisionPolicy::Default});
   NiceMock<Router::MockRouteTracing> route_tracing;
   ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
   ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
@@ -1657,7 +1657,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      false,
                                      256,
-                                     false});
+                                     Tracing::TraceRequestIdSampleDecisionPolicy::Default});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1740,7 +1740,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      false,
                                      256,
-                                     false});
+                                     Tracing::TraceRequestIdSampleDecisionPolicy::Default});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1825,7 +1825,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      false,
                                      256,
-                                     false});
+                                     Tracing::TraceRequestIdSampleDecisionPolicy::Default});
 
   auto* span = new NiceMock<Tracing::MockSpan>();
   EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
@@ -1902,7 +1902,7 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent1,
                                      false,
                                      256,
-                                     false});
+                                     Tracing::TraceRequestIdSampleDecisionPolicy::Default});
 
   EXPECT_CALL(
       runtime_.snapshot_,
