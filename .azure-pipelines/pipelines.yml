@@ -20,12 +20,12 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'docker | cache'
+        key: 'docker | envoy-build-ubuntu'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
     - script: |
-        docker load -i $(Pipeline.Workspace)/docker/cache.tar
+        docker load -i $(Pipeline.Workspace)/docker/envoy-build-ubuntu.tar
       displayName: Restore Docker image
       condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
@@ -44,7 +44,7 @@ stages:
       condition: failed()
     - script: |
         mkdir -p $(Pipeline.Workspace)/docker
-        docker save -o $(Pipeline.Workspace)/docker/cache.tar cache
+        docker save -o $(Pipeline.Workspace)/docker/envoy-build-ubuntu.tar envoyproxy/envoy-build-ubuntu:55d9e4719d2bd0accce8f829b44dab70cd42112a
       displayName: Save Docker image
       condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
 
