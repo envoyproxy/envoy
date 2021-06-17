@@ -24,7 +24,7 @@ public:
 private:
   // ClusterImplBase
   void startPreInit() override;
-
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> hosts;
   PriorityStateManagerPtr priority_state_manager_;
   uint32_t overprovisioning_factor_;
 };
