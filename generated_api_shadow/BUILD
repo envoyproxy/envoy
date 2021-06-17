@@ -53,7 +53,6 @@ proto_library(
         "//envoy/service/ratelimit/v2:pkg",
         "//envoy/service/status/v2:pkg",
         "//envoy/service/tap/v2alpha:pkg",
-        "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
         "//envoy/type/metadata/v2:pkg",
