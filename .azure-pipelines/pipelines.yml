@@ -18,6 +18,16 @@ stages:
     pool:
       vmImage: "ubuntu-18.04"
     steps:
+    - task: Cache@2
+      inputs:
+        key: 'docker | cache'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load -i $(Pipeline.Workspace)/docker/cache.tar
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
       workingDirectory: $(Build.SourcesDirectory)
       env:
@@ -32,6 +42,11 @@ stages:
         artifactName: format
       # not all have fixes so improve condition/handling
       condition: failed()
+    - script: |
+        mkdir -p $(Pipeline.Workspace)/docker
+        docker save -o $(Pipeline.Workspace)/docker/cache.tar cache
+      displayName: Save Docker image
+      condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
 
   - job: tooling
     dependsOn: []
