@@ -36,7 +36,7 @@ envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
   return ENVOY_SUCCESS;
 }
 
-bool ProvisionalDispatcher::isThreadSafe() {
+bool ProvisionalDispatcher::isThreadSafe() const {
   // Doesn't require locking because if a thread has a stale view of drained_, then by definition
   // this wasn't a threadsafe call.
   ENVOY_LOG(trace, "ProvisionalDispatcher::isThreadSafe");
