@@ -240,7 +240,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
     envoy::config::listener::v3::Listener::DrainType drain_type) {
-  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type, server_.dispatcher())};
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
