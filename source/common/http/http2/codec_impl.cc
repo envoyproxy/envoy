@@ -778,8 +778,8 @@ Status ConnectionImpl::protocolErrorForTest() {
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
-  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
-                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
+                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
   current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
@@ -985,9 +985,15 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     }
     break;
 
+  case NGHTTP2_ERR_FLOW_CONTROL:
+  case NGHTTP2_ERR_PROTO:
+  case NGHTTP2_ERR_STREAM_CLOSED:
+    // Known error conditions that should trigger connection close.
+    break;
+
   default:
-    ASSERT(error_code == NGHTTP2_ERR_FLOW_CONTROL || error_code == NGHTTP2_ERR_PROTO,
-           absl::StrCat("Unexpected error_code: ", error_code));
+    // Unknown error conditions. Trigger ENVOY_BUG and connection close.
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code));
     break;
   }
 
