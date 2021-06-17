@@ -16,18 +16,25 @@ from .common.executor import Executor
 from .response import Response
 
 
+def pre_build_engine() -> None:
+    engine_running = Event()
+    executor = ThreadingExecutor()
+    Engine.handle(executor, lambda: engine_running.set())
+    engine_running.wait()
+
+
 # TODO: add better typing to this (and functions that use it)
 def request(*args, **kwargs) -> Response:
     response = Response()
+    engine_running = Event()
     stream_complete = Event()
     executor = ThreadingExecutor()
 
-    def _set_stream_complete():
-        stream_complete.set()
-        executor.finish()
+    engine = Engine.handle(executor, lambda: engine_running.set())
+    engine_running.wait()
 
     stream = make_stream(
-        Engine.handle(), executor, response, _set_stream_complete,
+        engine, executor, response, lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     stream_complete.wait()
@@ -72,27 +79,11 @@ Func = TypeVar("Func", bound=Callable[..., Any])
 class ThreadingExecutor(Executor):
     def __init__(self):
         self.lock = Lock()
-        self.queue = Queue()
-        self.process_callbacks = Thread(target=self._process_callbacks)
-        self.process_callbacks.start()
 
     def wrap(self, fn: Func) -> Func:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            self.queue.put((fn, args, kwargs))
-
-        return cast(Func, wrapper)
-
-    def finish(self):
-        self.queue.put((None, None, None))
-
-    def _process_callbacks(self):
-        while True:
-            try:
-                fn, args, kwargs = self.queue.get(block=True, timeout=0.25)
-            except QueueEmpty:
-                continue
-            if fn is None and args is None and kwargs is None:
-                break
             with self.lock:
                 fn(*args, **kwargs)
+
+        return cast(Func, wrapper)

@@ -1,10 +1,12 @@
 import atexit
-from threading import Event
+from typing import Callable
 from typing import Optional
 
 from envoy_engine import Engine as EnvoyEngine
 from envoy_engine import EngineBuilder
 from envoy_engine import LogLevel
+
+from .executor import Executor
 
 
 class Engine:
@@ -13,24 +15,23 @@ class Engine:
     _handle: Optional[EnvoyEngine] = None
 
     @classmethod
-    def build(cls):
+    def build(cls, executor: Executor, set_engine_running: Callable[[], None]):
         if cls.config_template_override is None:
             engine_builder = EngineBuilder()
         else:
             engine_builder = EngineBuilder(cls.config_template_override)
 
-        engine_running = Event()
         cls._handle = (
             engine_builder.add_log_level(cls.log_level).set_on_engine_running(
-                lambda: engine_running.set()
+                executor.wrap(set_engine_running)
             )
         ).build()
-
         atexit.register(lambda: cls._handle.terminate())
-        engine_running.wait()
 
     @classmethod
-    def handle(cls):
+    def handle(cls, executor: Executor, set_engine_running: Callable[[], None]) -> EnvoyEngine:
         if cls._handle is None:
-            cls.build()
+            cls.build(executor, set_engine_running)
+        else:
+            executor.wrap(set_engine_running)()
         return cls._handle
