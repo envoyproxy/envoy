@@ -28,7 +28,7 @@ namespace {
 
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
-  void initialize(std::vector<std::string> preresolve_hostnames = {}, uint max_hosts = 1024) {
+  void initialize(std::vector<std::string> preresolve_hostnames = {}, uint32_t max_hosts = 1024) {
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
