@@ -325,9 +325,9 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
-  config_tracker_entry_ = admin.getConfigTracker().add(
-      "routes", [this](const Server::Configuration::ConfigDumpFilter& filter) {
-        return dumpRouteConfigs(filter);
+  config_tracker_entry_ =
+      admin.getConfigTracker().add("routes", [this](const Matchers::StringMatcher& matcher) {
+        return dumpRouteConfigs(matcher);
       });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
@@ -380,7 +380,7 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
 RouteConfigProviderManagerImpl::dumpRouteConfigs(
-    const Server::Configuration::ConfigDumpFilter& filter) const {
+    const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
@@ -392,7 +392,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
     ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
-      if (!filter.match(subscription->routeConfigUpdate()->protobufConfiguration())) {
+      if (!name_matcher.match(subscription->routeConfigUpdate()->protobufConfiguration().name())) {
         continue;
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
@@ -406,7 +406,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
-    if (!filter.match(provider->configInfo().value().config_)) {
+    if (!name_matcher.match(provider->configInfo().value().config_.name())) {
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();

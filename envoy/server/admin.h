@@ -3,10 +3,8 @@
 #include <functional>
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -121,8 +119,6 @@ public:
    * @return ConfigTracker& tracker for /config_dump endpoint.
    */
   virtual ConfigTracker& getConfigTracker() PURE;
-
-  virtual void resetConfigDumpFilter(Configuration::ConfigDumpFilterFactory& filter) PURE;
 
   /**
    * Expose this Admin console as an HTTP server.

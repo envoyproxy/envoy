@@ -187,13 +187,11 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
-    ConfigDumpFilterFactory& configDumpFilterFactory() override { return *dump_filter_factory_; }
 
     std::string profile_path_;
     std::list<AccessLog::InstanceSharedPtr> access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
-    ConfigDumpFilterFactory* dump_filter_factory_;
   };
 
   const bool enable_deprecated_v2_api_;

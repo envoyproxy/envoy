@@ -12,7 +12,6 @@
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/server/config_dump_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
@@ -25,17 +24,10 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
-#include "source/extensions/admin/config_dump_filter/default_config_dump_filter.h"
 
 namespace Envoy {
 namespace Server {
 namespace Configuration {
-namespace {
-ConfigDumpFilterFactory* getDefaultConfigDumpFactory() {
-  return Config::Utility::getFactoryByName<ConfigDumpFilterFactory>(
-      std::string(Extensions::ConfigDumpFilters::kDefaultName));
-}
-} // namespace
 
 bool FilterChainUtility::buildFilterChain(Network::FilterManager& filter_manager,
                                           const std::vector<Network::FilterFactoryCb>& factories) {
@@ -230,15 +222,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
         admin_.socket_options_,
         Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
   }
-
-  if (admin.has_config_dump_filter()) {
-    auto* factory =
-        Config::Utility::getFactory<ConfigDumpFilterFactory>(admin.config_dump_filter());
-    admin_.dump_filter_factory_ = factory != nullptr ? factory : getDefaultConfigDumpFactory();
-  } else {
-    admin_.dump_filter_factory_ = getDefaultConfigDumpFactory();
-  }
-  ASSERT(admin_.dump_filter_factory_ != nullptr);
 
   if (!bootstrap.flags_path().empty()) {
     flags_path_ = bootstrap.flags_path();

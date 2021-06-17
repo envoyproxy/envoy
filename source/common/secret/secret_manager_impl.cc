@@ -5,7 +5,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
-#include "envoy/server/config_dump_config.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -20,9 +19,9 @@ namespace Envoy {
 namespace Secret {
 
 SecretManagerImpl::SecretManagerImpl(Server::ConfigTracker& config_tracker)
-    : config_tracker_entry_(config_tracker.add(
-          "secrets", [this](const Server::Configuration::ConfigDumpFilter& filter) {
-            return dumpSecretConfigs(filter);
+    : config_tracker_entry_(
+          config_tracker.add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpSecretConfigs(name_matcher);
           })) {}
 void SecretManagerImpl::addStaticSecret(
     const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
@@ -169,7 +168,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(cert_iter.first);
     dump_secret.mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
-    if (!filter.match(dump_secret)) {
+    if (!name_matcher.match(dump_secret.name())) {
       continue;
     }
     MessageUtil::redact(dump_secret);
@@ -185,7 +184,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(context_iter.first);
     dump_secret.mutable_validation_context()->MergeFrom(*validation_context->secret());
-    if (!filter.match(dump_secret)) {
+    if (!name_matcher.match(dump_secret.name())) {
       continue;
     }
     auto static_secret = config_dump->mutable_static_secrets()->Add();
@@ -202,7 +201,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     for (const auto& key : session_ticket_keys->secret()->keys()) {
       dump_secret.mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
     }
-    if (!filter.match(dump_secret)) {
+    if (!name_matcher.match(dump_secret.name())) {
       continue;
     }
     MessageUtil::redact(dump_secret);
@@ -218,7 +217,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(secret_iter.first);
     dump_secret.mutable_generic_secret()->MergeFrom(*generic_secret->secret());
-    if (!filter.match(dump_secret)) {
+    if (!name_matcher.match(dump_secret.name())) {
       continue;
     }
     auto static_secret = config_dump->mutable_static_secrets()->Add();
@@ -241,7 +240,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     if (secret_ready) {
       secret.mutable_tls_certificate()->MergeFrom(*tls_cert);
     }
-    if (!filter.match(secret)) {
+    if (!name_matcher.match(secret.name())) {
       continue;
     }
     MessageUtil::redact(secret);
@@ -270,7 +269,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
       secret.mutable_validation_context()->MergeFrom(*validation_context);
     }
     secret.set_name(secret_data.resource_name_);
-    if (!filter.match(secret)) {
+    if (!name_matcher.match(secret.name())) {
       continue;
     }
     ProtobufWkt::Timestamp last_updated_ts;
@@ -298,7 +297,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     if (secret_ready) {
       secret.mutable_session_ticket_keys()->MergeFrom(*tls_stek);
     }
-    if (!filter.match(secret)) {
+    if (!name_matcher.match(secret.name())) {
       continue;
     }
     ProtobufWkt::Timestamp last_updated_ts;
@@ -327,7 +326,7 @@ SecretManagerImpl::dumpSecretConfigs(const Server::Configuration::ConfigDumpFilt
     if (secret_ready) {
       secret.mutable_generic_secret()->MergeFrom(*generic_secret);
     }
-    if (!filter.match(secret)) {
+    if (!name_matcher.match(secret.name())) {
       continue;
     }
     ProtobufWkt::Timestamp last_updated_ts;

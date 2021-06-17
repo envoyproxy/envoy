@@ -256,8 +256,8 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners",
-          [this](const Configuration::ConfigDumpFilter& filter) {
-            return dumpListenerConfigs(filter);
+          [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpListenerConfigs(name_matcher);
           })),
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
@@ -267,7 +267,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 }
 
 ProtobufTypes::MessagePtr
-ListenerManagerImpl::dumpListenerConfigs(const Configuration::ConfigDumpFilter& filter) {
+ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
 
@@ -276,7 +276,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Configuration::ConfigDumpFilter& 
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
-    if (!filter.match(listener->config())) {
+    if (!name_matcher.match(listener->config().name())) {
       continue;
     }
     if (listener->blockRemove()) {
@@ -303,7 +303,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Configuration::ConfigDumpFilter& 
   }
 
   for (const auto& listener : warming_listeners_) {
-    if (!filter.match(listener->config())) {
+    if (!name_matcher.match(listener->config().name())) {
       continue;
     }
     DynamicListener* dynamic_listener =
@@ -313,7 +313,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Configuration::ConfigDumpFilter& 
   }
 
   for (const auto& draining_listener : draining_listeners_) {
-    if (!filter.match(draining_listener.listener_->config())) {
+    if (!name_matcher.match(draining_listener.listener_->config().name())) {
       continue;
     }
     const auto& listener = draining_listener.listener_;

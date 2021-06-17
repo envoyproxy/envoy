@@ -384,7 +384,7 @@ public:
    *                                   config providers.
    */
   virtual ProtobufTypes::MessagePtr
-  dumpConfigs(const Server::Configuration::ConfigDumpFilter& filter) const PURE;
+  dumpConfigs(const Matchers::StringMatcher& name_matcher) const PURE;
 
 protected:
   // Ordered set for deterministic config dump output.

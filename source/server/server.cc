@@ -20,7 +20,6 @@
 #include "envoy/network/dns.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
-#include "envoy/server/config_dump_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -455,7 +454,6 @@ void InstanceImpl::initialize(const Options& options,
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
-  admin_->resetConfigDumpFilter(initial_config.admin().configDumpFilterFactory());
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -533,10 +531,7 @@ void InstanceImpl::initialize(const Options& options,
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
   config_tracker_entry_ = admin_->getConfigTracker().add(
-      "bootstrap", [this](const Server::Configuration::ConfigDumpFilter& filter) {
-        UNREFERENCED_PARAMETER(filter);
-        return dumpBootstrapConfig();
-      });
+      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }

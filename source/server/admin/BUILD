@@ -64,7 +64,6 @@ envoy_cc_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/request_id/uuid:config",
         "//source/server:listener_manager_lib",
-        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )
 
@@ -253,10 +252,8 @@ envoy_cc_library(
         "//envoy/server:admin_interface",
         "//envoy/server:instance_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/admin/config_dump_filter:default_config_dump_filter",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
