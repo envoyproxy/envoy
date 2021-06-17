@@ -23,8 +23,9 @@ protected:
   void rejectAll(const bool should_reject) {
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
-  void initMatcher() { stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(
-      stats_config_, symbol_table_); }
+  void initMatcher() {
+    stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_);
+  }
   void expectAccepted(const std::vector<std::string>& expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
       EXPECT_FALSE(stats_matcher_impl_->rejects(pool_.add(stat_name))) << "Accepted: " << stat_name;
@@ -110,7 +111,8 @@ TEST_F(StatsMatcherTest, CheckExcludeExact) {
   exclusionList()->set_exact("abc");
   initMatcher();
   EXPECT_TRUE(stats_matcher_impl_->hasStringMatchers());
-  expectAccepted({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
+  expectAccepted(
+      {"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
   expectDenied({"abc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
@@ -133,8 +135,8 @@ TEST_F(StatsMatcherTest, CheckIncludePrefixDot) {
   initMatcher();
   EXPECT_FALSE(stats_matcher_impl_->hasStringMatchers());
   expectAccepted({"abc", "abc.foo"});
-  expectDenied({"abcfoo", "ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc",
-      "fooabc"});
+  expectDenied(
+      {"abcfoo", "ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }

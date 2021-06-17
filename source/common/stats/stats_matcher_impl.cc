@@ -16,8 +16,7 @@ namespace Stats {
 // wrapper around what might be called a StringMatcherList.
 StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config,
                                    SymbolTable& symbol_table)
-    : symbol_table_(symbol_table),
-      stat_name_pool_(std::make_unique<StatNamePool>(symbol_table)) {
+    : symbol_table_(symbol_table), stat_name_pool_(std::make_unique<StatNamePool>(symbol_table)) {
 
   switch (config.stats_matcher().stats_matcher_case()) {
   case envoy::config::metrics::v3::StatsMatcher::StatsMatcherCase::kRejectAll:
@@ -48,8 +47,8 @@ StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig
 
 void StatsMatcherImpl::optimizeLastMatcher() {
   std::string prefix;
-  if (matchers_.back().getCaseSensitivePrefixMatch(prefix) &&
-      absl::EndsWith(prefix, ".") && prefix.size() > 1) {
+  if (matchers_.back().getCaseSensitivePrefixMatch(prefix) && absl::EndsWith(prefix, ".") &&
+      prefix.size() > 1) {
     prefixes_.push_back(stat_name_pool_->add(prefix.substr(0, prefix.size() - 1)));
     matchers_.pop_back();
   }

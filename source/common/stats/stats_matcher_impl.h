@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/stats_matcher.h"
 
 #include "source/common/common/matchers.h"
@@ -28,10 +28,12 @@ public:
 
   // StatsMatcher
   bool rejects(StatName name) const override;
-  bool acceptsAll() const override { return is_inclusive_ && matchers_.empty() &&
-        prefixes_.empty(); }
-  bool rejectsAll() const override { return !is_inclusive_ && matchers_.empty() &&
-        prefixes_.empty(); }
+  bool acceptsAll() const override {
+    return is_inclusive_ && matchers_.empty() && prefixes_.empty();
+  }
+  bool rejectsAll() const override {
+    return !is_inclusive_ && matchers_.empty() && prefixes_.empty();
+  }
 
   // Determines whether conversion from StatName to string may be necessary to
   // run a match against this set.

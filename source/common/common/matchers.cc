@@ -114,7 +114,7 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
 
 bool StringMatcherImpl::getCaseSensitivePrefixMatch(std::string& prefix) const {
   if (matcher_.match_pattern_case() ==
-      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix &&
+          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix &&
       !matcher_.ignore_case()) {
     prefix = matcher_.prefix();
     return true;

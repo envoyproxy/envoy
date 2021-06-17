@@ -750,7 +750,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "noop");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   // Testing No-op counters, gauges, histograms which match the prefix "noop".
 
@@ -830,7 +830,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*[A-Z].*"));
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = store_->counterFromString("lowercase_counter");
@@ -875,7 +875,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // the string "invalid".
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "invalid");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   Counter& valid_counter = store_->counterFromString("valid_counter");
   valid_counter.inc();
@@ -966,8 +966,9 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
-    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
-    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
+    StatNamePool pool(symbol_table_);
+    EXPECT_CALL(*matcher, rejects(pool.add("scope.reject"))).WillOnce(Return(true));
+    EXPECT_CALL(*matcher, rejects(pool.add("scope.ok"))).WillOnce(Return(false));
 
     for (int j = 0; j < 5; ++j) {
       EXPECT_EQ("", lookup_stat("reject"));
@@ -1109,7 +1110,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
 
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
