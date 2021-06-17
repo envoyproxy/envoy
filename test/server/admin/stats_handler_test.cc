@@ -53,7 +53,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
-  std::string url = "/stats?format=blergh";
+  const std::string url = "/stats?format=blergh";
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
@@ -69,7 +69,7 @@ TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
-  std::string url = "/stats";
+  const std::string url = "/stats";
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
@@ -118,7 +118,7 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
-  std::string url = "/stats?format=json";
+  const std::string url = "/stats?format=json";
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
