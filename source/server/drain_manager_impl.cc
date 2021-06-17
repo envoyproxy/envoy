@@ -98,9 +98,28 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
   return cbs_.add(cb);
 }
 
+void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
+  ASSERT(draining_);
+
+  // If the drain-tick-timer is active, add the callback to the queue. If not defined
+  // then it must have already expired, invoke the callback immediately.
+  if (drain_tick_timer_) {
+    drain_complete_cbs_.push_back(cb);
+  } else {
+    cb();
+  }
+}
+
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
   ASSERT(drain_complete_cb);
-  ASSERT(!draining_);
+
+  // If we've already started draining (either through direct invocation or through
+  // parent-initiated draining), enqueue the drain_complete_cb and return
+  if (draining_) {
+    addDrainCompleteCallback(drain_complete_cb);
+    return;
+  }
+
   ASSERT(!drain_tick_timer_);
   draining_ = true;
 
@@ -108,7 +127,14 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   children_.runCallbacks();
 
   // Schedule callback to run at end of drain time
-  drain_tick_timer_ = dispatcher_.createTimer(drain_complete_cb);
+  drain_tick_timer_ = dispatcher_.createTimer([this]() {
+    for (auto& cb : drain_complete_cbs_) {
+      cb();
+    }
+    drain_complete_cbs_.clear();
+    drain_tick_timer_.reset();
+  });
+  addDrainCompleteCallback(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;

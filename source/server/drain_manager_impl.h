@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -41,6 +42,8 @@ public:
   DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) override;
 
 private:
+  void addDrainCompleteCallback(std::function<void()> cb);
+
   Instance& server_;
   Event::Dispatcher& dispatcher_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
@@ -49,6 +52,7 @@ private:
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
+  std::vector<std::function<void()>> drain_complete_cbs_{};
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
   Common::ThreadSafeCallbackManager children_;

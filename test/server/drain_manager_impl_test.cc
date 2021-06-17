@@ -495,6 +495,62 @@ TEST_F(DrainManagerImplTest, DrainOnlyCascadesDownwards) {
   EXPECT_EQ(call_count, 2);
 }
 
+// Validate that we can initiate draining on a child (to no effect) after the parent
+// has already started draining
+TEST_F(DrainManagerImplTest, DrainChildExplicitlyAfterParent) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                            server_.dispatcher());
+  auto b = a.createChildManager(server_.dispatcher());
+  auto c = b->createChildManager(server_.dispatcher());
+
+  int call_count = 0;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb;
+
+  // validate top-level callback is never fired
+  EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  auto handle_a = a.addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(cb.AsStdFunction());
+
+  // Drain the parent, then the child
+  a.startDrainSequence([&] {});
+  b->startDrainSequence([&] {});
+  EXPECT_EQ(call_count, 3);
+}
+
+// Validate that we can initiate draining on a parent safely after a child has
+// already started draining
+TEST_F(DrainManagerImplTest, DrainParentAfterChild) {
+  ON_CALL(server_.options_, drainStrategy()).WillByDefault(Return(Server::DrainStrategy::Gradual));
+  ON_CALL(server_.options_, drainTime()).WillByDefault(Return(std::chrono::seconds(1)));
+
+  auto a = DrainManagerImpl(server_, envoy::config::listener::v3::Listener::DEFAULT,
+                            server_.dispatcher());
+  auto b = a.createChildManager(server_.dispatcher());
+  auto c = b->createChildManager(server_.dispatcher());
+
+  int call_count = 0;
+  testing::MockFunction<void(std::chrono::milliseconds)> cb;
+
+  // validate top-level callback is never fired
+  EXPECT_CALL(cb, Call(_)).WillRepeatedly(Invoke([&call_count](std::chrono::milliseconds) {
+    call_count++;
+  }));
+  auto handle_a = a.addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(cb.AsStdFunction());
+
+  // Drain the child, then the parent
+  b->startDrainSequence([] {});
+  a.startDrainSequence([] {});
+  EXPECT_EQ(call_count, 3);
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
