@@ -20,13 +20,25 @@ from .common.executor import Executor
 from .response import Response
 
 
+def pre_build_engine() -> None:
+    engine_running = Event()
+    executor = GeventExecutor()
+    Engine.handle(executor, lambda: engine_running.set())
+    engine_running.wait()
+
+
 # TODO: add better typing to this (and functions that use it)
 def request(*args, **kwargs) -> Response:
     response = Response()
+    engine_running = Event()
     stream_complete = Event()
+    executor = GeventExecutor()
+
+    engine = Engine.handle(executor, lambda: engine_running.set())
+    engine_running.wait()
 
     stream = make_stream(
-        Engine.handle(), GeventExecutor(), response, lambda: stream_complete.set(),
+        engine, executor, response, lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     stream_complete.wait()

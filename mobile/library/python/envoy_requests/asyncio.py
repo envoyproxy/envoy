@@ -12,13 +12,25 @@ from .common.executor import Executor
 from .response import Response
 
 
+async def pre_build_engine() -> None:
+    engine_running = asyncio.Event()
+    executor = AsyncioExecutor()
+    Engine.handle(executor, lambda: engine_running.set())
+    await engine_running.wait()
+
+
 # TODO: add better typing to this (and functions that use it)
 async def request(*args, **kwargs) -> Response:
     response = Response()
+    engine_running = asyncio.Event()
     stream_complete = asyncio.Event()
+    executor = AsyncioExecutor()
+
+    engine = Engine.handle(executor, lambda: engine_running.set())
+    await engine_running.wait()
 
     stream = make_stream(
-        Engine.handle(), AsyncioExecutor(), response, lambda: stream_complete.set(),
+        engine, executor, response, lambda: stream_complete.set(),
     )
     send_request(stream, *args, **kwargs)
     await stream_complete.wait()

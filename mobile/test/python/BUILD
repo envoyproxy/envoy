@@ -14,6 +14,8 @@ py_test(
     args = [
         "test/python/",
         "-s",
+        "-m",
+        "\"not standalone\"",
     ],
     main = "runner.py",
     python_version = "PY3",
@@ -33,7 +35,76 @@ py_test(
         "runner.py",
         "integration/**/*.py",
     ]),
-    args = ["test/python/"],
+    args = [
+        "test/python/",
+        "-s",
+        "-m",
+        "\"not standalone\"",
+    ],
+    main = "runner.py",
+    python_version = "PY3",
+    deps = [
+        "//library/python:envoy_requests",
+        requirement("pytest"),
+    ],
+)
+
+# these are all separated
+# so that there is one process per test
+# and each can construct their own Engine
+py_test(
+    name = "runtest_pre_build_engine_asyncio",
+    srcs = glob([
+        "conftest.py",
+        "echo_server.py",
+        "runner.py",
+        "unit/**/*.py",
+    ]),
+    args = [
+        "test/python/unit/test_pre_build_engine.py::test_pre_build_engine_asyncio",
+        "-s",
+    ],
+    main = "runner.py",
+    python_version = "PY3",
+    deps = [
+        "//library/python:envoy_requests",
+        requirement("pytest"),
+        requirement("pytest-asyncio"),
+    ],
+)
+
+py_test(
+    name = "runtest_pre_build_engine_gevent",
+    srcs = glob([
+        "conftest.py",
+        "echo_server.py",
+        "runner.py",
+        "unit/**/*.py",
+    ]),
+    args = [
+        "test/python/unit/test_pre_build_engine.py::test_pre_build_engine_gevent",
+        "-s",
+    ],
+    main = "runner.py",
+    python_version = "PY3",
+    deps = [
+        "//library/python:envoy_requests",
+        requirement("pytest"),
+    ],
+)
+
+py_test(
+    name = "runtest_pre_build_engine_threading",
+    srcs = glob([
+        "conftest.py",
+        "echo_server.py",
+        "runner.py",
+        "unit/**/*.py",
+    ]),
+    args = [
+        "test/python/unit/test_pre_build_engine.py::test_pre_build_engine_threading",
+        "-s",
+    ],
     main = "runner.py",
     python_version = "PY3",
     deps = [
