@@ -8,10 +8,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/upstream/subset_lb.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/upstream/subset_lb.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"

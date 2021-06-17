@@ -1,10 +1,10 @@
-#include "extensions/filters/network/tcp_proxy/config.h"
+#include "source/extensions/filters/network/tcp_proxy/config.h"
 
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/tcp_proxy/tcp_proxy.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Extensions {

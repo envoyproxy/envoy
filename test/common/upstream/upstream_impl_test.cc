@@ -16,13 +16,12 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/static_cluster.h"
-#include "common/upstream/strict_dns_cluster.h"
-
-#include "server/transport_socket_config_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/static_cluster.h"
+#include "source/common/upstream/strict_dns_cluster.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -1300,6 +1299,13 @@ TEST_F(HostImplTest, HealthPipeAddress) {
       EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
 }
 
+TEST_F(HostImplTest, HostAddressList) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
+  EXPECT_EQ(address_list, host->addressList());
+}
+
 // Test that hostname flag from the health check config propagates.
 TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
@@ -2343,22 +2349,22 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
   EXPECT_EQ(budget_percent, 42.0);
-  EXPECT_EQ(min_retry_concurrency, 3);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
   std::tie(budget_percent, min_retry_concurrency) =
       RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
   EXPECT_EQ(budget_percent, 20.0);
-  EXPECT_EQ(min_retry_concurrency, 123);
+  EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
 // Eds service_name is populated.
@@ -2610,6 +2616,20 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(3U, high_remaining_retries.value());
   cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
   EXPECT_EQ(4U, high_remaining_retries.value());
+}
+
+TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  EXPECT_FALSE(cluster_config.has_connect_timeout());
+  EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
 TEST_F(ClusterInfoImplTest, Timeouts) {

@@ -10,7 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

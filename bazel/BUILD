@@ -170,6 +170,11 @@ config_setting(
 )
 
 config_setting(
+    name = "clang_pch_build",
+    values = {"define": "ENVOY_CLANG_PCH=1"},
+)
+
+config_setting(
     name = "gcc_build_gcc",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
@@ -399,6 +404,11 @@ config_setting(
 config_setting(
     name = "wasm_v8",
     values = {"define": "wasm=v8"},
+)
+
+config_setting(
+    name = "wasm_wamr",
+    values = {"define": "wasm=wamr"},
 )
 
 config_setting(

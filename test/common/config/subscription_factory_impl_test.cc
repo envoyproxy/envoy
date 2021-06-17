@@ -8,8 +8,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/subscription_factory_impl.h"
-#include "common/config/xds_resource.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/xds_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"

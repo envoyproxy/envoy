@@ -1,8 +1,8 @@
-#include "extensions/filters/common/original_src/original_src_socket_option.h"
+#include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

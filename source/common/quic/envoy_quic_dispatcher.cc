@@ -1,10 +1,12 @@
-#include "common/quic/envoy_quic_dispatcher.h"
+#include "source/common/quic/envoy_quic_dispatcher.h"
 
-#include "common/common/safe_memcpy.h"
-#include "common/http/utility.h"
-#include "common/quic/envoy_quic_server_connection.h"
-#include "common/quic/envoy_quic_server_session.h"
-#include "common/quic/envoy_quic_utils.h"
+#include <openssl/crypto.h>
+
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/http/utility.h"
+#include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -17,13 +19,15 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
     Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
     Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-    Network::Socket& listen_socket)
+    Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length),
       connection_handler_(connection_handler), listener_config_(listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
-      listen_socket_(listen_socket) {
+      listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
+      crypto_server_stream_factory_(crypto_server_stream_factory) {
   // Set send buffer twice of max flow control window to ensure that stream send
   // buffer always takes all the data.
   // The max amount of data buffered is the per-stream high watermark + the max
@@ -46,6 +50,8 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
   listener_stats_.downstream_cx_active_.dec();
   per_worker_stats_.downstream_cx_active_.dec();
   connection_handler_.decNumConnections();
+  quic_stat_names_.chargeQuicConnectionCloseStats(listener_config_.listenerScope(), error, source,
+                                                  /*is_upstream*/ false);
 }
 
 std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
@@ -64,7 +70,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
-      listener_config_.perConnectionBufferLimitBytes());
+      listener_config_.perConnectionBufferLimitBytes(), quic_stat_names_,
+      listener_config_.listenerScope(), crypto_server_stream_factory_);
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(
@@ -92,11 +99,7 @@ quic::QuicConnectionId EnvoyQuicDispatcher::ReplaceLongServerConnectionId(
     uint8_t expected_server_connection_id_length) const {
   quic::QuicConnectionId new_connection_id = quic::QuicDispatcher::ReplaceLongServerConnectionId(
       version, server_connection_id, expected_server_connection_id_length);
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* server_connection_id_ptr = server_connection_id.data();
-  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(server_connection_id_ptr);
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
+  adjustNewConnectionIdForRoutine(new_connection_id, server_connection_id);
   return new_connection_id;
 }
 

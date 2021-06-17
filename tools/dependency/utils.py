@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 
-from exports import (
+from tools.dependency.exports import (
     api_repository_locations, envoy_repository_locations, repository_locations_utils)
 
 

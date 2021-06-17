@@ -1,6 +1,6 @@
-#include "common/stats/recent_lookups.h"
+#include "source/common/stats/recent_lookups.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Stats {

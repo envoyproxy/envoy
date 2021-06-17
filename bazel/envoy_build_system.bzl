@@ -12,9 +12,9 @@ load(
     _envoy_cc_posix_library = "envoy_cc_posix_library",
     _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
-    _envoy_include_prefix = "envoy_include_prefix",
     _envoy_proto_library = "envoy_proto_library",
 )
+load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
     _envoy_select_boringssl = "envoy_select_boringssl",
@@ -25,6 +25,7 @@ load(
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
     _envoy_select_wasm_rust_tests = "envoy_select_wasm_rust_tests",
     _envoy_select_wasm_v8 = "envoy_select_wasm_v8",
+    _envoy_select_wasm_wamr = "envoy_select_wasm_wamr",
     _envoy_select_wasm_wasmtime = "envoy_select_wasm_wasmtime",
     _envoy_select_wasm_wavm = "envoy_select_wasm_wavm",
 )
@@ -210,9 +211,10 @@ envoy_select_new_http1_parser_in_integration_tests = _envoy_select_new_http1_par
 envoy_select_hot_restart = _envoy_select_hot_restart
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests
 envoy_select_wasm_rust_tests = _envoy_select_wasm_rust_tests
+envoy_select_wasm_v8 = _envoy_select_wasm_v8
+envoy_select_wasm_wamr = _envoy_select_wasm_wamr
 envoy_select_wasm_wavm = _envoy_select_wasm_wavm
 envoy_select_wasm_wasmtime = _envoy_select_wasm_wasmtime
-envoy_select_wasm_v8 = _envoy_select_wasm_v8
 
 # Binary wrappers (from envoy_binary.bzl)
 envoy_cc_binary = _envoy_cc_binary
@@ -225,8 +227,8 @@ envoy_cc_linux_library = _envoy_cc_linux_library
 envoy_cc_posix_library = _envoy_cc_posix_library
 envoy_cc_posix_without_linux_library = _envoy_cc_posix_without_linux_library
 envoy_cc_win32_library = _envoy_cc_win32_library
-envoy_include_prefix = _envoy_include_prefix
 envoy_proto_library = _envoy_proto_library
+envoy_pch_library = _envoy_pch_library
 
 # Test wrappers (from envoy_test.bzl)
 envoy_cc_fuzz_test = _envoy_cc_fuzz_test

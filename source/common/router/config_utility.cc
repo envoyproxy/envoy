@@ -1,4 +1,4 @@
-#include "common/router/config_utility.h"
+#include "source/common/router/config_utility.h"
 
 #include <string>
 #include <vector>
@@ -7,8 +7,8 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Router {
@@ -33,12 +33,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
     }
 
     envoy::type::matcher::v3::StringMatcher matcher_config;
-    if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
-                                                   : false) {
-      matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
-    } else {
-      matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    }
+    matcher_config.set_exact(config.hidden_envoy_deprecated_value());
     return Matchers::StringMatcherImpl(matcher_config);
   }
   }

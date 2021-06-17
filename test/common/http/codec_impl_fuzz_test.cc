@@ -9,14 +9,14 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/conn_manager_utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/conn_manager_utility.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/test_common/test_runtime.h"
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
@@ -138,6 +138,13 @@ public:
         stream_state_ = StreamState::Closed;
       }
     }
+
+    void closeLocalAndRemote() {
+      remote_closed_ = true;
+      local_closed_ = true;
+      stream_state_ = StreamState::Closed;
+    }
+
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
@@ -179,6 +186,7 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
+<<<<<<< HEAD
         .WillByDefault(InvokeWithoutArgs([this] {
           response_.closeRemote();
           // Reset response as higher level code would do in case response ends before a request is
@@ -208,6 +216,13 @@ public:
                                                       "stream reset");
           }
         }));
+=======
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
+    ON_CALL(response_.response_decoder_, decodeData(_, true))
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
+    ON_CALL(response_.response_decoder_, decodeTrailers_(_))
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
+>>>>>>> upstream/main
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
@@ -388,7 +403,13 @@ public:
         }
       }
       // Perform the stream action.
-      directionalAction(request_, stream_action.request());
+      // The request_.request_encoder_ is initialized from the response_.response_decoder_.
+      // Fuzz test codec_impl_fuzz_test-5766628005642240 created a situation where the response
+      // stream was in closed state leading to the state.request_encoder_ in directionalAction()
+      // kData case no longer being a valid address.
+      if (response_.stream_state_ != HttpStream::StreamState::Closed) {
+        directionalAction(request_, stream_action.request());
+      }
       break;
     }
     case test::common::http::StreamAction::kResponse: {

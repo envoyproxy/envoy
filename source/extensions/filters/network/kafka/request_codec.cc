@@ -1,6 +1,6 @@
-#include "extensions/filters/network/kafka/request_codec.h"
+#include "source/extensions/filters/network/kafka/request_codec.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "absl/strings/string_view.h"
 

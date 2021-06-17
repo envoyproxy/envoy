@@ -17,8 +17,8 @@ envoy_cc_test(
 )
 
 CODEC_DEPS = [
-    "//include/envoy/buffer:buffer_interface",
-    "//include/envoy/event:dispatcher_interface",
+    "//envoy/buffer:buffer_interface",
+    "//envoy/event:dispatcher_interface",
     "//source/common/buffer:buffer_lib",
     "//source/common/event:dispatcher_lib",
     "//source/common/http:exception_lib",

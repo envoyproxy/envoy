@@ -157,8 +157,8 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:conn_pool_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -215,7 +215,8 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
-        ":ip_detection_extensions_lib",
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
@@ -240,7 +241,8 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
-        ":ip_detection_extensions_lib",
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
@@ -428,8 +430,6 @@ envoy_cc_test(
     deps = MIXED_CONN_POOL_TEST,
 )
 
-# TODO(alyssawilk): The conn pool grid should work correctly without H3. Circle back and figure
-# out the right way of handling the lack of H3 in the build.
 envoy_cc_test(
     name = "conn_pool_grid_test",
     srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
@@ -446,6 +446,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",
@@ -507,11 +508,19 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
-    name = "ip_detection_extensions_lib",
-    srcs = ["ip_detection_extensions.cc"],
-    hdrs = ["ip_detection_extensions.h"],
+    name = "custom_header_extension_lib",
+    srcs = ["custom_header_extension.cc"],
+    hdrs = ["custom_header_extension.h"],
     deps = [
         "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xff_extension_lib",
+    srcs = ["xff_extension.cc"],
+    hdrs = ["xff_extension.h"],
+    deps = [
         "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )

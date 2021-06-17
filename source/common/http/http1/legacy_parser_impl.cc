@@ -1,11 +1,11 @@
-#include "common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
 
 #include <http_parser.h>
 
 #include <cstdint>
 
-#include "common/common/assert.h"
-#include "common/http/http1/parser.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/http1/parser.h"
 
 namespace Envoy {
 namespace Http {
