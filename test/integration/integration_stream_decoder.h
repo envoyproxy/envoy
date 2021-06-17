@@ -29,6 +29,7 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason resetReason() { return reset_reason_; }
+  bool hasHeaders() { return headers_ != nullptr; }
   const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
@@ -45,6 +46,8 @@ public:
   waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForEndStreamOrReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder

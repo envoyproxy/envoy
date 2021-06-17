@@ -73,6 +73,76 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+TEST_P(ProtocolIntegrationTest, FullResponseAfterPartialRequest) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  testing_upstream_intentionally_ = true;
+  initialize();
+
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  http2_options.mutable_initial_connection_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  constexpr uint64_t response_size = 1024 * 1024;
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-length", "10"},
+                                     {"response_size_bytes", absl::StrCat(response_size)},
+                                     {"respond_after_n_request_bytes", "0"}});
+  auto& response = encoder_decoder.second;
+  ASSERT_TRUE(response->waitForEndStreamOrReset());
+  EXPECT_TRUE(response->complete());
+  EXPECT_TRUE(response->hasHeaders());
+  if (response->hasHeaders()) {
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(response_size, response->body().size());
+
+  codec_client_->close();
+}
+
+TEST_P(ProtocolIntegrationTest, FullSmallResponseAfterPartialRequest) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  testing_upstream_intentionally_ = true;
+  initialize();
+
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  http2_options.mutable_initial_connection_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  constexpr uint64_t response_size = 1024;
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-length", "10"},
+                                     {"response_size_bytes", absl::StrCat(response_size)},
+                                     {"respond_after_n_request_bytes", "0"}});
+  auto& response = encoder_decoder.second;
+  ASSERT_TRUE(response->waitForEndStreamOrReset());
+  EXPECT_TRUE(response->complete());
+  EXPECT_TRUE(response->hasHeaders());
+  if (response->hasHeaders()) {
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(response_size, response->body().size());
+
+  codec_client_->close();
+}
+
 // Change the default route to be restrictive, and send a request to an alternate route.
 TEST_P(DownstreamProtocolIntegrationTest, RouterNotFound) { testRouterNotFound(); }
 

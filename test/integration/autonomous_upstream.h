@@ -25,6 +25,9 @@ public:
   static const char NO_TRAILERS[];
   // Prevents upstream from finishing response.
   static const char NO_END_STREAM[];
+  // Generate a response after reading N bytes of the request body instead of waiting for
+  // end_stream.
+  static const char RESPOND_AFTER_N_REQUEST_BYTES[];
   // Closes the underlying connection after a given response is sent.
   static const char CLOSE_AFTER_RESPONSE[];
 
@@ -36,8 +39,10 @@ public:
 
 private:
   AutonomousUpstream& upstream_;
+  bool shouldSendResponse(bool got_end_stream) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void sendResponse() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   const bool allow_incomplete_streams_{false};
+  bool response_sent_{false};
   std::unique_ptr<Http::MetadataMapVector> pre_response_headers_metadata_;
 };
 

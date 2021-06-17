@@ -15,6 +15,21 @@ void HeaderToInt(const char header_name[], int32_t& return_int,
   }
 }
 
+absl::optional<int32_t> HeaderToInt(const char header_name[],
+                                    const Http::RequestHeaderMap& headers) {
+  auto header_values = headers.get(Http::LowerCaseString(header_name));
+  RELEASE_ASSERT(header_values.size() <= 1, "");
+  if (!header_values.empty() && !header_values[0]->value().getStringView().empty()) {
+    auto header_value = header_values[0]->value().getStringView();
+    uint64_t parsed_value;
+    RELEASE_ASSERT(absl::SimpleAtoi(header_value, &parsed_value) &&
+                       parsed_value < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()),
+                   "");
+    return parsed_value;
+  }
+  return {};
+}
+
 } // namespace
 
 const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
@@ -24,6 +39,7 @@ const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 const char AutonomousStream::CLOSE_AFTER_RESPONSE[] = "close_after_response";
 const char AutonomousStream::NO_TRAILERS[] = "no_trailers";
 const char AutonomousStream::NO_END_STREAM[] = "no_end_stream";
+const char AutonomousStream::RESPOND_AFTER_N_REQUEST_BYTES[] = "respond_after_n_request_bytes";
 
 AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
                                    AutonomousUpstream& upstream, bool allow_incomplete_streams)
@@ -36,10 +52,19 @@ AutonomousStream::~AutonomousStream() {
   }
 }
 
-// By default, automatically send a response when the request is complete.
+bool AutonomousStream::shouldSendResponse(bool got_end_stream) const {
+  absl::optional<int32_t> respond_after_n_request_bytes =
+      HeaderToInt(RESPOND_AFTER_N_REQUEST_BYTES, *headers_);
+  if (!got_end_stream && respond_after_n_request_bytes.has_value()) {
+    return body_.length() >= static_cast<uint64_t>(respond_after_n_request_bytes.value());
+  }
+  return got_end_stream;
+}
+
 void AutonomousStream::setEndStream(bool end_stream) {
   FakeStream::setEndStream(end_stream);
-  if (end_stream) {
+  if (!response_sent_ && shouldSendResponse(end_stream)) {
+    response_sent_ = true;
     sendResponse();
   }
 }
