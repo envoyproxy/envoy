@@ -14,7 +14,7 @@ using testing::StartsWith;
 class RouterTestSuppressEnvoyHeaders : public RouterTestBase {
 public:
   RouterTestSuppressEnvoyHeaders()
-      : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+      : RouterTestBase(false, true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // We don't get x-envoy-expected-rq-timeout-ms or an indication to insert
@@ -113,7 +113,7 @@ TEST_F(RouterTestSuppressEnvoyHeaders, EnvoyAttemptCountInResponseNotPresent) {
 
 class WatermarkTest : public RouterTestBase {
 public:
-  WatermarkTest() : RouterTestBase(false, false, Protobuf::RepeatedPtrField<std::string>{}) {
+  WatermarkTest() : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
   };
 
@@ -306,7 +306,8 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
 
 class RouterTestChildSpan : public RouterTestBase {
 public:
-  RouterTestChildSpan() : RouterTestBase(true, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+  RouterTestChildSpan()
+      : RouterTestBase(true, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
 // Make sure child spans start/inject/finish with a normal flow.
@@ -556,7 +557,8 @@ Protobuf::RepeatedPtrField<std::string> protobufStrList(const std::vector<std::s
 class RouterTestStrictCheckOneHeader : public RouterTestBase,
                                        public testing::WithParamInterface<std::string> {
 public:
-  RouterTestStrictCheckOneHeader() : RouterTestBase(false, false, protobufStrList({GetParam()})){};
+  RouterTestStrictCheckOneHeader()
+      : RouterTestBase(false, false, false, protobufStrList({GetParam()})){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckOneHeader,
@@ -605,7 +607,8 @@ class RouterTestStrictCheckSomeHeaders
     : public RouterTestBase,
       public testing::WithParamInterface<std::vector<std::string>> {
 public:
-  RouterTestStrictCheckSomeHeaders() : RouterTestBase(false, false, protobufStrList(GetParam())){};
+  RouterTestStrictCheckSomeHeaders()
+      : RouterTestBase(false, false, false, protobufStrList(GetParam())){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckSomeHeaders,
@@ -638,7 +641,7 @@ class RouterTestStrictCheckAllHeaders
       public testing::WithParamInterface<std::tuple<std::string, std::string>> {
 public:
   RouterTestStrictCheckAllHeaders()
-      : RouterTestBase(false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
+      : RouterTestBase(false, false, false, protobufStrList(SUPPORTED_STRICT_CHECKED_HEADERS)){};
 };
 
 INSTANTIATE_TEST_SUITE_P(StrictHeaderCheck, RouterTestStrictCheckAllHeaders,
@@ -705,6 +708,132 @@ TEST(RouterFilterUtilityTest, StrictCheckValidHeaders) {
                      .valid_)
         << fmt::format("'{}' should have failed strict validation", target);
   }
+}
+
+class RouterTestSupressGRPCStatsEnabled : public RouterTestBase {
+public:
+  RouterTestSupressGRPCStatsEnabled()
+      : RouterTestBase(false, false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
+};
+
+TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-internal", "true"}, {"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(
+      0U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_5xx").value());
+}
+
+class RouterTestSupressGRPCStatsDisabled : public RouterTestBase {
+public:
+  RouterTestSupressGRPCStatsDisabled()
+      : RouterTestBase(false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {}
+};
+
+TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-internal", "true"}, {"content-type", "application/grpc"}, {"grpc-timeout", "20S"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_5xx").value());
 }
 
 } // namespace Router

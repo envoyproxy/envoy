@@ -7,6 +7,17 @@
 
 set -e
 
+if [[ ! $(command -v bazel) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: bazel must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+if [[ ! $(command -v jq) ]]; then
+    # shellcheck disable=SC2016
+    echo 'ERROR: jq must be installed and available in "$PATH" to build docs' >&2
+    exit 1
+fi
+
 RELEASE_TAG_REGEX="^refs/tags/v.*"
 
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
@@ -41,9 +52,6 @@ else
 fi
 
 SCRIPT_DIR="$(dirname "$0")"
-SRC_DIR="$(dirname "$SCRIPT_DIR")"
-ENVOY_SRCDIR="$(realpath "$SRC_DIR")"
-CONFIGS_DIR="${SRC_DIR}"/configs
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -53,8 +61,6 @@ mkdir -p "${DOCS_OUTPUT_DIR}"
 
 rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
-
-export ENVOY_SRCDIR
 
 source_venv "$BUILD_DIR"
 pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
@@ -73,47 +79,23 @@ BAZEL_BUILD_OPTIONS+=(
     "--strategy=protodoc=sandboxed,local"
     "--action_env=ENVOY_BLOB_SHA")
 
-# Generate RST for the lists of trusted/untrusted extensions in
-# intro/arch_overview/security docs.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:extensions_security_rst
-
-# Generate RST for external dependency docs in intro/arch_overview/security.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:external_deps_rst
-
-# Fill in boiler plate for extensions that have google.protobuf.Empty as their
-# config. We only have v2 support here for version history anchors, which don't point at any empty
-# configs.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:empty_protos_rst
-
-# Generate RST for api
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:api_rst
-
-# Edge hardening example YAML.
-mkdir -p "${GENERATED_RST_DIR}"/configuration/best_practices
-cp -f "${CONFIGS_DIR}"/google-vrp/envoy-edge.yaml "${GENERATED_RST_DIR}"/configuration/best_practices
-
-copy_example_configs () {
-    mkdir -p "${GENERATED_RST_DIR}/start/sandboxes/_include"
-    cp -a "${SRC_DIR}"/examples/* "${GENERATED_RST_DIR}/start/sandboxes/_include"
-}
-
-copy_example_configs
-
-rsync -av \
-      "${SCRIPT_DIR}"/root/ \
-      "${SCRIPT_DIR}"/conf.py \
-      "${SCRIPT_DIR}"/redirects.txt \
-      "${SCRIPT_DIR}"/_ext \
-      "${GENERATED_RST_DIR}"
-
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:redirects
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
 
 # TODO(phlax): once all of above jobs are moved to bazel build genrules these can be done as part of the sphinx build
-tar -xf bazel-bin/tools/docs/extensions_security_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/external_deps_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/empty_protos_rst.tar -C "${GENERATED_RST_DIR}"
-tar -xf bazel-bin/tools/docs/api_rst.tar -C "${GENERATED_RST_DIR}"
-cp -a bazel-bin/docs/envoy-redirects.txt "${GENERATED_RST_DIR}"
+tar -xf bazel-bin/docs/rst.tar -C "${GENERATED_RST_DIR}"
+
+# TODO(phlax): these will move to python
+ENVOY_DOCS_BUILD_CONFIG="${GENERATED_RST_DIR}/build.yaml"
+{
+    echo "blob_sha: ${ENVOY_BLOB_SHA}"
+    echo "release_level: ${ENVOY_DOCS_RELEASE_LEVEL}"
+    echo "version_string: ${ENVOY_DOCS_VERSION_STRING}"
+    echo "docker_image_tag_name: ${DOCKER_IMAGE_TAG_NAME}"
+} > "$ENVOY_DOCS_BUILD_CONFIG"
+if [[ -n "$SPHINX_SKIP_CONFIG_VALIDATION" ]]; then
+    echo "skip_validation: true" >> "$ENVOY_DOCS_BUILD_CONFIG"
+fi
+export ENVOY_DOCS_BUILD_CONFIG
 
 # To speed up validate_fragment invocations in validating_code_block
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/config_validation:validate_fragment

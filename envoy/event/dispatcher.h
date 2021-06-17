@@ -64,6 +64,57 @@ public:
   virtual ~DispatcherBase() = default;
 
   /**
+   * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
+   * of the dispatcher event loop which may be on a different thread than the caller.
+   */
+  virtual void post(PostCb callback) PURE;
+
+  /**
+   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
+   * current thread of execution is on the same thread upon which the dispatcher loop is running.
+   */
+  virtual bool isThreadSafe() const PURE;
+};
+
+/**
+ * Minimal interface to support ScopeTrackedObjects.
+ */
+class ScopeTracker {
+public:
+  virtual ~ScopeTracker() = default;
+
+  /**
+   * Appends a tracked object to the current stack of tracked objects operating
+   * in the dispatcher.
+   *
+   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
+   * invoking, there needs to be a subsequent call to popTrackedObject().
+   */
+  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
+
+  /**
+   * Removes the top of the stack of tracked object and asserts that it was expected.
+   */
+  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
+
+  /**
+   * Whether the tracked object stack is empty.
+   */
+  virtual bool trackedObjectStackIsEmpty() const PURE;
+};
+
+/**
+ * Abstract event dispatching loop.
+ */
+class Dispatcher : public DispatcherBase, public ScopeTracker {
+public:
+  /**
+   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
+   * @return const std::string& the name that identifies this dispatcher.
+   */
+  virtual const std::string& name() PURE;
+
+  /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
@@ -104,48 +155,6 @@ public:
   virtual Event::SchedulableCallbackPtr createSchedulableCallback(std::function<void()> cb) PURE;
 
   /**
-   * Appends a tracked object to the current stack of tracked objects operating
-   * in the dispatcher.
-   *
-   * It's recommended to use ScopeTrackerScopeState to manage the object's tracking. If directly
-   * invoking, there needs to be a subsequent call to popTrackedObject().
-   */
-  virtual void pushTrackedObject(const ScopeTrackedObject* object) PURE;
-
-  /**
-   * Removes the top of the stack of tracked object and asserts that it was expected.
-   */
-  virtual void popTrackedObject(const ScopeTrackedObject* expected_object) PURE;
-
-  /**
-   * Whether the tracked object stack is empty.
-   */
-  virtual bool trackedObjectStackIsEmpty() const PURE;
-
-  /**
-   * Validates that an operation is thread-safe with respect to this dispatcher; i.e. that the
-   * current thread of execution is on the same thread upon which the dispatcher loop is running.
-   */
-  virtual bool isThreadSafe() const PURE;
-
-  /**
-   * Returns a recently cached MonotonicTime value.
-   */
-  virtual MonotonicTime approximateMonotonicTime() const PURE;
-};
-
-/**
- * Abstract event dispatching loop.
- */
-class Dispatcher : public DispatcherBase {
-public:
-  /**
-   * Returns the name that identifies this dispatcher, such as "worker_2" or "main_thread".
-   * @return const std::string& the name that identifies this dispatcher.
-   */
-  virtual const std::string& name() PURE;
-
-  /**
    * Register a watchdog for this dispatcher. The dispatcher is responsible for touching the
    * watchdog at least once per touch interval. Dispatcher implementations may choose to touch more
    * often to avoid spurious miss events when processing long callback queues.
@@ -158,6 +167,11 @@ public:
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * Returns a recently cached MonotonicTime value.
+   */
+  virtual MonotonicTime approximateMonotonicTime() const PURE;
 
   /**
    * Initializes stats for this dispatcher. Note that this can't generally be done at construction
@@ -263,12 +277,6 @@ public:
    * @return SignalEventPtr a signal event that is owned by the caller.
    */
   virtual SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) PURE;
-
-  /**
-   * Posts a functor to the dispatcher. This is safe cross thread. The functor runs in the context
-   * of the dispatcher event loop which may be on a different thread than the caller.
-   */
-  virtual void post(PostCb callback) PURE;
 
   /**
    * Post the deletable to this dispatcher. The deletable objects are guaranteed to be destroyed on

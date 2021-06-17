@@ -715,7 +715,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
-        "//source/common/quic:codec_lib",
+        "//source/common/quic:quic_factory_lib",
     ]),
 )
 
@@ -1746,12 +1746,11 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":http_integration_lib",
         "//source/common/quic:client_connection_factory_lib",
-        "//source/common/quic:codec_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/common/quic:quic_transport_socket_factory_lib",
+        "//source/common/quic:quic_factory_lib",
         "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",

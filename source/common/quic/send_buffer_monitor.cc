@@ -21,7 +21,9 @@ SendBufferMonitor::ScopedWatermarkBufferUpdater::~ScopedWatermarkBufferUpdater()
     ASSERT(static_cast<void*>(quic_stream_) != static_cast<void*>(send_buffer_monitor_));
     return;
   }
-  uint64_t new_buffered_bytes = quic_stream_->BufferedDataBytes();
+  // If quic_stream_ is done writing, regards all buffered bytes, if there is any, as drained.
+  uint64_t new_buffered_bytes =
+      quic_stream_->write_side_closed() ? 0u : quic_stream_->BufferedDataBytes();
   send_buffer_monitor_->is_doing_watermark_accounting_ = false;
   send_buffer_monitor_->updateBytesBuffered(old_buffered_bytes_, new_buffered_bytes);
 }
