@@ -101,6 +101,11 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
   }
 }
 
+bool ThreadLocalStoreImpl::fastRejects(StatName stat_name) const {
+  return stats_matcher_->rejectsAll() ||
+         (!stats_matcher_->hasStringMatchers() && stats_matcher_->rejects(stat_name));
+}
+
 bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
   ASSERT(!stats_matcher_->acceptsAll());
 
@@ -448,10 +453,6 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
     rejected_name = &(*iter);
   } else {
     if (rejects(name)) {
-      if (!stats_matcher_->hasStringMatchers()) {
-        // Skip recording of cheaply-matched rejections in the caches.
-        return true;
-      }
       auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
       const StatNameStorage& rejected_name_ref = *(insertion.first);
       rejected_name = &rejected_name_ref;
@@ -474,8 +475,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
     StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
-  if (tls_rejected_stats != nullptr &&
-      tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end()) {
+  if (parent_.fastRejects(full_stat_name) ||
+      (tls_rejected_stats != nullptr &&
+       tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end())) {
     return null_stat;
   }
 

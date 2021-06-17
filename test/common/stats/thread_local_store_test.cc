@@ -743,6 +743,28 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v3::StatsConfig stats_config_;
+
+  ~StatsMatcherTLSTest() {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+  }
+
+  // Adds counters for 1000 clusters and returns the amount of memory consumed.
+  uint64_t memoryConsumedAddingClusterStats() {
+    StatNamePool pool(symbol_table_);
+    std::vector<StatName> stat_names;
+    Stats::TestUtil::forEachSampleStat(1000, false, [&pool, &stat_names](absl::string_view name) {
+      stat_names.push_back(pool.add(name));
+    });
+
+    {
+      TestUtil::MemoryTest memory_test;
+      for (StatName stat_name : stat_names) {
+        store_->counterFromStatName(stat_name);
+      }
+      return memory_test.consumedBytes();
+    }
+  }
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -815,9 +837,6 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Histogram& noop_histogram_2 =
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
-
-  tls_.shutdownGlobalThreading();
-  store_->shutdownThreading();
 }
 
 // We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
@@ -927,10 +946,35 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   TextReadout& invalid_string_2 = store_->textReadoutFromString("also_INVLD_string");
   invalid_string_2.set("still no");
   EXPECT_EQ("", invalid_string_2.value());
+}
 
-  // Expected to free lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
-  tls_.shutdownGlobalThreading();
-  store_->shutdownThreading();
+// Rejecting stats of the form "cluster." enables an optimization in the matcher
+// infrastructure that performs the rejection without converting from StatName
+// to string, obviating the need to memoize the rejection in a set. This saves
+// a ton of memory, allowing us to reject thousands of stats without consuming
+// memory. Note that the trailing "." is critical so we can compare symbolically.
+TEST_F(StatsMatcherTLSTest, RejectPrefixDot) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster."); // Prefix match can be executed symbolically.
+  store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+  uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+  EXPECT_MEMORY_EQ(mem_consumed, 240);
+  EXPECT_MEMORY_LE(mem_consumed, 300);
+}
+
+// Repeating the same test but retaining the dot means that the StatsMatcher
+// infrastructure requires us remember the rejected StatNames in an ever-growing
+// map. That map is needed to avoid taking locks while re-rejecting stats we've
+// rejected in the past.
+TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster"); // No dot at the end means we have to compare as strings.
+  store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+  uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+  EXPECT_MEMORY_EQ(mem_consumed, 2936480);
+  EXPECT_MEMORY_LE(mem_consumed, 3500000);
 }
 
 // Tests the logic for caching the stats-matcher results, and in particular the
@@ -1184,7 +1228,7 @@ protected:
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
+      100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
@@ -1193,7 +1237,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
+      100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }
