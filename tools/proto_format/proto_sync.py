@@ -52,6 +52,10 @@ api_proto_package($fields)
 """)
 
 IGNORED_V2_PROTOS = [
+    "envoy/config/accesslog/v2",
+    "envoy/config/cluster/aggregate/v2alpha",
+    "envoy/config/cluster/redis",
+    "envoy/config/common/tap/v2alpha",
     "envoy/config/filter/dubbo/router/v2alpha1",
     "envoy/config/filter/http/adaptive_concurrency/v2alpha",
     "envoy/config/filter/http/aws_lambda/v2alpha",
@@ -98,6 +102,13 @@ IGNORED_V2_PROTOS = [
     "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
     "envoy/config/filter/thrift/rate_limit/v2alpha1",
     "envoy/config/filter/udp/udp_proxy/v2alpha",
+    "envoy/config/grpc_credential/v2alpha",
+    "envoy/config/ratelimit/v2",
+    "envoy/config/rbac/v2",
+    "envoy/config/retry/omit_host_metadata/v2",
+    "envoy/config/retry/previous_priorities",
+    "envoy/config/transport_socket/raw_buffer/v2",
+    "envoy/config/transport_socket/tap/v2alpha",
 ]
 
 IMPORT_REGEX = re.compile('import "(.*)";')
