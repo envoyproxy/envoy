@@ -16,6 +16,14 @@ export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
+if [[ "$1" == "docs" || "$1" == "format_pre" || "$1" == "tooling" || "$1" == "deps" || "$1" == "deps" || -n "$MINIMAL_SETUP" ]]; then
+    # shellcheck source=ci/setup_cache.sh
+    . "$(dirname "$0")"/setup_cache.sh
+    NO_BUILD_SETUP=1
+    # shellcheck source=ci/build_setup.sh
+    . "$(dirname "$0")"/build_setup_minimal.sh $build_setup_args
+fi
+
 if [[ -z "$NO_BUILD_SETUP" ]]; then
     # shellcheck source=ci/setup_cache.sh
     . "$(dirname "$0")"/setup_cache.sh
@@ -406,7 +414,7 @@ elif [[ "$CI_TARGET" == "format_pre" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
+  # setup_clang_toolchain
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
@@ -414,7 +422,7 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
+  # setup_clang_toolchain
 
   echo "check_format_test..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN

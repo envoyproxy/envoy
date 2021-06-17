@@ -1,11 +1,12 @@
 #!/bin/bash
 
 
+
 source_venv() {
   VENV_DIR=$1
   if [[ "${VIRTUAL_ENV}" == "" ]]; then
     if [[ ! -d "${VENV_DIR}"/venv ]]; then
-      virtualenv "${VENV_DIR}"/venv --python=python3
+        python3 -m venv "${VENV_DIR}"/venv
     fi
     # shellcheck disable=SC1090
     source "${VENV_DIR}/venv/bin/activate"

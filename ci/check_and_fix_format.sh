@@ -9,6 +9,7 @@ DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format.diff}"
 # prevents AZP cache weirdness.
 export FORCE_PROTO_FORMAT=yes
 export FORCE_PYTHON_FORMAT=yes
+export MINIMAL_SETUP=yes
 
 function fix {
   set +e

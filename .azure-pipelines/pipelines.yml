@@ -11,14 +11,46 @@ trigger:
 pr: none
 
 stages:
+
 - stage: precheck
   jobs:
-  - job: format_pre
+  - job: docker_cache
     dependsOn: []
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        mkdir -p $(Pipeline.Workspace)/docker
+        cd envoy-build-minimal
+        docker build . -t envoyproxy/envoy-build-ubuntu:minimal
+        cd ../envoy-build-upload
+        docker build . -t envoyproxy/envoy-build-ubuntu:upload
+        docker save envoyproxy/envoy-build-ubuntu:minimal envoyproxy/envoy-build-ubuntu:upload | gzip > $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Create Docker image
+      # condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
+
+  - job: format_pre
+    dependsOn: ["docker_cache"]
+    pool:
+      vmImage: "ubuntu-18.04"
+    steps:
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
+    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -34,11 +66,21 @@ stages:
       condition: failed()
 
   - job: tooling
-    dependsOn: []
+    dependsOn: ["docker_cache"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
+    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/do_ci.sh tooling'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -46,9 +88,8 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Run tooling checks"
-
     - script: |
-        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/tooling tooling'
+        IMAGE_ID=upload ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/tooling tooling'
       displayName: "Upload tooling coverage to GCS"
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -56,7 +97,7 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: format
-    dependsOn: ["format_pre"]
+    dependsOn: ["docker_cache"]  # "format_pre"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
@@ -65,8 +106,18 @@ stages:
         key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
 
-    - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
+    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -82,7 +133,7 @@ stages:
       condition: failed()
 
   - job: docs
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    dependsOn: ["docker_cache"]
     condition: ne(variables['PostSubmit'], true)
     pool:
       vmImage: "ubuntu-18.04"
@@ -92,8 +143,18 @@ stages:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
 
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
+    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         AZP_BRANCH: $(Build.SourceBranch)
@@ -104,7 +165,7 @@ stages:
       displayName: "Generate docs"
 
     - script: |
-        ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
+        IMAGE_ID=upload ci/run_envoy_docker.sh 'ci/upload_gcs_artifact.sh /source/generated/docs docs'
       displayName: "Upload Docs to GCS"
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -112,11 +173,26 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
 
   - job: dependencies
-    dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
+    dependsOn: ["docker_cache"]
     pool:
       vmImage: "ubuntu-18.04"
     steps:
-    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
+    - task: Cache@2
+      inputs:
+        key: "docs | ./WORKSPACE | **/*.bzl"
+        path: $(Build.StagingDirectory)/repository_cache
+      continueOnError: true
+    - task: Cache@2
+      inputs:
+        key: 'docker | envoy-build-minimal | v23'
+        path: $(Pipeline.Workspace)/docker
+        cacheHitVar: DOCKER_CACHE_HIT
+      displayName: Cache Docker images
+    - script: |
+        docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+      displayName: Restore Docker image
+      condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
+    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/do_ci.sh deps'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
