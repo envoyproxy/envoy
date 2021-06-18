@@ -26,6 +26,5 @@ function fix {
 trap fix ERR
 
 ci/do_ci.sh check_format
-ci/do_ci.sh check_repositories
 ci/do_ci.sh check_spelling
 ci/do_ci.sh check_spelling_pedantic

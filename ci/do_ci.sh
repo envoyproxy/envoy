@@ -6,7 +6,7 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
+if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || \
           "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
           "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
     build_setup_args="-nofetch"
@@ -419,10 +419,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
-elif [[ "$CI_TARGET" == "check_repositories" ]]; then
-  echo "check_repositories..."
-  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  exit 0
 elif [[ "$CI_TARGET" == "check_spelling" ]]; then
   echo "check_spelling..."
   "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh check
@@ -445,6 +441,7 @@ elif [[ "$CI_TARGET" == "docs" ]]; then
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
+
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
   "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
@@ -455,6 +452,8 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
 
   # Validate repository metadata.
+  echo "check repositories..."
+  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
   "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
 
   # Run pip requirements tests
