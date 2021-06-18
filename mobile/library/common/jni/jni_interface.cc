@@ -119,22 +119,6 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_nativeFilterTemplateString(JNIE
   return result;
 }
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_gRPCStatsSinkTemplateString(JNIEnv* env,
-                                                                             jclass // class
-) {
-  jstring result = env->NewStringUTF(grpc_stats_sink_template);
-  return result;
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_statsdSinkTemplateString(JNIEnv* env,
-                                                                          jclass // class
-) {
-  jstring result = env->NewStringUTF(statsd_sink_template);
-  return result;
-}
-
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class
