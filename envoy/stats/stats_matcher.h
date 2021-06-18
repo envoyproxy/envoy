@@ -17,10 +17,34 @@ public:
 
   /**
    * Take a metric name and report whether or not it should be instantiated.
+   * The may need to convert the StatName to a string.
+   *
    * @param the name of a Stats::Metric.
    * @return bool true if that stat should not be instantiated.
    */
   virtual bool rejects(StatName name) const PURE;
+
+  /**
+   * Takes a metric name and quickly determine whether it can be rejected based
+   * purely on the StatName. A return of 'false' means we may need to check
+   * slowRejects as well.
+   *
+   * @param the name of a Stats::Metric.
+   * @return bool true if that stat should not be instantiated, or whether we
+   *                   need to check slowRejects.
+   */
+  virtual bool fastRejects(StatName name) const PURE;
+
+  /**
+   * Takes a metric name and quickly determine whether it can be rejected based
+   * purely on the StatName. A return of 'false' means we may need to check
+   * slowRejects as well.
+   *
+   * @param the name of a Stats::Metric.
+   * @return bool true if that stat should not be instantiated, or whether we
+   *                   need to check slowRejects.
+   */
+  virtual bool slowRejects(StatName name) const PURE;
 
   /**
    * Helps determine whether the matcher needs to be called. This can be used

@@ -744,7 +744,7 @@ class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v3::StatsConfig stats_config_;
 
-  ~StatsMatcherTLSTest() {
+  ~StatsMatcherTLSTest() override {
     tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
   }
@@ -959,8 +959,8 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixDot) {
       "cluster."); // Prefix match can be executed symbolically.
   store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
   uint64_t mem_consumed = memoryConsumedAddingClusterStats();
-  EXPECT_MEMORY_EQ(mem_consumed, 240);
-  EXPECT_MEMORY_LE(mem_consumed, 300);
+  EXPECT_MEMORY_EQ(mem_consumed, 0);
+  EXPECT_MEMORY_LE(mem_consumed, 0);
 }
 
 // Repeating the same test but retaining the dot means that the StatsMatcher
@@ -1011,11 +1011,16 @@ public:
     store_.setStatsMatcher(std::move(matcher_ptr));
 
     StatNamePool pool(symbol_table_);
-    EXPECT_CALL(*matcher, rejects(pool.add("scope.reject"))).WillOnce(Return(true));
-    EXPECT_CALL(*matcher, rejects(pool.add("scope.ok"))).WillOnce(Return(false));
-
     for (int j = 0; j < 5; ++j) {
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.reject"))).WillOnce(Return(false));
+      if (j == 0) {
+        EXPECT_CALL(*matcher, slowRejects(pool.add("scope.reject"))).WillOnce(Return(true));
+      }
       EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+      if (j == 0) {
+        EXPECT_CALL(*matcher, slowRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+      }
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
   }
@@ -1030,8 +1035,10 @@ public:
 
     ScopePtr scope = store_.createScope("scope.");
 
+    StatNamePool pool(symbol_table_);
     for (int j = 0; j < 5; ++j) {
-      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      // Note: zero calls to fastReject() or slowReject() are made, as
+      // reject-all should short-circuit.
       EXPECT_EQ("", lookup_stat("reject"));
     }
   }
@@ -1043,9 +1050,11 @@ public:
     matcher->accepts_all_ = true;
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
+    StatNamePool pool(symbol_table_);
 
     for (int j = 0; j < 5; ++j) {
-      // Note: zero calls to reject() are made, as accept-all should short-circuit.
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+      // Note: zero calls to slowReject() are made, as accept-all should short-circuit.
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
   }

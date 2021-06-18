@@ -55,7 +55,49 @@ void StatsMatcherImpl::optimizeLastMatcher() {
 }
 
 bool StatsMatcherImpl::rejects(StatName stat_name) const {
+  if (rejectsAll()) {
+    return true;
+  }
+
+  bool match = fastRejectMatch(stat_name) || slowRejectMatch(stat_name);
+
+  //  is_inclusive_ | match | return
+  // ---------------+-------+--------
+  //        T       |   T   |   T     Default-inclusive and matching an (exclusion) matcher, deny.
+  //        T       |   F   |   F     Otherwise, allow.
+  //        F       |   T   |   F     Default-exclusive and matching an (inclusion) matcher, allow.
+  //        F       |   F   |   T     Otherwise, deny.
   //
+  // This is an XNOR, which can be evaluated by checking for equality.
+  return is_inclusive_ == match;
+}
+
+bool StatsMatcherImpl::fastRejects(StatName stat_name) const {
+  if (rejectsAll()) {
+    return true;
+  }
+
+  // We can short-circuit the slow matchers only if they are empty, or if
+  // we are in inclusive-mode and we find a match.
+  if (is_inclusive_ || matchers_.empty()) {
+    return fastRejectMatch(stat_name) == is_inclusive_;
+  }
+
+  // If there are both prefix and string matchers, and we are in exclusive
+  // mode, then it isn't helpful to run the prefix matchers early, so
+  // we return false. This forces the caller to eventually then call
+  // slowRejects(), where we'll handle this case below.
+  return false;
+}
+
+bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
+  return std::any_of(prefixes_.begin(), prefixes_.end(),
+                     [stat_name](StatName prefix) { return stat_name.startsWith(prefix); });
+}
+
+bool StatsMatcherImpl::slowRejects(StatName stat_name) const {
+  bool match = slowRejectMatch(stat_name);
+
   //  is_inclusive_ | match | return
   // ---------------+-------+--------
   //        T       |   T   |   T     Default-inclusive and matching an (exclusion) matcher, deny.
@@ -65,15 +107,27 @@ bool StatsMatcherImpl::rejects(StatName stat_name) const {
   //
   // This is an XNOR, which can be evaluated by checking for equality.
 
-  bool match = std::any_of(prefixes_.begin(), prefixes_.end(),
-                           [stat_name](StatName prefix) { return stat_name.startsWith(prefix); });
-  if (!match && !matchers_.empty()) {
-    std::string name = symbol_table_->toString(stat_name);
-    match = std::any_of(matchers_.begin(), matchers_.end(),
-                        [&name](auto& matcher) { return matcher.match(name); });
+  if (is_inclusive_ || match || prefixes_.empty()) {
+    return match == is_inclusive_;
   }
 
-  return is_inclusive_ == match;
+  // For exclusive-mode, we may need to re-test the prefixes, as we had to toss
+  // out that case in fastRejects(). This seems really annoying, but OTOH I
+  // don't understand the use-case for exclusive-mode, so it's probably not
+  // worth trying to optimize for it, which would involve carrying through the
+  // fast-reject match state, which would be a confusing interface. It would
+  // also be possible to abstradct this into a MatchState object, but that would
+  // be very cumbersome to mock for use in thread_local_store_test.cc.
+  return !fastRejectMatch(stat_name);
+}
+
+bool StatsMatcherImpl::slowRejectMatch(StatName stat_name) const {
+  if (matchers_.empty()) {
+    return false;
+  }
+  std::string name = symbol_table_->toString(stat_name);
+  return std::any_of(matchers_.begin(), matchers_.end(),
+                     [&name](auto& matcher) { return matcher.match(name); });
 }
 
 } // namespace Stats

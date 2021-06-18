@@ -89,7 +89,7 @@ template <class StatMapClass, class StatListClass>
 void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass& list) {
   StatNameVec remove_list;
   for (auto& stat : map) {
-    if (rejects(stat.first)) {
+    if (fastRejects(stat.first) || slowRejects(stat.first)) {
       remove_list.push_back(stat.first);
     }
   }
@@ -102,21 +102,11 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
 }
 
 bool ThreadLocalStoreImpl::fastRejects(StatName stat_name) const {
-  return stats_matcher_->rejectsAll() ||
-         (!stats_matcher_->hasStringMatchers() && stats_matcher_->rejects(stat_name));
+  return stats_matcher_->fastRejects(stat_name);
 }
 
-bool ThreadLocalStoreImpl::rejects(StatName stat_name) const {
-  ASSERT(!stats_matcher_->acceptsAll());
-
-  // TODO(ambuc): If stats_matcher_ depends on regexes, this operation (on the
-  // hot path) could become prohibitively expensive. Revisit this usage in the
-  // future.
-  //
-  // Also note that the elaboration of the stat-name into a string is expensive,
-  // so I think it might be better to move the matcher test until after caching,
-  // unless its acceptsAll/rejectsAll.
-  return stats_matcher_->rejectsAll() || stats_matcher_->rejects(stat_name);
+bool ThreadLocalStoreImpl::slowRejects(StatName stat_name) const {
+  return stats_matcher_->slowRejects(stat_name);
 }
 
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
@@ -452,7 +442,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   if (iter != central_rejected_stats.end()) {
     rejected_name = &(*iter);
   } else {
-    if (rejects(name)) {
+    if (slowRejects(name)) {
       auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
       const StatNameStorage& rejected_name_ref = *(insertion.first);
       rejected_name = &rejected_name_ref;
@@ -475,8 +465,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
     StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
-  if (parent_.fastRejects(full_stat_name) ||
-      (tls_rejected_stats != nullptr &&
+  if ((tls_rejected_stats != nullptr &&
        tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end())) {
     return null_stat;
   }
@@ -551,6 +540,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
+  if (parent_.fastRejects(final_stat_name)) {
+    return parent_.null_counter_;
+  }
+
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatRefMap<Counter>* tls_cache = nullptr;
@@ -605,6 +598,10 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
 
+  if (parent_.fastRejects(final_stat_name)) {
+    return parent_.null_gauge_;
+  }
+
   StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_cache_) {
@@ -642,6 +639,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
 
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   StatName final_stat_name = joiner.nameWithTags();
+
+  if (parent_.fastRejects(final_stat_name)) {
+    return parent_.null_histogram_;
+  }
 
   StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
@@ -715,6 +716,10 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   // re-copying the string and significant memory overhead.
   TagUtility::TagStatNameJoiner joiner(prefix_.statName(), name, stat_name_tags, symbolTable());
   Stats::StatName final_stat_name = joiner.nameWithTags();
+
+  if (parent_.fastRejects(final_stat_name)) {
+    return parent_.null_text_readout_;
+  }
 
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.

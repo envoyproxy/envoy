@@ -28,6 +28,8 @@ public:
 
   // StatsMatcher
   bool rejects(StatName name) const override;
+  bool fastRejects(StatName name) const override;
+  bool slowRejects(StatName name) const override;
   bool acceptsAll() const override {
     return is_inclusive_ && matchers_.empty() && prefixes_.empty();
   }
@@ -38,6 +40,8 @@ public:
 
 private:
   void optimizeLastMatcher();
+  bool fastRejectMatch(StatName name) const;
+  bool slowRejectMatch(StatName name) const;
 
   // Bool indicating whether or not the StatsMatcher is including or excluding stats by default. See
   // StatsMatcherImpl::rejects() for much more detail.

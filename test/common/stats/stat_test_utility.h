@@ -186,7 +186,9 @@ private:
   do {                                                                                             \
     if (Stats::TestUtil::MemoryTest::mode() != Stats::TestUtil::MemoryTest::Mode::Disabled) {      \
       EXPECT_LE(consumed_bytes, upper_bound);                                                      \
-      EXPECT_GT(consumed_bytes, 0);                                                                \
+      if (upper_bound != 0) {                                                                      \
+        EXPECT_GT(consumed_bytes, 0);                                                              \
+      }                                                                                            \
     } else {                                                                                       \
       ENVOY_LOG_MISC(                                                                              \
           info, "Skipping upper-bound memory test against {} bytes as platform lacks tcmalloc",    \
