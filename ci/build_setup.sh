@@ -64,7 +64,7 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR="${TEST_TMPDIR:-BUILD_DIR/tmp}"
+export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
 export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
