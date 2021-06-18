@@ -89,7 +89,7 @@ private:
 static void BM_StatsNoTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
@@ -103,7 +103,7 @@ static void BM_StatsWithTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
   context.initThreading();
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
@@ -115,7 +115,7 @@ static void BM_StatsWithTlsAndRejectionsWithDot(benchmark::State& state) {
   context.initThreading();
   context.initPrefixRejections("cluster.");
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
@@ -127,7 +127,7 @@ static void BM_StatsWithTlsAndRejectionsWithoutDot(benchmark::State& state) {
   context.initThreading();
   context.initPrefixRejections("cluster");
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
