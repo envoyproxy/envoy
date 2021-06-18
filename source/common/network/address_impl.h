@@ -69,14 +69,15 @@ private:
   const Type type_;
 };
 
+// Create an address instance. Upon failure, return an error status without throwing.
 class InstanceFactory {
 public:
   template <typename InstanceType, typename... Args>
-  static StatusOr<InstanceConstPtr> createInstancePtr(Args&&... args) {
+  static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
     absl::Status status;
     // Use new instead of make_unique here because the instance constructors are private and must be
     // called directly here.
-    std::unique_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
+    std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
     if (!status.ok()) {
       return status;
     }

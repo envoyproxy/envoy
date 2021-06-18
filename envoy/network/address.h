@@ -209,7 +209,6 @@ public:
 };
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
-using InstanceConstPtr = std::unique_ptr<const Instance>;
 
 } // namespace Address
 } // namespace Network
