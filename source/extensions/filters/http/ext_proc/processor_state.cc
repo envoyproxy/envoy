@@ -79,21 +79,25 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
 
       } else if (body_mode_ == ProcessingMode::STREAMED) {
         if (complete_body_available_) {
-          // All data came in before headers callback, so act just as if we were streaming
+          // All data came in before headers callback, so act just as if we were buffering
+          // since effectively this is the same thing.
           ENVOY_LOG(debug, "Sending buffered body data for whole message");
           filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback,
-                                  true);
+                                   true);
           clearWatermark();
           return true;
         }
 
         if (hasBufferedData()) {
-          // Otherwise, treat the buffered data like any other streaming chunk
+          // Otherwise, we need to send the currently buffered data. But since we
+          // are streaming and more things will come, clear the current data.
           auto buffered_chunk = std::make_unique<QueuedChunk>();
-          buffered_chunk->buffered = true;
-          ENVOY_LOG(debug, "Sending first chunk as buffered data");
-          filter_.sendBodyChunk(*this, *bufferedData(), ProcessorState::CallbackState::StreamedBodyCallback,
-                                false);
+          auto& buffered_chunk_data = buffered_chunk->data;
+          modifyBufferedData(
+              [&buffered_chunk_data](Buffer::Instance& data) { buffered_chunk_data.move(data); });
+          ENVOY_LOG(debug, "Sending first chunk using buffered data");
+          filter_.sendBodyChunk(*this, buffered_chunk_data,
+                                ProcessorState::CallbackState::StreamedBodyCallback, false);
           enqueueStreamingChunk(std::move(buffered_chunk));
         }
         return true;
@@ -133,28 +137,38 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
 
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (!streaming_chunks_.empty()) {
-        QueuedChunkPtr chunk = std::move(streaming_chunks_.front());
-        streaming_chunks_.pop_front();
-        if (chunk->buffered) {
-          // This chunk was buffered data from the start of the message
-          ENVOY_LOG(debug, "Applying body response to buffered data in streaming mode. State = {}", callback_state_);
-          modifyBufferedData([this, &response](Buffer::Instance& data) {
-            MutationUtils::applyCommonBodyResponse(response, headers_, data);
-          });
-          //should_continue = true;
-        } else {
-          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->data.length());
-          MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
-          if (chunk->data.length() > 0) {
-            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain. end_stream = {}", chunk->data.length(),
-              chunk->end_stream);
-            injectDataToFilterChain(chunk->data, chunk->end_stream);
+      if (!chunks_for_processing_.empty()) {
+        QueuedChunkPtr chunk = std::move(chunks_for_processing_.front());
+        chunks_for_processing_.pop_front();
+        ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
+                  chunk->data.length());
+        MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+
+        should_continue = chunk->end_stream;
+        if (chunk->end_stream) {
+          // There may be data that never got delivered in line that we need to inject now
+          while (!processed_chunks_.empty()) {
+            auto next_chunk = std::move(processed_chunks_.front());
+            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain",
+                      next_chunk->data.length());
+            injectDataToFilterChain(next_chunk->data, false);
+            processed_chunks_.pop_front();
           }
-          should_continue = chunk->end_stream;
+
+          // The last chunk needs to be manually injected into the stream,
+          // even if it's empty, to indicate end of stream
+          if (chunk->data.length() > 0) {
+            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain at end of stream",
+                      chunk->data.length());
+            injectDataToFilterChain(chunk->data, false);
+          }
+
+        } else {
+          // Ensure that the chunk gets delivered in a subsequent data callback
+          processed_chunks_.push_back(std::move(chunk));
         }
       }
-      if (streaming_chunks_.empty()) {
+      if (chunks_for_processing_.empty()) {
         clearWatermark();
         callback_state_ = CallbackState::Idle;
       }
@@ -166,7 +180,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     message_timer_->disableTimer();
 
     headers_ = nullptr;
-    body_chunk_ = nullptr;  
+    body_chunk_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server

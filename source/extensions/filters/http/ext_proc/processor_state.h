@@ -10,8 +10,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +23,6 @@ class Filter;
 class QueuedChunk {
   public:
     bool end_stream = false;
-    bool buffered = false;
     Buffer::OwnedImpl data;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
@@ -92,7 +91,18 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   void enqueueStreamingChunk(QueuedChunkPtr&& chunk) {
-    streaming_chunks_.push_back(std::move(chunk));
+    chunks_for_processing_.push_back(std::move(chunk));
+  }
+  bool hasProcessedChunks() const {
+    return !processed_chunks_.empty();
+  }
+  QueuedChunkPtr dequeueProcessedChunk() {
+    if (processed_chunks_.empty()) {
+      return nullptr;
+    }
+    auto ret = std::move(processed_chunks_.front());
+    processed_chunks_.pop_front();
+    return ret;
   }
 
   virtual Http::HeaderMap* addTrailers() PURE;
@@ -134,7 +144,8 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Buffer::Instance* body_chunk_ = nullptr;
   Event::TimerPtr message_timer_;
-  std::deque<QueuedChunkPtr> streaming_chunks_;
+  std::deque<QueuedChunkPtr> chunks_for_processing_;
+  std::deque<QueuedChunkPtr> processed_chunks_;
 };
 
 class DecodingProcessorState : public ProcessorState {

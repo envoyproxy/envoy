@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "absl/strings/str_format.h"
 
@@ -195,7 +194,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                   end_stream);
     // Save the chunk, which we will replace or re-send later
     state.enqueueStreamingChunk(std::move(next_chunk));
-    // At this point we will continue, but with an empty buffer and empty chunk
+
+    while (state.hasProcessedChunks()) {
+      data.move(state.dequeueProcessedChunk()->data);
+    }
+    ENVOY_LOG(trace, "Continuing with {} bytes of processed data", data.length());
+
+    // At this point we will continue, but with different data, and possibly none
     if (end_stream) {
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
@@ -347,6 +352,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (processing_complete_) {
+    ENVOY_LOG(debug, "Ignoring stream message received after processing complete");
     // Ignore additional messages after we decided we were done with the stream
     return;
   }
@@ -365,24 +371,31 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
+    ENVOY_LOG(debug, "Received RequestHeaders response");
     message_handled = decoding_state_.handleHeadersResponse(response->request_headers());
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
+    ENVOY_LOG(debug, "Received ResponseHeaders response");
     message_handled = encoding_state_.handleHeadersResponse(response->response_headers());
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
+    ENVOY_LOG(debug, "Received RequestBody response");
     message_handled = decoding_state_.handleBodyResponse(response->request_body());
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
+    ENVOY_LOG(debug, "Received ResponseBody response");
     message_handled = encoding_state_.handleBodyResponse(response->response_body());
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
+    ENVOY_LOG(debug, "Received RequestTrailers response");
     message_handled = decoding_state_.handleTrailersResponse(response->request_trailers());
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
+    ENVOY_LOG(debug, "Received responseTrailers response");
     message_handled = encoding_state_.handleTrailersResponse(response->response_trailers());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
+    ENVOY_LOG(debug, "Received ImmediateResponse response");
     // We won't be sending anything more to the stream after we
     // receive this message.
     processing_complete_ = true;
@@ -391,6 +404,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     break;
   default:
     // Any other message is considered spurious
+    ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
+      response->response_case());
     break;
   }
 

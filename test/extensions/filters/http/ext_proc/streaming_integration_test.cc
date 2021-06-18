@@ -1,12 +1,16 @@
 #include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/network/address_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
+#include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
+
+#include "absl/strings/str_format.h"
 
 #include "gtest/gtest.h"
 
@@ -212,6 +216,71 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
+// Send a body that's larger than the buffer limit in streamed mode, and ensure
+// that the processor gets the right number of bytes.
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
+  const uint32_t num_chunks = 152;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        if (!stream->Read(&header_req)) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+        }
+        if (!header_req.has_request_headers()) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request headers");
+        }
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        uint32_t received_size = 0;
+        ProcessingRequest body_req;
+        do {
+          if (!stream->Read(&body_req)) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+          }
+          if (!body_req.has_request_body()) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request body");
+          }
+          received_size += body_req.request_body().body().size();
+
+          ProcessingResponse body_resp;
+          body_resp.mutable_request_body();
+          stream->Write(body_resp);
+        } while (!body_req.request_body().end_of_stream());
+
+        if (received_size != total_size) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                              "expected different response size");
+        }
+
+        return grpc::Status::OK;
+      });
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto& encoder = sendClientRequestHeaders([total_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  for (uint32_t i = 0; i < num_chunks; i++) {
+    Buffer::OwnedImpl chunk;
+    TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
+    codec_client_->sendData(encoder, chunk, false);
+  }
+  Buffer::OwnedImpl empty_chunk;
+  codec_client_->sendData(encoder, empty_chunk, true);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+}
+
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
 TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
@@ -259,6 +328,292 @@ TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(client_response_->body().size(), response_size);
+}
+
+// Do an HTTP GET that will return a body larger than the buffer limit, which we process
+// in the processor using streaming.
+TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
+  uint32_t response_size = 170000;
+  std::atomic_uint64_t processor_response_hash;
+
+  test_processor_.start(
+      [response_size, &processor_response_hash](
+          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        if (!stream->Read(&header_req)) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+        }
+        if (!header_req.has_request_headers()) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request headers");
+        }
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        auto* override = header_resp.mutable_mode_override();
+        override->set_response_header_mode(ProcessingMode::SKIP);
+        override->set_response_body_mode(ProcessingMode::STREAMED);
+        stream->Write(header_resp);
+
+        ProcessingRequest body_req;
+        uint32_t total_response_size = 0;
+        Buffer::OwnedImpl allData;
+
+        do {
+          if (!stream->Read(&body_req)) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+          }
+          if (!body_req.has_response_body()) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected response body");
+          }
+          total_response_size += body_req.response_body().body().size();
+          // Save all the chunks in a buffer so that we can calculate a hash.
+          allData.add(body_req.response_body().body());
+
+          ProcessingResponse body_resp;
+          body_resp.mutable_response_body();
+          stream->Write(body_resp);
+        } while (!body_req.response_body().end_of_stream());
+
+        processor_response_hash = HashUtil::xxHash64(allData.toString());
+        if (total_response_size != response_size) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                              absl::StrFormat("Received %u response bytes; wanted %u",
+                                              total_response_size, response_size));
+        }
+
+        return grpc::Status::OK;
+      });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.addCopy(LowerCaseString("response_size_bytes"), response_size);
+  sendGetRequest(headers);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ(client_response_->body().size(), response_size);
+  EXPECT_EQ(processor_response_hash, HashUtil::xxHash64(client_response_->body()));
+}
+
+// Send a large HTTP POST, and expect back an equally large reply. Stream both and verify
+// that we got back what we expected.
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
+  const uint32_t send_chunks = 10;
+  const uint32_t chunk_size = 11000;
+  uint32_t request_size = send_chunks * chunk_size;
+  uint32_t response_size = 1700000;
+  std::atomic_uint64_t processor_request_hash;
+  std::atomic_uint64_t processor_response_hash;
+
+  test_processor_.start(
+      [request_size, response_size, &processor_request_hash, &processor_response_hash](
+          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        if (!stream->Read(&header_req)) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+        }
+        if (!header_req.has_request_headers()) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request headers");
+        }
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        bool saw_response_headers = false;
+        bool saw_request_eof = false;
+        bool saw_response_eof = false;
+        ProcessingRequest message;
+        uint32_t total_request_size = 0;
+        uint32_t total_response_size = 0;
+        Buffer::OwnedImpl allResponseData;
+        Buffer::OwnedImpl allRequestData;
+
+        do {
+          ProcessingResponse response;
+          if (!stream->Read(&message)) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+          }
+          if (message.has_response_headers()) {
+            if (saw_response_headers) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "duplicate response headers");
+            }
+            EXPECT_THAT(message.response_headers().headers(),
+                        SingleProtoHeaderValueIs(":status", "200"));
+            saw_response_headers = true;
+            response.mutable_response_headers();
+
+          } else if (message.has_request_body()) {
+            total_request_size += message.request_body().body().size();
+            allRequestData.add(message.request_body().body());
+            if (message.request_body().end_of_stream()) {
+              if (saw_request_eof) {
+                return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "duplicate request eof");
+              }
+              saw_request_eof = true;
+              if (total_request_size != request_size) {
+                return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                    absl::StrFormat("Received %u request bytes; wanted %u",
+                                                    total_request_size, request_size));
+              }
+              processor_request_hash = HashUtil::xxHash64(allRequestData.toString());
+            }
+            response.mutable_request_body();
+
+          } else if (message.has_response_body()) {
+            total_response_size += message.response_body().body().size();
+            allResponseData.add(message.response_body().body());
+            if (message.response_body().end_of_stream()) {
+              if (saw_response_eof) {
+                return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "duplicate response eof");
+              }
+              saw_response_eof = true;
+              if (total_response_size != response_size) {
+                return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                    absl::StrFormat("Received %u response bytes; wanted %u",
+                                                    total_response_size, response_size));
+              }
+              processor_response_hash = HashUtil::xxHash64(allResponseData.toString());
+            }
+            response.mutable_response_body();
+          } else {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "unexpected stream message");
+          }
+
+          stream->Write(response);
+        } while (!saw_response_headers || !saw_request_eof || !saw_response_eof);
+
+        return grpc::Status::OK;
+      });
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto& encoder = sendClientRequestHeaders([request_size, response_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), request_size);
+    headers.addCopy(LowerCaseString("response_size_bytes"), response_size);
+  });
+  Buffer::OwnedImpl complete_request_body;
+
+  for (uint32_t i = 0; i < send_chunks; i++) {
+    Buffer::OwnedImpl chunk;
+    TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
+    complete_request_body.add(chunk.toString());
+    codec_client_->sendData(encoder, chunk, false);
+  }
+  Buffer::OwnedImpl empty_chunk;
+  codec_client_->sendData(encoder, empty_chunk, true);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ(client_response_->body().size(), response_size);
+  EXPECT_EQ(processor_request_hash, HashUtil::xxHash64(complete_request_body.toString()));
+  EXPECT_EQ(processor_response_hash, HashUtil::xxHash64(client_response_->body()));
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::info);
+}
+
+// Send a large HTTP POST, and expect back an equally large reply. Stream both and replace both 
+// the request and response bodies with different bodies.
+TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
+  const uint32_t send_chunks = 12;
+  const uint32_t chunk_size = 10000;
+  uint32_t response_size = 180000;
+
+  test_processor_.start(
+      [] (
+          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        if (!stream->Read(&header_req)) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+        }
+        if (!header_req.has_request_headers()) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request headers");
+        }
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        bool saw_response_headers = false;
+        bool saw_request_eof = false;
+        bool saw_response_eof = false;
+        bool first_request_chunk = true;
+        ProcessingRequest message;
+
+        do {
+          ProcessingResponse response;
+          if (!stream->Read(&message)) {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+          }
+          if (message.has_response_headers()) {
+            if (saw_response_headers) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "duplicate response headers");
+            }
+            EXPECT_THAT(message.response_headers().headers(),
+                        SingleProtoHeaderValueIs(":status", "200"));
+            saw_response_headers = true;
+            response.mutable_response_headers();
+
+          } else if (message.has_request_body()) {
+            // Replace the first chunk with a new message, and zero out the rest
+            auto* new_body = response.mutable_request_body()->mutable_response();
+            if (first_request_chunk) {
+              new_body->mutable_body_mutation()->set_body("Hello");
+              first_request_chunk = false;
+            } else {
+              new_body->mutable_body_mutation()->set_clear_body(true);
+            }
+            if (message.request_body().end_of_stream()) {   
+              saw_request_eof = true;
+            }   
+
+          } else if (message.has_response_body()) {
+            // Replace the last chunk with a new message and zero out the rest
+            auto* new_body = response.mutable_response_body()->mutable_response();
+            if (message.response_body().end_of_stream()) {
+              new_body->mutable_body_mutation()->set_body("World");
+              first_request_chunk = false;
+              saw_response_eof = true;
+            } else {
+              new_body->mutable_body_mutation()->set_clear_body(true);
+            }
+
+          } else {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "unexpected stream message");
+          }
+
+          stream->Write(response);
+        } while (!saw_response_headers || !saw_request_eof || !saw_response_eof);
+
+        return grpc::Status::OK;
+      });
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto& encoder = sendClientRequestHeaders([response_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), 5);
+    headers.addCopy(LowerCaseString("response_size_bytes"), response_size);
+  });
+
+  for (uint32_t i = 0; i < send_chunks; i++) {
+    Buffer::OwnedImpl chunk;
+    TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
+    codec_client_->sendData(encoder, chunk, false);
+  }
+  Buffer::OwnedImpl empty_chunk;
+  codec_client_->sendData(encoder, empty_chunk, true);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
 // Send a body that's larger than the buffer limit and have the processor
