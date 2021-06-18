@@ -1284,6 +1284,47 @@ protected:
   bool threading_enabled_{false};
 };
 
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTableFor10Counters) {
+  TestUtil::MemoryTest memory_test;
+  for (int i = 0; i < 10; ++i) {
+    const std::string name = absl::StrCat("cluster.service_0.stat_", i);
+    store_.counterFromString(name);
+  }
+  std::cerr << "mem: " << memory_test.consumedBytes() << std::endl;
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
+}
+
+class TestCounterGroupDescriptor : public CounterGroupDescriptor {
+public:
+  TestCounterGroupDescriptor(std::vector<std::string> suffixes)
+      : suffixes_(suffixes) {}
+
+  ~TestCounterGroupDescriptor() override = default;
+
+  absl::string_view nameSuffix(size_t index) const override {
+    return suffixes_[index];
+  }
+
+  size_t size() const override { return suffixes_.size(); }
+
+ private:
+  std::vector<std::string> suffixes_;
+};
+
+TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTableFor10CounterGroup) {
+  std::vector<std::string> suffixes;
+  TestUtil::MemoryTest memory_test;
+  for (int i = 0; i < 10; ++i) {
+    suffixes.push_back(absl::StrCat("stat_", i));
+  }
+  auto d = std::make_shared<TestCounterGroupDescriptor>(suffixes);
+
+  const std::string name = absl::StrCat("cluster.service_0");
+  store_.counterGroupFromString(name, d);
+  std::cerr << "mem: " << memory_test.consumedBytes() << std::endl;
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
+}
+
 // Tests how much memory is consumed allocating 100k stats.
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
