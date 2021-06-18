@@ -47,13 +47,9 @@ def generate_protobufs(targets, output, api_repo):
         #
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
-        _, stripped_path = rule.decode().rsplit('//', 1)  # envoy/config/bootstrap/v3:pkg_go_proto
-        rule_dir, proto = stripped_path.rsplit(':', 1)
+        rule_dir, proto = rule.decode().rsplit('//', 1)[1].rsplit(':', 1)
 
-        if len(api_repo) == 0:
-            prefix = ''
-        else:
-            prefix = os.path.join('external', api_repo)
+        prefix = '' if not api_repo else os.path.join('external', api_repo)
         input_dir = os.path.join(bazel_bin, prefix, rule_dir, proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
