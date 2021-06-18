@@ -52,7 +52,7 @@ api_proto_package($fields)
 """)
 
 KEEP_V2_PROTOS = [
-    "//envoy/config/health_checker/redis/v2:pkg",
+    "envoy/config/health_checker/redis/v2",
 ]
 
 IGNORED_V2_PROTOS = [
