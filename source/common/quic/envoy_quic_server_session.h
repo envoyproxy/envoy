@@ -45,7 +45,8 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+                         OptRef<const Network::TransportSocketFactory> transport_socket_factory);
 
   ~EnvoyQuicServerSession() override;
 
@@ -118,6 +119,7 @@ private:
   Stats::Scope& listener_scope_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
+  OptRef<const Network::TransportSocketFactory> transport_socket_factory_;
 };
 
 } // namespace Quic
