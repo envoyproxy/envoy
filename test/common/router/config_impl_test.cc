@@ -1210,6 +1210,67 @@ virtual_hosts:
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
+TEST_F(RouteMatcherTest, TestMatchTree) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    "@type": type.googleapis.com/envoy.config.common.matcher.v3.Matcher
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo": 
+            action: 
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree
+          "/new_endpoint/bar": 
+            action: 
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree_2
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree", headers.get_("x-route-header"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/bar", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_2", headers.get_("x-route-header"));
+  }
+}
+
+// Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
 virtual_hosts:

@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
+#include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -29,8 +31,10 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/reset_header_parser.h"
@@ -59,6 +63,78 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
+class MatchTreeRouteEntryImpl : public RouteEntryImplBase {
+public:
+  using RouteEntryImplBase::RouteEntryImplBase;
+
+  virtual absl::optional<std::string>
+  currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
+  }
+  RouteConstSharedPtr matches(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                              uint64_t) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  PathMatchType matchType() const override { return PathMatchType::None; }
+  const std::string& matcher() const override { NOT_REACHED_GCOVR_EXCL_LINE; }
+};
+
+RouteEntryImplBaseConstSharedPtr createAndValidateRoute(
+    const envoy::config::route::v3::Route& route_config, const VirtualHostImpl& vhost,
+    const OptionalHttpFilters& optional_http_filters,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ProtobufMessage::ValidationVisitor& validator,
+    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
+
+  RouteEntryImplBaseConstSharedPtr route;
+  switch (route_config.match().path_specifier_case()) {
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
+    route = std::make_shared<PrefixRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                   factory_context, validator);
+    break;
+  }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
+    route = std::make_shared<PathRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                 factory_context, validator);
+    break;
+  }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
+    route = std::make_shared<RegexRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                  factory_context, validator);
+    break;
+  }
+  case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
+    route = std::make_shared<ConnectRouteEntryImpl>(vhost, route_config, optional_http_filters,
+                                                    factory_context, validator);
+    break;
+  }
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  if (validation_clusters.has_value()) {
+    route->validateClusters(*validation_clusters);
+    for (const auto& shadow_policy : route->shadowPolicies()) {
+      ASSERT(!shadow_policy->cluster().empty());
+      if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+        throw EnvoyException(
+            fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
+      }
+    }
+  }
+
+  return route;
+}
+
+class RouteActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
+                                          absl::string_view) override {
+    return absl::OkStatus();
+  }
+};
 } // namespace
 
 const std::string& OriginalConnectPort::key() {
@@ -1226,42 +1302,23 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
-  for (const auto& route : virtual_host.routes()) {
-    switch (route.match().path_specifier_case()) {
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPrefix: {
-      routes_.emplace_back(new PrefixRouteEntryImpl(*this, route, optional_http_filters,
-                                                    factory_context, validator));
-      break;
-    }
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kPath: {
-      routes_.emplace_back(
-          new PathRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));
-      break;
-    }
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex: {
-      routes_.emplace_back(
-          new RegexRouteEntryImpl(*this, route, optional_http_filters, factory_context, validator));
-      break;
-    }
-    case envoy::config::route::v3::RouteMatch::PathSpecifierCase::kConnectMatcher: {
-      routes_.emplace_back(new ConnectRouteEntryImpl(*this, route, optional_http_filters,
-                                                     factory_context, validator));
-      break;
-    }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
+  if (virtual_host.has_matcher()) {
+    envoy::config::common::matcher::v3::Matcher matcher;
+    MessageUtil::anyConvertAndValidate(virtual_host.matcher(), matcher, validator);
 
-    if (validation_clusters.has_value()) {
-      routes_.back()->validateClusters(*validation_clusters);
-      for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
-        ASSERT(!shadow_policy->cluster().empty());
-        if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
-          throw EnvoyException(
-              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
-        }
+    RouteActionContext context{*this, optional_http_filters, factory_context};
+    RouteActionValidationVisitor validation_visitor;
+    Matcher::MatchTreeFactory<Http::HttpMatchingData, RouteActionContext> factory(
+        context, validator, validation_visitor);
+
+    matcher_ = factory.create(matcher)();
+  } else {
+    for (const auto& route : virtual_host.routes()) {
+      if (!route.has_match()) {
+        throw EnvoyException("RouteValidationError.Match");
       }
+      routes_.emplace_back(createAndValidateRoute(route, *this, optional_http_filters,
+                                                  factory_context, validator, validation_clusters));
     }
   }
 
@@ -1382,33 +1439,46 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     return SSL_REDIRECT_ROUTE;
   }
 
-  // Check for a route that matches the request.
-  for (auto route = routes_.begin(); route != routes_.end(); ++route) {
-    if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
-      continue;
+  if (matcher_) {
+    Http::Matching::HttpMatchingDataImpl data;
+    data.onRequestHeaders(headers);
+
+    auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+
+    if (match.result_) {
+      return dynamic_cast<const RouteMatchAction&>(*match.result_).route();
     }
 
-    RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
-    if (nullptr == route_entry) {
-      continue;
-    }
-
-    if (cb) {
-      RouteEvalStatus eval_status = (std::next(route) == routes_.end())
-                                        ? RouteEvalStatus::NoMoreRoutes
-                                        : RouteEvalStatus::HasMoreRoutes;
-      RouteMatchStatus match_status = cb(route_entry, eval_status);
-      if (match_status == RouteMatchStatus::Accept) {
-        return route_entry;
+    return nullptr;
+  } else {
+    // Check for a route that matches the request.
+    for (auto route = routes_.begin(); route != routes_.end(); ++route) {
+      if (!headers.Path() && !(*route)->supportsPathlessHeaders()) {
+        continue;
       }
-      if (match_status == RouteMatchStatus::Continue &&
-          eval_status == RouteEvalStatus::NoMoreRoutes) {
-        return nullptr;
-      }
-      continue;
-    }
 
-    return route_entry;
+      RouteConstSharedPtr route_entry = (*route)->matches(headers, stream_info, random_value);
+      if (nullptr == route_entry) {
+        continue;
+      }
+
+      if (cb) {
+        RouteEvalStatus eval_status = (std::next(route) == routes_.end())
+                                          ? RouteEvalStatus::NoMoreRoutes
+                                          : RouteEvalStatus::HasMoreRoutes;
+        RouteMatchStatus match_status = cb(route_entry, eval_status);
+        if (match_status == RouteMatchStatus::Accept) {
+          return route_entry;
+        }
+        if (match_status == RouteMatchStatus::Continue &&
+            eval_status == RouteEvalStatus::NoMoreRoutes) {
+          return nullptr;
+        }
+        continue;
+      }
+
+      return route_entry;
+    }
   }
 
   return nullptr;
@@ -1591,6 +1661,20 @@ const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) 
   auto it = configs_.find(name);
   return it == configs_.end() ? nullptr : it->second.get();
 }
+
+Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
+    const Protobuf::Message& config, RouteActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& route_config =
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
+                                                                               validation_visitor);
+  auto route = std::make_shared<MatchTreeRouteEntryImpl>(
+      context.vhost, route_config, context.optional_http_filters, context.factory_context,
+      validation_visitor);
+
+  return [route]() { return std::make_unique<RouteMatchAction>(route); };
+}
+REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 } // namespace Router
 } // namespace Envoy

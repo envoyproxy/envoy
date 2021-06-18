@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.VirtualHost";
 
@@ -82,6 +82,9 @@ message VirtualHost {
     min_items: 1
     items {string {well_known_regex: HTTP_HEADER_VALUE strict: false}}
   }];
+
+  // This is mega hacky but gets around the circular dependency between this file and the matcher file.
+  google.protobuf.Any matcher = 21;
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -213,7 +216,7 @@ message Route {
   string name = 14;
 
   // Route matching parameters.
-  RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  RouteMatch match = 1;
 
   oneof action {
     option (validate.required) = true;
