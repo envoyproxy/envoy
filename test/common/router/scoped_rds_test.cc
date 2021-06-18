@@ -384,7 +384,10 @@ key:
   EXPECT_EQ(2UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
-  EXPECT_NE(0, server_factory_context_.scope_.gauge("foo.scoped_rds.foo_scoped_routes.config_reload_time", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_NE(0, server_factory_context_.scope_
+                   .gauge("foo.scoped_rds.foo_scoped_routes.config_reload_time",
+                          Stats::Gauge::ImportMode::NeverImport)
+                   .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),

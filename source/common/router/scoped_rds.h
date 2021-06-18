@@ -93,7 +93,7 @@ private:
 // clang-format on
 
 struct ScopedRdsStats {
-  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
+  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 
   static ScopedRdsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ScopedRdsStats{

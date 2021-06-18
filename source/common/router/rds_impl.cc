@@ -88,7 +88,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
       local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
-      stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_),POOL_GAUGE(*scope_))}),
+      stat_prefix_(stat_prefix),
+      stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();

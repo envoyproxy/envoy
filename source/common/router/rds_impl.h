@@ -106,7 +106,7 @@ private:
  * Struct definition for all RDS stats. @see stats_macros.h
  */
 struct RdsStats {
-  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
+  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class RdsRouteConfigProviderImpl;
