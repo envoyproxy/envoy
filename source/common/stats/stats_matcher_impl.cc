@@ -111,13 +111,9 @@ bool StatsMatcherImpl::slowRejects(StatName stat_name) const {
     return match == is_inclusive_;
   }
 
-  // For exclusive-mode, we may need to re-test the prefixes, as we had to toss
-  // out that case in fastRejects(). This seems really annoying, but OTOH I
-  // don't understand the use-case for exclusive-mode, so it's probably not
-  // worth trying to optimize for it, which would involve carrying through the
-  // fast-reject match state, which would be a confusing interface. It would
-  // also be possible to abstradct this into a MatchState object, but that would
-  // be very cumbersome to mock for use in thread_local_store_test.cc.
+  // In exclusive-mode with both prefixes and matches, we must
+  // skip the fast-path prefix since we invert the results, so we can't
+  // definitively declare a rejection. So we must check them now.
   return !fastRejectMatch(stat_name);
 }
 
