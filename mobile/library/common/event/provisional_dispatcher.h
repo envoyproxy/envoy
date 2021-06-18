@@ -16,7 +16,7 @@ namespace Event {
  * versions may support correct calling semantics after the Event::Dispatcher has been
  * terminated/deleted or before it has been created.
  */
-class ProvisionalDispatcher : public Logger::Loggable<Logger::Id::main> {
+class ProvisionalDispatcher {
 public:
   ProvisionalDispatcher() = default;
   virtual ~ProvisionalDispatcher() = default;

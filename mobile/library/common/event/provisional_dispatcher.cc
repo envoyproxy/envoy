@@ -12,7 +12,6 @@ void ProvisionalDispatcher::drain(Event::Dispatcher& event_dispatcher) {
   // because of behavioral oddities in Event::Dispatcher: event_dispatcher_->isThreadSafe() will
   // crash.
   Thread::LockGuard lock(state_lock_);
-  ENVOY_LOG(trace, "ProvisionalDispatcher::drain");
   RELEASE_ASSERT(!drained_, "ProvisionalDispatcher::drain must only occur once");
   drained_ = true;
   event_dispatcher_ = &event_dispatcher;
@@ -26,12 +25,10 @@ envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
   Thread::LockGuard lock(state_lock_);
 
   if (drained_) {
-    ENVOY_LOG(trace, "ProvisionalDispatcher::post: pass-through");
     event_dispatcher_->post(callback);
     return ENVOY_SUCCESS;
   }
 
-  ENVOY_LOG(trace, "ProvisionalDispatcher::post: queueing");
   init_queue_.push_back(callback);
   return ENVOY_SUCCESS;
 }
@@ -39,7 +36,6 @@ envoy_status_t ProvisionalDispatcher::post(Event::PostCb callback) {
 bool ProvisionalDispatcher::isThreadSafe() const {
   // Doesn't require locking because if a thread has a stale view of drained_, then by definition
   // this wasn't a threadsafe call.
-  ENVOY_LOG(trace, "ProvisionalDispatcher::isThreadSafe");
   return TS_UNCHECKED_READ(drained_) && event_dispatcher_->isThreadSafe();
 }
 
