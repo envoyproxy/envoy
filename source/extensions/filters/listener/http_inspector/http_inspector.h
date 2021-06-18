@@ -67,7 +67,7 @@ class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filt
 public:
   Filter(const ConfigSharedPtr config);
   ~Filter() override {
-    if(cb_) {
+    if (cb_) {
       cb_->socket().ioHandle().resetFileEvents();
     }
   }

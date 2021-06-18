@@ -133,9 +133,7 @@ public:
     io_handle_.initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
-  bool isFileEventInitialized() override {
-    return io_handle_.isFileEventInitialized();
-  }
+  bool isFileEventInitialized() override { return io_handle_.isFileEventInitialized(); }
 
   Network::IoHandlePtr duplicate() override { return io_handle_.duplicate(); }
 
