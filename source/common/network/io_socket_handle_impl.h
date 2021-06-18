@@ -70,7 +70,9 @@ public:
   Address::InstanceConstSharedPtr peerAddress() override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
-
+  bool isFileEventInitialized() override {
+    return file_event_ != nullptr;
+  }
   IoHandlePtr duplicate() override;
 
   void activateFileEvents(uint32_t events) override;

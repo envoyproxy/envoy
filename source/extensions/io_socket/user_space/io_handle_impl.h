@@ -81,6 +81,10 @@ public:
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
+  bool isFileEventInitialized() override {
+    return user_file_event_ != nullptr;
+  }
+
   Network::IoHandlePtr duplicate() override;
   void activateFileEvents(uint32_t events) override;
   void enableFileEvents(uint32_t events) override;

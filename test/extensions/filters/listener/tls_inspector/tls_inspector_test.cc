@@ -32,7 +32,11 @@ public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
-  ~TlsInspectorTest() override { io_handle_->close(); }
+  ~TlsInspectorTest() override {
+    io_handle_->close();
+    filter_.reset();
+    EXPECT_EQ(false, io_handle_->isFileEventInitialized());
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

@@ -79,8 +79,8 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
-  bool continueOnListenerFiltersTimeout() const override { return false; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return std::chrono::milliseconds(1000); }
+  bool continueOnListenerFiltersTimeout() const override { return true; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
@@ -209,6 +209,23 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// This test ensures the socket file event was reset after timeout, otherwise
+// the assertion which avoid to create file event duplicated will be triggered.
+TEST_P(ProxyProtocolTest, Timeout) {
+  connect();
+  absl::SleepFor(absl::Seconds(5));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "127.0.0.1");
+  } else {
+    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
+              "::1");
+  }
+
+  disconnect();
+}
 
 TEST_P(ProxyProtocolTest, V1Basic) {
   connect();
