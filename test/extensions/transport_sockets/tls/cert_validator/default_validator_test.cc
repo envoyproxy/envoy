@@ -122,7 +122,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   // Create the default validator object.
   auto default_validator =
       std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          nullptr, stats, Event::GlobalTimeSystem().timeSystem());
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
 
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
@@ -137,7 +138,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
   std::vector<Matchers::StringMatcherImpl> invalid_san_matchers;
   invalid_san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
-  // Verify the certificate with incorrect SAN exact mathcer.
+  // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
                                                  invalid_san_matchers),
             Envoy::Ssl::ClientValidationStatus::Failed);
