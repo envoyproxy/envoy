@@ -3,12 +3,12 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/server/admin/utils.h"
-#include "source/common/common/matchers.h"
-#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Server {
@@ -136,9 +136,13 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
-  const Matchers::StringMatcherPtr name_matcher = buildNameMatcher(query_params);
-  if (name_matcher == nullptr) {
-    response.add("Could not parse name_regex parameter.");
+  Matchers::StringMatcherPtr name_matcher;
+  TRY_ASSERT_MAIN_THREAD
+  name_matcher = buildNameMatcher(query_params);
+  END_TRY
+  catch (std::exception& e) {
+    response.add(absl::StrCat("Error while parsing name_regex: ", e.what()));
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
     return Http::Code::BadRequest;
   }
 

@@ -53,9 +53,9 @@ envoy_cc_library(
     name = "config_tracker_interface",
     hdrs = ["config_tracker.h"],
     deps = [
+        "//envoy/common:matchers_interface",
         "//source/common/common:non_copyable",
         "//source/common/protobuf",
-        "//envoy/common:matchers_interface",
     ],
 )
 
