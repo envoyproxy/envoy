@@ -219,6 +219,7 @@ using SubscriptionPtr = std::unique_ptr<Subscription>;
  */
 #define ALL_SUBSCRIPTION_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)                            \
   COUNTER(init_fetch_timeout)                                                                      \
+  GAUGE(config_reload_time, NeverImport)                                                           \
   COUNTER(update_attempt)                                                                          \
   COUNTER(update_failure)                                                                          \
   COUNTER(update_rejected)                                                                         \
