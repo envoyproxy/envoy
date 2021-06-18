@@ -15,6 +15,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/network/filter.h"
 
+#include "id.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
@@ -31,6 +32,19 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Attributes {
+
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    referer_handle = Http::CustomHeaders::get().Referer;
+
+MapValue_Entry* ValueUtil::getOrInsert(MapValue* m, absl::string_view key) {
+  if (m == nullptr) {
+    return nullptr;
+  }
+  MapValue_Entry* e = m->add_entries();
+  auto key_val = ValueUtil::stringValue(std::string(key));
+  e->set_allocated_key(&key_val);
+  return e;
+}
 
 Value ValueUtil::mapValue(MapValue* m) {
   Value val;
@@ -63,39 +77,118 @@ const Value ValueUtil::nullValue() {
   v.set_null_value(v1.null_value());
   return v;
 }
+template <class T> Value ValueUtil::objectValue(T val) {
+  Value vv;
+  Value any_v;
+  Any* a = any_v.mutable_object_value();
+  a->PackFrom(*val);
+  vv.set_allocated_object_value(a);
+  return vv;
+}
 
-Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
-    referer_handle = Http::CustomHeaders::get().Referer;
+Value Attributes::buildAttributesValue(const std::vector<AttributeId>& attrs) {
+  MapValue map;
 
-absl::optional<Value> Attributes::getAttribute(AttributeId& attr_id) {
+  for (auto attr : attrs) {
+    RootToken root_token = attr.root();
+    MapValue_Entry* root_entry = ValueUtil::getOrInsert(&map, attr.root_name());
+    if (!attr.sub()) {
+      // get the full map
+      Value val = full(root_token);
+      root_entry->set_allocated_value(&val);
+    } else {
+      Value* root_entry_val = root_entry->mutable_value();
+      MapValue* sub_map = root_entry_val->mutable_map_value();
+
+      auto sub_key = attr.sub_name();
+      MapValue_Entry* sub_entry = ValueUtil::getOrInsert(sub_map, *sub_key);
+      Value sub_val = get(attr);
+      sub_entry->set_allocated_value(&sub_val);
+    }
+  }
+  return ValueUtil::mapValue(&map);
+}
+
+Value Attributes::get(AttributeId& attr_id) {
   switch (attr_id.root()) {
+  case RootToken::REQUEST: {
+    RequestToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::RESPONSE: {
+    ResponseToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::SOURCE: {
+    SourceToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::DESTINATION: {
+    DestinationToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::CONNECTION: {
+    ConnectionToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::UPSTREAM: {
+    UpstreamToken tok;
+    attr_id.sub(tok);
+    return get(tok);
+  }
+  case RootToken::METADATA: {
+    return getMetadata();
+  }
+  case RootToken::FILTER_STATE: {
+    return getFilterState();
+  }
+  }
+}
+
+Value Attributes::full(RootToken tok) {
+  switch (tok) {
   case RootToken::REQUEST:
-    return getRequest(attr_id);
+    return full<RequestToken>();
   case RootToken::RESPONSE:
-    return getResponse(attr_id);
+    return full<ResponseToken>();
   case RootToken::SOURCE:
-    return getSource(attr_id);
+    return full<SourceToken>();
   case RootToken::DESTINATION:
-    return getDestination(attr_id);
+    return full<DestinationToken>();
   case RootToken::CONNECTION:
-    return getConnection(attr_id);
+    return full<ConnectionToken>();
   case RootToken::UPSTREAM:
-    return getUpstream(attr_id);
+    return full<UpstreamToken>();
   case RootToken::METADATA:
     return getMetadata();
   case RootToken::FILTER_STATE:
     return getFilterState();
   }
-  return absl::nullopt;
+}
+// todo(eas): use helpers
+template <class T> Value Attributes::full() {
+  MapValue m;
+  for (auto element : request_tokens) {
+    Value val = get(element.second);
+    MapValue_Entry* e = m.add_entries();
+    auto key = ValueUtil::stringValue(std::string(element.first));
+    e->set_allocated_key(&key);
+    Value vv;
+    Value any_v;
+    Any* a = any_v.mutable_object_value();
+    a->PackFrom(val);
+    vv.set_allocated_object_value(a);
+    e->set_allocated_value(&vv);
+  }
+  return ValueUtil::mapValue(&m);
 }
 
-absl::optional<Value> Attributes::getRequest(AttributeId& attr_id) {
-  RequestToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
-
+Value Attributes::get(RequestToken tok) {
   auto headers = request_headers_;
 
   switch (tok) {
@@ -174,12 +267,7 @@ absl::optional<Value> Attributes::getRequest(AttributeId& attr_id) {
   return ValueUtil::nullValue();
 }
 
-absl::optional<Value> Attributes::getResponse(AttributeId& attr_id) {
-  ResponseToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
+Value Attributes::get(ResponseToken tok) {
   switch (tok) {
   case ResponseToken::CODE:
     if (stream_info_.responseCode().has_value()) {
@@ -201,22 +289,16 @@ absl::optional<Value> Attributes::getResponse(AttributeId& attr_id) {
     break;
   case ResponseToken::SIZE:
     return ValueUtil::uint64Value(stream_info_.bytesSent());
-
   case ResponseToken::TOTAL_SIZE:
     return ValueUtil::uint64Value(stream_info_.bytesReceived());
   }
-  return absl::nullopt;
+  return ValueUtil::nullValue();
 }
 
-absl::optional<Value> Attributes::getSource(AttributeId& attr_id) {
-  SourceToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
+Value Attributes::get(SourceToken tok) {
 
   if (stream_info_.upstreamHost() == nullptr) {
-    return absl::nullopt;
+    return ValueUtil::nullValue();
   }
   auto addr = stream_info_.upstreamHost()->address();
   if (addr == nullptr) {
@@ -232,16 +314,9 @@ absl::optional<Value> Attributes::getSource(AttributeId& attr_id) {
     }
     return ValueUtil::uint64Value(addr->ip()->port());
   }
-  return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::getDestination(AttributeId& attr_id) {
-  DestinationToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
-
+Value Attributes::get(DestinationToken tok) {
   auto addr = stream_info_.downstreamAddressProvider().localAddress();
   if (addr == nullptr) {
     return ValueUtil::nullValue();
@@ -256,16 +331,9 @@ absl::optional<Value> Attributes::getDestination(AttributeId& attr_id) {
     }
     return ValueUtil::uint64Value(addr->ip()->port());
   }
-  return absl::nullopt;
 }
 
-absl::optional<Value> Attributes::getUpstream(AttributeId& attr_id) {
-  UpstreamToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
-
+Value Attributes::get(UpstreamToken tok) {
   auto upstreamHost = stream_info_.upstreamHost();
   auto upstreamSsl = stream_info_.upstreamSslConnection();
 
@@ -325,16 +393,10 @@ absl::optional<Value> Attributes::getUpstream(AttributeId& attr_id) {
     return ValueUtil::stringValue(stream_info_.upstreamTransportFailureReason());
     break;
   }
-  return absl::nullopt;
+  return ValueUtil::nullValue();
 }
 
-absl::optional<Value> Attributes::getConnection(AttributeId& attr_id) {
-  ConnectionToken tok;
-  bool valid = attr_id.sub(tok);
-  if (!valid) {
-    return absl::nullopt;
-  }
-
+Value Attributes::get(ConnectionToken tok) {
   auto connId = stream_info_.connectionID();
   auto downstreamSsl = stream_info_.downstreamSslConnection();
 
@@ -345,7 +407,8 @@ absl::optional<Value> Attributes::getConnection(AttributeId& attr_id) {
     }
     break;
   case ConnectionToken::MTLS:
-    return absl::nullopt;
+    // todo(eas): why is this crashing
+    return ValueUtil::nullValue();
     if (downstreamSsl != nullptr) {
       return ValueUtil::boolValue(downstreamSsl->peerCertificatePresented());
     }
@@ -392,10 +455,10 @@ absl::optional<Value> Attributes::getConnection(AttributeId& attr_id) {
       return ValueUtil::optionalStringValue(stream_info_.connectionTerminationDetails());
     }
   }
-  return absl::nullopt;
+  return ValueUtil::nullValue();
 }
 
-absl::optional<Value> Attributes::getMetadata() {
+Value Attributes::getMetadata() {
   //   if (attributes_.contains(METADATA_TOKEN)) {
   //     MapValue m;
   //     for (auto const& [k, v] : stream_info_.dynamicMetadata().filter_metadata()) {
@@ -412,7 +475,7 @@ absl::optional<Value> Attributes::getMetadata() {
   //     }
   //     return absl::make_optional(ValueUtil::mapValue(&m));
   //   }
-  return absl::nullopt;
+  return ValueUtil::nullValue();
 }
 
 // todo(eas): there are two issues here
@@ -426,7 +489,7 @@ absl::optional<Value> Attributes::getMetadata() {
 //   is indicated that the filter state values should be binary data, but `Value` only allows the
 //   following: [null, number, string, bool, struct, list] where struct is simply a `map<string,
 //   value>`.
-absl::optional<Value> Attributes::getFilterState() { return absl::nullopt; }
+Value Attributes::getFilterState() { return ValueUtil::nullValue(); }
 
 std::string Attributes::formatDuration(absl::Duration duration) {
   return absl::FormatDuration(duration);
@@ -449,13 +512,13 @@ std::string Attributes::getTs() {
 // todo(eas): these are unavailable at headers time.
 //
 absl::optional<Value> Attributes::getGrpcStatus() {
-  Http::ResponseHeaderMap& hs = response_headers_ != nullptr
-                                    ? *response_headers_
-                                    : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
+  const Http::ResponseHeaderMap& hs =
+      response_headers_ != nullptr ? *response_headers_
+                                   : *Envoy::Http::StaticEmptyHeaders::get().response_headers;
 
-  Http::ResponseTrailerMap& ts = response_trailers_ != nullptr
-                                     ? *response_trailers_
-                                     : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
+  const Http::ResponseTrailerMap& ts =
+      response_trailers_ != nullptr ? *response_trailers_
+                                    : *Envoy::Http::StaticEmptyHeaders::get().response_trailers;
 
   if (!Envoy::Grpc::Common::hasGrpcContentType(hs)) {
     return absl::nullopt;
@@ -468,10 +531,10 @@ absl::optional<Value> Attributes::getGrpcStatus() {
   }
   return absl::nullopt;
 }
-void Attributes::setRequestHeaders(Http::RequestHeaderMap* request_headers) {
+void Attributes::setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
   request_headers_ = request_headers;
 }
-void Attributes::setResponseHeaders(Http::ResponseHeaderMap* response_headers) {
+void Attributes::setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
   response_headers_ = response_headers;
 }
 

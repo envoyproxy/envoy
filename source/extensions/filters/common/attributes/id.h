@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atomic>
 #include <chrono>
 #include <iterator>
@@ -84,8 +86,17 @@ enum class UpstreamToken { UPSTREAM_TOKENS(_DECLARE) };
 static absl::flat_hash_map<absl::string_view, RootToken> root_tokens = {ROOT_TOKENS(_PAIR)};
 #undef _PAIR
 
+#define _PAIR(_t) {RootToken::_t, downCase(#_t)},
+static absl::flat_hash_map<RootToken, absl::string_view> root_tokens_inv = {ROOT_TOKENS(_PAIR)};
+#undef _PAIR
+
 #define _PAIR(_t) {downCase(#_t), RequestToken::_t},
 static absl::flat_hash_map<absl::string_view, RequestToken> request_tokens = {
+    REQUEST_TOKENS(_PAIR)};
+#undef _PAIR
+
+#define _PAIR(_t) {RequestToken::_t, downCase(#_t)},
+static absl::flat_hash_map<RequestToken, absl::string_view> request_tokens_inv = {
     REQUEST_TOKENS(_PAIR)};
 #undef _PAIR
 
@@ -94,12 +105,27 @@ static absl::flat_hash_map<absl::string_view, ResponseToken> response_tokens = {
     RESPONSE_TOKENS(_PAIR)};
 #undef _PAIR
 
+#define _PAIR(_t) {ResponseToken::_t, downCase(#_t)},
+static absl::flat_hash_map<ResponseToken, absl::string_view> response_tokens_inv = {
+    RESPONSE_TOKENS(_PAIR)};
+#undef _PAIR
+
 #define _PAIR(_t) {downCase(#_t), SourceToken::_t},
 static absl::flat_hash_map<absl::string_view, SourceToken> source_tokens = {SOURCE_TOKENS(_PAIR)};
 #undef _PAIR
 
+#define _PAIR(_t) {SourceToken::_t, downCase(#_t)},
+static absl::flat_hash_map<SourceToken, absl::string_view> source_tokens_inv = {
+    SOURCE_TOKENS(_PAIR)};
+#undef _PAIR
+
 #define _PAIR(_t) {downCase(#_t), DestinationToken::_t},
 static absl::flat_hash_map<absl::string_view, DestinationToken> destination_tokens = {
+    DESTINATION_TOKENS(_PAIR)};
+#undef _PAIR
+
+#define _PAIR(_t) {DestinationToken::_t, downCase(#_t)},
+static absl::flat_hash_map<DestinationToken, absl::string_view> destination_tokens_inv = {
     DESTINATION_TOKENS(_PAIR)};
 #undef _PAIR
 
@@ -108,8 +134,18 @@ static absl::flat_hash_map<absl::string_view, ConnectionToken> connection_tokens
     CONNECTION_TOKENS(_PAIR)};
 #undef _PAIR
 
+#define _PAIR(_t) {ConnectionToken::_t, downCase(#_t)},
+static absl::flat_hash_map<ConnectionToken, absl::string_view> connection_tokens_inv = {
+    CONNECTION_TOKENS(_PAIR)};
+#undef _PAIR
+
 #define _PAIR(_t) {downCase(#_t), UpstreamToken::_t},
 static absl::flat_hash_map<absl::string_view, UpstreamToken> upstream_tokens = {
+    UPSTREAM_TOKENS(_PAIR)};
+#undef _PAIR
+
+#define _PAIR(_t) {UpstreamToken::_t, downCase(#_t)},
+static absl::flat_hash_map<UpstreamToken, absl::string_view> upstream_tokens_inv = {
     UPSTREAM_TOKENS(_PAIR)};
 #undef _PAIR
 
@@ -120,6 +156,30 @@ class AttributeId {
 public:
   AttributeId(RootToken root, absl::optional<SubToken> sub) : root_token_(root), sub_token_(sub){};
   RootToken root() { return root_token_; };
+  absl::string_view root_name() { return root_tokens_inv[root_token_]; }
+  absl::optional<absl::string_view> sub_name() {
+    if (!sub_token_) {
+      return absl::nullopt;
+    }
+    switch (root_token_) {
+    case RootToken::REQUEST:
+      return request_tokens_inv[absl::get<RequestToken>(*sub_token_)];
+    case RootToken::RESPONSE:
+      return response_tokens_inv[absl::get<ResponseToken>(*sub_token_)];
+    case RootToken::SOURCE:
+      return source_tokens_inv[absl::get<SourceToken>(*sub_token_)];
+    case RootToken::DESTINATION:
+      return destination_tokens_inv[absl::get<DestinationToken>(*sub_token_)];
+    case RootToken::CONNECTION:
+      return connection_tokens_inv[absl::get<ConnectionToken>(*sub_token_)];
+    case RootToken::UPSTREAM:
+      return upstream_tokens_inv[absl::get<UpstreamToken>(*sub_token_)];
+    case RootToken::METADATA:
+    case RootToken::FILTER_STATE:
+      return absl::nullopt;
+    }
+  };
+
   absl::optional<SubToken> sub() { return sub_token_; };
   bool sub(RequestToken& tok);
   bool sub(ResponseToken& tok);

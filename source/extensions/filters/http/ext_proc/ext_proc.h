@@ -16,12 +16,15 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
-#include "source/extensions/filters/http/ext_proc/attr_utils.h"
+#include "source/extensions/filters/common/attributes/attributes.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
+
+using Filters::Common::Attributes::AttributeId;
+using Filters::Common::Attributes::Attributes;
 
 #define ALL_EXT_PROC_FILTER_STATS(COUNTER)                                                         \
   COUNTER(streams_started)                                                                         \
@@ -45,8 +48,8 @@ public:
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
         processing_mode_(config.processing_mode()),
-        request_attributes_(AttrUtils::tokenizeAttrs(config.request_attributes())),
-        response_attributes_(AttrUtils::tokenizeAttrs(config.response_attributes())) {}
+        request_attributes_(parseAttributes(config.request_attributes())),
+        response_attributes_(parseAttributes(config.response_attributes())) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -54,14 +57,8 @@ public:
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
-  const std::vector<std::tuple<absl::string_view, absl::string_view>>
-  requestAttributesSpecified() const {
-    return request_attributes_;
-  }
-  const std::vector<std::tuple<absl::string_view, absl::string_view>>
-  responseAttributesSpecified() const {
-    return response_attributes_;
-  }
+  const std::vector<AttributeId>& requestAttributes() { return request_attributes_; }
+  const std::vector<AttributeId>& responseAttributes() { return response_attributes_; }
 
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode&
   processingMode() const {
@@ -80,8 +77,9 @@ private:
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
-  const std::vector<std::tuple<absl::string_view, absl::string_view>> request_attributes_;
-  const std::vector<std::tuple<absl::string_view, absl::string_view>> response_attributes_;
+  const std::vector<AttributeId> request_attributes_;
+  const std::vector<AttributeId> response_attributes_;
+  std::vector<AttributeId> parseAttributes(google::protobuf::RepeatedPtrField<std::string> attrs);
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

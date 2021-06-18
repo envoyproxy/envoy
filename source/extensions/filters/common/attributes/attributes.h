@@ -1,3 +1,5 @@
+#pragma once
+
 #include <atomic>
 #include <chrono>
 #include <iterator>
@@ -49,8 +51,9 @@ public:
   static Value uint64Value(uint64_t n);
   static Value doubleValue(double n);
   static Value boolValue(bool b);
-  static Value objectValue(Any o);
+  template <class T> static Value objectValue(T val);
   static Value mapValue(MapValue* m);
+  static MapValue_Entry* getOrInsert(MapValue* m, absl::string_view key);
   static const Value nullValue();
 };
 
@@ -58,21 +61,24 @@ class Attributes : public Logger::Loggable<Logger::Id::filter> {
 public:
   Attributes(StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info){};
 
-  void setRequestHeaders(Http::RequestHeaderMap* request_headers);
-  void setResponseHeaders(Http::ResponseHeaderMap* response_headers);
-  void setRequestTrailers(Http::RequestTrailerMap* request_trailers);
-  void setResponseTrailers(Http::ResponseTrailerMap* response_trailers);
-  absl::optional<Value> getAttribute(AttributeId& attr_id);
+  void setRequestHeaders(const Http::RequestHeaderMap* request_headers);
+  void setResponseHeaders(const Http::ResponseHeaderMap* response_headers);
+  void setRequestTrailers(const Http::RequestTrailerMap* request_trailers);
+  void setResponseTrailers(const Http::ResponseTrailerMap* response_trailers);
+  Value buildAttributesValue(const std::vector<AttributeId>& attrs);
 
 private:
-  absl::optional<Value> getRequest(AttributeId& attr_id);
-  absl::optional<Value> getResponse(AttributeId& attr_id);
-  absl::optional<Value> getSource(AttributeId& attr_id);
-  absl::optional<Value> getDestination(AttributeId& attr_id);
-  absl::optional<Value> getConnection(AttributeId& attr_id);
-  absl::optional<Value> getUpstream(AttributeId& attr_id);
-  absl::optional<Value> getMetadata();
-  absl::optional<Value> getFilterState();
+  template <class T> Value full();
+  Value full(RootToken tok);
+  Value get(AttributeId& attr_id);
+  Value get(RequestToken tok);
+  Value get(ResponseToken tok);
+  Value get(SourceToken tok);
+  Value get(DestinationToken tok);
+  Value get(ConnectionToken tok);
+  Value get(UpstreamToken tok);
+  Value getMetadata();
+  Value getFilterState();
 
   std::string getTs();
   std::string formatDuration(absl::Duration duration);
@@ -80,10 +86,10 @@ private:
 
   StreamInfo::StreamInfo& stream_info_;
 
-  Envoy::Http::RequestHeaderMap* request_headers_;
-  Envoy::Http::ResponseHeaderMap* response_headers_;
-  Envoy::Http::RequestTrailerMap* request_trailers_;
-  Envoy::Http::ResponseTrailerMap* response_trailers_;
+  const Envoy::Http::RequestHeaderMap* request_headers_;
+  const Envoy::Http::ResponseHeaderMap* response_headers_;
+  const Envoy::Http::RequestTrailerMap* request_trailers_;
+  const Envoy::Http::ResponseTrailerMap* response_trailers_;
 };
 
 } // namespace Attributes
