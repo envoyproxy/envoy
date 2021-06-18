@@ -7,6 +7,8 @@
 
 FAILED=()
 CURRENT=""
+# AZP appears to make lines with this prefix red
+BASH_ERR_PREFIX="##[error]: "
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
 
@@ -24,6 +26,13 @@ trap_errors () {
             FAILED+=("  > ${sub}@ ${file} :${line}")
         else
             FAILED+=("${sub}@ ${file} :${line}${command}")
+            if [[ "$CURRENT" == "glint" ]]; then
+                FAILED+=(
+                    "    Please fix your editor to ensure:"
+                    "      - no trailing whitespace"
+                    "      - no mixed tabs/spaces"
+                    "      - all files end with a newline")
+            fi
         fi
         ((frame++))
     done
@@ -50,9 +59,9 @@ CURRENT=extensions
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/extensions:extensions_check
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
-    echo "TESTS FAILED:" >&2
+    echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2
     for failed in "${FAILED[@]}"; do
-        echo "  $failed" >&2
+        echo "${BASH_ERR_PREFIX} $failed" >&2
     done
     exit 1
 fi
