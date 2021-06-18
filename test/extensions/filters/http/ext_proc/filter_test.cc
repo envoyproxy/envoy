@@ -77,11 +77,7 @@ protected:
     return stream;
   }
 
-  void doSend(ProcessingRequest&& request, Unused) {
-    ASSERT_TRUE(last_request_processed_);
-    last_request_ = std::move(request);
-    last_request_processed_ = false;
-  }
+  void doSend(ProcessingRequest&& request, Unused) { last_request_ = std::move(request); }
 
   bool doSendClose() { return !server_closed_stream_; }
 
@@ -105,12 +101,37 @@ protected:
             Invoke([&buf](std::function<void(Buffer::Instance&)> callback) { callback(buf); }));
   }
 
+  void setUpDecodingWatermarking(bool& watermarked) {
+    EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark())
+        .WillRepeatedly(Invoke([&watermarked]() {
+          EXPECT_FALSE(watermarked);
+          watermarked = true;
+        }));
+    EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark())
+        .WillRepeatedly(Invoke([&watermarked]() {
+          EXPECT_TRUE(watermarked);
+          watermarked = false;
+        }));
+  }
+
+  void setUpEncodingWatermarking(bool& watermarked) {
+    EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
+        .WillRepeatedly(Invoke([&watermarked]() {
+          EXPECT_FALSE(watermarked);
+          watermarked = true;
+        }));
+    EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
+        .WillRepeatedly(Invoke([&watermarked]() {
+          EXPECT_TRUE(watermarked);
+          watermarked = false;
+        }));
+  }
+
   // Expect a request_headers request, and send back a valid response.
   void processRequestHeaders(
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    ASSERT_FALSE(last_request_processed_);
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_request_headers());
     const auto& headers = last_request_.request_headers();
@@ -119,7 +140,6 @@ protected:
     if (cb) {
       (*cb)(headers, *response, *headers_response);
     }
-    last_request_processed_ = true;
     if (!buffering_data) {
       EXPECT_CALL(decoder_callbacks_, continueDecoding());
     }
@@ -131,7 +151,6 @@ protected:
       bool buffering_data,
       absl::optional<std::function<void(const HttpHeaders&, ProcessingResponse&, HeadersResponse&)>>
           cb) {
-    ASSERT_FALSE(last_request_processed_);
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_response_headers());
     const auto& headers = last_request_.response_headers();
@@ -140,7 +159,6 @@ protected:
     if (cb) {
       (*cb)(headers, *response, *headers_response);
     }
-    last_request_processed_ = true;
     if (!buffering_data) {
       EXPECT_CALL(encoder_callbacks_, continueEncoding());
     }
@@ -149,8 +167,8 @@ protected:
 
   // Expect a request_body request, and send back a valid response
   void processRequestBody(
-      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb) {
-    ASSERT_FALSE(last_request_processed_);
+      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+      bool should_continue = true) {
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_request_body());
     const auto& body = last_request_.request_body();
@@ -159,15 +177,16 @@ protected:
     if (cb) {
       (*cb)(body, *response, *body_response);
     }
-    last_request_processed_ = true;
-    EXPECT_CALL(decoder_callbacks_, continueDecoding());
+    if (should_continue) {
+      EXPECT_CALL(decoder_callbacks_, continueDecoding());
+    }
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
   // Expect a request_body request, and send back a valid response
   void processResponseBody(
-      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb) {
-    ASSERT_FALSE(last_request_processed_);
+      absl::optional<std::function<void(const HttpBody&, ProcessingResponse&, BodyResponse&)>> cb,
+      bool should_continue = true) {
     EXPECT_FALSE(last_request_.async_mode());
     ASSERT_TRUE(last_request_.has_response_body());
     const auto& body = last_request_.response_body();
@@ -176,15 +195,15 @@ protected:
     if (cb) {
       (*cb)(body, *response, *body_response);
     }
-    last_request_processed_ = true;
-    EXPECT_CALL(encoder_callbacks_, continueEncoding());
+    if (should_continue) {
+      EXPECT_CALL(encoder_callbacks_, continueEncoding());
+    }
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
-  bool last_request_processed_ = true;
   bool server_closed_stream_ = false;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
@@ -433,7 +452,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   EXPECT_FALSE(last_request_.async_mode());
   ASSERT_TRUE(last_request_.has_response_headers());
-  last_request_processed_ = true;
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
@@ -826,7 +844,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
 }
 
 // Using a configuration with streaming set for the request and
-// response bodies, we should ignore a "buffered" body mode for now
+// response bodies, we should ignore a "buffered partial" body mode for now
 // because it is not implemented.
 TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
   initialize(R"EOF(
@@ -836,8 +854,8 @@ TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
   processing_mode:
     request_header_mode: "SEND"
     response_header_mode: "SEND"
-    request_body_mode: "STREAMED"
-    response_body_mode: "STREAMED"
+    request_body_mode: "BUFFERED_PARTIAL"
+    response_body_mode: "BUFFERED_PARTIAL"
     request_trailer_mode: "SKIP"
     response_trailer_mode: "SKIP"
   )EOF");
@@ -874,6 +892,204 @@ TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with streaming set for the request and
+// response bodies, ensure that the chunks are delivered to the processor and
+// that the processor gets them correctly.
+TEST_F(HttpFilterTest, PostStreamingBodies) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  bool decoding_watermarked = false;
+  setUpDecodingWatermarking(decoding_watermarked);
+
+  Buffer::OwnedImpl want_request_body;
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
+
+  Buffer::OwnedImpl req_chunk_1;
+  TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
+  want_request_body.add(req_chunk_1.toString());
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk_1, true));
+  got_request_body.move(req_chunk_1);
+  processRequestBody(absl::nullopt);
+  EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
+  EXPECT_FALSE(decoding_watermarked);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "100");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_TRUE(encoding_watermarked);
+    got_response_body.move(resp_chunk);
+    processResponseBody(absl::nullopt, false);
+  }
+
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, true);
+
+  // At this point, since we injected the data from each chunk after the "encodeData"
+  // callback, and since we also injected any chunks inserted using "injectEncodedData,"
+  // the two buffers should match!
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(9, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(9, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with streaming set for the request and
+// response bodies, ensure that the chunks are delivered to the processor and
+// that the processor gets them correctly when some data comes in before the
+// headers are done processing.
+TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  bool decoding_watermarked = false;
+  setUpDecodingWatermarking(decoding_watermarked);
+
+  Buffer::OwnedImpl want_request_body;
+  Buffer::OwnedImpl got_request_body;
+  EXPECT_CALL(decoder_callbacks_, injectDecodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_request_body](Buffer::Instance& data, Unused) { got_request_body.move(data); }));
+
+  Buffer::OwnedImpl req_chunk_1;
+  TestUtility::feedBufferWithRandomCharacters(req_chunk_1, 100);
+  want_request_body.add(req_chunk_1.toString());
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_chunk_1, true));
+  got_request_body.move(req_chunk_1);
+  processRequestBody(absl::nullopt);
+  EXPECT_EQ(want_request_body.toString(), got_request_body.toString());
+  EXPECT_FALSE(decoding_watermarked);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "100");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+  Buffer::OwnedImpl response_buffer;
+  setUpEncodingBuffering(response_buffer);
+
+  for (int i = 0; i < 3; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_chunk, false));
+    response_buffer.move(resp_chunk);
+    EXPECT_TRUE(encoding_watermarked);
+  }
+
+  processResponseHeaders(false, absl::nullopt);
+  EXPECT_EQ(0, response_buffer.length());
+  EXPECT_FALSE(encoding_watermarked);
+  got_response_body.move(response_buffer);
+
+  for (int i = 0; i < 5; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_TRUE(encoding_watermarked);
+    got_response_body.move(resp_chunk);
+  }
+
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
+
+  // Act as if the callbacks were delayed and send back all the responses now.
+  for (int i = 0; i < 7; i++) {
+    auto response = std::make_unique<ProcessingResponse>();
+    response->mutable_response_body();
+    if (i == 6) {
+      EXPECT_CALL(encoder_callbacks_, continueEncoding());
+    }
+    stream_callbacks_->onReceiveMessage(std::move(response));
+  }
+
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(10, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(10, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::info);
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1015,7 +1231,6 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
 
   EXPECT_FALSE(last_request_.async_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
-  last_request_processed_ = true;
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
@@ -1156,7 +1371,6 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
 
   EXPECT_FALSE(last_request_.async_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
-  last_request_processed_ = true;
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();

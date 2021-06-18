@@ -184,7 +184,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     }
 
     auto next_chunk = std::make_unique<QueuedChunk>();
-    // This clears the current data chunk
+    // Clear the current chunk and save it on the queue while it's processed
     next_chunk->data.move(data);
     next_chunk->end_stream = end_stream;
     // Send the chunk, and ensure that we have watermarked so that we don't overflow
@@ -192,16 +192,18 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.requestWatermark();
     sendBodyChunk(state, next_chunk->data, ProcessorState::CallbackState::StreamedBodyCallback,
                   end_stream);
-    // Save the chunk, which we will replace or re-send later
     state.enqueueStreamingChunk(std::move(next_chunk));
 
-    while (state.hasProcessedChunks()) {
-      data.move(state.dequeueProcessedChunk()->data);
+    if (!end_stream) {
+      // Send along any data that came back from the processor in the meantime,
+      // unless it's EOF, in which case we will handle it differently later.
+      state.onProcessedChunks([&data](Buffer::Instance& chunk) { data.move(chunk); });
     }
     ENVOY_LOG(trace, "Continuing with {} bytes of processed data", data.length());
 
     // At this point we will continue, but with different data, and possibly none
     if (end_stream) {
+      // But we need to buffer the last chunk because it's our last chance to do stuff
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
       result = FilterDataStatus::Continue;
@@ -405,7 +407,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   default:
     // Any other message is considered spurious
     ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
-      response->response_case());
+              response->response_case());
     break;
   }
 

@@ -118,11 +118,12 @@ public:
 
   void onMessageTimeout();
 
-  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state, bool end_stream) {
+  void sendBufferedData(ProcessorState& state, ProcessorState::CallbackState new_state,
+                        bool end_stream) {
     sendBodyChunk(state, *state.bufferedData(), new_state, end_stream);
   }
   void sendBodyChunk(ProcessorState& state, const Buffer::Instance& data,
-     ProcessorState::CallbackState new_state, bool end_stream);
+                     ProcessorState::CallbackState new_state, bool end_stream);
 
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 

@@ -21,9 +21,9 @@ namespace ExternalProcessing {
 class Filter;
 
 class QueuedChunk {
-  public:
-    bool end_stream = false;
-    Buffer::OwnedImpl data;
+public:
+  bool end_stream = false;
+  Buffer::OwnedImpl data;
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
@@ -69,7 +69,6 @@ public:
 
   void setHeaders(Http::RequestOrResponseHeaderMap* headers) { headers_ = headers; }
   void setTrailers(Http::HeaderMap* trailers) { trailers_ = trailers; }
-  void setBodyChunk(Buffer::Instance* chunk) { body_chunk_ = chunk; }
 
   void startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout);
   void cleanUpTimer() const;
@@ -83,9 +82,7 @@ public:
   bool handleTrailersResponse(const envoy::service::ext_proc::v3alpha::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
-  bool hasBufferedData() const {
-    return bufferedData() != nullptr && bufferedData()->length() > 0;
-  }
+  bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }
   virtual void addBufferedData(Buffer::Instance& data) const PURE;
   virtual void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const PURE;
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
@@ -93,17 +90,7 @@ public:
   void enqueueStreamingChunk(QueuedChunkPtr&& chunk) {
     chunks_for_processing_.push_back(std::move(chunk));
   }
-  bool hasProcessedChunks() const {
-    return !processed_chunks_.empty();
-  }
-  QueuedChunkPtr dequeueProcessedChunk() {
-    if (processed_chunks_.empty()) {
-      return nullptr;
-    }
-    auto ret = std::move(processed_chunks_.front());
-    processed_chunks_.pop_front();
-    return ret;
-  }
+  void onProcessedChunks(std::function<void(Buffer::Instance& chunk)> cb);
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
@@ -142,7 +129,6 @@ protected:
 
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
-  Buffer::Instance* body_chunk_ = nullptr;
   Event::TimerPtr message_timer_;
   std::deque<QueuedChunkPtr> chunks_for_processing_;
   std::deque<QueuedChunkPtr> processed_chunks_;

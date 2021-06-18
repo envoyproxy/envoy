@@ -89,8 +89,9 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         }
 
         if (hasBufferedData()) {
-          // Otherwise, we need to send the currently buffered data. But since we
-          // are streaming and more things will come, clear the current data.
+          // We now know that we need to process what we have buffered in streaming mode.
+          // Move the current buffer into the queue for remote processing and clear the
+          // buffered data.
           auto buffered_chunk = std::make_unique<QueuedChunk>();
           auto& buffered_chunk_data = buffered_chunk->data;
           modifyBufferedData(
@@ -100,6 +101,8 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
                                 ProcessorState::CallbackState::StreamedBodyCallback, false);
           enqueueStreamingChunk(std::move(buffered_chunk));
         }
+        clearWatermark();
+        continueProcessing();
         return true;
       }
 
@@ -146,25 +149,19 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
 
         should_continue = chunk->end_stream;
         if (chunk->end_stream) {
-          // There may be data that never got delivered in line that we need to inject now
-          while (!processed_chunks_.empty()) {
-            auto next_chunk = std::move(processed_chunks_.front());
-            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain",
-                      next_chunk->data.length());
-            injectDataToFilterChain(next_chunk->data, false);
-            processed_chunks_.pop_front();
-          }
-
-          // The last chunk needs to be manually injected into the stream,
-          // even if it's empty, to indicate end of stream
-          if (chunk->data.length() > 0) {
-            ENVOY_LOG(debug, "Injecting chunk of {} bytes to filter chain at end of stream",
-                      chunk->data.length());
-            injectDataToFilterChain(chunk->data, false);
-          }
-
+          // This is our last chance to include data, so take everything that we have
+          // received so far, put it in one big chunk, and apply it to the buffered data.
+          Buffer::OwnedImpl remaining_data;
+          onProcessedChunks([&remaining_data](Buffer::Instance& processed_chunk) {
+            ENVOY_LOG(trace, "Adding a processed chunk to final chunk buffer");
+            remaining_data.move(processed_chunk);
+          });
+          remaining_data.move(chunk->data);
+          ENVOY_LOG(debug, "Injecting final chunk with {} bytes", remaining_data.length());
+          injectDataToFilterChain(remaining_data, false);
+          should_continue = true;
         } else {
-          // Ensure that the chunk gets delivered in a subsequent data callback
+          // Otherwise, ensure that the chunk gets delivered in a subsequent data callback
           processed_chunks_.push_back(std::move(chunk));
         }
       }
@@ -178,9 +175,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       filter_callbacks_->clearRouteCache();
     }
     message_timer_->disableTimer();
-
     headers_ = nullptr;
-    body_chunk_ = nullptr;
 
     if (send_trailers_ && trailers_available_) {
       // Trailers came in while we were waiting for this response, and the server
@@ -225,6 +220,14 @@ void ProcessorState::clearAsyncState() {
 void ProcessorState::cleanUpTimer() const {
   if (message_timer_ && message_timer_->enabled()) {
     message_timer_->disableTimer();
+  }
+}
+
+void ProcessorState::onProcessedChunks(std::function<void(Buffer::Instance& chunk)> cb) {
+  while (!processed_chunks_.empty()) {
+    auto chunk = std::move(processed_chunks_.front());
+    cb(chunk->data);
+    processed_chunks_.pop_front();
   }
 }
 

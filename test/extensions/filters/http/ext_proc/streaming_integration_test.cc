@@ -11,7 +11,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -108,6 +107,8 @@ protected:
   TestProcessor test_processor_;
   envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
   IntegrationStreamDecoderPtr client_response_;
+  std::atomic<uint64_t> processor_request_hash_;
+  std::atomic<uint64_t> processor_response_hash_;
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
@@ -334,10 +335,9 @@ TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
 // in the processor using streaming.
 TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   uint32_t response_size = 170000;
-  std::atomic_uint64_t processor_response_hash;
 
   test_processor_.start(
-      [response_size, &processor_response_hash](
+      [this, response_size](
           grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
@@ -374,7 +374,7 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
           stream->Write(body_resp);
         } while (!body_req.response_body().end_of_stream());
 
-        processor_response_hash = HashUtil::xxHash64(allData.toString());
+        processor_response_hash_ = HashUtil::xxHash64(allData.toString());
         if (total_response_size != response_size) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
                               absl::StrFormat("Received %u response bytes; wanted %u",
@@ -395,22 +395,19 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(client_response_->body().size(), response_size);
-  EXPECT_EQ(processor_response_hash, HashUtil::xxHash64(client_response_->body()));
+  EXPECT_EQ(processor_response_hash_, HashUtil::xxHash64(client_response_->body()));
 }
 
 // Send a large HTTP POST, and expect back an equally large reply. Stream both and verify
 // that we got back what we expected.
 TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   const uint32_t send_chunks = 10;
   const uint32_t chunk_size = 11000;
   uint32_t request_size = send_chunks * chunk_size;
   uint32_t response_size = 1700000;
-  std::atomic_uint64_t processor_request_hash;
-  std::atomic_uint64_t processor_response_hash;
 
   test_processor_.start(
-      [request_size, response_size, &processor_request_hash, &processor_response_hash](
+      [this, request_size, response_size](
           grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
@@ -460,7 +457,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
                                     absl::StrFormat("Received %u request bytes; wanted %u",
                                                     total_request_size, request_size));
               }
-              processor_request_hash = HashUtil::xxHash64(allRequestData.toString());
+              processor_request_hash_ = HashUtil::xxHash64(allRequestData.toString());
             }
             response.mutable_request_body();
 
@@ -477,7 +474,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
                                     absl::StrFormat("Received %u response bytes; wanted %u",
                                                     total_response_size, response_size));
               }
-              processor_response_hash = HashUtil::xxHash64(allResponseData.toString());
+              processor_response_hash_ = HashUtil::xxHash64(allResponseData.toString());
             }
             response.mutable_response_body();
           } else {
@@ -513,12 +510,11 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(client_response_->body().size(), response_size);
-  EXPECT_EQ(processor_request_hash, HashUtil::xxHash64(complete_request_body.toString()));
-  EXPECT_EQ(processor_response_hash, HashUtil::xxHash64(client_response_->body()));
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::info);
+  EXPECT_EQ(processor_request_hash_, HashUtil::xxHash64(complete_request_body.toString()));
+  EXPECT_EQ(processor_response_hash_, HashUtil::xxHash64(client_response_->body()));
 }
 
-// Send a large HTTP POST, and expect back an equally large reply. Stream both and replace both 
+// Send a large HTTP POST, and expect back an equally large reply. Stream both and replace both
 // the request and response bodies with different bodies.
 TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
   const uint32_t send_chunks = 12;
@@ -526,8 +522,7 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
   uint32_t response_size = 180000;
 
   test_processor_.start(
-      [] (
-          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -569,9 +564,9 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
             } else {
               new_body->mutable_body_mutation()->set_clear_body(true);
             }
-            if (message.request_body().end_of_stream()) {   
+            if (message.request_body().end_of_stream()) {
               saw_request_eof = true;
-            }   
+            }
 
           } else if (message.has_response_body()) {
             // Replace the last chunk with a new message and zero out the rest
