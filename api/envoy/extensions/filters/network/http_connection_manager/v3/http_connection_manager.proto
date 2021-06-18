@@ -896,7 +896,9 @@ message ScopedRoutes {
       }
 
       message DynamicMetadataValueExtractor {
-        oneof extract_type {
+        oneof metadata_extract_type {
+          option (validate.required) = true;
+
           // Extract the entire value for the provided metadata key.
           type.metadata.v3.MetadataKey metadata_key = 1;
         }

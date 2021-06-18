@@ -28,7 +28,7 @@ using envoy::extensions::filters::network::http_connection_manager::v3::ScopedRo
  */
 class FragmentBuilderBase {
 public:
-  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
+  explicit FragmentBuilderBase(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
       : config_(std::move(config)) {}
   virtual ~FragmentBuilderBase() = default;
 
@@ -41,14 +41,13 @@ protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
 };
 
-// @tallen rename this to fragmentbuilderimpl
 class FragmentBuilderImpl : public FragmentBuilderBase {
 public:
   using FragmentBuilderConfig = ScopedRoutes::ScopeKeyBuilder::FragmentBuilder;
   using HeaderValueExtractorConfig = FragmentBuilderConfig::HeaderValueExtractor;
   using MetadataValueExtractorConfig = FragmentBuilderConfig::DynamicMetadataValueExtractor;
 
-  explicit FragmentBuilderImpl(FragmentBuilderConfig&& config);
+  explicit FragmentBuilderImpl(FragmentBuilderConfig config);
 
   std::unique_ptr<ScopeKeyFragmentBase> computeFragment(const Http::HeaderMap& headers,
                                                         const Metadata& meta) const override;

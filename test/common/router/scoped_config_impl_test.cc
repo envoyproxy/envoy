@@ -76,9 +76,9 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set, ASSERT only fails in debug mode.
 #if !defined(NDEBUG)
-  EXPECT_DEATH(FragmentBuilderImpl(std::move(config)), "value extractor is not set.");
+  EXPECT_DEATH((FragmentBuilderImpl(config)), "value extractor is not set.");
 #else
-  EXPECT_THROW_WITH_REGEX(FragmentBuilderImpl(std::move(config)), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX((FragmentBuilderImpl(config)), ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
 #endif // !defined(NDEBUG)
 
@@ -91,7 +91,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
 )EOF";
   TestUtility::loadFromYaml(yaml_plain, config);
 
-  EXPECT_THROW_WITH_REGEX(FragmentBuilderImpl(std::move(config)), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX((FragmentBuilderImpl(config)), ProtoValidationException,
                           "Index > 0 for empty string element separator.");
   // extract_type not set.
   yaml_plain = R"EOF(
@@ -101,7 +101,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
 )EOF";
   TestUtility::loadFromYaml(yaml_plain, config);
 
-  EXPECT_THROW_WITH_REGEX(FragmentBuilderImpl(std::move(config)), ProtoValidationException,
+  EXPECT_THROW_WITH_REGEX((FragmentBuilderImpl(config)), ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
 }
 

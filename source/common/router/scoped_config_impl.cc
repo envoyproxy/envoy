@@ -33,14 +33,14 @@ void FragmentBuilderImpl::validateMetadataValueExtractorConfig(
     const MetadataValueExtractorConfig&) const { /* @tallen */
 }
 
-FragmentBuilderImpl::FragmentBuilderImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder&& config)
+FragmentBuilderImpl::FragmentBuilderImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
     : FragmentBuilderBase(std::move(config)) {
   switch (config_.type_case()) {
   case FragmentBuilderConfig::kHeaderValueExtractor:
-    validateHeaderValueExtractorConfig(config.header_value_extractor());
+    validateHeaderValueExtractorConfig(config_.header_value_extractor());
     break;
   case FragmentBuilderConfig::kMetadataValueExtractor:
-    validateMetadataValueExtractorConfig(config.metadata_value_extractor());
+    validateMetadataValueExtractorConfig(config_.metadata_value_extractor());
     break;
   case FragmentBuilderConfig::TYPE_NOT_SET:
     ASSERT(false, "value extractor is not set.");
