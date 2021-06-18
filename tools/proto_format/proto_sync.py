@@ -109,6 +109,11 @@ IGNORED_V2_PROTOS = [
     "envoy/config/retry/previous_priorities",
     "envoy/config/transport_socket/raw_buffer/v2",
     "envoy/config/transport_socket/tap/v2alpha",
+    "envoy/data/cluster/v2alpha",
+    "envoy/data/dns/v2alpha",
+    "envoy/data/core/v2alpha",
+    "envoy/service/event_reporting/v2alpha",
+    "envoy/service/trace/v2",
 ]
 
 IMPORT_REGEX = re.compile('import "(.*)";')
