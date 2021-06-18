@@ -84,6 +84,7 @@ private:
 // clang-format off
 #define ALL_SCOPED_RDS_STATS(COUNTER, GAUGE)                                                       \
   COUNTER(config_reload)                                                                           \
+  GAUGE(config_reload_time, NeverImport)                                                           \
   COUNTER(update_empty)                                                                            \
   GAUGE(all_scopes, Accumulate)                                                                    \
   GAUGE(on_demand_scopes, Accumulate)                                                              \
@@ -92,7 +93,7 @@ private:
 // clang-format on
 
 struct ScopedRdsStats {
-  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SCOPED_RDS_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
 
   static ScopedRdsStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return ScopedRdsStats{

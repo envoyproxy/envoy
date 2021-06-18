@@ -97,15 +97,16 @@ private:
 /**
  * All RDS stats. @see stats_macros.h
  */
-#define ALL_RDS_STATS(COUNTER)                                                                     \
+#define ALL_RDS_STATS(COUNTER, GAUGE)                                                              \
   COUNTER(config_reload)                                                                           \
+  GAUGE(config_reload_time, NeverImport)                                                           \
   COUNTER(update_empty)
 
 /**
  * Struct definition for all RDS stats. @see stats_macros.h
  */
 struct RdsStats {
-  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT,GENERATE_GAUGE_STRUCT)
 };
 
 class RdsRouteConfigProviderImpl;
