@@ -84,7 +84,7 @@ private:
 // clang-format off
 #define ALL_SCOPED_RDS_STATS(COUNTER, GAUGE)                                                       \
   COUNTER(config_reload)                                                                           \
-  GAUGE(config_reload_time_ms, NeverImport)                                                           \
+  GAUGE(config_reload_time_ms, NeverImport)                                                        \
   COUNTER(update_empty)                                                                            \
   GAUGE(all_scopes, Accumulate)                                                                    \
   GAUGE(on_demand_scopes, Accumulate)                                                              \
