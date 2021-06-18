@@ -53,13 +53,15 @@ public:
 
   std::string name() const override { return name_; }
 
-  Matcher::DataInputPtr<HttpMatchingData>
-  createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& factory_context) override {
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           Server::Configuration::FactoryContext& factory_context) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<const ProtoType&>(
         config, factory_context.messageValidationVisitor());
 
-    return std::make_unique<DataInputType>(typed_config.header_name());
+    return [header_name = typed_config.header_name()] {
+      return std::make_unique<DataInputType>(header_name);
+    };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoType>();

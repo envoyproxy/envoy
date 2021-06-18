@@ -74,7 +74,7 @@ matcher_tree:
       .Times(2);
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
@@ -109,7 +109,7 @@ matcher_list:
   auto common_input_factory = TestCommonProtocolInputFactory("generic", "foo");
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
@@ -150,7 +150,7 @@ matcher_list:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_FALSE(result.on_match_.has_value());
 }
@@ -208,7 +208,7 @@ matcher_tree:
       .Times(3);
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
@@ -267,7 +267,7 @@ matcher_tree:
       .Times(3);
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
@@ -308,7 +308,7 @@ matcher_list:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_FALSE(result.on_match_.has_value());
 }
@@ -360,12 +360,12 @@ matcher_list:
       .Times(2);
   auto match_tree = factory.create(matcher);
 
-  const auto result = match_tree->match(TestData());
+  const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
   EXPECT_TRUE(result.on_match_.has_value());
   EXPECT_EQ(result.on_match_->action_cb_, nullptr);
 
-  const auto recursive_result = evaluateMatch(*match_tree, TestData());
+  const auto recursive_result = evaluateMatch(*(match_tree()), TestData());
   EXPECT_EQ(recursive_result.match_state_, MatchState::MatchComplete);
   EXPECT_NE(recursive_result.result_, nullptr);
 }

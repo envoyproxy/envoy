@@ -4,7 +4,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/kill_request/kill_request_filter.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
@@ -101,7 +100,7 @@ TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+          perFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(&kill_settings));
   EXPECT_DEATH(filter_->decodeHeaders(request_headers_, false), "");
 }
@@ -116,7 +115,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
 
   ON_CALL(random_generator_, random()).WillByDefault(Return(0));
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+          perFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(nullptr));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
@@ -221,7 +220,7 @@ TEST_F(KillRequestFilterTest, PerRouteKillSettingFound) {
   // Return valid kill setting on the REQUEST direction
   const KillSettings kill_settings(route_level_kill_request);
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().KillRequest))
+          perFilterConfig("envoy.filters.http.kill_request"))
       .WillByDefault(Return(&kill_settings));
   ASSERT_EQ(filter_->decodeHeaders(request_headers_, false), Http::FilterHeadersStatus::Continue);
 }

@@ -2,7 +2,6 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -281,7 +280,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_typed_per_filter_config();
 
-        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
+        (*config)["envoy.filters.http.rbac"].PackFrom(per_route_config);
       });
   config_helper_.addFilter(RBAC_CONFIG);
 

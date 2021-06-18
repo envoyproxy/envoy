@@ -60,12 +60,14 @@ public:
     while (stream->Read(&request)) {
       if (request.has_client_start()) {
         client_versions = request.client_start().rpc_versions();
+        client_max_frame_size = request.client_start().max_frame_size();
         // Sets response to make first request successful.
         response.set_out_frames(kClientInitFrame);
         response.set_bytes_consumed(0);
         response.mutable_status()->set_code(grpc::StatusCode::OK);
       } else if (request.has_server_start()) {
         server_versions = request.server_start().rpc_versions();
+        server_max_frame_size = request.server_start().max_frame_size();
         response.mutable_status()->set_code(grpc::StatusCode::CANCELLED);
       }
       stream->Write(response);
@@ -81,9 +83,8 @@ public:
   grpc::gcp::RpcProtocolVersions client_versions;
   grpc::gcp::RpcProtocolVersions server_versions;
 
-  // TODO(yihuazhang): Test maximum frame size stored in handshake messages
-  // after updating test/core/tsi/alts/fake_handshaker/handshaker.proto to
-  // support maximum frame size negotiation.
+  size_t client_max_frame_size{0};
+  size_t server_max_frame_size{0};
 };
 
 class AltsIntegrationTestBase : public Event::TestUsingSimulatedTime,
@@ -178,19 +179,19 @@ public:
     fake_handshaker_server_thread_->join();
   }
 
-  Network::ClientConnectionPtr makeAltsConnection() {
-    Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+  Network::TransportSocketPtr makeAltsTransportSocket() {
     auto client_transport_socket = client_alts_->createTransportSocket(nullptr);
     client_tsi_socket_ = dynamic_cast<TsiSocket*>(client_transport_socket.get());
     client_tsi_socket_->setActualFrameSizeToUse(16384);
     client_tsi_socket_->setFrameOverheadSize(4);
-    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               std::move(client_transport_socket), nullptr);
+    return client_transport_socket;
   }
 
-  void verifyActualFrameSizeToUse() {
-    EXPECT_NE(client_tsi_socket_, nullptr);
-    EXPECT_EQ(client_tsi_socket_->actualFrameSizeToUse(), 16384);
+  Network::ClientConnectionPtr makeAltsConnection() {
+    auto client_transport_socket = makeAltsTransportSocket();
+    Network::Address::InstanceConstSharedPtr address = getAddress(version_, lookupPort("http"));
+    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                               std::move(client_transport_socket), nullptr);
   }
 
   std::string fakeHandshakerServerAddress(bool connect_to_handshaker) {
@@ -245,7 +246,21 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-  verifyActualFrameSizeToUse();
+}
+
+TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "GET / HTTP/1.1\r\n"
+                                "Host: foo.com\r\n"
+                                "Foo: bar\r\n"
+                                "User-Agent: public\r\n"
+                                "User-Agent: 123\r\n"
+                                "Eep: baz\r\n\r\n",
+                                &response, true, makeAltsTransportSocket());
+  EXPECT_THAT(response, testing::StartsWith("HTTP/1.1 200 OK\r\n"));
 }
 
 class AltsIntegrationTestEmptyPeer : public AltsIntegrationTestBase {
@@ -267,7 +282,6 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
-  verifyActualFrameSizeToUse();
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
@@ -368,6 +382,15 @@ TEST_P(AltsIntegrationTestCapturingHandshaker, CheckAltsVersion) {
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.max_rpc_version().minor());
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().major());
   EXPECT_NE(0, capturing_handshaker_service_->client_versions.min_rpc_version().minor());
+}
+
+// Verifies that handshake request should include max frame size.
+TEST_P(AltsIntegrationTestCapturingHandshaker, CheckMaxFrameSize) {
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeAltsConnection(), absl::nullopt);
+  EXPECT_FALSE(codec_client_->connected());
+  EXPECT_EQ(capturing_handshaker_service_->client_max_frame_size, 16384);
+  EXPECT_EQ(capturing_handshaker_service_->server_max_frame_size, 16384);
 }
 
 } // namespace
