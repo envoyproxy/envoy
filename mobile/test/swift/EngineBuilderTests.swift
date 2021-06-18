@@ -3,28 +3,18 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
-private let kMockTemplate = """
-mock_template:
+private let kMockTemplate =
+"""
+fixture_template:
 - name: mock
-  stats_domain: {{ stats_domain }}
-  device_os: {{ device_os }}
-  connect_timeout: {{ connect_timeout_seconds }}s
-  dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-  dns_failure_refresh_rate:
-    base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
-    max_interval: {{ dns_failure_refresh_rate_seconds_max }}s
-  platform_filter_chain: {{ platform_filter_chain }}
-  stats_flush_interval: {{ stats_flush_interval_seconds }}s
-  stream_idle_timeout: {{ stream_idle_timeout_seconds }}s
-  app_version: {{ app_version }}
-  app_id: {{ app_id }}
-  virtual_clusters: {{ virtual_clusters }}
-  native_filter_chain:
-{{ native_filter_chain }}
-{{ fake_remote_listener }}
-{{ fake_cluster_matchers }}
-{{ route_reset_filter }}
-{{ fake_remote_cluster }}
+  clusters:
+#{custom_clusters}
+  listeners:
+#{custom_listeners}
+  filters:
+#{custom_filters}
+  routes:
+#{custom_routes}
 """
 
 private struct TestFilter: Filter {}
@@ -255,18 +245,25 @@ final class EngineBuilderTests: XCTestCase {
       stringAccessors: [:]
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
-    XCTAssertTrue(resolvedYAML.contains("stats_domain: stats.envoyproxy.io"))
-    XCTAssertTrue(resolvedYAML.contains("connect_timeout: 200s"))
-    XCTAssertTrue(resolvedYAML.contains("dns_refresh_rate: 300s"))
-    XCTAssertTrue(resolvedYAML.contains("base_interval: 400s"))
-    XCTAssertTrue(resolvedYAML.contains("max_interval: 500s"))
-    XCTAssertTrue(resolvedYAML.contains("filter_name: TestFilter"))
-    XCTAssertTrue(resolvedYAML.contains("stats_flush_interval: 600s"))
-    XCTAssertTrue(resolvedYAML.contains("stream_idle_timeout: 700s"))
+    XCTAssertTrue(resolvedYAML.contains("&connect_timeout 200s"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_refresh_rate 300s"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_fail_base_interval 400s"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_fail_max_interval 500s"))
+    XCTAssertTrue(resolvedYAML.contains("&stream_idle_timeout 700s"))
+
+    // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
     XCTAssertTrue(resolvedYAML.contains("app_version: v1.2.3"))
     XCTAssertTrue(resolvedYAML.contains("app_id: com.envoymobile.ios"))
-    XCTAssertTrue(resolvedYAML.contains("virtual_clusters: [test]"))
+
+    XCTAssertTrue(resolvedYAML.contains("&virtual_clusters [test]"))
+
+    // Stats
+    XCTAssertTrue(resolvedYAML.contains("&stats_domain stats.envoyproxy.io"))
+    XCTAssertTrue(resolvedYAML.contains("&stats_flush_interval 600s"))
+
+    // Filters
+    XCTAssertTrue(resolvedYAML.contains("filter_name: TestFilter"))
     XCTAssertTrue(resolvedYAML.contains("name: filter_name"))
     XCTAssertTrue(resolvedYAML.contains("typed_config: test_config"))
   }

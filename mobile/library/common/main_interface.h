@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "library/common/config_template.h"
+#include "library/common/config/templates.h"
 #include "library/common/types/c_types.h"
 
 // NOLINT(namespace-envoy)

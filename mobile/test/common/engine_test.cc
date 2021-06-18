@@ -1,17 +1,12 @@
 #include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
+#include "library/common/config/templates.h"
 #include "library/common/engine.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
 
-class EngineTest : public testing::Test {};
-
-typedef struct {
-  absl::Notification on_engine_running;
-  absl::Notification on_exit;
-} engine_test_context;
-
+// This config is the minimal envoy mobile config that allows for running the engine.
 const std::string MINIMAL_TEST_CONFIG = R"(
 static_resources:
   listeners:
@@ -44,6 +39,13 @@ layered_runtime:
     static_layer:
       overload: { global_downstream_max_connections: 50000 }
 )";
+
+class EngineTest : public testing::Test {};
+
+typedef struct {
+  absl::Notification on_engine_running;
+  absl::Notification on_exit;
+} engine_test_context;
 
 TEST_F(EngineTest, EarlyExit) {
   const std::string level = "debug";

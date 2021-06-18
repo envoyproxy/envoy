@@ -75,73 +75,58 @@ public class EnvoyConfiguration {
    * configuration.
    *
    * @param templateYAML the template configuration to resolve.
-   * @param statsSinkTemplateYAML helper template to add the stats sink.
    * @param platformFilterTemplateYAML helper template to build platform http filters.
    * @param nativeFilterTemplateYAML helper template to build native http filters.
    * @return String, the resolved template.
    * @throws ConfigurationException, when the template provided is not fully
    *                                 resolved.
    */
-  String resolveTemplate(final String templateYAML, final String statsSinkTemplateYAML,
-                         final String statsdSinkTemplateYAML,
-                         final String platformFilterTemplateYAML,
+  String resolveTemplate(final String templateYAML, final String platformFilterTemplateYAML,
                          final String nativeFilterTemplateYAML) {
-    final StringBuilder filterConfigBuilder = new StringBuilder();
+    final StringBuilder customFiltersBuilder = new StringBuilder();
+
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
       String filterConfig = platformFilterTemplateYAML.replace("{{ platform_filter_name }}",
                                                                filterFactory.getFilterName());
-      filterConfigBuilder.append(filterConfig);
+      customFiltersBuilder.append(filterConfig);
     }
-    String filterConfigChain = filterConfigBuilder.toString();
 
-    final StringBuilder nativeFilterConfigBuilder = new StringBuilder();
     for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
-      String nativeFilterConfig =
+      String filterConfig =
           nativeFilterTemplateYAML.replace("{{ native_filter_name }}", filter.name)
               .replace("{{ native_filter_typed_config }}", filter.typedConfig);
-      nativeFilterConfigBuilder.append(nativeFilterConfig);
+      customFiltersBuilder.append(filterConfig);
     }
-    String nativeFilterConfigChain = nativeFilterConfigBuilder.toString();
 
-    // We could support this in the future, as Envoy supports multiple stat sinks. It require
-    // some changes to how we template the sink configuration though, so keeping it simple for now.
+    String processedTemplate =
+        templateYAML.replace("#{custom_filters}", customFiltersBuilder.toString());
+
+    StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
+    configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
+        .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
+        .append(String.format("- &dns_fail_base_interval %ss\n", dnsFailureRefreshSecondsBase))
+        .append(String.format("- &dns_fail_max_interval %ss\n", dnsFailureRefreshSecondsMax))
+        .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
+        .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
+                              "Android", appVersion, appId))
+        .append("- &virtual_clusters ")
+        .append(virtualClusters)
+        .append("\n");
+
+    // TODO(goaway): enable support for both types of sinks, since it's now much easier.
     if (statsdPort != null && grpcStatsDomain != null) {
       throw new ConfigurationException("cannot enable both statsD and gRPC metrics sink");
-    }
-    String statsSinkConfiguration = null;
-    if (statsdPort != null) {
-      statsSinkConfiguration =
-          statsdSinkTemplateYAML.replace("{{ port }}", String.valueOf(statsdPort));
     } else if (grpcStatsDomain != null) {
-      statsSinkConfiguration = statsSinkTemplateYAML;
+      configBuilder.append("- &stats_domain ").append(grpcStatsDomain).append("\n");
+      configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));
+      configBuilder.append("- &stats_sinks [ *base_metrics_service ]\n");
+    } else if (statsdPort != null) {
+      configBuilder.append("- &statsd_port ").append(statsdPort).append("\n");
+      configBuilder.append("- &stats_sinks [ *base_statsd ]\n");
     }
 
-    String resolvedConfiguration =
-        templateYAML
-            .replace("{{ stats_domain }}", grpcStatsDomain != null ? grpcStatsDomain : "0.0.0.0")
-            .replace("{{ stats_sink }}",
-                     statsSinkConfiguration != null ? statsSinkConfiguration : "")
-            .replace("{{ platform_filter_chain }}", filterConfigChain)
-            .replace("{{ connect_timeout_seconds }}", String.format("%s", connectTimeoutSeconds))
-            .replace("{{ dns_refresh_rate_seconds }}", String.format("%s", dnsRefreshSeconds))
-            .replace("{{ dns_failure_refresh_rate_seconds_base }}",
-                     String.format("%s", dnsFailureRefreshSecondsBase))
-            .replace("{{ dns_failure_refresh_rate_seconds_max }}",
-                     String.format("%s", dnsFailureRefreshSecondsMax))
-            .replace("{{ stats_flush_interval_seconds }}", String.format("%s", statsFlushSeconds))
-            .replace("{{ stream_idle_timeout_seconds }}",
-                     String.format("%s", streamIdleTimeoutSeconds))
-            .replace("{{ device_os }}", "Android")
-            .replace("{{ app_version }}", appVersion)
-            .replace("{{ app_id }}", appId)
-            .replace("{{ virtual_clusters }}", virtualClusters)
-            // TODO(@buildbreaker): Update these empty values to expose direct responses:
-            // https://github.com/envoyproxy/envoy-mobile/issues/1291
-            .replace("{{ fake_cluster_matchers }}", "")
-            .replace("{{ fake_remote_cluster }}", "")
-            .replace("{{ fake_remote_listener }}", "")
-            .replace("{{ route_reset_filter }}", "")
-            .replace("{{ native_filter_chain }}", nativeFilterConfigChain);
+    configBuilder.append(processedTemplate);
+    String resolvedConfiguration = configBuilder.toString();
 
     final Matcher unresolvedKeys = UNRESOLVED_KEY_PATTERN.matcher(resolvedConfiguration);
     if (unresolvedKeys.find()) {

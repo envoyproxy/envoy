@@ -77,9 +77,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
     }
 
     return runWithResolvedYAML(envoyConfiguration.resolveTemplate(
-                                   configurationYAML, JniLibrary.gRPCStatsSinkTemplateString(),
-                                   JniLibrary.statsdSinkTemplateString(),
-                                   JniLibrary.platformFilterTemplateString(),
+                                   configurationYAML, JniLibrary.platformFilterTemplateString(),
                                    JniLibrary.nativeFilterTemplateString()),
                                logLevel);
   }

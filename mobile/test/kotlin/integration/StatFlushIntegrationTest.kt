@@ -53,7 +53,7 @@ class StatFlushIntegrationTest {
     val countDownLatch = CountDownLatch(1)
     engine = EngineBuilder()
       .addLogLevel(LogLevel.DEBUG)
-      .addStatsDPort(5555)
+      .addStatsDPort(8125)
       // Really high flush interval so it won't trigger during test execution.
       .addStatsFlushSeconds(100)
       .setLogger { msg ->
@@ -68,7 +68,7 @@ class StatFlushIntegrationTest {
     engine!!.pulseClient().counter(Element("foo"), Element("bar")).increment(1)
 
     val statsdServer = TestStatsdServer()
-    statsdServer.runAsync(5555)
+    statsdServer.runAsync(8125)
 
     engine!!.flushStats()
 
