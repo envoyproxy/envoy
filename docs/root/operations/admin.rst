@@ -194,6 +194,16 @@ modify different aspects of the server:
   field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
   resource, use both as documented below.
 
+.. _operations_admin_interface_config_dump_by_name_regex:
+
+.. http:get:: /config_dump?name_regex={}
+
+  Dump only the currently loaded configurations whose names match the specified regex. Can be used with
+  both `resource` and `mask` query parameters. 
+
+  For example, get all configs whose name contain a specified substring with
+  ``/config_dump?name_regex=.*substring.*``
+
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
 .. http:get:: /config_dump?resource={}&mask={}
