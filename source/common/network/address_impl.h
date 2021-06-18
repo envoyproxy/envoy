@@ -75,7 +75,7 @@ public:
   template <typename InstanceType, typename... Args>
   static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
     absl::Status status;
-    // Use new instead of make_unique here because the instance constructors are private and must be
+    // Use new instead of make_shared here because the instance constructors are private and must be
     // called directly here.
     std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
     if (!status.ok()) {
