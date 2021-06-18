@@ -723,7 +723,7 @@ TEST(SymbolTableTest, Memory) {
   // Tests a stat-name allocation strategy.
   auto test_memory_usage = [](std::function<void(absl::string_view)> fn) -> size_t {
     TestUtil::MemoryTest memory_test;
-    TestUtil::forEachSampleStat(1000, fn);
+    TestUtil::forEachSampleStat(1000, true, fn);
     return memory_test.consumedBytes();
   };
 
