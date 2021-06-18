@@ -87,7 +87,7 @@ public:
   explicit ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config);
 
   ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers,
-                                      const envoy::config::core::v3::Metadata& meta) const override;
+                              const envoy::config::core::v3::Metadata& meta) const override;
 
 private:
   std::vector<std::unique_ptr<FragmentBuilderBase>> fragment_builders_;
@@ -133,11 +133,13 @@ public:
   void removeRoutingScopes(const std::vector<std::string>& scope_names);
 
   // Envoy::Router::ScopedConfig
-  Router::ConfigConstSharedPtr getRouteConfig(const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& meta) const override;
+  Router::ConfigConstSharedPtr
+  getRouteConfig(const Http::HeaderMap& headers,
+                 const envoy::config::core::v3::Metadata& meta) const override;
 
   // The return value is not null only if the scope corresponding to the header or metadata exists.
   ScopeKeyPtr computeScopeKey(const Http::HeaderMap& headers,
-                                      const envoy::config::core::v3::Metadata& meta) const override;
+                              const envoy::config::core::v3::Metadata& meta) const override;
 
 private:
   ScopeKeyBuilderImpl scope_key_builder_;
@@ -152,8 +154,8 @@ private:
  */
 class NullScopedConfigImpl : public ScopedConfig {
 public:
-  Router::ConfigConstSharedPtr getRouteConfig(
-    const Http::HeaderMap&, const envoy::config::core::v3::Metadata&) const override {
+  Router::ConfigConstSharedPtr
+  getRouteConfig(const Http::HeaderMap&, const envoy::config::core::v3::Metadata&) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };

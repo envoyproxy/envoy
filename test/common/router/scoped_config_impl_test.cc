@@ -76,7 +76,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config;
   // Type not set, ASSERT only fails in debug mode.
 #if !defined(NDEBUG)
-  EXPECT_DEATH(FragmentBuilderImpl(std::move(config)), "header_value_extractor is not set.");
+  EXPECT_DEATH(FragmentBuilderImpl(std::move(config)), "value extractor is not set.");
 #else
   EXPECT_THROW_WITH_REGEX(FragmentBuilderImpl(std::move(config)), ProtoValidationException,
                           "HeaderValueExtractor extract_type not set.+");
@@ -127,20 +127,23 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByIndex) {
   EXPECT_EQ(fragment, nullptr);
 
   // Empty header value.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", ""},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ""},
+      },
+      {});
   EXPECT_EQ(fragment, nullptr);
 
   // Index out of bound.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "part-0"}, {} }, {});
+  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{{"foo_header", "part-0"}, {}}, {});
   EXPECT_EQ(fragment, nullptr);
 
   // Element is empty.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "part-0,,,bluh"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "part-0,,,bluh"},
+      },
+      {});
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment(""));
 }
@@ -158,50 +161,63 @@ TEST(HeaderValueExtractorImplTest, HeaderExtractionByKey) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   FragmentBuilderImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment =
-      extractor.computeFragment(TestRequestHeaderMapImpl{
+  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
           {"foo_header", "part-0;bar=>bluh;foo=>foo_value"},
-      }, {});
+      },
+      {});
 
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"bluh"});
 
   // No such header.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"bluh", "part-0;"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"bluh", "part-0;"},
+      },
+      {});
   EXPECT_EQ(fragment, nullptr);
 
   // Empty header value.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", ""},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ""},
+      },
+      {});
   EXPECT_EQ(fragment, nullptr);
 
   // No such key.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "part-0"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "part-0"},
+      },
+      {});
   EXPECT_EQ(fragment, nullptr);
 
   // Empty value.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "bluh;;bar=>;foo=>last_value"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "bluh;;bar=>;foo=>last_value"},
+      },
+      {});
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{""});
 
   // Duplicate values, the first value returned.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "bluh;;bar=>value1;bar=>value2;bluh;;bar=>last_value"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "bluh;;bar=>value1;bar=>value2;bluh;;bar=>last_value"},
+      },
+      {});
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"value1"});
 
   // No separator in the element, value is set to empty string.
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "bluh;;bar;bar=>value2;bluh;;bar=>last_value"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "bluh;;bar;bar=>value2;bluh;;bar=>last_value"},
+      },
+      {});
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{""});
 }
@@ -219,16 +235,19 @@ TEST(HeaderValueExtractorImplTest, ElementSeparatorEmpty) {
 
   TestUtility::loadFromYaml(yaml_plain, config);
   FragmentBuilderImpl extractor(std::move(config));
-  std::unique_ptr<ScopeKeyFragmentBase> fragment =
-      extractor.computeFragment(TestRequestHeaderMapImpl{
+  std::unique_ptr<ScopeKeyFragmentBase> fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
           {"foo_header", "bar=b;c=d;e=f"},
-      }, {});
+      },
+      {});
   EXPECT_NE(fragment, nullptr);
   EXPECT_EQ(*fragment, StringKeyFragment{"b;c=d;e=f"});
 
-  fragment = extractor.computeFragment(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b;bar=d;e=f"},
-  }, {});
+  fragment = extractor.computeFragment(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b;bar=d;e=f"},
+      },
+      {});
   EXPECT_EQ(fragment, nullptr);
 }
 
@@ -298,54 +317,68 @@ TEST(ScopeKeyBuilderImplTest, Parse) {
   TestUtility::loadFromYaml(yaml_plain, config);
   ScopeKeyBuilderImpl key_builder(std::move(config));
 
-  ScopeKeyPtr key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,bar=bar_value,e=f"},
-      {"bar_header", "a=b;bar=bar_value;index2"},
-  }, {});
+  ScopeKeyPtr key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,bar=bar_value,e=f"},
+          {"bar_header", "a=b;bar=bar_value;index2"},
+      },
+      {});
   EXPECT_NE(key, nullptr);
   EXPECT_EQ(*key, makeKey({"bar_value", "index2"}));
 
   // Empty string fragment is fine.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,bar,e=f"},
-      {"bar_header", "a=b;bar=bar_value;"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,bar,e=f"},
+          {"bar_header", "a=b;bar=bar_value;"},
+      },
+      {});
   EXPECT_NE(key, nullptr);
   EXPECT_EQ(*key, makeKey({"", ""}));
 
   // Key not found.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,meh,e=f"},
-      {"bar_header", "a=b;bar=bar_value;"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,meh,e=f"},
+          {"bar_header", "a=b;bar=bar_value;"},
+      },
+      {});
   EXPECT_EQ(key, nullptr);
 
   // Index out of bound.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,bar=bar_value,e=f"},
-      {"bar_header", "a=b;bar=bar_value"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,bar=bar_value,e=f"},
+          {"bar_header", "a=b;bar=bar_value"},
+      },
+      {});
   EXPECT_EQ(key, nullptr);
 
   // Header missing.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,bar=bar_value,e=f"},
-      {"foobar_header", "a=b;bar=bar_value;index2"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,bar=bar_value,e=f"},
+          {"foobar_header", "a=b;bar=bar_value;index2"},
+      },
+      {});
   EXPECT_EQ(key, nullptr);
 
   // Header value empty.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", ""},
-      {"bar_header", "a=b;bar=bar_value;index2"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ""},
+          {"bar_header", "a=b;bar=bar_value;index2"},
+      },
+      {});
   EXPECT_EQ(key, nullptr);
 
   // Case sensitive.
-  key = key_builder.computeScopeKey(TestRequestHeaderMapImpl{
-      {"foo_header", "a=b,Bar=bar_value,e=f"},
-      {"bar_header", "a=b;bar=bar_value;index2"},
-  }, {});
+  key = key_builder.computeScopeKey(
+      TestRequestHeaderMapImpl{
+          {"foo_header", "a=b,Bar=bar_value,e=f"},
+          {"bar_header", "a=b;bar=bar_value;index2"},
+      },
+      {});
   EXPECT_EQ(key, nullptr);
 }
 
@@ -448,24 +481,30 @@ TEST_F(ScopedConfigImplTest, PickRoute) {
   scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
 
   // Key (foo, bar) maps to scope_info_a_.
-  ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
-      {"foo_header", ",,key=value,bar=foo,"},
-      {"bar_header", ";val1;bar;val3"},
-  }, {});
+  ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ",,key=value,bar=foo,"},
+          {"bar_header", ";val1;bar;val3"},
+      },
+      {});
   EXPECT_EQ(route_config, scope_info_a_->routeConfig());
 
   // Key (bar, baz) maps to scope_info_b_.
-  route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
-      {"foo_header", ",,key=value,bar=bar,"},
-      {"bar_header", ";val1;baz;val3"},
-  }, {});
+  route_config = scoped_config_impl_->getRouteConfig(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ",,key=value,bar=bar,"},
+          {"bar_header", ";val1;baz;val3"},
+      },
+      {});
   EXPECT_EQ(route_config, scope_info_b_->routeConfig());
 
   // No such key (bar, NOT_BAZ).
-  route_config = scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
-      {"foo_header", ",key=value,bar=bar,"},
-      {"bar_header", ";val1;NOT_BAZ;val3"},
-  }, {});
+  route_config = scoped_config_impl_->getRouteConfig(
+      TestRequestHeaderMapImpl{
+          {"foo_header", ",key=value,bar=bar,"},
+          {"bar_header", ";val1;NOT_BAZ;val3"},
+      },
+      {});
   EXPECT_EQ(route_config, nullptr);
 }
 
@@ -485,9 +524,11 @@ TEST_F(ScopedConfigImplTest, Update) {
   // scope_info_a_ not found
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers, {}), nullptr);
   // scope_info_b_ found
-  EXPECT_EQ(scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
-                {"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}}, {}),
-            scope_info_b_->routeConfig());
+  EXPECT_EQ(
+      scoped_config_impl_->getRouteConfig(
+          TestRequestHeaderMapImpl{{"foo_header", ",,key=v,bar=bar,"}, {"bar_header", ";val1;baz"}},
+          {}),
+      scope_info_b_->routeConfig());
 
   // Add scope_key (foo, bar).
   scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
@@ -499,9 +540,11 @@ TEST_F(ScopedConfigImplTest, Update) {
   EXPECT_EQ(scoped_config_impl_->getRouteConfig(headers, {}), nullptr);
 
   // foo_scope now is keyed by (xyz, xyz).
-  EXPECT_EQ(scoped_config_impl_->getRouteConfig(TestRequestHeaderMapImpl{
-                {"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}}, {}),
-            scope_info_a_v2_->routeConfig());
+  EXPECT_EQ(
+      scoped_config_impl_->getRouteConfig(
+          TestRequestHeaderMapImpl{{"foo_header", ",bar=xyz,foo=bar"}, {"bar_header", ";;xyz"}},
+          {}),
+      scope_info_a_v2_->routeConfig());
 
   // Remove scope "foo_scope".
   scoped_config_impl_->removeRoutingScopes({"foo_scope"});

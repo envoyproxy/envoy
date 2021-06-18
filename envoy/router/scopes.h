@@ -92,16 +92,19 @@ public:
    * @param headers the request headers to match the scoped routing configuration against.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
-  virtual ConfigConstSharedPtr getRouteConfig(
-    const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& meta) const PURE;
+  virtual ConfigConstSharedPtr
+  getRouteConfig(const Http::HeaderMap& headers,
+                 const envoy::config::core::v3::Metadata& meta) const PURE;
 
   /**
    * Based on the incoming HTTP request headers, returns the hash value of its scope key.
    * @param headers the request headers to match the scoped routing configuration against.
    * @return unique_ptr of the scope key computed from header.
    */
-  virtual ScopeKeyPtr computeScopeKey(
-    const Http::HeaderMap&, const envoy::config::core::v3::Metadata&) const { return {}; }
+  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&,
+                                      const envoy::config::core::v3::Metadata&) const {
+    return {};
+  }
 };
 
 using ScopedConfigConstSharedPtr = std::shared_ptr<const ScopedConfig>;
