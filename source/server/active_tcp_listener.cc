@@ -199,6 +199,8 @@ void ActiveTcpSocket::newConnection() {
     if (socket_->detectedTransportProtocol().empty()) {
       socket_->setDetectedTransportProtocol("raw_buffer");
     }
+    // Clear the listener filter to ensure the file event registered by
+    // listener filter to be removed. reference PR #8922.
     accept_filters_.clear();
     // Create a new connection on this listener.
     listener_.newConnection(std::move(socket_), std::move(stream_info_));
