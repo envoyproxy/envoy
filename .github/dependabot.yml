@@ -22,11 +22,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/docs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/docs"
   schedule:
     interval: "daily"
