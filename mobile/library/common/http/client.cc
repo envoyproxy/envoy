@@ -187,8 +187,7 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   callbacks_->onError();
 }
 
-envoy_status_t Client::startStream(envoy_stream_t new_stream_handle,
-                                   envoy_http_callbacks bridge_callbacks) {
+void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream{new DirectStream(new_stream_handle, *this)};
   direct_stream->callbacks_ =
@@ -201,11 +200,9 @@ envoy_status_t Client::startStream(envoy_stream_t new_stream_handle,
 
   streams_.emplace(new_stream_handle, std::move(direct_stream));
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
-
-  return ENVOY_SUCCESS;
 }
 
-envoy_status_t Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream = getStream(stream);
   // If direct_stream is not found, it means the stream has already closed or been reset
@@ -239,11 +236,9 @@ envoy_status_t Client::sendHeaders(envoy_stream_t stream, envoy_headers headers,
               *internal_headers);
     direct_stream->request_decoder_->decodeHeaders(std::move(internal_headers), end_stream);
   }
-
-  return ENVOY_SUCCESS;
 }
 
-envoy_status_t Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
+void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream = getStream(stream);
   // If direct_stream is not found, it means the stream has already closed or been reset
@@ -262,15 +257,11 @@ envoy_status_t Client::sendData(envoy_stream_t stream, envoy_data data, bool end
               data.length, end_stream);
     direct_stream->request_decoder_->decodeData(*buf, end_stream);
   }
-
-  return ENVOY_SUCCESS;
 }
 
-envoy_status_t Client::sendMetadata(envoy_stream_t, envoy_headers) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-envoy_status_t Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
+void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream = getStream(stream);
   // If direct_stream is not found, it means the stream has already closed or been reset
@@ -285,11 +276,9 @@ envoy_status_t Client::sendTrailers(envoy_stream_t stream, envoy_headers trailer
     ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
     direct_stream->request_decoder_->decodeTrailers(std::move(internal_trailers));
   }
-
-  return ENVOY_SUCCESS;
 }
 
-envoy_status_t Client::cancelStream(envoy_stream_t stream) {
+void Client::cancelStream(envoy_stream_t stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream = getStream(stream);
   if (direct_stream) {
@@ -311,7 +300,6 @@ envoy_status_t Client::cancelStream(envoy_stream_t stream) {
     // reset from a wide variety of contexts without apparent issue.
     direct_stream->runResetCallbacks(StreamResetReason::RemoteReset);
   }
-  return ENVOY_SUCCESS;
 }
 
 const HttpClientStats& Client::stats() const { return stats_; }

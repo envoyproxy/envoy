@@ -178,7 +178,7 @@ TEST_P(ClientIntegrationTest, Basic) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    EXPECT_EQ(http_client_->startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+    http_client_->startStream(stream, bridge_callbacks);
     http_client_->sendHeaders(stream, c_headers, false);
     http_client_->sendData(stream, c_data, false);
     http_client_->sendTrailers(stream, c_trailers);
@@ -245,7 +245,7 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    EXPECT_EQ(http_client_->startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+    http_client_->startStream(stream, bridge_callbacks);
     http_client_->sendHeaders(stream, c_headers, true);
   });
   terminal_callback.waitReady();
@@ -298,7 +298,7 @@ TEST_P(ClientIntegrationTest, BasicReset) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    EXPECT_EQ(http_client_->startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+    http_client_->startStream(stream, bridge_callbacks);
     http_client_->sendHeaders(stream, c_headers, true);
   });
   terminal_callback.waitReady();

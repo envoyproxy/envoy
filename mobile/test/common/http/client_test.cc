@@ -112,7 +112,7 @@ public:
           response_encoder_ = &encoder;
           return request_decoder_;
         }));
-    EXPECT_EQ(http_client_.startStream(stream_, bridge_callbacks_), ENVOY_SUCCESS);
+    http_client_.startStream(stream_, bridge_callbacks_);
   }
 
   MockApiListener api_listener_;
@@ -485,7 +485,7 @@ TEST_F(ClientTest, MultipleStreams) {
         response_encoder2 = &encoder;
         return request_decoder2;
       }));
-  EXPECT_EQ(http_client_.startStream(stream2, bridge_callbacks_2), ENVOY_SUCCESS);
+  http_client_.startStream(stream2, bridge_callbacks_2);
 
   // Send request headers.
 
@@ -597,7 +597,7 @@ TEST_F(ClientTest, ResetStreamLocal) {
   createStream();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  ASSERT_EQ(http_client_.cancelStream(stream_), ENVOY_SUCCESS);
+  http_client_.cancelStream(stream_);
   ASSERT_EQ(cc_.on_cancel_calls, 1);
   ASSERT_EQ(cc_.on_error_calls, 0);
   ASSERT_EQ(cc_.on_complete_calls, 0);
@@ -612,9 +612,9 @@ TEST_F(ClientTest, DoubleResetStreamLocal) {
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
 
-  ASSERT_EQ(http_client_.cancelStream(stream_), ENVOY_SUCCESS);
+  http_client_.cancelStream(stream_);
   // Second cancel call has no effect because stream is already cancelled.
-  ASSERT_EQ(http_client_.cancelStream(stream_), ENVOY_SUCCESS);
+  http_client_.cancelStream(stream_);
 
   ASSERT_EQ(cc_.on_cancel_calls, 1);
   ASSERT_EQ(cc_.on_error_calls, 0);
@@ -683,7 +683,7 @@ TEST_F(ClientTest, StreamResetAfterOnComplete) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
 
   // Cancellation should have no effect as the stream should have already been cleaned up.
-  ASSERT_EQ(http_client_.cancelStream(stream_), ENVOY_SUCCESS);
+  http_client_.cancelStream(stream_);
   ASSERT_EQ(cc_.on_cancel_calls, 0);
 }
 
@@ -756,7 +756,7 @@ TEST_F(ClientTest, NullAccessors) {
         response_encoder_ = &encoder;
         return request_decoder_;
       }));
-  EXPECT_EQ(http_client_.startStream(stream, bridge_callbacks), ENVOY_SUCCESS);
+  http_client_.startStream(stream, bridge_callbacks);
 
   EXPECT_FALSE(response_encoder_->http1StreamEncoderOptions().has_value());
   EXPECT_FALSE(response_encoder_->streamErrorOnInvalidHttpMessage());
