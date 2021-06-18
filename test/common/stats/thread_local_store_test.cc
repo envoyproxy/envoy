@@ -1290,8 +1290,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTableFor10C
     const std::string name = absl::StrCat("cluster.service_0.stat_", i);
     store_.counterFromString(name);
   }
-  std::cerr << "mem: " << memory_test.consumedBytes() << std::endl;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 2080); // June, 18, 2021
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2288);
 }
 
 class TestCounterGroupDescriptor : public CounterGroupDescriptor {
@@ -1321,8 +1321,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTableFor10C
 
   const std::string name = absl::StrCat("cluster.service_0");
   store_.counterGroupFromString(name, d);
-  std::cerr << "mem: " << memory_test.consumedBytes() << std::endl;
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 1256); // June, 18, 2021
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1382);
 }
 
 // Tests how much memory is consumed allocating 100k stats.
