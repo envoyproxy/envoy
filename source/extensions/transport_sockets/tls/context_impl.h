@@ -82,8 +82,6 @@ public:
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
 
-  const std::vector<TlsContext>& getTlsContexts() { return tls_contexts_; }
-
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
               TimeSource& time_source);
