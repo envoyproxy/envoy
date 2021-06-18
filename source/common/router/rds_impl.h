@@ -99,7 +99,7 @@ private:
  */
 #define ALL_RDS_STATS(COUNTER, GAUGE)                                                              \
   COUNTER(config_reload)                                                                           \
-  GAUGE(config_reload_time, NeverImport)                                                           \
+  GAUGE(config_reload_time_ms, NeverImport)                                                           \
   COUNTER(update_empty)
 
 /**

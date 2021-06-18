@@ -132,7 +132,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
-    stats_.config_reload_time_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
     if (config_update_info_->protobufConfiguration().has_vhds() &&
         config_update_info_->vhdsConfigurationChanged()) {
       ENVOY_LOG(
