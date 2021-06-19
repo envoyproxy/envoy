@@ -36,7 +36,6 @@ public:
   bool rejectsAll() const override {
     return !is_inclusive_ && matchers_.empty() && prefixes_.empty();
   }
-  bool hasStringMatchers() const override { return !matchers_.empty(); }
 
 private:
   void optimizeLastMatcher();
