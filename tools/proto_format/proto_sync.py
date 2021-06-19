@@ -482,7 +482,6 @@ def sync(api_root, mode, is_ci, labels, shadow):
             shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
         for proto in IGNORED_V2_PROTOS:
-            print("remove: " + str(dst_dir.joinpath("envoy", proto[6:])))
             shutil.rmtree(str(dst_dir.joinpath("envoy", proto[6:])))
 
         diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
