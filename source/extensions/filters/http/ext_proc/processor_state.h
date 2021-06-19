@@ -90,7 +90,6 @@ public:
   void enqueueStreamingChunk(QueuedChunkPtr&& chunk) {
     chunks_for_processing_.push_back(std::move(chunk));
   }
-  void onProcessedChunks(std::function<void(Buffer::Instance& chunk)> cb);
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
@@ -131,7 +130,6 @@ protected:
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
   std::deque<QueuedChunkPtr> chunks_for_processing_;
-  std::deque<QueuedChunkPtr> processed_chunks_;
 };
 
 class DecodingProcessorState : public ProcessorState {

@@ -146,24 +146,8 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
         ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
                   chunk->data.length());
         MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
-
         should_continue = chunk->end_stream;
-        if (chunk->end_stream) {
-          // This is our last chance to include data, so take everything that we have
-          // received so far, put it in one big chunk, and apply it to the buffered data.
-          Buffer::OwnedImpl remaining_data;
-          onProcessedChunks([&remaining_data](Buffer::Instance& processed_chunk) {
-            ENVOY_LOG(trace, "Adding a processed chunk to final chunk buffer");
-            remaining_data.move(processed_chunk);
-          });
-          remaining_data.move(chunk->data);
-          ENVOY_LOG(debug, "Injecting final chunk with {} bytes", remaining_data.length());
-          injectDataToFilterChain(remaining_data, false);
-          should_continue = true;
-        } else {
-          // Otherwise, ensure that the chunk gets delivered in a subsequent data callback
-          processed_chunks_.push_back(std::move(chunk));
-        }
+        injectDataToFilterChain(chunk->data, false);
       }
       if (chunks_for_processing_.empty()) {
         clearWatermark();
@@ -220,14 +204,6 @@ void ProcessorState::clearAsyncState() {
 void ProcessorState::cleanUpTimer() const {
   if (message_timer_ && message_timer_->enabled()) {
     message_timer_->disableTimer();
-  }
-}
-
-void ProcessorState::onProcessedChunks(std::function<void(Buffer::Instance& chunk)> cb) {
-  while (!processed_chunks_.empty()) {
-    auto chunk = std::move(processed_chunks_.front());
-    cb(chunk->data);
-    processed_chunks_.pop_front();
   }
 }
 

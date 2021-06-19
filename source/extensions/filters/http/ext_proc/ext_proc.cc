@@ -194,14 +194,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                   end_stream);
     state.enqueueStreamingChunk(std::move(next_chunk));
 
-    if (!end_stream) {
-      // Send along any data that came back from the processor in the meantime,
-      // unless it's EOF, in which case we will handle it differently later.
-      state.onProcessedChunks([&data](Buffer::Instance& chunk) { data.move(chunk); });
-    }
-    ENVOY_LOG(trace, "Continuing with {} bytes of processed data", data.length());
-
-    // At this point we will continue, but with different data, and possibly none
+    // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
       // But we need to buffer the last chunk because it's our last chance to do stuff
       result = FilterDataStatus::StopIterationNoBuffer;
