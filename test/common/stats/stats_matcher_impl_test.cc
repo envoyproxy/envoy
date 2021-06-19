@@ -322,5 +322,35 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
 
+TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchersWithPrefix) {
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  inclusionList()->set_suffix("requests");
+  inclusionList()->set_exact("regex");
+  inclusionList()->set_prefix("prefix.");
+  initMatcher();
+  EXPECT_TRUE(stats_matcher_impl_->hasStringMatchers());
+  expectAccepted({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex",
+                  "prefix", "prefix.foo"});
+  expectAccepted({"prefix.envoy.matchers.requests", "prefix.requests.for.envoy",
+                  "prefix.envoyrequests", "prefix.regex"});
+  expectDenied({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchersWithPrefix) {
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  exclusionList()->set_suffix("requests");
+  exclusionList()->set_exact("regex");
+  exclusionList()->set_prefix("prefix.");
+  initMatcher();
+  EXPECT_TRUE(stats_matcher_impl_->hasStringMatchers());
+  expectAccepted({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc", "prefixfoo"});
+  expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex", "prefix",
+                "prefix.foo", "prefix.requests.for.envoy"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
 } // namespace Stats
 } // namespace Envoy

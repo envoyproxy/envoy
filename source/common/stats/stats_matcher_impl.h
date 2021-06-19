@@ -27,7 +27,7 @@ public:
   StatsMatcherImpl() = default;
 
   // StatsMatcher
-  bool rejects(StatName name) const override;
+  bool rejects(StatName name) const override { return fastRejects(name) || slowRejects(name); }
   bool fastRejects(StatName name) const override;
   bool slowRejects(StatName name) const override;
   bool acceptsAll() const override {

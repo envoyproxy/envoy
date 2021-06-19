@@ -54,24 +54,6 @@ void StatsMatcherImpl::optimizeLastMatcher() {
   }
 }
 
-bool StatsMatcherImpl::rejects(StatName stat_name) const {
-  if (rejectsAll()) {
-    return true;
-  }
-
-  bool match = fastRejectMatch(stat_name) || slowRejectMatch(stat_name);
-
-  //  is_inclusive_ | match | return
-  // ---------------+-------+--------
-  //        T       |   T   |   T     Default-inclusive and matching an (exclusion) matcher, deny.
-  //        T       |   F   |   F     Otherwise, allow.
-  //        F       |   T   |   F     Default-exclusive and matching an (inclusion) matcher, allow.
-  //        F       |   F   |   T     Otherwise, deny.
-  //
-  // This is an XNOR, which can be evaluated by checking for equality.
-  return is_inclusive_ == match;
-}
-
 bool StatsMatcherImpl::fastRejects(StatName stat_name) const {
   if (rejectsAll()) {
     return true;
