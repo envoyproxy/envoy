@@ -1,6 +1,6 @@
 # Building documentation locally
 
-There are two methods to build the documentation, described below.
+There are two methods to build the documentation, described below :
 
 In both cases, the generated output can be found in `generated/docs`.
 
