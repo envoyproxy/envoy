@@ -126,25 +126,25 @@ protected:
 
 // Simple flow of putting in an item, getting it, deleting it.
 TEST_F(SimpleHttpCacheTest, PutGet) {
-  const std::string RequestPath1("Name");
-  LookupContextPtr name_lookup_context = lookup(RequestPath1);
+  const std::string request_path1("Name");
+  LookupContextPtr name_lookup_context = lookup(request_path1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"}};
 
-  const std::string Body1("Value");
-  insert(move(name_lookup_context), response_headers, Body1);
-  name_lookup_context = lookup(RequestPath1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), Body1));
+  const std::string body1("Value");
+  insert(move(name_lookup_context), response_headers, body1);
+  name_lookup_context = lookup(request_path1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), body1));
 
-  const std::string& RequestPath2("Another Name");
-  LookupContextPtr another_name_lookup_context = lookup(RequestPath2);
+  const std::string& request_path2("Another Name");
+  LookupContextPtr another_name_lookup_context = lookup(request_path2);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  const std::string NewBody1("NewValue");
-  insert(move(name_lookup_context), response_headers, NewBody1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), NewBody1));
+  const std::string new_body1("NewValue");
+  insert(move(name_lookup_context), response_headers, new_body1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(request_path1).get(), new_body1));
 }
 
 TEST_F(SimpleHttpCacheTest, PrivateResponse) {
@@ -276,25 +276,26 @@ TEST_F(SimpleHttpCacheTest, VaryResponses) {
 }
 
 TEST_F(SimpleHttpCacheTest, PutGetWithTrailers) {
-  const std::string RequestPath1("Name");
-  LookupContextPtr name_lookup_context = lookup(RequestPath1);
+  const std::string request_path1("Name");
+  LookupContextPtr name_lookup_context = lookup(request_path1);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestResponseHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                                    {"cache-control", "public,max-age=3600"}};
-  const std::string Body1("Value");
+  const std::string body1("Value");
   Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
-  insert(move(name_lookup_context), response_headers, Body1, response_trailers);
-  name_lookup_context = lookup(RequestPath1);
-  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), Body1, response_trailers));
+  insert(move(name_lookup_context), response_headers, body1, response_trailers);
+  name_lookup_context = lookup(request_path1);
+  EXPECT_TRUE(expectLookupSuccessWithBody(name_lookup_context.get(), body1, response_trailers));
 
-  const std::string& RequestPath2("Another Name");
-  LookupContextPtr another_name_lookup_context = lookup(RequestPath2);
+  const std::string& request_path2("Another Name");
+  LookupContextPtr another_name_lookup_context = lookup(request_path2);
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
-  const std::string NewBody1("NewValue");
-  insert(move(name_lookup_context), response_headers, NewBody1, response_trailers);
-  EXPECT_TRUE(expectLookupSuccessWithBody(lookup(RequestPath1).get(), NewBody1, response_trailers));
+  const std::string new_body1("NewValue");
+  insert(move(name_lookup_context), response_headers, new_body1, response_trailers);
+  EXPECT_TRUE(
+      expectLookupSuccessWithBody(lookup(request_path1).get(), new_body1, response_trailers));
 }
 
 } // namespace

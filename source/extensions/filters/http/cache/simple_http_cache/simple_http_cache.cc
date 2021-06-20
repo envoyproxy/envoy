@@ -23,7 +23,7 @@ public:
     trailers_ = std::move(entry.trailers_);
     cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
                                                            std::move(entry.metadata_), body_.size(),
-                                                           /*has_trailers=*/trailers_ != nullptr)
+                                                           trailers_ != nullptr)
                                : LookupResult{});
   }
 
@@ -132,10 +132,10 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   if (VaryHeader::hasVary(*iter->second.response_headers_)) {
     return varyLookup(request, iter->second.response_headers_);
   } else {
-    Http::ResponseTrailerMapPtr trailers_map =
-        iter->second.trailers_
-            ? Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_)
-            : nullptr;
+    Http::ResponseTrailerMapPtr trailers_map = nullptr;
+    if (iter->second.trailers_) {
+      trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
+    }
     return SimpleHttpCache::Entry{
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
         iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
@@ -168,10 +168,10 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
     return SimpleHttpCache::Entry{};
   }
   ASSERT(iter->second.response_headers_);
-  Http::ResponseTrailerMapPtr trailers_map =
-      iter->second.trailers_
-          ? Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_)
-          : nullptr;
+  Http::ResponseTrailerMapPtr trailers_map = nullptr;
+  if (iter->second.trailers_) {
+    trailers_map = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*iter->second.trailers_);
+  }
 
   return SimpleHttpCache::Entry{
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*iter->second.response_headers_),
