@@ -15,9 +15,9 @@ envoy_cc_test(
         "abseil_synchronization",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/registry",
-        "//include/envoy/server:guarddog_config_interface",
+        "//envoy/common:time_interface",
+        "//envoy/registry",
+        "//envoy/server:guarddog_config_interface",
         "//source/common/watchdog:abort_action_config",
         "//source/common/watchdog:abort_action_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -31,8 +31,8 @@ envoy_cc_test(
     name = "abort_action_config_test",
     srcs = ["abort_action_config_test.cc"],
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:guarddog_config_interface",
+        "//envoy/registry",
+        "//envoy/server:guarddog_config_interface",
         "//source/common/watchdog:abort_action_config",
         "//source/common/watchdog:abort_action_lib",
         "//test/common/stats:stat_test_utility_lib",

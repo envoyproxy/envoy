@@ -1,12 +1,11 @@
-#include "extensions/filters/udp/dns_filter/dns_parser.h"
+#include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "envoy/network/address.h"
 
-#include "common/common/safe_memcpy.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 #include "ares.h"
 

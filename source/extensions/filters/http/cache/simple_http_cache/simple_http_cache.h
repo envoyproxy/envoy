@@ -1,8 +1,7 @@
 #pragma once
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/cache/http_cache.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"

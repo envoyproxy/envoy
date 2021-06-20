@@ -5,8 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/common/aws/signer.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

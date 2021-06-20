@@ -7,11 +7,10 @@
 
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

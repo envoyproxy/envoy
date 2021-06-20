@@ -1,10 +1,10 @@
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Extensions {

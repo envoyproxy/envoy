@@ -23,10 +23,10 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
 
    $ sudo apt update
    $ sudo apt install apt-transport-https ca-certificates curl gnupg2 software-properties-common
-   $ curl -sL 'https://getenvoy.io/gpg' | sudo apt-key add -
-   $ # verify the key
-   $ apt-key fingerprint 6FF974DB | grep "5270 CEAC"
-   $ sudo add-apt-repository "deb [arch=amd64] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable"
+   $ curl -sL 'https://getenvoy.io/gpg' | sudo gpg --dearmor -o /usr/share/keyrings/getenvoy-keyring.gpg
+   # Verify the keyring - this should yield "OK"
+   $ echo 1a2f6152efc6cc39e384fb869cdf3cc3e4e1ac68f4ad8f8f114a7c58bb0bea01 /usr/share/keyrings/getenvoy-keyring.gpg | sha256sum --check
+   $ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/getenvoy-keyring.gpg] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/getenvoy.list
    $ sudo apt update
    $ sudo apt install getenvoy-envoy
 
@@ -45,10 +45,10 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
 
    $ sudo apt update
    $ sudo apt install apt-transport-https ca-certificates curl gnupg-agent software-properties-common
-   $ curl -sL 'https://getenvoy.io/gpg' | sudo apt-key add -
-   $ # verify the key
-   $ apt-key fingerprint 6FF974DB | grep "5270 CEAC"
-   $ sudo add-apt-repository "deb [arch=amd64] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable"
+   $ curl -sL 'https://getenvoy.io/gpg' | sudo gpg --dearmor -o /usr/share/keyrings/getenvoy-keyring.gpg
+   # Verify the keyring - this should yield "OK"
+   $ echo 1a2f6152efc6cc39e384fb869cdf3cc3e4e1ac68f4ad8f8f114a7c58bb0bea01 /usr/share/keyrings/getenvoy-keyring.gpg | sha256sum --check
+   $ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/getenvoy-keyring.gpg] https://dl.bintray.com/tetrate/getenvoy-deb $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/getenvoy.list
    $ sudo apt update
    $ sudo apt install -y getenvoy-envoy
 
@@ -57,38 +57,16 @@ using `Get Envoy <https://www.getenvoy.io/>`__.
    To add the nightly repository instead, replace the word ``stable`` with ``nightly``,
    when adding the ``apt`` repository.
 
-Install Envoy on CentOS Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on RPM-based distros
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on CentOS <https://www.getenvoy.io/install/envoy/centos/>`_
+You can `install Envoy on Centos/Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rpm/>`_
 using `Get Envoy <https://www.getenvoy.io/>`__.
 
 .. code-block:: console
 
    $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/centos/tetrate-getenvoy.repo
-   $ sudo yum install getenvoy-envoy
-
-.. tip::
-
-   You can enable/disable ``nightly`` using ``yum-config-manager``:
-
-   .. code-block:: console
-
-      $ sudo yum-config-manager --enable tetrate-getenvoy-nightly
-      $ sudo yum-config-manager --disable tetrate-getenvoy-nightly
-
-Install Envoy on Redhat Enterprise Linux (RHEL)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can
-`install Envoy on Redhat Enterprise Linux (RHEL) <https://www.getenvoy.io/install/envoy/rhel/>`_
-using `Get Envoy <https://www.getenvoy.io/>`__.
-
-.. code-block:: console
-
-   $ sudo yum install yum-utils
-   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rhel/tetrate-getenvoy.repo
+   $ sudo yum-config-manager --add-repo https://getenvoy.io/linux/rpm/tetrate-getenvoy.repo
    $ sudo yum install getenvoy-envoy
 
 .. tip::

@@ -1,8 +1,8 @@
-#include "extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {

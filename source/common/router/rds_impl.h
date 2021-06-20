@@ -24,15 +24,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-#include "common/init/watcher_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/route_config_update_receiver_impl.h"
-#include "common/router/vhds.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -68,6 +68,7 @@ class RouteConfigProviderManagerImpl;
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
+                                const OptionalHttpFilters& http_filters,
                                 Server::Configuration::ServerFactoryContext& factory_context,
                                 ProtobufMessage::ValidationVisitor& validator,
                                 RouteConfigProviderManagerImpl& route_config_provider_manager);
@@ -144,6 +145,7 @@ private:
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      const OptionalHttpFilters& optional_http_filters,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
@@ -170,6 +172,7 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
+  const OptionalHttpFilters optional_http_filters_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback
@@ -214,7 +217,8 @@ private:
   };
 
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
-                             Server::Configuration::ServerFactoryContext& factory_context);
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             const OptionalHttpFilters& optional_http_filters);
 
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
@@ -225,6 +229,7 @@ private:
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  const OptionalHttpFilters optional_http_filters_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -241,11 +246,13 @@ public:
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      const OptionalHttpFilters& optional_http_filters,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 
   RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::config::route::v3::RouteConfiguration& route_config,
+                                  const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator) override;
 

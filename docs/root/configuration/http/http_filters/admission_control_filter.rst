@@ -41,6 +41,11 @@ where,
   rejection probability will be higher for higher success rates. See `Aggression`_ for a more
   detailed explanation.
 
+Note that there are additional parameters that affect the rejection probability:
+
+- *rps_threshold* is a configurable value that when RPS is lower than it, requests will pass through the filter.
+- *max_reject_probability* represents the upper limit of the rejection probability.
+
 .. note::
    The success rate calculations are performed on a per-thread basis for increased performance. In
    addition, the per-thread isolation prevents decreases the blast radius of a single bad connection
@@ -91,6 +96,12 @@ fields can be overridden via runtime settings.
     aggression:
       default_value: 1.5
       runtime_key: "admission_control.aggression"
+    rps_threshold:
+      default_value: 5
+      runtime_key: "admission_control.rps_threshold"
+    max_rejection_probability:
+      default_value: 80.0
+      runtime_key: "admission_control.max_rejection_probability"
     success_criteria:
       http_criteria:
         http_success_status:
@@ -110,6 +121,8 @@ The above configuration can be understood as follows:
   window.
 * HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
 * gRPC requests are considered successful if they are OK or CANCELLED.
+* Requests will never be rejeted from this filter if the RPS is lower than 5.
+* Rejection probability will never exceed 80% even if the failure rate is 100%.
 
 Statistics
 ----------

@@ -123,6 +123,25 @@ RAW_TRY_ALLOWLIST = (
     "./source/common/network/utility.cc",
 )
 
+# These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+# now this is just WASM which makes use of std::string_view heavily so we need to convert to
+# absl::string_view internally. Everywhere else should be using absl::string_view for additional
+# safety.
+STD_STRING_VIEW_ALLOWLIST = (
+    "./source/extensions/common/wasm/context.h",
+    "./source/extensions/common/wasm/context.cc",
+    "./source/extensions/common/wasm/foreign.cc",
+    "./source/extensions/common/wasm/wasm.h",
+    "./source/extensions/common/wasm/wasm.cc",
+    "./source/extensions/common/wasm/wasm_vm.h",
+    "./source/extensions/common/wasm/wasm_vm.cc",
+    "./test/extensions/bootstrap/wasm/wasm_speed_test.cc",
+    "./test/extensions/bootstrap/wasm/wasm_test.cc",
+    "./test/extensions/common/wasm/wasm_test.cc",
+    "./test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc",
+    "./test/test_common/wasm_base.h",
+)
+
 # Header files that can throw exceptions. These should be limited; the only
 # valid situation identified so far is template functions used for config
 # processing.
@@ -256,7 +275,6 @@ UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
   "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
   "envoy.reloadable_features.upstream_http2_flood_checks",
   "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 }
@@ -323,11 +341,15 @@ class FormatChecker:
     # look_path searches for the given executable in all directories in PATH
     # environment variable. If it cannot be found, empty string is returned.
     def look_path(self, executable):
+        if executable is None:
+            return ''
         return shutil.which(executable) or ''
 
     # path_exists checks whether the given path exists. This function assumes that
     # the path is absolute and evaluates environment variables.
     def path_exists(self, executable):
+        if executable is None:
+            return False
         return os.path.exists(os.path.expandvars(executable))
 
     # executable_by_others checks whether the given path has execute permission for
@@ -433,6 +455,9 @@ class FormatChecker:
 
     def allow_listed_for_serialize_as_string(self, file_path):
         return file_path in SERIALIZE_AS_STRING_ALLOWLIST or file_path.endswith(DOCS_SUFFIX)
+
+    def allow_listed_for_std_string_view(self, file_path):
+        return file_path in STD_STRING_VIEW_ALLOWLIST
 
     def allow_listed_for_json_string_to_message(self, file_path):
         return file_path in JSON_STRING_TO_MESSAGE_ALLOWLIST
@@ -820,8 +845,12 @@ class FormatChecker:
             report_error("Don't use std::monostate; use absl::monostate instead")
         if self.token_in_line("std::optional", line):
             report_error("Don't use std::optional; use absl::optional instead")
-        if self.token_in_line("std::string_view", line):
-            report_error("Don't use std::string_view; use absl::string_view instead")
+        if not self.allow_listed_for_std_string_view(
+                file_path) and not "NOLINT(std::string_view)" in line:
+            if self.token_in_line("std::string_view", line) or self.token_in_line("toStdStringView",
+                                                                                  line):
+                report_error(
+                    "Don't use std::string_view or toStdStringView; use absl::string_view instead")
         if self.token_in_line("std::variant", line):
             report_error("Don't use std::variant; use absl::variant instead")
         if self.token_in_line("std::visit", line):
@@ -831,12 +860,12 @@ class FormatChecker:
             report_error(
                 "Don't use raw try, use TRY_ASSERT_MAIN_THREAD if on the main thread otherwise don't use exceptions."
             )
-        if "__attribute__((packed))" in line and file_path != "./include/envoy/common/platform.h":
+        if "__attribute__((packed))" in line and file_path != "./envoy/common/platform.h":
             # __attribute__((packed)) is not supported by MSVC, we have a PACKED_STRUCT macro that
             # can be used instead
             report_error(
                 "Don't use __attribute__((packed)), use the PACKED_STRUCT macro defined "
-                "in include/envoy/common/platform.h instead")
+                "in envoy/common/platform.h instead")
         if DESIGNATED_INITIALIZER_REGEX.search(line):
             # Designated initializers are not part of the C++14 standard and are not supported
             # by MSVC

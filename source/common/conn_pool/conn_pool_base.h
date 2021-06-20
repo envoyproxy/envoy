@@ -6,8 +6,8 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
 
@@ -34,7 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
-  void releaseResources();
+  virtual void releaseResources() { releaseResourcesBase(); }
+  void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -248,6 +249,7 @@ protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
+    FailedToCreateConnection,
     CreatedNewConnection,
     ShouldNotConnect,
     NoConnectionRateLimited,

@@ -1,8 +1,8 @@
-#include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
+#include "source/extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/numbers.h"
 

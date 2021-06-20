@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
-#include "common/common/hash.h"
-#include "common/network/socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/common/common/hash.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/socket.h"
@@ -105,7 +104,11 @@ public:
       if (parent_.expect_gro_) {
         EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
       }
-      EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg())
+          .Times(Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.udp_per_event_loop_read_limit")
+                     ? 2u
+                     : 1u);
       // Return the datagram.
       EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
@@ -136,9 +139,6 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        if (parent_.expect_gro_) {
-          EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
-        }
         EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(

@@ -1,4 +1,4 @@
-#include "common/http/codes.h"
+#include "source/common/http/codes.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -72,11 +72,14 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
+                                       bool exclude_http_code_stats) const {
   const Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
-  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  if (!exclude_http_code_stats) {
+    chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  }
 
   const Stats::StatName rq_group = upstreamRqGroup(code);
   const Stats::StatName rq_code = upstreamRqStatName(code);

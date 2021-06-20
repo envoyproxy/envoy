@@ -7,11 +7,11 @@
 #include "envoy/type/v3/http.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/metadata.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/health_checker_impl.h"
-#include "common/upstream/health_discovery_service.h"
+#include "source/common/config/metadata.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_discovery_service.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
@@ -30,10 +30,10 @@ namespace {
 class HdsIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
                            public HttpIntegrationTest {
 public:
-  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     hds_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
@@ -62,10 +62,10 @@ public:
 
     // Endpoint connections
     if (tls_hosts_) {
-      host_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
-      host2_upstream_ =
-          &addFakeUpstream(HttpIntegrationTest::createUpstreamTlsContext(), http_conn_type_);
+      host_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
+      host2_upstream_ = &addFakeUpstream(
+          HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), http_conn_type_);
     } else {
       host_upstream_ = &addFakeUpstream(http_conn_type_);
       host2_upstream_ = &addFakeUpstream(http_conn_type_);
@@ -370,7 +370,7 @@ transport_socket_matches:
   FakeHttpConnectionPtr host_fake_connection_;
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
-  FakeHttpConnection::Type http_conn_type_{FakeHttpConnection::Type::HTTP1};
+  Http::CodecType http_conn_type_{Http::CodecType::HTTP1};
   bool tls_hosts_{false};
 
   static constexpr int MaxTimeout = 100;
@@ -959,7 +959,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTlsHttp2) {
   tls_hosts_ = true;
 
   // Change hosts to operate over HTTP/2 instead of default HTTP.
-  http_conn_type_ = FakeHttpConnection::Type::HTTP2;
+  http_conn_type_ = Http::CodecType::HTTP2;
 
   initialize();
 
