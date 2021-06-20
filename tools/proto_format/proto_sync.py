@@ -483,7 +483,7 @@ def sync(api_root, mode, is_ci, labels, shadow):
 
         for proto in IGNORED_V2_PROTOS:
             ignored_v2_proto_path = str(dst_dir.joinpath("envoy", proto[6:]))
-            if(os.path.exists(ignored_v2_proto_path)):
+            if (os.path.exists(ignored_v2_proto_path)):
                 shutil.rmtree(ignored_v2_proto_path)
 
         diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
