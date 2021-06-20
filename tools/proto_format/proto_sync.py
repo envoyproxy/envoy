@@ -9,7 +9,6 @@
 
 import argparse
 from collections import defaultdict
-from genericpath import exists
 import multiprocessing as mp
 import os
 import pathlib
