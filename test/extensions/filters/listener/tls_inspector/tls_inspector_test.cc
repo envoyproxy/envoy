@@ -35,11 +35,14 @@ public:
   ~TlsInspectorTest() override {
     filter_.reset();
     EXPECT_CALL(dispatcher_,
-                  createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                   Event::FileReadyType::Read | Event::FileReadyType::Closed)).WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
+        .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
     // This is used to test the FileEvent was reset by the listener filters.
     // Otherwise the assertion inside `initializeFileEvent` will be trigger.
-    io_handle_->initializeFileEvent(dispatcher_, [](uint32_t) -> void { }, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Closed);
+    io_handle_->initializeFileEvent(
+        dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
     io_handle_->resetFileEvents();
     io_handle_->close();
   }
