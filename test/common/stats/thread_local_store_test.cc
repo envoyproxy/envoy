@@ -959,6 +959,8 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixDot) {
       "cluster."); // Prefix match can be executed symbolically.
   store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
   uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+
+  // No memory is consumed at all while rejecting stats from "prefix."
   EXPECT_MEMORY_EQ(mem_consumed, 0);
   EXPECT_MEMORY_LE(mem_consumed, 0);
 }
@@ -973,6 +975,9 @@ TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
       "cluster"); // No dot at the end means we have to compare as strings.
   store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
   uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+
+  // Memory is consumed at all while rejecting stats from "prefix" in proportion
+  // to the number of stat instantiations attempted.
   EXPECT_MEMORY_EQ(mem_consumed, 2936480);
   EXPECT_MEMORY_LE(mem_consumed, 3500000);
 }

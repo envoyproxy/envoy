@@ -86,8 +86,13 @@ public:
 
   const envoy::type::matcher::v3::StringMatcher& matcher() const { return matcher_; }
 
-  // If the matcher is a case-sensitive prefix match, returns the prefix string.
-  // otherwise, returns an empty string.
+  /**
+   * Helps applications optimize the case where a matcher is a case-sensitive
+   * prefix-match.
+   *
+   * @param prefix the returned prefix string
+   * @return true if the matcher is a case-sensitive prefix-match.
+   */
   bool getCaseSensitivePrefixMatch(std::string& prefix) const;
 
 private:

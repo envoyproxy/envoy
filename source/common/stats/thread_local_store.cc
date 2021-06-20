@@ -465,8 +465,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
     StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
-  if ((tls_rejected_stats != nullptr &&
-       tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end())) {
+  if (tls_rejected_stats != nullptr &&
+      tls_rejected_stats->find(full_stat_name) != tls_rejected_stats->end()) {
     return null_stat;
   }
 

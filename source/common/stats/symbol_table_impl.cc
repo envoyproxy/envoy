@@ -164,14 +164,16 @@ bool StatName::startsWith(StatName symbolic_prefix) const {
       [&prefix_symbols](Symbol symbol) { prefix_symbols.push_back(symbol); },
       [&ret](absl::string_view) { ret = false; });
 
-  // If there any dynamic components, we'll our string_view lambda called, and
-  // then we'll return false for simplicity.
+  // If there any dynamic components, our string_view lambda will be called, and
+  // then we'll return false for simplicity. We don't have a current need for
+  // prefixes to be expressed dynamically, and handling that case would add
+  // complexity.
   if (!ret) {
     return false;
   }
 
   // Now decode the StatName, matching against the symbols. It's OK for there to
-  // be string_view elements after the prefix match.
+  // be dynamic string_view elements after the prefix match.
   uint32_t index = 0;
   SymbolTableImpl::Encoding::decodeTokens(
       data(), dataSize(),

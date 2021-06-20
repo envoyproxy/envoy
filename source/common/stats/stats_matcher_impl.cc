@@ -45,6 +45,20 @@ StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig
   }
 }
 
+// If the last string-matcher added is a case-sensitive prefix match, and the
+// prefix ends in ".", then this drops that match and adds it to a list of
+// prefixes. This is beneficial because token prefixes can be handled more
+// efficiently as a StatName without requiring conversion to a string.
+//
+// In the future, other matcher patterns could be optimized in a similar way,
+// such as:
+//   * suffixes that begin with "."
+//   * exact-matches
+//   * substrings that begin and end with "."
+//
+// These are left unoptimized for the moment to keep the code-change simpler,
+// and because we haven't observed an acute performance need to optimize those
+// other patterns yet.
 void StatsMatcherImpl::optimizeLastMatcher() {
   std::string prefix;
   if (matchers_.back().getCaseSensitivePrefixMatch(prefix) && absl::EndsWith(prefix, ".") &&

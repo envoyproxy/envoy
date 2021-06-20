@@ -19,28 +19,29 @@ public:
    * Take a metric name and report whether or not it should be instantiated.
    * The may need to convert the StatName to a string.
    *
-   * @param the name of a Stats::Metric.
+   * @param name the name of a Stats::Metric.
    * @return bool true if that stat should not be instantiated.
    */
   virtual bool rejects(StatName name) const PURE;
 
   /**
    * Takes a metric name and quickly determine whether it can be rejected based
-   * purely on the StatName. A return of 'false' means we may need to check
+   * purely on the StatName. A return of 'false' means we will need to check
    * slowRejects as well.
    *
-   * @param the name of a Stats::Metric.
+   * @param name the name of a Stats::Metric.
    * @return bool true if that stat should not be instantiated, or whether we
    *                   need to check slowRejects.
    */
   virtual bool fastRejects(StatName name) const PURE;
 
   /**
-   * Takes a metric name and quickly determine whether it can be rejected based
-   * purely on the StatName. A return of 'false' means we may need to check
-   * slowRejects as well.
+   * Takes a metric name and converts it to a string, if needed, to  determine
+   * whether it needs to be rejected. This is intended to be used if fastRejects()
+   * returns false. It is a good idea to cache the results of this, to avoid the
+   * stringification overhead as well as a global symbol table lock.
    *
-   * @param the name of a Stats::Metric.
+   * @param name the name of a Stats::Metric.
    * @return bool true if that stat should not be instantiated, or whether we
    *                   need to check slowRejects.
    */
