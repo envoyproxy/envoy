@@ -9,6 +9,7 @@
 
 import argparse
 from collections import defaultdict
+from genericpath import exists
 import multiprocessing as mp
 import os
 import pathlib
@@ -482,7 +483,9 @@ def sync(api_root, mode, is_ci, labels, shadow):
             shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
         for proto in IGNORED_V2_PROTOS:
-            shutil.rmtree(str(dst_dir.joinpath("envoy", proto[6:])))
+            ignored_v2_proto_path = str(dst_dir.joinpath("envoy", proto[6:]))
+            if(os.path.exists(ignored_v2_proto_path)):
+                shutil.rmtree(str(dst_dir.joinpath("envoy", proto[6:])))
 
         diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 
