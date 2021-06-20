@@ -1011,19 +1011,19 @@ public:
    * This method returns the client sampling percentage.
    * @return the client sampling percentage
    */
-  virtual const envoy::type::v3::FractionalPercent& getClientSampling() const PURE;
+  virtual const envoy::config::core::v3::RuntimeFractionalPercent& getClientSampling() const PURE;
 
   /**
    * This method returns the random sampling percentage.
    * @return the random sampling percentage
    */
-  virtual const envoy::type::v3::FractionalPercent& getRandomSampling() const PURE;
+  virtual const envoy::config::core::v3::RuntimeFractionalPercent& getRandomSampling() const PURE;
 
   /**
    * This method returns the overall sampling percentage.
    * @return the overall sampling percentage
    */
-  virtual const envoy::type::v3::FractionalPercent& getOverallSampling() const PURE;
+  virtual const envoy::config::core::v3::RuntimeFractionalPercent& getOverallSampling() const PURE;
 
   /**
    * This method returns the route level tracing custom tags.

@@ -259,38 +259,46 @@ const std::string& DecoratorImpl::getOperation() const { return operation_; }
 bool DecoratorImpl::propagate() const { return propagate_; }
 
 RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing) {
+  // TODO(ikonst): add runtime_key to envoy.config.route.v3.Tracing
+  //  to allow per-route runtime tracing overrides
   if (!tracing.has_client_sampling()) {
-    client_sampling_.set_numerator(100);
-    client_sampling_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    client_sampling_.mutable_default_value().set_numerator(100);
+    client_sampling_.mutable_default_value().set_denominator(
+        envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
-    client_sampling_ = tracing.client_sampling();
+    client_sampling_.set_default_value(tracing.client_sampling());
   }
   if (!tracing.has_random_sampling()) {
-    random_sampling_.set_numerator(100);
-    random_sampling_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    random_sampling_.mutable_default_value().set_numerator(100);
+    random_sampling_.mutable_default_value().set_denominator(
+        envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
-    random_sampling_ = tracing.random_sampling();
+    random_sampling_.set_default_value(tracing.random_sampling());
   }
   if (!tracing.has_overall_sampling()) {
-    overall_sampling_.set_numerator(100);
-    overall_sampling_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
+    overall_sampling_.mutable_default_value().set_numerator(100);
+    overall_sampling_.mutable_default_value().set_denominator(
+        envoy::type::v3::FractionalPercent::HUNDRED);
   } else {
-    overall_sampling_ = tracing.overall_sampling();
+    overall_sampling_.set_default_value(tracing.overall_sampling());
   }
   for (const auto& tag : tracing.custom_tags()) {
     custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
   }
 }
 
-const envoy::type::v3::FractionalPercent& RouteTracingImpl::getClientSampling() const {
+const envoy::config::core::v3::RuntimeFractionalPercent&
+RouteTracingImpl::getClientSampling() const {
   return client_sampling_;
 }
 
-const envoy::type::v3::FractionalPercent& RouteTracingImpl::getRandomSampling() const {
+const envoy::config::core::v3::RuntimeFractionalPercent&
+RouteTracingImpl::getRandomSampling() const {
   return random_sampling_;
 }
 
-const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
+const envoy::config::core::v3::RuntimeFractionalPercent&
+RouteTracingImpl::getOverallSampling() const {
   return overall_sampling_;
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }

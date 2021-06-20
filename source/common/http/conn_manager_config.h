@@ -127,9 +127,9 @@ struct ConnectionManagerTracingStats {
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
   Tracing::CustomTagMap custom_tags_;
-  envoy::type::v3::FractionalPercent client_sampling_;
-  envoy::type::v3::FractionalPercent random_sampling_;
-  envoy::type::v3::FractionalPercent overall_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent client_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent random_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent overall_sampling_;
   bool verbose_;
   uint32_t max_path_tag_length_;
 };

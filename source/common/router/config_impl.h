@@ -411,20 +411,20 @@ public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
   // Tracing::getClientSampling
-  const envoy::type::v3::FractionalPercent& getClientSampling() const override;
+  const envoy::config::core::v3::RuntimeFractionalPercent& getClientSampling() const override;
 
   // Tracing::getRandomSampling
-  const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
+  const envoy::config::core::v3::RuntimeFractionalPercent& getRandomSampling() const override;
 
   // Tracing::getOverallSampling
-  const envoy::type::v3::FractionalPercent& getOverallSampling() const override;
+  const envoy::config::core::v3::RuntimeFractionalPercent& getOverallSampling() const override;
 
   const Tracing::CustomTagMap& getCustomTags() const override;
 
 private:
-  envoy::type::v3::FractionalPercent client_sampling_;
-  envoy::type::v3::FractionalPercent random_sampling_;
-  envoy::type::v3::FractionalPercent overall_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent client_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent random_sampling_;
+  envoy::config::core::v3::RuntimeFractionalPercent overall_sampling_;
   Tracing::CustomTagMap custom_tags_;
 };
 

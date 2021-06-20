@@ -487,19 +487,23 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
 
-    envoy::type::v3::FractionalPercent client_sampling;
+    envoy::config::core::v3::RuntimeFractionalPercent client_sampling;
     client_sampling.set_numerator(
         tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
-    envoy::type::v3::FractionalPercent random_sampling;
+    client_sampling.set_runtime_key("tracing.client_enabled");
+    envoy::config::core::v3::RuntimeFractionalPercent random_sampling;
     // TODO: Random sampling historically was an integer and default to out of 10,000. We should
     // deprecate that and move to a straight fractional percent config.
     uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
         tracing_config, random_sampling, 10000, 10000)};
-    random_sampling.set_numerator(random_sampling_numerator);
-    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    envoy::type::v3::FractionalPercent overall_sampling;
-    overall_sampling.set_numerator(
+    random_sampling.mutable_default_value().set_numerator(random_sampling_numerator);
+    random_sampling.mutable_default_value().set_denominator(
+        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    random_sampling.set_runtime_key("tracing.random_sampling");
+    envoy::config::core::v3::RuntimeFractionalPercent overall_sampling;
+    overall_sampling.mutable_default_value().set_numerator(
         tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
+    overall_sampling.set_runtime_key("tracing.global_enabled");
 
     const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);

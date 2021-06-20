@@ -290,11 +290,11 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
   const uint64_t result = rid_to_integer.value() % 10000;
 
-  const envoy::type::v3::FractionalPercent* client_sampling =
+  const envoy::config::core::v3::RuntimeFractionalPercent* client_sampling =
       &config.tracingConfig()->client_sampling_;
-  const envoy::type::v3::FractionalPercent* random_sampling =
+  const envoy::config::core::v3::RuntimeFractionalPercent* random_sampling =
       &config.tracingConfig()->random_sampling_;
-  const envoy::type::v3::FractionalPercent* overall_sampling =
+  const envoy::config::core::v3::RuntimeFractionalPercent* overall_sampling =
       &config.tracingConfig()->overall_sampling_;
 
   if (route && route->tracingConfig()) {
@@ -306,22 +306,20 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   // Do not apply tracing transformations if we are currently tracing.
   final_reason = rid_extension->getTraceReason(request_headers);
   if (Tracing::Reason::NotTraceable == final_reason) {
-    if (request_headers.ClientTraceId() &&
-        runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
+    if (request_headers.ClientTraceId() && FractionalPercent(client_sampling, runtime).enabled()) {
       final_reason = Tracing::Reason::ClientForced;
       rid_extension->setTraceReason(request_headers, final_reason);
     } else if (request_headers.EnvoyForceTrace()) {
       final_reason = Tracing::Reason::ServiceForced;
       rid_extension->setTraceReason(request_headers, final_reason);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
-                                                 result)) {
+    } else if (FractionalPercent(random_sampling, runtime).enabled()) {
       final_reason = Tracing::Reason::Sampling;
       rid_extension->setTraceReason(request_headers, final_reason);
     }
   }
 
   if (final_reason != Tracing::Reason::NotTraceable &&
-      !runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
+      !FractionalPercent(overall_sampling, runtime).enabled()) {
     final_reason = Tracing::Reason::NotTraceable;
     rid_extension->setTraceReason(request_headers, final_reason);
   }
