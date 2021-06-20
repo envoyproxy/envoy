@@ -300,12 +300,6 @@ public:
                                    Event::FileTriggerType trigger, uint32_t events) PURE;
 
   /**
-   * Check whether the file event is initialized or not.
-   * @return return true if the file event is initialize, otherwise return false.
-   */
-  virtual bool isFileEventInitialized() PURE;
-
-  /**
    * Activates file events for the current underlying fd.
    * @param events events that will be activated.
    */
