@@ -72,9 +72,6 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   // Track success for later bookkeeping (stream could still be reset).
   success_ = CodeUtility::is2xx(response_status);
 
-  // Testing hook.
-  http_client_.synchronizer_.syncPoint("dispatch_encode_headers");
-
   ENVOY_LOG(debug, "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
   bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream,
@@ -96,11 +93,6 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   if (error_code_) {
     onError();
     return;
-  }
-
-  // Testing hook.
-  if (end_stream) {
-    http_client_.synchronizer_.syncPoint("dispatch_encode_final_data");
   }
 
   ENVOY_LOG(debug,
@@ -151,9 +143,6 @@ void Client::DirectStreamCallbacks::onError() {
   envoy_error_code_t code = error_code_.value_or(ENVOY_STREAM_RESET);
   envoy_data message = error_message_.value_or(envoy_nodata);
   int32_t attempt_count = error_attempt_count_.value_or(-1);
-
-  // Testing hook.
-  http_client_.synchronizer_.syncPoint("dispatch_on_error");
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform remote reset stream",
             direct_stream_.stream_handle_);
@@ -284,8 +273,6 @@ void Client::cancelStream(envoy_stream_t stream) {
   if (direct_stream) {
     removeStream(direct_stream->stream_handle_);
 
-    // Testing hook.
-    synchronizer_.syncPoint("dispatch_on_cancel");
     direct_stream->callbacks_->onCancel();
 
     // Since https://github.com/envoyproxy/envoy/pull/13052, the connection manager expects that
