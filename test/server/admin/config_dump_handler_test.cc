@@ -578,10 +578,10 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
  ]
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK,
+  EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, testing::HasSubstr("could not be successfully used"));
 }
 
 // Test that a 404 Not found is returned if a non-existent resource is passed in as the

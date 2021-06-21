@@ -12,6 +12,19 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+
+//
+bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
+                                  Protobuf::Message& message) {
+  for (const auto& path : field_mask.paths()) {
+    if (!ProtobufUtil::FieldMaskUtil::GetFieldDescriptors(message.GetDescriptor(), path, nullptr)) {
+      return false;
+    }
+  }
+  ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &message);
+  return true;
+}
+
 // Apply a field mask to a resource message. A simple field mask might look
 // like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
 // resource. Unfortunately, since the "cluster" field is Any and the in-built
@@ -31,7 +44,7 @@ namespace {
 // this to allow arbitrary indexing through Any fields. This is pretty
 // complicated, we would need to build a FieldMask tree similar to how the C++
 // Protobuf library does this internally.
-void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
+bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   // Figure out which paths cover Any fields. For each field, gather the paths to
@@ -87,13 +100,14 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
       MessageUtil::unpackTo(any_message, *inner_message);
       // Trim message.
-      ProtobufUtil::FieldMaskUtil::TrimMessage(inner_field_mask, inner_message.get());
+      if (!CheckFieldMaskAndTrimMessage(inner_field_mask, *inner_message))
+        return false;
       // Pack it back into the Any resource.
       any_message.PackFrom(*inner_message);
       reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
     }
   }
-  ProtobufUtil::FieldMaskUtil::TrimMessage(outer_field_mask, &message);
+  return CheckFieldMaskAndTrimMessage(outer_field_mask, message);
 }
 
 // Helper method to get the resource parameter.
@@ -129,12 +143,14 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   if (resource.has_value()) {
     auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
     if (err.has_value()) {
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
       response.add(err.value().second);
       return err.value().first;
     }
   } else {
     auto err = addAllConfigToDump(dump, mask, include_eds);
     if (err.has_value()) {
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
       response.add(err.value().second);
       return err.value().first;
     }
@@ -180,10 +196,7 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       if (mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
-        // trimResourceMessage will LOG(FATAL) if `field_mask` is malformed.
-        TRY_ASSERT_MAIN_THREAD { trimResourceMessage(field_mask, msg); }
-        END_TRY
-        catch (...) {
+        if (!trimResourceMessage(field_mask, msg)) {
           return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
               Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
                                                    " could not be successfully used."))};
@@ -225,11 +238,7 @@ ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields.
-      TRY_ASSERT_MAIN_THREAD {
-        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
-      }
-      END_TRY
-      catch (...) {
+      if (!CheckFieldMaskAndTrimMessage(field_mask, *message)) {
         return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
             Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
                                                  " could not be successfully used."))};
