@@ -195,17 +195,6 @@ def run_checks():
         "serialize_as_string.cc",
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
     errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history not in alphabetical order (zzzzz vs aaaaa): please check placement of line"
-    )
-    errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history not in alphabetical order (this vs aaaa): please check placement of line")
-    errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
-        "check_format.py")
-    errors += check_unfixable_error(
         "counter_from_string.cc",
         "Don't lookup stats by name at runtime; use StatName saved during construction")
     errors += check_unfixable_error(
