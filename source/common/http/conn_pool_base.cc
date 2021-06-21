@@ -154,6 +154,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
     break;
   case StreamResetReason::LocalReset:
   case StreamResetReason::ProtocolError:
+  case StreamResetReason::OverloadManager:
     parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
     break;
   case StreamResetReason::RemoteReset:
