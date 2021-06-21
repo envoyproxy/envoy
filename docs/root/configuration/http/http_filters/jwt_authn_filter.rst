@@ -41,8 +41,7 @@ JwtProvider
 * *from_headers*: extract JWT from HTTP headers.
 * *from_params*: extract JWT from query parameters.
 * *forward_payload_header*: forward the JWT payload in the specified HTTP header.
-* *enable_jwt_cache*: Enables JWT cache, it can be configured by *jwt_cache_config*. Only valid JWT tokens are cached.
-* *jwt_cache_config*: Specify JWT cache configuration.
+* *jwt_cache_config*: Enables JWT cache, its size can be specified by *jwt_cache_size*. Only valid JWT tokens are cached.
 
 Default Extract Location
 ~~~~~~~~~~~~~~~~~~~~~~~~

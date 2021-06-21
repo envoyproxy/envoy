@@ -35,7 +35,7 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
-    bool enable_jwt_cache = jwt_provider_.enable_jwt_cache();
+    bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
