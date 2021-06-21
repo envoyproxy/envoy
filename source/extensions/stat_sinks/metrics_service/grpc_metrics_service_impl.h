@@ -117,13 +117,18 @@ private:
  */
 template <class RequestProto, class ResponseProto> class MetricsServiceSink : public Stats::Sink {
 public:
-  // MetricsService::Sink
   MetricsServiceSink(
       const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
       bool report_counters_as_deltas, bool emit_labels)
-      : flusher_(report_counters_as_deltas, emit_labels),
-        grpc_metrics_streamer_(grpc_metrics_streamer) {}
+      : MetricsServiceSink(grpc_metrics_streamer,
+                           MetricsFlusher(report_counters_as_deltas, emit_labels)) {}
 
+  MetricsServiceSink(
+      const GrpcMetricsStreamerSharedPtr<RequestProto, ResponseProto>& grpc_metrics_streamer,
+      MetricsFlusher&& flusher)
+      : flusher_(std::move(flusher)), grpc_metrics_streamer_(std::move(grpc_metrics_streamer)) {}
+
+  // MetricsService::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
     grpc_metrics_streamer_->send(flusher_.flush(snapshot));
   }

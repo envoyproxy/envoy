@@ -36,7 +36,6 @@ envoy_extension_cc_test(
     srcs = ["http_inspector_config_test.cc"],
     extension_name = "envoy.filters.listener.http_inspector",
     deps = [
-        "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/http_inspector:config",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/mocks/api:api_mocks",

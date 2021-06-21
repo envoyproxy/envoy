@@ -8,7 +8,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -212,7 +211,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 }
 
 const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& nspace) const {
-  return nspace.empty() ? HttpFilterNames::get().HeaderToMetadata : nspace;
+  static const std::string& headerToMetadata = "envoy.filters.http.header_to_metadata";
+  return nspace.empty() ? headerToMetadata : nspace;
 }
 
 // add metadata['key']= value depending on header present or missing case
@@ -267,7 +267,7 @@ const Config* HeaderToMetadataFilter::getConfig() const {
   }
 
   effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
-      HttpFilterNames::get().HeaderToMetadata, decoder_callbacks_->route());
+      "envoy.filters.http.header_to_metadata", decoder_callbacks_->route());
   if (effective_config_) {
     return effective_config_;
   }

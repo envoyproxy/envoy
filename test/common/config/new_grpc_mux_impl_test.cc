@@ -328,7 +328,8 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
   response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
 
-  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  EXPECT_LOG_CONTAINS("debug", "for " + type_url + " from HAL 9000",
+                      grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_));
 
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);

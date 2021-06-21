@@ -34,7 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
-  void releaseResources();
+  virtual void releaseResources() { releaseResourcesBase(); }
+  void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;

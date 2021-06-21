@@ -99,6 +99,26 @@ TEST_F(DnsFilterUtilsTest, GetAddressRecordTypeTest) {
   EXPECT_EQ(addr_type.value(), DNS_RECORD_TYPE_A);
 }
 
+TEST_F(DnsFilterUtilsTest, GetDomainSuffixTest) {
+  struct DomainSuffixTestData {
+    const std::string domain;
+    const std::string expected_suffix;
+  } suffix_data[] = {
+      {"_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local",
+       "utelsystems.local"},
+      {"primary.voip.subzero.com", "subzero.com"},
+      {"subzero.com", "subzero.com"},
+      {"subzero", "subzero"},
+      {".com", "com"},
+      {"", ""},
+  };
+
+  for (auto& ptr : suffix_data) {
+    const absl::string_view result = Utils::getDomainSuffix(ptr.domain);
+    EXPECT_EQ(ptr.expected_suffix, result);
+  }
+}
+
 } // namespace
 } // namespace Utils
 } // namespace DnsFilter

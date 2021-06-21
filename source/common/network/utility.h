@@ -69,8 +69,7 @@ public:
 };
 
 static const uint64_t DEFAULT_UDP_MAX_DATAGRAM_SIZE = 1500;
-static const uint64_t NUM_DATAGRAMS_PER_GRO_RECEIVE = 16;
-static const uint64_t NUM_DATAGRAMS_PER_MMSG_RECEIVE = 16;
+static const uint64_t NUM_DATAGRAMS_PER_RECEIVE = 16;
 static const uint64_t MAX_NUM_PACKETS_PER_EVENT_LOOP = 6000;
 
 /**

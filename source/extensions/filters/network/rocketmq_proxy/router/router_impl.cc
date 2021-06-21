@@ -166,6 +166,7 @@ void RouterImpl::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDat
 }
 
 void RouterImpl::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+                                                absl::string_view,
                                                 Upstream::HostDescriptionConstSharedPtr host) {
   if (router_.handle_) {
     ENVOY_LOG(trace, "#onPoolFailure, reset cancellable handle to nullptr");

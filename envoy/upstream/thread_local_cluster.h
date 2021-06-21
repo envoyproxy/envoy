@@ -17,12 +17,23 @@ public:
   HttpPoolData(OnNewStreamFn on_new_stream, Http::ConnectionPool::Instance* pool)
       : on_new_stream_(on_new_stream), pool_(pool) {}
 
+  /**
+   * See documentation of Http::ConnectionPool::Instance.
+   */
   Envoy::Http::ConnectionPool::Cancellable*
   newStream(Http::ResponseDecoder& response_decoder,
             Envoy::Http::ConnectionPool::Callbacks& callbacks) {
     on_new_stream_();
     return pool_->newStream(response_decoder, callbacks);
   }
+  bool hasActiveConnections() const { return pool_->hasActiveConnections(); };
+
+  /**
+   * See documentation of Envoy::ConnectionPool::Instance.
+   */
+  void addDrainedCallback(ConnectionPool::Instance::DrainedCb cb) {
+    pool_->addDrainedCallback(cb);
+  };
 
   Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
 

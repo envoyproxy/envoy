@@ -42,7 +42,7 @@ static_resources:
 
   clusters:
   - name: web_service
-    type: STRICT_DNS # static
+    type: STRICT_DNS  # static
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: web_service
