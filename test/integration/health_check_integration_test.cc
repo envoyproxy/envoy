@@ -265,12 +265,13 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
   test_server_->waitForCounterGe("cluster.cluster_1.health_check.failure", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.attempt")->value());
   test_server_->waitForGaugeEq("cluster.cluster_1.membership_excluded", 1);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_1.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_healthy")->value());
 
-  // Advance time to cause another health check. This should remove the cluster exclusion.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  // Wait until the next attempt is made.
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 2);
 
   ASSERT_TRUE(clusters_[cluster_idx].host_fake_connection_->waitForNewStream(
       *dispatcher_, clusters_[cluster_idx].host_stream_));

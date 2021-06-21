@@ -6,6 +6,7 @@ load(
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_pch_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -467,5 +468,32 @@ envoy_cc_library(
     hdrs = ["statusor.h"],
     deps = [
         "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_pch_library(
+    name = "common_pch",
+    external_deps = [
+        "spdlog",
+    ],
+    includes = [
+        "envoy/config/bootstrap/v3/bootstrap.pb.h",
+        "envoy/config/cluster/v3/cluster.pb.h",
+        "envoy/config/core/v3/base.pb.h",
+        "envoy/config/core/v3/config_source.pb.h",
+        "envoy/config/route/v3/route_components.pb.h",
+        "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h",
+        "envoy/service/discovery/v3/discovery.pb.h",
+        "spdlog/sinks/android_sink.h",
+        "spdlog/spdlog.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
