@@ -60,11 +60,16 @@ public:
    * @return the socket shared by worker threads; otherwise return null.
    */
   Network::SocketOptRef sharedSocket() const override {
+    // If a tcp listener socket doesn't bind to port, there is no listen socket so there is no
+    // shared socket.
+    if (socketType() == Network::Socket::Type::Stream && !bind_to_port_) {
+      return absl::nullopt;
+    }
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
     }
-    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // If reuse_port is true, always return nullopt, even socket_ is created for reserving
     // port number.
     return absl::nullopt;
   }
