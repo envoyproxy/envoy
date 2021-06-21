@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This API is a work in progress.
 
 message PathTransformation {
-  // Action to take when the path has been modified by a transformation.
+  // Action to take on a http request when the request path url has been modified by a transformation.
   enum NormalizePathAction {
     CONTINUE = 0;
     REJECT = 1;
@@ -49,6 +49,7 @@ message PathTransformation {
     message MergeSlashes {
     }
 
+    // When request URL path contains escaped slash sequences (%2F, %2f, %5C and %5c), unescape these sequences.
     message UnescapeSlashes {
     }
 
@@ -65,6 +66,7 @@ message PathTransformation {
       UnescapeSlashes unescape_slashes = 4;
     }
 
+    // Action to take when request URL path is modified by the operation.
     NormalizePathAction normalize_path_action = 11;
   }
 
