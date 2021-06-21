@@ -1,3 +1,4 @@
+#include <thread>
 #include <vector>
 
 #include "source/common/common/callback_impl.h"
@@ -65,82 +66,71 @@ public:
 TEST_F(ThreadSafeCallbackManagerTest, All) {
   InSequence s;
 
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackManager manager{dispatcher};
+  auto manager = ThreadSafeCallbackManager::create();
 
-  auto handle1 = manager.add(cb_dispatcher, [this]() -> void { called(5); });
-  auto handle2 = manager.add(cb_dispatcher, [this]() -> void { called(10); });
+  auto handle1 = manager->add(cb_dispatcher, [this]() -> void { called(5); });
+  auto handle2 = manager->add(cb_dispatcher, [this]() -> void { called(10); });
 
   EXPECT_CALL(*this, called(5));
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacks();
+  manager->runCallbacks();
 
   handle1.reset();
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacks();
+  manager->runCallbacks();
 
   EXPECT_CALL(*this, called(10));
   EXPECT_CALL(*this, called(20));
-  auto handle3 = manager.add(cb_dispatcher, [this]() -> void { called(20); });
-  manager.runCallbacks();
+  auto handle3 = manager->add(cb_dispatcher, [this]() -> void { called(20); });
+  manager->runCallbacks();
   handle3.reset();
 
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacks();
+  manager->runCallbacks();
 }
 
 TEST_F(ThreadSafeCallbackManagerTest, DestroyManagerBeforeHandle) {
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackHandlePtr handle;
+  CallbackHandlePtr handle;
   {
-    ThreadSafeCallbackManager manager{dispatcher};
-    handle = manager.add(cb_dispatcher, [this]() -> void { called(5); });
+    auto manager = ThreadSafeCallbackManager::create();
+    handle = manager->add(cb_dispatcher, [this]() -> void { called(5); });
     EXPECT_CALL(*this, called(5));
-    manager.runCallbacks();
+    manager->runCallbacks();
   }
   EXPECT_NE(nullptr, handle);
   // It should be safe to destruct the handle after the manager.
   handle.reset();
 }
 
-TEST_F(ThreadSafeCallbackManagerTest, RemoveCallbackAsync) {
-  InSequence s;
+TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
+  auto manager = ThreadSafeCallbackManager::create();
 
-  std::vector<std::function<void()>> remove_cbs;
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&remove_cbs](std::function<void()> cb) {
-    remove_cbs.push_back(cb);
-  }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackManager manager{dispatcher};
+  // Register a callback in a new thread and then remove it
+  auto t = std::thread([this, manager = manager.get()] {
+    testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
+    ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  auto handle1 = manager.add(cb_dispatcher, [this]() -> void { called(5); });
-  auto handle2 = manager.add(cb_dispatcher, [this]() -> void { called(10); });
+    auto handle = manager->add(cb_dispatcher, [this]() { called(20); });
+    handle.reset();
+  });
 
-  // delete handle1, but delay removal from callback manager
-  handle1.reset();
+  // Add another callback on the main thread
+  auto handle = manager->add(cb_dispatcher, [this]() { called(10); });
+
+  // Validate that we can wait for the above thread to terminate (and de-register the
+  // callback), then run the remaining callbacks.
+  t.join();
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacks();
-
-  // remove all callbacks
-  handle2.reset();
-  for (auto& cb : remove_cbs) {
-    cb();
-  }
-
-  // Validate empty and that running empty callback set works
-  EXPECT_EQ(0, manager.size());
-  manager.runCallbacks();
+  manager->runCallbacks();
 }
 
 } // namespace Common

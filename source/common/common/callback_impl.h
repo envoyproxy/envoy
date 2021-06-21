@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <list>
+#include <memory>
 #include <tuple>
 
 #include "envoy/common/callback.h"
@@ -108,38 +109,33 @@ private:
 /**
  * @brief Utility class for managing callbacks across multiple threads.
  *
- * Callback registration (via locks) and callback execution (via dispatchers and shared_ptr's) are
- * thread-safe. However the main ThreadSafeCallbackManager instance is assumed to exist on a single
- * thread during it's lifetime, the same as the provided dispatcher it is constructed with.
- *
- * @note This is not safe to use for instances in which the lifetimes of the threads registering
- * callbacks is less than the thread that owns the callback manager due to an assumption that
- * dispatchers registered alongside callbacks remain valid, even if the callback expires.
- *
  * @see CallbackManager for a non-thread-safe version
  */
-class ThreadSafeCallbackManager {
+class ThreadSafeCallbackManager : public std::enable_shared_from_this<ThreadSafeCallbackManager> {
   struct CallbackHolder;
-  using CallbackListEntry = std::tuple<std::weak_ptr<CallbackHolder>, Event::Dispatcher&>;
+  using CallbackListEntry = std::tuple<CallbackHolder*, Event::Dispatcher&, std::weak_ptr<bool>>;
 
 public:
   using Callback = std::function<void()>;
 
   /**
-   * @param dispatcher Dispatcher relevant to the thread in which the callback manager is
-   * created/managed
+   * @brief Create a ThreadSafeCallbackManager
+   *
+   * @note The ThreadSafeCallbackManager must always be represented as a std::shared_ptr in
+   *       order to satisfy internal conditions to how callbacks are managed.
    */
-  explicit ThreadSafeCallbackManager(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  static std::shared_ptr<ThreadSafeCallbackManager> create() {
+    return std::shared_ptr<ThreadSafeCallbackManager>(new ThreadSafeCallbackManager());
+  }
 
   /**
    * @brief Add a callback.
    * @param dispatcher Dispatcher from the same thread as the registered callback. This will be used
    *                   to schedule the execution of the callback.
    * @param callback callback to add
-   * @return ThreadSafeCallbackHandlePtr a handle that can be used to remove the callback.
+   * @return Handle that can be used to remove the callback.
    */
-  ABSL_MUST_USE_RESULT ThreadSafeCallbackHandlePtr add(Event::Dispatcher& dispatcher,
-                                                       Callback callback);
+  ABSL_MUST_USE_RESULT CallbackHandlePtr add(Event::Dispatcher& dispatcher, Callback callback);
 
   /**
    * @brief Run all callbacks
@@ -150,17 +146,20 @@ public:
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(ThreadSafeCallbackManager& parent, Callback cb);
+    CallbackHolder(std::weak_ptr<ThreadSafeCallbackManager> parent, Callback cb,
+                   Event::Dispatcher& cb_dispatcher);
 
     ~CallbackHolder() override;
 
+    std::weak_ptr<ThreadSafeCallbackManager> parent_;
     Callback cb_;
-    Event::Dispatcher& parent_dispatcher_;
+    Event::Dispatcher& callback_dispatcher_;
+    std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 
-    ThreadSafeCallbackManager& parent_;
-    std::weak_ptr<bool> still_alive_;
     typename std::list<CallbackListEntry>::iterator it_;
   };
+
+  ThreadSafeCallbackManager() = default;
 
   /**
    * Remove a member update callback added via add().
@@ -168,18 +167,10 @@ private:
    */
   void remove(typename std::list<CallbackListEntry>::iterator& it);
 
-  Event::Dispatcher& dispatcher_;
-
   // This must be held on all read/writes of callbacks_
-  mutable Thread::MutexBasicLockable lock_;
+  mutable Thread::MutexBasicLockable lock_{};
 
   std::list<CallbackListEntry> callbacks_ ABSL_GUARDED_BY(lock_);
-
-  // This is a sentinel shared_ptr used for keeping track of whether the manager is still alive.
-  // It is only held by weak reference in the callback holder above. This is used versus having
-  // the manager inherit from shared_from_this to avoid the manager having to be allocated inside
-  // a shared_ptr at all call sites.
-  const std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 };
 
 } // namespace Common

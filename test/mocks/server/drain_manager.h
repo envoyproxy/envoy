@@ -20,9 +20,9 @@ public:
   ~MockDrainManager() override;
 
   // Network::DrainManager
-  MOCK_METHOD(DrainManagerSharedPtr, createChildManager,
+  MOCK_METHOD(DrainManagerPtr, createChildManager,
               (Event::Dispatcher&, envoy::config::listener::v3::Listener::DrainType), (override));
-  MOCK_METHOD(DrainManagerSharedPtr, createChildManager, (Event::Dispatcher&), (override));
+  MOCK_METHOD(DrainManagerPtr, createChildManager, (Event::Dispatcher&), (override));
   MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startParentShutdownSequence, ());
   MOCK_METHOD(void, startDrainSequence, (std::function<void()> completion));

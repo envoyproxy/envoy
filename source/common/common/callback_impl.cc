@@ -3,11 +3,11 @@
 namespace Envoy {
 namespace Common {
 
-ThreadSafeCallbackHandlePtr ThreadSafeCallbackManager::add(Event::Dispatcher& dispatcher,
-                                                           Callback callback) {
+CallbackHandlePtr ThreadSafeCallbackManager::add(Event::Dispatcher& dispatcher, Callback callback) {
   Thread::LockGuard lock(lock_);
-  auto new_callback = std::make_shared<CallbackHolder>(*this, callback);
-  callbacks_.push_back(CallbackListEntry(std::weak_ptr<CallbackHolder>(new_callback), dispatcher));
+  auto new_callback = std::make_unique<CallbackHolder>(weak_from_this(), callback, dispatcher);
+  callbacks_.push_back(CallbackListEntry(new_callback.get(), dispatcher,
+                                         std::weak_ptr<bool>(new_callback->still_alive_)));
   // Get the list iterator of added callback handle, which will be used to remove itself from
   // callbacks_ list.
   new_callback->it_ = (--callbacks_.end());
@@ -17,19 +17,19 @@ ThreadSafeCallbackHandlePtr ThreadSafeCallbackManager::add(Event::Dispatcher& di
 void ThreadSafeCallbackManager::runCallbacks() {
   Thread::LockGuard lock(lock_);
   for (auto it = callbacks_.cbegin(); it != callbacks_.cend();) {
-    auto& [cb, cb_dispatcher] = *(it++);
+    auto& [cb, cb_dispatcher, still_alive] = *(it++);
 
     // sanity check cb is valid before attempting to schedule a dispatch
-    if (cb.expired()) {
+    if (still_alive.expired()) {
       continue;
     }
 
-    cb_dispatcher.post([cb = cb] {
+    cb_dispatcher.post([cb = cb, still_alive = still_alive] {
       // Once we're running on the thread that scheduled the callback, validate the
-      // callback is still valid and execute
-      std::shared_ptr<CallbackHolder> cb_shared = cb.lock();
-      if (cb_shared != nullptr) {
-        cb_shared->cb_();
+      // callback is still valid and execute. Even though 'expired()' is racy, because
+      // we are on the scheduling thread, this should not race with destruction.
+      if (!still_alive.expired()) {
+        cb->cb_();
       }
     });
   }
@@ -45,19 +45,20 @@ void ThreadSafeCallbackManager::remove(typename std::list<CallbackListEntry>::it
   callbacks_.erase(it);
 }
 
-ThreadSafeCallbackManager::CallbackHolder::CallbackHolder(ThreadSafeCallbackManager& parent,
-                                                          Callback cb)
-    : cb_(cb), parent_dispatcher_(parent.dispatcher_), parent_(parent),
-      still_alive_(parent.still_alive_) {}
+ThreadSafeCallbackManager::CallbackHolder::CallbackHolder(
+    std::weak_ptr<ThreadSafeCallbackManager> parent, Callback cb, Event::Dispatcher& cb_dispatcher)
+    : parent_(parent), cb_(cb), callback_dispatcher_(cb_dispatcher) {}
 
 ThreadSafeCallbackManager::CallbackHolder::~CallbackHolder() {
-  parent_dispatcher_.post([still_alive = still_alive_, &parent = parent_, it = it_]() mutable {
-    // We're running on the same thread the parent is managed on. We can assume there is
-    // no race between checking if alive and calling remove.
-    if (!still_alive.expired()) {
-      parent.remove(it);
-    }
-  });
+  // Validate that destruction of the callback is happening on the same thread in which it was
+  // intended to be executed.
+  ASSERT(callback_dispatcher_.isThreadSafe());
+
+  // If the parent is still active, remove the reference to the callback
+  auto parent = parent_.lock();
+  if (parent) {
+    parent->remove(it_);
+  }
 }
 
 } // namespace Common

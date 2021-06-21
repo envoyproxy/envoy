@@ -13,7 +13,6 @@ namespace Server {
 
 class DrainManager;
 using DrainManagerPtr = std::unique_ptr<DrainManager>;
-using DrainManagerSharedPtr = std::shared_ptr<DrainManager>;
 
 /**
  * Handles connection draining. This concept is used globally during hot restart / server draining
@@ -36,10 +35,10 @@ public:
    * exist.
    * @param drain_type The drain-type for the manager. May be different from the parent manager.
    */
-  virtual DrainManagerSharedPtr
+  virtual DrainManagerPtr
   createChildManager(Event::Dispatcher& dispatcher,
                      envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
-  virtual DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) PURE;
+  virtual DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) PURE;
 
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).

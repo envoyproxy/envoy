@@ -36,10 +36,10 @@ public:
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
   bool draining() const override { return draining_; }
   void startParentShutdownSequence() override;
-  DrainManagerSharedPtr
+  DrainManagerPtr
   createChildManager(Event::Dispatcher& dispatcher,
                      envoy::config::listener::v3::Listener::DrainType drain_type) override;
-  DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) override;
+  DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) override;
 
 private:
   void addDrainCompleteCallback(std::function<void()> cb);
@@ -55,11 +55,13 @@ private:
   std::vector<std::function<void()>> drain_complete_cbs_{};
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
-  Common::ThreadSafeCallbackManager children_;
+  std::shared_ptr<Common::ThreadSafeCallbackManager> children_;
+
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 
   // Callback handle parent will invoke to initiate drain-sequence. Created and set
   // by the parent drain-manager.
-  Common::ThreadSafeCallbackHandlePtr parent_callback_handle_;
+  Common::CallbackHandlePtr parent_callback_handle_;
 
   Event::TimerPtr parent_shutdown_timer_;
 };

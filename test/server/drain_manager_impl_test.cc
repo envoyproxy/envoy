@@ -173,7 +173,7 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
-    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    std::array<Common::CallbackHandlePtr, num_cbs> cb_handles;
     for (auto i = 0; i < num_cbs; i++) {
       auto& cb = cbs[i];
       if (drain_gradually) {
@@ -212,7 +212,7 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
-    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    std::array<Common::CallbackHandlePtr, num_cbs> cb_handles;
     for (auto i = 0; i < num_cbs; i++) {
       auto& cb = cbs[i];
       auto step = 1000.0 / num_cbs;
@@ -245,7 +245,7 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
   {
     // Register callbacks (store in array to keep in scope for test)
     std::array<testing::MockFunction<void(std::chrono::milliseconds)>, num_cbs> cbs;
-    std::array<Common::ThreadSafeCallbackHandlePtr, num_cbs> cb_handles;
+    std::array<Common::CallbackHandlePtr, num_cbs> cb_handles;
     for (auto i = 0; i < num_cbs; i++) {
       auto& cb = cbs[i];
       auto step = 250.0 / num_cbs;
