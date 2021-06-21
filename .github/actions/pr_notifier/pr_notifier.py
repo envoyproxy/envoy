@@ -87,6 +87,9 @@ def track_prs():
         # If the PR is waiting, continue.
         if is_waiting(pr_info.labels):
             continue
+        # If the PR is a draft, continue.
+        if pr_info.draft:
+            continue
 
         # Update the time based on the time zone delta from github's
         pr_age = pr_info.updated_at - datetime.timedelta(hours=4)
@@ -107,9 +110,6 @@ def track_prs():
 
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
-            # don't bother assigning maintainer WIPs.
-            if pr_info.draft and pr_info.user.login in maintainers_and_prs.keys():
-                continue
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications}, and stalled PRs
