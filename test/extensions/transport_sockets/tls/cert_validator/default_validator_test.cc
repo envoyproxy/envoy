@@ -134,6 +134,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   // Verify the certificate with correct SAN regex matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
             Envoy::Ssl::ClientValidationStatus::Validated);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 0);
 
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
   std::vector<Matchers::StringMatcherImpl> invalid_san_matchers;
@@ -142,6 +143,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
                                                  invalid_san_matchers),
             Envoy::Ssl::ClientValidationStatus::Failed);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
 
 } // namespace Tls
