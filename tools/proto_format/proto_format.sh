@@ -6,7 +6,6 @@ set -e
 
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 
-
 [[ "$1" == "check" || "$1" == "fix" || "$1" == "freeze" ]] || {
     echo "Usage: $0 <check|fix|freeze>"
     exit 1
@@ -34,6 +33,16 @@ if [[ "$1" == "freeze" ]]; then
     PROTO_SYNC_CMD="fix"
 fi
 
+echo
+echo ">>> RUNNING PROTO_FORMAT: ${PROTO_SYNC_COMMAND}"
+echo "BAZEL BUILD OPTIONS: ${BAZEL_BUILD_OPTIONS[*]}"
+echo "FREEZE ARG: ${FREEZE_ARG}"
+echo
+env
+echo
+
+echo ">>> RUN: protoxform aspect"
+
 # Invoke protoxform aspect.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api_canonical//versioning:active_protos ${FREEZE_ARG} \
   @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
@@ -46,6 +55,10 @@ for proto_type in active frozen; do
         <<< "$protos"
 done
 
+echo
+echo ">>> RUN: merge_active_shadow"
+echo
+
 # Setup for proto_sync.py.
 TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 # To satisfy dependency on api_proto_plugin.
@@ -53,15 +66,25 @@ export PYTHONPATH="$TOOLS"
 # Build protoprint and merge_active_shadow_tools for use in proto_sync.py.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/protoxform:merge_active_shadow
 
+echo
+echo ">>> RUN: proto_sync.py"
+echo "PROTO TARGETS: ${PROTO_TARGETS[*]}"
+echo
+
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
 # pretty-printing to format with protoprint and potentially merging active/shadow versions of protos
 # with merge_active_shadow.
-./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}" --ci
+time ./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}" --ci
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]; then
     ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 fi
+
+echo
+echo ">>> RUN: type_whisperer:api_build_file"
+echo "PROTO TARGETS: ${PROTO_TARGETS[*]}"
+echo
 
 # Generate api/BUILD file based on updated type database.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file

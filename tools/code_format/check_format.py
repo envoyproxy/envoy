@@ -865,6 +865,7 @@ class FormatChecker:
                 + "Lua API (bad light userdata pointer) on ARM64 architecture. See "
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
+    def check_proto_line(self, line, file_path, report_error):
         if file_path.endswith(PROTO_SUFFIX):
             exclude_path = ['v1', 'v2', 'generated_api_shadow']
             result = PROTO_VALIDATION_STRING.search(line)
@@ -939,8 +940,6 @@ class FormatChecker:
         return error_messages
 
     def fix_source_path(self, file_path):
-        self.evaluate_lines(file_path, self.fix_source_line)
-
         error_messages = []
 
         if not file_path.endswith(PROTO_SUFFIX):
@@ -950,6 +949,7 @@ class FormatChecker:
             package_name, error_message = self.package_name_for_proto(file_path)
             if package_name is None:
                 error_messages += error_message
+
         return error_messages
 
     def check_source_path(self, file_path):
@@ -1018,11 +1018,13 @@ class FormatChecker:
                 file_path) or self.is_workspace_file(file_path):
             if try_to_fix:
                 error_messages += self.fix_build_path(file_path)
-            error_messages += self.check_build_path(file_path)
+            else:
+                error_messages += self.check_build_path(file_path)
         else:
             if try_to_fix:
                 error_messages += self.fix_source_path(file_path)
-            error_messages += self.check_source_path(file_path)
+            else:
+                error_messages += self.check_source_path(file_path)
 
         if error_messages:
             return ["From %s" % file_path] + error_messages

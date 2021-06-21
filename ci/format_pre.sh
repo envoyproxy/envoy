@@ -9,6 +9,7 @@ FAILED=()
 CURRENT=""
 # AZP appears to make lines with this prefix red
 BASH_ERR_PREFIX="##[error]: "
+FORMAT_FAILED=
 
 DIFF_OUTPUT="${DIFF_OUTPUT:-/build/fix_format_pre.diff}"
 
@@ -32,6 +33,9 @@ trap_errors () {
                     "      - no trailing whitespace"
                     "      - no mixed tabs/spaces"
                     "      - all files end with a newline")
+            fi
+            if [[ "$CURRENT" == "format" ]]; then
+                FORMAT_FAILED=yes
             fi
         fi
         ((frame++))
@@ -64,6 +68,16 @@ CURRENT=spelling
 CURRENT=rst
 # TODO(phlax): Move this to general docs checking of all rst files
 bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/docs:rst_check
+
+CURRENT=format
+"${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
+
+if [[ -n "$FORMAT_FAILED" ]]; then
+    # todo: append to diff_output...
+    echo "Format check failed, try apply following patch to fix:"
+    git add api
+    git diff HEAD | tee "${DIFF_OUTPUT}"
+fi
 
 if [[ "${#FAILED[@]}" -ne "0" ]]; then
     echo "${BASH_ERR_PREFIX}TESTS FAILED:" >&2

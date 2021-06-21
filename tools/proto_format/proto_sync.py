@@ -527,5 +527,11 @@ if __name__ == '__main__':
     parser.add_argument('labels', nargs='*')
     args = parser.parse_args()
 
+    import time
+    start = time.time()
+    print(f">>> SYNC: {args.api_root}")
     sync(args.api_root, args.mode, args.ci, args.labels, False)
+    print(f">>> SYNC: {args.api_root} took {time.time() - start} seconds")
+    print(f">>> SYNC: {args.api_shadow_root}")
     sync(args.api_shadow_root, args.mode, args.ci, args.labels, True)
+    print(f">>> SYNC: {args.api_shadow_root} took {time.time() - start} seconds")
