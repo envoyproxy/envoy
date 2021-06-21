@@ -186,43 +186,20 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-<<<<<<< HEAD
         .WillByDefault(InvokeWithoutArgs([this] {
-          response_.closeRemote();
-          // Reset response as higher level code would do in case response ends before a request is
-          // complete.
-          if (response_.local_closed_) {
-            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
-                                                      "stream reset");
-          }
+          response_.closeLocalAndRemote();
+          response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset, "stream reset");
         }));
     ON_CALL(response_.response_decoder_, decodeData(_, true))
         .WillByDefault(InvokeWithoutArgs([this] {
-          response_.closeRemote();
-          // Reset response as higher level code would do in case response ends before a request is
-          // complete.
-          if (response_.local_closed_) {
-            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
-                                                      "stream reset");
-          }
+          response_.closeLocalAndRemote();
+          response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset, "stream reset");
         }));
     ON_CALL(response_.response_decoder_, decodeTrailers_(_))
         .WillByDefault(InvokeWithoutArgs([this] {
-          response_.closeRemote();
-          // Reset response as higher level code would do in case response ends before a request is
-          // complete.
-          if (response_.local_closed_) {
-            response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset,
-                                                      "stream reset");
-          }
+          response_.closeLocalAndRemote();
+          response_.stream_callbacks_.onResetStream(StreamResetReason::RemoteReset, "stream reset");
         }));
-=======
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
-    ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
-    ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
->>>>>>> upstream/main
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
