@@ -388,6 +388,8 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     } else if (status == ThriftFilters::ResponseStatus::Reset) {
       // Note: invalid responses are not accounted in the response size histogram.
       ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
       upstream_request_->resetStream();
       return;
     }
