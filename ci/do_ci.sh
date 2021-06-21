@@ -7,8 +7,7 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || \
-          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
-          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "tooling" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -418,22 +417,6 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
-  exit 0
-elif [[ "$CI_TARGET" == "check_spelling" ]]; then
-  echo "check_spelling..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh check
-  exit 0
-elif [[ "$CI_TARGET" == "fix_spelling" ]];then
-  echo "fix_spell..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh fix
-  exit 0
-elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
-  echo "check_spelling_pedantic..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
-  exit 0
-elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
-  echo "fix_spelling_pedantic..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py fix
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
