@@ -3,10 +3,14 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "source/common/common/utility.h"
 
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
+
+using envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig;
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +36,8 @@ public:
                       std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) PURE;
 
   // JwtCache factory function.
-  static JwtCachePtr create(bool enable_cache, int cache_size, TimeSource& time_source);
+  static JwtCachePtr create(bool enable_cache, const JwtCacheConfig& config,
+                            TimeSource& time_source);
 };
 
 } // namespace JwtAuthn

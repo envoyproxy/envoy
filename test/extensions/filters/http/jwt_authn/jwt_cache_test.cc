@@ -19,7 +19,11 @@ namespace {
 
 class JwtCacheTest : public testing::Test {
 public:
-  void setupCache(bool enable) { cache_ = JwtCache::create(enable, 0, time_system_); }
+  void setupCache(bool enable) {
+    envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig config;
+    config.set_jwt_cache_size(0);
+    cache_ = JwtCache::create(enable, config, time_system_);
+  }
 
   void loadJwt(const char* jwt_str) {
     jwt_ = std::make_unique<::google::jwt_verify::Jwt>();

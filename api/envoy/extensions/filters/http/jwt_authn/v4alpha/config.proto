@@ -216,8 +216,17 @@ message JwtProvider {
   // Only valid JWT tokens are cached.
   bool enable_jwt_cache = 11;
 
+  // Specify JWT cache configuration.
+  JwtCacheConfig jwt_cache_config = 12;
+}
+
+// This message specifies JWT Cache configuration.
+message JwtCacheConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.jwt_authn.v3.JwtCacheConfig";
+
   // The unit is number of JWT tokens, default to 100.
-  uint32 jwt_cache_size = 12;
+  uint32 jwt_cache_size = 1;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.

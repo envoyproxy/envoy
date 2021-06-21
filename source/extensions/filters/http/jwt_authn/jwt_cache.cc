@@ -19,15 +19,13 @@ constexpr int kMaxJwtSizeForCache = 4 * 1024; // 4KiB
 
 class JwtCacheImpl : public JwtCache {
 public:
-  JwtCacheImpl(bool enable_cache, int cache_size, TimeSource& time_source)
+  JwtCacheImpl(bool enable_cache, const JwtCacheConfig& config, TimeSource& time_source)
       : time_source_(time_source) {
     if (enable_cache) {
       // if cache_size is 0, it is not specified in the config, use default
-      if (cache_size == 0) {
-        cache_size = kJwtCacheDefaultSize;
-      }
+      cache_size_ = config.jwt_cache_size() == 0 ? kJwtCacheDefaultSize : config.jwt_cache_size();
       jwt_lru_cache_ =
-          std::make_unique<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>>(cache_size);
+          std::make_unique<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>>(cache_size_);
     }
   }
 
@@ -66,11 +64,13 @@ public:
 private:
   std::unique_ptr<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>> jwt_lru_cache_;
   TimeSource& time_source_;
+  int cache_size_{};
 };
 } // namespace
 
-JwtCachePtr JwtCache::create(bool enable_cache, int cache_size, TimeSource& time_source) {
-  return std::make_unique<JwtCacheImpl>(enable_cache, cache_size, time_source);
+JwtCachePtr JwtCache::create(bool enable_cache, const JwtCacheConfig& config,
+                             TimeSource& time_source) {
+  return std::make_unique<JwtCacheImpl>(enable_cache, config, time_source);
 }
 
 } // namespace JwtAuthn
