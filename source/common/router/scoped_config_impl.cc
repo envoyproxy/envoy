@@ -3,6 +3,8 @@
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
+#include "source/common/config/metadata.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -30,7 +32,9 @@ void FragmentBuilderImpl::validateHeaderValueExtractorConfig(
 }
 
 void FragmentBuilderImpl::validateMetadataValueExtractorConfig(
-    const MetadataValueExtractorConfig&) const { /* @tallen */
+    const MetadataValueExtractorConfig& config) const {
+  // Assuming support for only a single type of metadata extraction.
+  ASSERT(config.metadata_extract_type_case() == MetadataValueExtractorConfig::kMetadataKey);
 }
 
 FragmentBuilderImpl::FragmentBuilderImpl(ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config)
@@ -102,10 +106,14 @@ std::unique_ptr<ScopeKeyFragmentBase> FragmentBuilderImpl::computeFragmentFromHe
   return nullptr;
 }
 
-std::unique_ptr<ScopeKeyFragmentBase> FragmentBuilderImpl::computeFragmentFromMetadata(
-    const Metadata& /*meta*/, const MetadataValueExtractorConfig& /*config*/) const {
-  ASSERT(false); // @tallen
-  return nullptr;
+std::unique_ptr<ScopeKeyFragmentBase>
+FragmentBuilderImpl::computeFragmentFromMetadata(const Metadata& meta,
+                                                 const MetadataValueExtractorConfig& config) const {
+  const auto& value = Envoy::Config::Metadata::metadataValue(&meta, config.metadata_key());
+  if (value.kind_case() != value.kStringValue && value.kind_case() != value.KIND_NOT_SET) {
+    ENVOY_LOG_EVERY_POW_2(warn, "metadata key must be string type, got {}", value.kind_case());
+  }
+  return std::make_unique<StringKeyFragment>(value.string_value());
 }
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,

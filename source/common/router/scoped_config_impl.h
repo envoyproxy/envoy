@@ -11,6 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/hash.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
@@ -41,7 +42,8 @@ protected:
   const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder config_;
 };
 
-class FragmentBuilderImpl : public FragmentBuilderBase {
+class FragmentBuilderImpl : public FragmentBuilderBase,
+                            public Logger::Loggable<Logger::Id::router> {
 public:
   using FragmentBuilderConfig = ScopedRoutes::ScopeKeyBuilder::FragmentBuilder;
   using HeaderValueExtractorConfig = FragmentBuilderConfig::HeaderValueExtractor;
