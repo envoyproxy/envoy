@@ -33,7 +33,7 @@ static_resources:
               typed_config:
                 "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig"
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
 
   clusters:
   - name: service1

@@ -28,7 +28,7 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
 
   - address:
       socket_address:
@@ -58,7 +58,7 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
 
       transport_socket:
         name: envoy.transport_sockets.tls

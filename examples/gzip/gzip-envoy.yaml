@@ -38,7 +38,7 @@ static_resources:
                   memory_level: 3
                   window_bits: 10
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
   - address:
       socket_address:
         address: 0.0.0.0
@@ -77,7 +77,7 @@ static_resources:
                   memory_level: 3
                   window_bits: 10
           - name: envoy.filters.http.router
-            typed_config: {}
+            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
 
   clusters:
   - name: envoy-stats
