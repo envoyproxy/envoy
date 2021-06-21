@@ -143,6 +143,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   if (resource.has_value()) {
     auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
     if (err.has_value()) {
+      response_headers.addReference(Http::Headers::get().XContentTypeOptions,
+                                    Http::Headers::get().XContentTypeOptionValues.Nosniff);
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
       response.add(err.value().second);
       return err.value().first;
@@ -150,6 +152,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   } else {
     auto err = addAllConfigToDump(dump, mask, include_eds);
     if (err.has_value()) {
+      response_headers.addReference(Http::Headers::get().XContentTypeOptions,
+                                    Http::Headers::get().XContentTypeOptionValues.Nosniff);
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
       response.add(err.value().second);
       return err.value().first;

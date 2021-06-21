@@ -630,7 +630,10 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
   EXPECT_EQ("FieldMask paths: \"cluster.transport_socket_matches.name\"\n could not be "
             "successfully used.",
             response.toString());
-  EXPECT_EQ(header_map.ContentType()->value().getStringView(), "text/plain");
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
+            Http::Headers::get().ContentTypeValues.Text);
+  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
+            Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
 TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
@@ -648,7 +651,10 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   EXPECT_EQ("FieldMask paths: \"bootstrap.node.extensions.name\"\n could not be "
             "successfully used.",
             response.toString());
-  EXPECT_EQ(header_map.ContentType()->value().getStringView(), "text/plain");
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
+            Http::Headers::get().ContentTypeValues.Text);
+  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
+            Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
 } // namespace Server
