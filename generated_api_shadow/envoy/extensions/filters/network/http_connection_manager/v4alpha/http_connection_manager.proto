@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 48]
+// [#next-free-field: 50]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -72,6 +72,15 @@ message HttpConnectionManager {
     // Pass through the value of the server header, and do not append a header
     // if none is present.
     PASS_THROUGH = 2;
+  }
+
+  enum SchemeHeaderTransformation {
+    // Overwrite any Scheme header with the contents of scheme
+    OVERWRITE_SCHEME = 0;
+
+    // If no Scheme header is present, append Scheme scheme
+    // If a Scheme header is present, pass it through.
+    APPEND_SCHEME_IF_ABSENT = 1;
   }
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
@@ -373,6 +382,18 @@ message HttpConnectionManager {
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
       [(validate.rules).enum = {defined_only: true}];
+
+  // Defines the action to be applied to the Scheme header on the request path
+  // if scheme is set in the config. Defaults to OVERWRITE_SCHEME.
+  SchemeHeaderTransformation scheme_header_transformation = 48
+      [(validate.rules).enum = {defined_only: true}];
+
+  // An optional override. If set, the connection manager will set the request
+  // scheme to this value based on scheme_header_transformation. Valid values are 'http' and
+  // 'https'. If absent, Envoy will pass through downstream scheme if present or
+  // set scheme based on downstream encryption level.
+  string scheme = 49
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.

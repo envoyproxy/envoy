@@ -562,6 +562,9 @@ public:
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
+  MOCK_METHOD(const OptRef<const std::string>, schemeToSet, (), (const));
+  MOCK_METHOD(HttpConnectionManagerProto::SchemeHeaderTransformation, schemeHeaderTransformation,
+              (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
   MOCK_METHOD(bool, useRemoteAddress, (), (const));

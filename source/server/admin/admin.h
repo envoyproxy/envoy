@@ -146,9 +146,14 @@ public:
     return &scoped_route_config_provider_;
   }
   const std::string& serverName() const override { return Http::DefaultServerString::get(); }
+  const OptRef<const std::string> schemeToSet() const override { return {}; }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
+  }
+  HttpConnectionManagerProto::SchemeHeaderTransformation
+  schemeHeaderTransformation() const override {
+    return HttpConnectionManagerProto::OVERWRITE_SCHEME;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }

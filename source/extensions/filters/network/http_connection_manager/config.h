@@ -147,6 +147,11 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
+  HttpConnectionManagerProto::SchemeHeaderTransformation
+  schemeHeaderTransformation() const override {
+    return scheme_transformation_;
+  }
+  const OptRef<const std::string> schemeToSet() const override { return scheme_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -245,6 +250,9 @@ private:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
+  HttpConnectionManagerProto::SchemeHeaderTransformation scheme_transformation_{
+      HttpConnectionManagerProto::OVERWRITE_SCHEME};
+  OptRef<const std::string> scheme_;
   Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;

@@ -518,6 +518,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   server_transformation_ = config.server_header_transformation();
 
+  scheme_transformation_ = config.scheme_header_transformation();
+
+  if (!config.scheme().empty()) {
+    scheme_ = config.scheme();
+    if (config.scheme() != Http::Headers::get().SchemeValues.Https &&
+        config.scheme() != Http::Headers::get().SchemeValues.Http) {
+      throw EnvoyException(fmt::format("Invalid scheme: {}", config.scheme()));
+    }
+  }
+
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
   } else {

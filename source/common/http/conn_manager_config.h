@@ -349,6 +349,17 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
+   * @return SchemeHeaderTransformation the transformation to apply to request headers.
+   */
+  virtual HttpConnectionManagerProto::SchemeHeaderTransformation
+  schemeHeaderTransformation() const PURE;
+
+  /**
+   * @return const OptRef<const std::string> the scheme name to write into requests.
+   */
+  virtual const OptRef<const std::string> schemeToSet() const PURE;
+
+  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;

@@ -332,6 +332,37 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
+TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
+  std::string scheme_string = "http";
+  OptRef<const std::string> scheme = scheme_string;
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, schemeToSet()).WillByDefault(Return(scheme));
+  ON_CALL(config_, schemeHeaderTransformation())
+      .WillByDefault(
+          Return(ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_SCHEME_IF_ABSENT));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  TestRequestHeaderMapImpl headers{};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  // Scheme was absent. Append HTTP.
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.getSchemeValue());
+
+  // Scheme was present. Do not overwrite.
+  scheme_string = "https";
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("http", headers.getSchemeValue());
+
+  // Scheme will be overwritten.
+  ON_CALL(config_, schemeHeaderTransformation())
+      .WillByDefault(Return(ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME));
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.getSchemeValue());
+}
+
 // Verify internal request and XFF is set when we are using remote address and the address is
 // internal according to user configuration.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
