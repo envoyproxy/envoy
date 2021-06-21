@@ -147,7 +147,9 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
                   chunk->data.length());
         MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
         should_continue = chunk->end_stream;
-        injectDataToFilterChain(chunk->data, false);
+        if (chunk->data.length() > 0) {
+          injectDataToFilterChain(chunk->data, false);
+        }
       }
       if (chunks_for_processing_.empty()) {
         clearWatermark();

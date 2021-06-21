@@ -282,6 +282,82 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
+// Send a body that's larger than the buffer limit in streamed mode, and change
+// the processing mode after receiving some of the body.
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
+  const uint32_t num_chunks = 19;
+  const uint32_t chunk_size = 10000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        ProcessingRequest header_req;
+        if (!stream->Read(&header_req)) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
+        }
+        if (!header_req.has_request_headers()) {
+          return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected request headers");
+        }
+
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        uint32_t received_count = 0;
+        uint32_t received_bytes = 0;
+        ProcessingRequest req;
+
+        while (stream->Read(&req)) {
+          ProcessingResponse resp;
+          if (req.has_request_body()) {
+            received_count++;
+            received_bytes += req.request_body().body().size();
+            if (req.request_body().end_of_stream() && received_bytes < total_size) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected no last chunk yet");
+            }
+            if (received_count == 2) {
+              // After two body chunks, change the processing mode. Since the body
+              // is pipelined, we might still get body chunks, however. This test can't
+              // validate this, but at least we can ensure that this doesn't blow up the
+              // protocol.
+              auto* mode_override = resp.mutable_mode_override();
+              mode_override->set_request_body_mode(ProcessingMode::NONE);
+            }
+            resp.mutable_request_body();
+          } else if (req.has_response_headers()) {
+            if (received_count < 2) {
+              return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT,
+                                  "should not see response headers yet");
+            }
+            resp.mutable_response_body();
+          } else {
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "unexpected stream message");
+          }
+          stream->Write(resp);
+        }
+        return grpc::Status::OK;
+      });
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto& encoder = sendClientRequestHeaders([total_size](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  for (uint32_t i = 0; i < num_chunks; i++) {
+    Buffer::OwnedImpl chunk;
+    TestUtility::feedBufferWithRandomCharacters(chunk, chunk_size);
+    codec_client_->sendData(encoder, chunk, false);
+  }
+  Buffer::OwnedImpl empty_chunk;
+  codec_client_->sendData(encoder, empty_chunk, true);
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+}
+
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
 TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
@@ -337,8 +413,8 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   uint32_t response_size = 170000;
 
   test_processor_.start(
-      [this, response_size](
-          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [this,
+       response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");
@@ -407,8 +483,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
   uint32_t response_size = 1700000;
 
   test_processor_.start(
-      [this, request_size, response_size](
-          grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      [this, request_size,
+       response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         if (!stream->Read(&header_req)) {
           return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "expected message");

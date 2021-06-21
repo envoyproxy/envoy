@@ -987,7 +987,6 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
 // that the processor gets them correctly when some data comes in before the
 // headers are done processing.
 TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::trace);
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -1089,7 +1088,6 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   EXPECT_EQ(10, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(10, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
-  Logger::Registry::getLog(Logger::Id::filter).set_level(spdlog::level::info);
 }
 
 // Using the default configuration, test the filter with a processor that
