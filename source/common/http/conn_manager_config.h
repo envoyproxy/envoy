@@ -461,8 +461,16 @@ public:
    */
   virtual const LocalReply::LocalReply& localReply() const PURE;
 
+  /**
+   * @return PathTransformer that normalize the request path url, changes to the path will be
+   * applied at the end of the filter chain and only visible to upstream servers.
+   */
   virtual const PathTransformer& forwardingPathTransformer() const PURE;
 
+  /**
+   * @return PathTransformer that normalize the request path url, changes to the path will be
+   * applied at the beginning of the filter chain and visible to both filters and upstream servers.
+   */
   virtual const PathTransformer& filterPathTransformer() const PURE;
   /**
    * @return the action HttpConnectionManager should take when receiving client request
