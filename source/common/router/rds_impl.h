@@ -99,8 +99,8 @@ private:
  */
 #define ALL_RDS_STATS(COUNTER, GAUGE)                                                              \
   COUNTER(config_reload)                                                                           \
-  GAUGE(config_reload_time_ms, NeverImport)                                                        \
-  COUNTER(update_empty)
+  COUNTER(update_empty)                                                                            \
+  GAUGE(config_reload_time_ms, NeverImport)                                                        
 
 /**
  * Struct definition for all RDS stats. @see stats_macros.h
