@@ -102,9 +102,6 @@ public:
     CONSTRUCT_ON_FIRST_USE(std::string, "client cancelled stream");
   }
 
-  // Used for testing.
-  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
-
 private:
   class DirectStream;
 
@@ -222,7 +219,6 @@ private:
   // Shared synthetic address across DirectStreams.
   Network::Address::InstanceConstSharedPtr address_;
   Random::RandomGenerator& random_;
-  Thread::ThreadSynchronizer synchronizer_;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
