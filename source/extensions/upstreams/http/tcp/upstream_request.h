@@ -49,9 +49,10 @@ public:
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_handle_ = nullptr;
-    callbacks_->onPoolFailure(reason, "", host);
+    callbacks_->onPoolFailure(reason, transport_failure_reason, host);
   }
 
   void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
