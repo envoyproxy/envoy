@@ -101,7 +101,7 @@ Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storag
 }
 
 Address::InstanceConstSharedPtr
-getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
+addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
   // Set v6only to false so that mapped-v6 address can be normalize to v4
   // address. Though dual stack may be disabled, it's still okay to assume the
   // address is from a dual stack socket. This is because mapped-v6 address

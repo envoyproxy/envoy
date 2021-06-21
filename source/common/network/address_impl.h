@@ -41,8 +41,8 @@ InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, so
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len,
-                                                   os_fd_t fd, bool v6only = true);
+InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len,
+                                                os_fd_t fd, bool v6only = true);
 
 /**
  * Base class for all address types.
@@ -140,6 +140,8 @@ private:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
    */
   explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
                         const SocketInterface* sock_interface = nullptr);
@@ -219,6 +221,8 @@ private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
    */
   Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
                const SocketInterface* sock_interface = nullptr);
@@ -299,7 +303,9 @@ public:
 private:
   /**
    * Construct from an existing unix address.
-   * Store the status code in passed in parameter instead of throwing.
+   * Store the error status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
    */
   PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
                const SocketInterface* sock_interface = nullptr);

@@ -285,7 +285,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return Address::getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -295,7 +295,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    return Address::getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
 
   return nullptr;
@@ -365,8 +365,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ =
-      Address::getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -473,7 +472,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
     output.msg_[i].peer_address_ =
-        Address::getAddressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
+        Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {

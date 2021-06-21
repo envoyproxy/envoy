@@ -415,8 +415,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::getAddressFromSockAddrOrDie(orig_addr, 0, -1,
-                                              true /* default for v6 constructor */);
+  return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
 
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
