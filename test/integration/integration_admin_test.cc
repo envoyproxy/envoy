@@ -403,7 +403,6 @@ TEST_P(IntegrationAdminTest, Admin) {
   envoy::admin::v3::ConfigDump name_filtered_config_dump;
   TestUtility::loadFromJson(response->body(), name_filtered_config_dump);
   EXPECT_EQ(6, config_dump.configs_size());
-  ENVOY_LOG(error, name_filtered_config_dump.DebugString());
 
   // SecretsConfigDump should have been totally filtered away.
   secret_config_dump.Clear();
