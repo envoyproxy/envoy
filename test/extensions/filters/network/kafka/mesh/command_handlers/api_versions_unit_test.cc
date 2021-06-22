@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

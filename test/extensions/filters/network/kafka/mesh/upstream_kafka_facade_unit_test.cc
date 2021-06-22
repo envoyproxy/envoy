@@ -1,7 +1,7 @@
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"

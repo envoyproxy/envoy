@@ -1,6 +1,5 @@
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/kafka/mesh/upstream_config.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
 
 #include "test/test_common/utility.h"
 

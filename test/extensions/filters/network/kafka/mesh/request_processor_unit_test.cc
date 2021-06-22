@@ -1,8 +1,8 @@
-#include "extensions/filters/network/kafka/mesh/abstract_command.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/produce.h"
-#include "extensions/filters/network/kafka/mesh/request_processor.h"
+#include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
+#include "source/extensions/filters/network/kafka/mesh/request_processor.h"
 
 #include "test/test_common/utility.h"
 

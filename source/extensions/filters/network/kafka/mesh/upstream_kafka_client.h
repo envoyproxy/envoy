@@ -6,7 +6,7 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "librdkafka/rdkafkacpp.h"
 

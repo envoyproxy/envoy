@@ -1,8 +1,8 @@
-#include "extensions/filters/network/kafka/mesh/upstream_config.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_cat.h"
 

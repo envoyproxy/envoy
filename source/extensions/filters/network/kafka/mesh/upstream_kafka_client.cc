@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_client.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,5 +1,5 @@
-#include "extensions/filters/network/kafka/external/responses.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
+#include "source/extensions/filters/network/kafka/external/responses.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

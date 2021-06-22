@@ -1,14 +1,11 @@
-#include "extensions/filters/network/kafka/mesh/filter.h"
-
-#include <thread>
+#include "source/extensions/filters/network/kafka/mesh/filter.h"
 
 #include "envoy/network/connection.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/kafka/external/requests.h"
-#include "extensions/filters/network/kafka/external/responses.h"
-#include "extensions/filters/network/kafka/response_codec.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/kafka/external/requests.h"
+#include "source/extensions/filters/network/kafka/external/responses.h"
+#include "source/extensions/filters/network/kafka/response_codec.h"
 
 namespace Envoy {
 namespace Extensions {

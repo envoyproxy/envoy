@@ -1,10 +1,9 @@
 #pragma once
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/kafka/external/requests.h"
-#include "extensions/filters/network/kafka/mesh/abstract_command.h"
-#include "extensions/filters/network/kafka/request_codec.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/kafka/external/requests.h"
+#include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "source/extensions/filters/network/kafka/request_codec.h"
 
 namespace Envoy {
 namespace Extensions {

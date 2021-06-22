@@ -1,10 +1,10 @@
-#include "extensions/filters/network/kafka/mesh/request_processor.h"
+#include "source/extensions/filters/network/kafka/mesh/request_processor.h"
 
 #include "envoy/common/exception.h"
 
-#include "extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
-#include "extensions/filters/network/kafka/mesh/command_handlers/produce.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
 
 namespace Envoy {
 namespace Extensions {

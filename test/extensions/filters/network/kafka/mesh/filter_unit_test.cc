@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/mesh/filter.h"
+#include "source/extensions/filters/network/kafka/mesh/filter.h"
 
 #include "test/mocks/network/mocks.h"
 
