@@ -122,7 +122,7 @@ private:
   bool parseV2Header(char* buf);
   absl::optional<size_t> lenV2Address(char* buf);
 
-  Network::ListenerFilterCallbacks* cb_{nullptr};
+  Network::ListenerFilterCallbacks* cb_{};
 
   // The offset in buf_ that has been fully read
   size_t buf_off_{};

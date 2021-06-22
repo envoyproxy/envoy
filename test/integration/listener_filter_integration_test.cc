@@ -152,7 +152,7 @@ TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
   Buffer::OwnedImpl buffer("fake data");
   client_->write(buffer, false);
   // the timeout is set as one seconds, sleep 5 to trigger the timeout.
-  absl::SleepFor(absl::Seconds(5));
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
 }

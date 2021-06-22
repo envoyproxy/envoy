@@ -90,7 +90,7 @@ private:
   void onServername(absl::string_view name);
 
   ConfigSharedPtr config_;
-  Network::ListenerFilterCallbacks* cb_{nullptr};
+  Network::ListenerFilterCallbacks* cb_{};
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

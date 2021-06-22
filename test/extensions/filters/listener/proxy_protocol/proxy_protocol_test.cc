@@ -54,7 +54,7 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)),
+      : api_(Api::createApiForTest(stats_store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
@@ -186,6 +186,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
+  Event::SimulatedTimeSystemHelper time_system_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -216,8 +217,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
 // the assertion which avoid to create file event duplicated will be triggered.
 TEST_P(ProxyProtocolTest, Timeout) {
   connect();
-  absl::SleepFor(absl::Seconds(5));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(2000), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
     EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
               "127.0.0.1");
@@ -225,7 +226,7 @@ TEST_P(ProxyProtocolTest, Timeout) {
     EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
               "::1");
   }
-
+  EXPECT_EQ(stats_store_.counter("downstream_cx_total").value(), 1);
   disconnect();
 }
 
