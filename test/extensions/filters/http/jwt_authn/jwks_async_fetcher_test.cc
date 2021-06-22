@@ -1,4 +1,4 @@
-#include "extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/factory_context.h"

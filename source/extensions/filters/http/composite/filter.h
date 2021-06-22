@@ -4,9 +4,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/composite/action.h"
-#include "extensions/filters/http/composite/factory_wrapper.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/composite/action.h"
+#include "source/extensions/filters/http/composite/factory_wrapper.h"
 
 #include "absl/types/variant.h"
 
@@ -25,7 +25,9 @@ struct FilterStats {
   ALL_COMPOSITE_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Http::StreamFilter,
+               public AccessLog::Instance,
+               Logger::Loggable<Logger::Id::filter> {
 public:
   explicit Filter(FilterStats& stats) : decoded_headers_(false), stats_(stats) {}
 
@@ -62,6 +64,16 @@ public:
   }
 
   void onMatchCallback(const Matcher::Action& action) override;
+
+  // AccessLog::Instance
+  void log(const Http::RequestHeaderMap* request_headers,
+           const Http::ResponseHeaderMap* response_headers,
+           const Http::ResponseTrailerMap* response_trailers,
+           const StreamInfo::StreamInfo& stream_info) override {
+    for (const auto& log : access_loggers_) {
+      log->log(request_headers, response_headers, response_trailers, stream_info);
+    }
+  }
 
 private:
   friend FactoryCallbacksWrapper;
@@ -108,6 +120,7 @@ private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
   };
+  std::vector<AccessLog::InstanceSharedPtr> access_loggers_;
 
   Http::StreamFilterSharedPtr delegated_filter_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

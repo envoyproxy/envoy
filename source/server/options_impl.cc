@@ -1,4 +1,4 @@
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,13 +7,12 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
-#include "common/version/version.h"
-
-#include "server/options_impl_platform.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/version/version.h"
+#include "source/server/options_impl_platform.h"
 
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"

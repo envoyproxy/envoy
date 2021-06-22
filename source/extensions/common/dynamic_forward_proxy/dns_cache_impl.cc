@@ -1,14 +1,14 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/config/utility.h"
-#include "common/http/utility.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,6 +33,25 @@ DnsCacheImpl::DnsCacheImpl(
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
+
+  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts_) {
+    throw EnvoyException(fmt::format(
+        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
+        config.name(), config.preresolve_hostnames().size(), max_hosts_));
+  }
+
+  // Preresolved hostnames are resolved without a read lock on primary hosts because it is done
+  // during object construction.
+  for (const auto& hostname : config.preresolve_hostnames()) {
+    // No need to get a resolution handle on this resolution as the only outcome needed is for the
+    // cache to load an entry. Further if this particular resolution fails all the is lost is the
+    // potential optimization of having the entry be preresolved the first time a true consumer of
+    // this DNS cache asks for it.
+    main_thread_dispatcher_.post(
+        [this, host = hostname.address(), default_port = hostname.port_value()]() {
+          startCacheLoad(host, default_port);
+        });
+  }
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
@@ -50,17 +69,24 @@ DnsCacheImpl::~DnsCacheImpl() {
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
     Event::Dispatcher& main_thread_dispatcher) {
-  if (config.has_dns_resolver()) {
-    const auto& resolver_addrs = config.dns_resolver().resolvers();
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    resolvers.reserve(resolver_addrs.size());
-    for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  if (config.has_dns_resolution_config()) {
+    dns_resolver_options.CopyFrom(config.dns_resolution_config().dns_resolver_options());
+    if (!config.dns_resolution_config().resolvers().empty()) {
+      const auto& resolver_addrs = config.dns_resolution_config().resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
     }
-    return main_thread_dispatcher.createDnsResolver(resolvers, config.use_tcp_for_dns_lookups());
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
+    // compatible utilize config.use_tcp_for_dns_lookups() if `config.dns_resolution_config`
+    // is not set.
+    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
   }
-
-  return main_thread_dispatcher.createDnsResolver({}, config.use_tcp_for_dns_lookups());
+  return main_thread_dispatcher.createDnsResolver(resolvers, dns_resolver_options);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {

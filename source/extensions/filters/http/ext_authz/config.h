@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +19,7 @@ class ExtAuthzFilterConfig
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthz,
           envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute> {
 public:
-  ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().ExtAuthorization) {}
+  ExtAuthzFilterConfig() : FactoryBase("envoy.filters.http.ext_authz") {}
 
 private:
   static constexpr uint64_t DefaultTimeout = 200;

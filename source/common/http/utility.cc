@@ -1,4 +1,4 @@
-#include "common/http/utility.h"
+#include "source/common/http/utility.h"
 
 #include <http_parser.h>
 
@@ -10,20 +10,20 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/status.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
@@ -419,6 +419,13 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   }
   path_str.remove_prefix(query_offset);
   return path_str;
+}
+
+std::string Utility::stripQueryString(const HeaderString& path) {
+  absl::string_view path_str = path.getStringView();
+  size_t query_offset = path_str.find('?');
+  return std::string(path_str.data(),
+                     query_offset != path_str.npos ? query_offset : path_str.size());
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
@@ -840,6 +847,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote error with CONNECT request";
   case Http::StreamResetReason::ProtocolError:
     return "protocol error";
+  case Http::StreamResetReason::OverloadManager:
+    return "overload manager reset";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

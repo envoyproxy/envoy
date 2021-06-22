@@ -13,8 +13,8 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
-#include "common/http/exception.h"
-#include "common/http/status.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/status.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -239,6 +239,13 @@ QueryParams parseParameters(absl::string_view data, size_t start, bool decode_pa
  *         no query string.
  */
 absl::string_view findQueryStringStart(const HeaderString& path);
+
+/**
+ * Returns the path without the query string.
+ * @param path supplies a HeaderString& possibly containing a query string.
+ * @return std::string the path without query string.
+ */
+std::string stripQueryString(const HeaderString& path);
 
 /**
  * Parse a particular value out of a cookie

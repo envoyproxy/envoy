@@ -9,12 +9,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
-#include "common/common/byte_order.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/kafka/kafka_types.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/kafka/kafka_types.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"

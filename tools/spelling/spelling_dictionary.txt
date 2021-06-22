@@ -938,6 +938,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc

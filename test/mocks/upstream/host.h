@@ -9,7 +9,7 @@
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -83,6 +83,8 @@ public:
   ~MockHostDescription() override;
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
+  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
+              (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
@@ -158,6 +160,8 @@ public:
   }
 
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
+  MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
+              (const));
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, healthCheckAddress, (), (const));
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));

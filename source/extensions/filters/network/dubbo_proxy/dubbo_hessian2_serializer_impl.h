@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/serializer.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/serializer.h"
 
 namespace Envoy {
 namespace Extensions {

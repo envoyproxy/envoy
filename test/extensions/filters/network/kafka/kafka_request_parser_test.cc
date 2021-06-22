@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/kafka_request_parser.h"
+#include "source/extensions/filters/network/kafka/kafka_request_parser.h"
 
 #include "test/extensions/filters/network/kafka/buffer_based_test.h"
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"

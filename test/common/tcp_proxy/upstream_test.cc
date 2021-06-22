@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "common/tcp_proxy/upstream.h"
+#include "source/common/tcp_proxy/upstream.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"

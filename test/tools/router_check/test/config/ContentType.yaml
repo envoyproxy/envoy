@@ -6,8 +6,8 @@ virtual_hosts:
   - match:
       prefix: "/"
       headers:
-        - name: "content-type"
-          exact_match: "application/grpc"
+      - name: "content-type"
+        exact_match: "application/grpc"
     route:
       cluster: local_service_grpc
   - match:

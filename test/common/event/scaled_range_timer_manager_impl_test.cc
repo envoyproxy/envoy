@@ -3,8 +3,8 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/timer.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/wrapped_dispatcher.h"

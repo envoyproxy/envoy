@@ -27,18 +27,18 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/client_connection_factory_impl.h"
-#include "common/quic/envoy_quic_client_session.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #include "test/common/quic/test_utils.h"
 #include "test/config/integration/certs/clientcert_hash.h"
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
@@ -62,10 +62,6 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
-void updateResource(AtomicFileUpdater& updater, double pressure) {
-  updater.update(absl::StrCat(pressure));
-}
-
 // A test that sets up its own client connection with customized quic version and connection ID.
 class QuicHttpIntegrationTest : public HttpIntegrationTest, public QuicMultiVersionTest {
 public:
@@ -78,13 +74,10 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
-        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()),
-        injected_resource_filename_1_(TestEnvironment::temporaryPath("injected_resource_1")),
-        injected_resource_filename_2_(TestEnvironment::temporaryPath("injected_resource_2")),
-        file_updater_1_(injected_resource_filename_1_),
-        file_updater_2_(injected_resource_filename_2_) {}
+        conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -117,7 +110,8 @@ public:
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
-        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
+        persistent_info.crypto_stream_factory_);
     return session;
   }
 
@@ -144,42 +138,6 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      const std::string overload_config =
-          fmt::format(R"EOF(
-        refresh_interval:
-          seconds: 0
-          nanos: 1000000
-        resource_monitors:
-          - name: "envoy.resource_monitors.injected_resource_1"
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig
-              filename: "{}"
-          - name: "envoy.resource_monitors.injected_resource_2"
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.resource_monitors.injected_resource.v3.InjectedResourceConfig
-              filename: "{}"
-        actions:
-          - name: "envoy.overload_actions.stop_accepting_requests"
-            triggers:
-              - name: "envoy.resource_monitors.injected_resource_1"
-                threshold:
-                  value: 0.95
-          - name: "envoy.overload_actions.stop_accepting_connections"
-            triggers:
-              - name: "envoy.resource_monitors.injected_resource_1"
-                threshold:
-                  value: 0.9
-          - name: "envoy.overload_actions.disable_http_keepalive"
-            triggers:
-              - name: "envoy.resource_monitors.injected_resource_2"
-                threshold:
-                  value: 0.8
-      )EOF",
-                      injected_resource_filename_1_, injected_resource_filename_2_);
-      *bootstrap.mutable_overload_manager() =
-          TestUtility::parseYaml<envoy::config::overload::v3::OverloadManager>(overload_config);
-    });
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -189,8 +147,6 @@ public:
                                           v3::HttpConnectionManager::HTTP3);
         });
 
-    updateResource(file_updater_1_, 0);
-    updateResource(file_updater_2_, 0);
     HttpIntegrationTest::initialize();
     // Latch quic_transport_socket_factory_ which is instantiated in initialize().
     transport_socket_factory_ =
@@ -270,10 +226,6 @@ protected:
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
   EnvoyQuicClientConnection* quic_connection_{nullptr};
-  const std::string injected_resource_filename_1_;
-  const std::string injected_resource_filename_2_;
-  AtomicFileUpdater file_updater_1_;
-  AtomicFileUpdater file_updater_2_;
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
 };
@@ -313,6 +265,23 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                   ->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
+  if (GetParam().first == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq(
+        "listener.127.0.0.1_0.http3.downstream.rx.quic_connection_close_error_"
+        "code_QUIC_NO_ERROR",
+        2u);
+  } else {
+    test_server_->waitForCounterEq("listener.[__1]_0.http3.downstream.rx.quic_connection_close_"
+                                   "error_code_QUIC_NO_ERROR",
+                                   2u);
+  }
+  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
+  } else if (GetParam().second == QuicVersionType::GquicTls) {
+    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  } else {
+    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -377,75 +346,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
-TEST_P(QuicHttpIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
-  initialize();
-
-  // Put envoy in overloaded state and check that it doesn't accept the new client connection.
-  updateResource(file_updater_1_, 0.9);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               1);
-  codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt);
-  EXPECT_TRUE(codec_client_->disconnected());
-
-  // Reduce load a little to allow the connection to be accepted connection.
-  updateResource(file_updater_1_, 0.8);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
-                               0);
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  // Send response headers, but hold response body for now.
-  upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
-
-  updateResource(file_updater_1_, 0.95);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
-  // Existing request should be able to finish.
-  upstream_request_->encodeData(10, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  // New request should be rejected.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response2->waitForEndStream());
-  EXPECT_EQ("503", response2->headers().getStatusValue());
-  EXPECT_EQ("envoy overloaded", response2->body());
-  codec_client_->close();
-
-  EXPECT_TRUE(makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt)
-                  ->disconnected());
-}
-
-TEST_P(QuicHttpIntegrationTest, NoNewStreamsWhenOverloaded) {
-  initialize();
-  updateResource(file_updater_1_, 0.7);
-
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  // Send a complete request and start a second.
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-
-  // Enable the disable-keepalive overload action. This should send a shutdown notice before
-  // encoding the headers.
-  updateResource(file_updater_2_, 0.9);
-  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
-
-  upstream_request_->encodeHeaders(default_response_headers_, /*end_stream=*/false);
-  upstream_request_->encodeData(10, true);
-
-  response2->waitForHeaders();
-  EXPECT_TRUE(codec_client_->waitForDisconnect());
-
-  EXPECT_TRUE(codec_client_->sawGoAway());
-  codec_client_->close();
-}
-
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);
 }
@@ -491,6 +391,15 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
+                                  : "listener.[__1]_0.http3.downstream.rx.";
+  std::string error_code = GetParam().second == QuicVersionType::Iquic
+                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
+                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {

@@ -1,4 +1,4 @@
-#include "common/formatter/substitution_formatter.h"
+#include "source/common/formatter/substitution_formatter.h"
 
 #include "test/common/formatter/substitution_formatter_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"

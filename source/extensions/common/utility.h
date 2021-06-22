@@ -3,9 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 
-#include "common/common/documentation_url.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
+#include "source/common/common/documentation_url.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

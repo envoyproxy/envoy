@@ -41,9 +41,9 @@ void MockInstance::poolFailure(PoolFailureReason reason, bool host_null) {
   callbacks_.pop_front();
   handles_.pop_front();
   if (host_null) {
-    cb->onPoolFailure(reason, nullptr);
+    cb->onPoolFailure(reason, "", nullptr);
   } else {
-    cb->onPoolFailure(reason, host_);
+    cb->onPoolFailure(reason, "", host_);
   }
 }
 

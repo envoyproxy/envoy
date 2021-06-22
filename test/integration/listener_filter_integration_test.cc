@@ -5,11 +5,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"

@@ -1,17 +1,17 @@
-#include "common/http/filter_manager.h"
+#include "source/common/http/filter_manager.h"
 
 #include <functional>
 
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracked_object_stack.h"
-#include "common/common/scope_tracker.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracked_object_stack.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -1082,6 +1082,21 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
       continue_data_entry = entry;
     }
+  }
+
+  // Check if the filter chain above did not remove critical headers or set malformed header values.
+  // We could do this at the codec in order to prevent other places than the filter chain from
+  // removing critical headers, but it will come with the implementation complexity.
+  // See the previous attempt (#15658) for detail, and for now we choose to protect only against
+  // filter chains.
+  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+  if (!status.ok()) {
+    // If the check failed, then we reply with BadGateway, and stop the further processing.
+    sendLocalReply(
+        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                     "{", status.message(), "}"));
+    return;
   }
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());

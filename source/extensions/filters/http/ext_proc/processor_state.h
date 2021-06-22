@@ -7,7 +7,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
