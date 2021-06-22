@@ -874,7 +874,7 @@ to run clang-format scripts on your workstation directly:
 
 To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
-also have 'buildifier' installed from the bazel distribution.
+also have 'buildifier' installed from the bazel distribution and `aspell`.
 
 Edit the paths shown here to reflect the installation locations on your system:
 
