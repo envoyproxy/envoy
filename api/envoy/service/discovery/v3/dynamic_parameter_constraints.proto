@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package envoy.service.discovery.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.discovery.v3";
+option java_outer_classname = "DynamicParameterConstraintsProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Parameter Constraints]
+
+// A set of dynamic parameter constraints used to select the variant of
+// a given resource desired by a client. Clients send a set of
+// constraints with each subscription request, and servers respond by
+// sending a resource with a matching set of dynamic parameters.
+message DynamicParameterConstraints {
+  // Constraints for a given key.
+  message KeyConstraints {
+    message Constraint {
+      // A list of one or more integer ranges.
+      // A value is considered to match if it falls in any of the ranges.
+      message IntegerRangeList {
+        // At least one of *min_value* or *max_value* must be set.
+        message Range {
+          // If specified, value may not be less than this.
+          uint64 min_value = 1;
+
+          // If specified, value may not be greater than this.
+          uint64 max_value = 2;
+        }
+
+        repeated Range range = 1;
+      }
+
+      message Exists {
+      }
+
+      oneof constraint {
+        // The key must have this specific value.
+        string value = 1;
+
+        // The key's value must be integers and within one of the ranges in this list.
+        IntegerRangeList integer_range_list = 2;
+
+        // The key exists.
+        Exists exists = 3;
+      }
+
+      // If true, the constraint is inverted (i.e., logical-not of the constraint).
+      bool invert = 4;
+    }
+
+    // A list of one or more constraints on the value of the key.
+    // All constraints must be met.
+    repeated Constraint constraints = 2;
+
+    // If specified, the key is optional (i.e., a subscription will match
+    // even if it does not have the specified dynamic parameter).
+    bool is_optional = 3;
+  }
+
+  // One entry per key.
+  map<string, KeyConstraints> key_constraints = 1;
+}

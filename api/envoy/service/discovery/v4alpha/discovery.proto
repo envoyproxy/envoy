@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.discovery.v4alpha;
 
 import "envoy/config/core/v4alpha/base.proto";
+import "envoy/service/discovery/v4alpha/dynamic_parameter_constraints.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -18,13 +19,17 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 
 // [#protodoc-title: Common discovery API components]
 
+// A specification of a resource used when subscribing or unsubscribing.
 message ResourceLocator {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v3.ResourceLocator";
 
+  // The resource name to subscribe to.
   string name = 1;
 
-  map<string, string> dynamic_parameters = 2;
+  // A set of constraints used to match against the dynamic parameters on the resource. This
+  // allows clients to select between multiple variants of the same resource.
+  DynamicParameterConstraints dynamic_parameter_constraints = 2;
 }
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
@@ -269,73 +274,6 @@ message DeltaDiscoveryResponse {
   config.core.v4alpha.ControlPlane control_plane = 7;
 }
 
-// A set of dynamic parameter constraints associated with an individual
-// xDS resource. These constraints determine whether the resource matches
-// a subscription based on the set of dynamic parameters in the subscription.
-// This allows xDS servers and caching proxies to determine which variant of a
-// resource is appropriate for a given client.
-message DynamicParameterConstraints {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.service.discovery.v3.DynamicParameterConstraints";
-
-  message Constraint {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.service.discovery.v3.DynamicParameterConstraints.Constraint";
-
-    // A list of one or more integer ranges.
-    // A value is considered to match if it falls in any of the ranges.
-    message IntegerRangeList {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.service.discovery.v3.DynamicParameterConstraints.Constraint.IntegerRangeList";
-
-      // At least one of *min_value* or *max_value* must be set.
-      message Range {
-        option (udpa.annotations.versioning).previous_message_type =
-            "envoy.service.discovery.v3.DynamicParameterConstraints.Constraint.IntegerRangeList."
-            "Range";
-
-        // If specified, value may not be less than this.
-        uint64 min_value = 1;
-
-        // If specified, value may not be greater than this.
-        uint64 max_value = 2;
-      }
-
-      repeated Range range = 1;
-    }
-
-    message Exists {
-      option (udpa.annotations.versioning).previous_message_type =
-          "envoy.service.discovery.v3.DynamicParameterConstraints.Constraint.Exists";
-    }
-
-    oneof constraint {
-      // The key must have this specific value.
-      string value = 1;
-
-      // The key's value must be integers and within one of the ranges in this list.
-      IntegerRangeList integer_range_list = 2;
-
-      // The key exists.
-      Exists exists = 3;
-    }
-
-    // If true, the constraint is inverted (i.e., logical-not of the constraint).
-    bool invert = 4;
-  }
-
-  // The name of the dynamic parameter to match against.
-  string key = 1;
-
-  // A list of one or more constraints on the value of the key.
-  // All constraints must be met.
-  repeated Constraint constraints = 2;
-
-  // If specified, the key is optional (i.e., a subscription will match
-  // even if it does not have the specified dynamic parameter).
-  bool is_optional = 3;
-}
-
 // [#next-free-field: 9]
 message Resource {
   option (udpa.annotations.versioning).previous_message_type =
@@ -385,7 +323,7 @@ message Resource {
   // [#not-implemented-hide:]
   CacheControl cache_control = 7;
 
-  // Dynamic parameter constraints associated with this resource. To be used by client-side caches
+  // Dynamic parameters associated with this resource. To be used by client-side caches
   // (including xDS proxies) when matching subscribed resource locators.
-  repeated DynamicParameterConstraints dynamic_parameter_constraints = 8;
+  map<string, string> dynamic_parameters = 8;
 }
