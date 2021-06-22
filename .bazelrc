@@ -10,6 +10,8 @@
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
+run --color=yes
+
 build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_strict_action_env=true
