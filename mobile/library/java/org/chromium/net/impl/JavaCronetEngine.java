@@ -97,9 +97,7 @@ public final class JavaCronetEngine extends CronetEngineBase {
 
   @Override
   public String getVersionString() {
-    // TODO(carloseltuerto): replace with something similar to original Cronet
-    return "CronetHttpURLConnection/"
-        + "ImplVersion.getCronetVersionWithLastChange()";
+    return "CronetHttpURLConnection/" + ImplVersion.getCronetVersionWithLastChange();
   }
 
   @Override

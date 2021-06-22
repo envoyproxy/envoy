@@ -1,4 +1,4 @@
-exclude: '/certificates.inc$'
+exclude: '(/certificates.inc$)|(test/.*/testing/data/)'
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v2.1.0

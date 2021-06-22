@@ -5,7 +5,6 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
-
 import java.util.Locale;
 
 /**
@@ -16,8 +15,6 @@ public final class UserAgent {
 
   private static final int VERSION_CODE_UNINITIALIZED = 0;
   private static int sVersionCode = VERSION_CODE_UNINITIALIZED;
-
-  private UserAgent() {}
 
   /**
    * Constructs a User-Agent string including application name and version,
@@ -94,7 +91,8 @@ public final class UserAgent {
 
   private static void appendCronetVersion(StringBuilder builder) {
     builder.append(" Cronet/");
-    // TODO(carloseltuerto): replace this: ImplVersion.getCronetVersion()
-    builder.append("DummyVersion");
+    builder.append(ImplVersion.getCronetVersion());
   }
+
+  private UserAgent() {}
 }
