@@ -679,8 +679,6 @@ void RequestHeaderMapImpl::setTraceContext(absl::string_view key, absl::string_v
   new_val.setCopy(val);
 
   HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
-  ASSERT(new_key.empty()); // NOLINT(bugprone-use-after-move)
-  ASSERT(new_val.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
@@ -692,7 +690,6 @@ void RequestHeaderMapImpl::setTraceContextReferenceKey(absl::string_view key,
   new_val.setCopy(val);
 
   HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
-  ASSERT(new_val.empty()); // NOLINT(bugprone-use-after-move)
 }
 
 void RequestHeaderMapImpl::setTraceContextReference(absl::string_view key, absl::string_view val) {
