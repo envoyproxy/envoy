@@ -889,7 +889,7 @@ static_route_configs:
               route: { cluster: baz }
     last_updated:
       seconds: 1234567891
-      nanos: 234000000    
+      nanos: 234000000
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump4.DebugString());
@@ -909,7 +909,7 @@ dynamic_route_configs:
       virtual_hosts:
     last_updated:
       seconds: 1234567891
-      nanos: 234000000  
+      nanos: 234000000
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump5.DebugString());

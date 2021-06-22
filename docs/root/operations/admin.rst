@@ -199,7 +199,7 @@ modify different aspects of the server:
 .. http:get:: /config_dump?name_regex={}
 
   Dump only the currently loaded configurations whose names match the specified regex. Can be used with
-  both `resource` and `mask` query parameters. 
+  both `resource` and `mask` query parameters.
 
   For example, get all configs whose name contain a specified substring with
   ``/config_dump?name_regex=.*substring.*``
