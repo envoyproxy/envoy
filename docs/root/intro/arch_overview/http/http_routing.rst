@@ -55,7 +55,7 @@ Route Scope
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
 A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
-RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
+RouteConfiguration associated with scopejj can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
@@ -74,6 +74,22 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
         element:
           key: x-foo-key
           separator: =
+
+One may also choose derive scope keys from dynamic :ref:`metadata
+<envoy_v3_api_msg_config.core.v3.Metadata>`. In the configuration below, Envoy looks into the opaque
+metadata associated with "filter.name.foo" and extracts the value associated with the key
+"some_key_value":
+
+.. code-block:: yaml
+
+  fragments:
+  - metadata_value_extractor:
+      metadata_key:
+        key: filter.name.foo
+        path:
+        - key: some_key_value
+
+
 
 .. _arch_overview_http_routing_route_table:
 
