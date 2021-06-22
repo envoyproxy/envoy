@@ -419,6 +419,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
                                                      const RequestHeaderMap* request_headers,
                                                      ConnectionManagerConfig& config,
                                                      const std::string& via) {
+  bool clear_hop_by_hop = config.clearHopByHopResponseHeaders();
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
@@ -436,19 +437,21 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
       response_headers.setContentLength(uint64_t(0));
     }
   } else {
-    response_headers.removeConnection();
-    response_headers.removeUpgrade();
+    if (clear_hop_by_hop) {
+      response_headers.removeConnection();
+      response_headers.removeUpgrade();
+    }
   }
-
-  response_headers.removeTransferEncoding();
 
   if (request_headers != nullptr &&
       (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
     config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
-  response_headers.removeKeepAlive();
-  response_headers.removeProxyConnection();
-
+  if (clear_hop_by_hop) {
+    response_headers.removeTransferEncoding();
+    response_headers.removeKeepAlive();
+    response_headers.removeProxyConnection();
+  }
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }

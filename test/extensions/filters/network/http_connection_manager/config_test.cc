@@ -829,10 +829,11 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
+TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   server_header_transformation: OVERWRITE
+  preserve_hop_by_hop_response_headers: true
   route_config:
     name: local_route
   http_filters:
@@ -848,6 +849,7 @@ TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
                                      filter_config_provider_manager_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
+  EXPECT_FALSE(config.clearHopByHopResponseHeaders());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {

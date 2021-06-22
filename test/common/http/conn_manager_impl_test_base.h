@@ -110,6 +110,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
+  bool clearHopByHopResponseHeaders() const override { return true; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
