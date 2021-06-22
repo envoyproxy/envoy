@@ -78,7 +78,6 @@ build_images() {
     else
       IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
     fi
-    IMAGES_TO_SAVE+=("${IMAGE_TAG}")
 
     # docker buildx load cannot have multiple platform, load individually
     if ! is_windows; then
@@ -138,13 +137,25 @@ fi
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  build_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+    image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+    build_images "${BUILD_TYPE}" "$image_tag"
+
+    if ! is_windows; then
+        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-alpine" ]]; then
+            # verify_examples expects the base and alpine images, and for them to be named `-dev`
+            dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
+            docker tag "$image_tag" "$dev_image"
+            IMAGES_TO_SAVE+=("$dev_image")
+        fi
+    fi
 done
 
 mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
-ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
-echo "Saving built images to ${ENVOY_DOCKER_TAR}."
-docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
+if [[ ${#IMAGES_TO_SAVE[@]} -ne 0 ]]; then
+    ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
+    echo "Saving built images to ${ENVOY_DOCKER_TAR}: ${IMAGES_TO_SAVE[*]}"
+    docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
+fi
 
 # Only push images for main builds, release branch builds, and tag builds.
 if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&
