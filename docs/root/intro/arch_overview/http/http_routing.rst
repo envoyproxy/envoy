@@ -78,7 +78,8 @@ If the "addr" header value is "foo=1;x-foo-key=127.0.0.1;x-bar-key=1.1.1.1", the
 One may also choose derive scope keys from dynamic :ref:`metadata
 <envoy_v3_api_msg_config.core.v3.Metadata>`. In the configuration below, Envoy looks into the opaque
 metadata associated with "filter.name.foo" and extracts the value associated with the key
-"some_key_value":
+"some_key_value". This enables identification based on arbitrary information passed from other
+filters, such as connection metadata.
 
 .. code-block:: yaml
 
@@ -88,8 +89,6 @@ metadata associated with "filter.name.foo" and extracts the value associated wit
         key: filter.name.foo
         path:
         - key: some_key_value
-
-
 
 .. _arch_overview_http_routing_route_table:
 
