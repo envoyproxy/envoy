@@ -15,14 +15,15 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
     uint32_t send_buffer_limit, QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory)
+    EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+    OptRef<const Network::TransportSocketFactory> transport_socket_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
       QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
                                       send_buffer_limit),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
-}
+      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
+      transport_socket_factory_(transport_socket_factory) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -38,7 +39,8 @@ EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
   return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
-      crypto_config, compressed_certs_cache, this, stream_helper());
+      crypto_config, compressed_certs_cache, this, stream_helper(), transport_socket_factory_,
+      dispatcher());
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {
