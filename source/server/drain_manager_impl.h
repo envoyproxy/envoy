@@ -57,8 +57,6 @@ private:
   // Callbacks called by startDrainSequence to cascade/proxy to children
   std::shared_ptr<Common::ThreadSafeCallbackManager> children_;
 
-  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
-
   // Callback handle parent will invoke to initiate drain-sequence. Created and set
   // by the parent drain-manager.
   Common::CallbackHandlePtr parent_callback_handle_;

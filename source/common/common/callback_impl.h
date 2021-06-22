@@ -146,12 +146,12 @@ public:
 
 private:
   struct CallbackHolder : public CallbackHandle {
-    CallbackHolder(std::weak_ptr<ThreadSafeCallbackManager> parent, Callback cb,
+    CallbackHolder(std::shared_ptr<ThreadSafeCallbackManager> parent, Callback cb,
                    Event::Dispatcher& cb_dispatcher);
 
     ~CallbackHolder() override;
 
-    std::weak_ptr<ThreadSafeCallbackManager> parent_;
+    std::shared_ptr<ThreadSafeCallbackManager> parent_;
     Callback cb_;
     Event::Dispatcher& callback_dispatcher_;
     std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};

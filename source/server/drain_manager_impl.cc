@@ -27,12 +27,11 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
 
   // Wire up the child so that when the parent starts draining, the child also sees the
   // state-change
-  auto child_cb = children_->add(
-      dispatcher, [child = child.get(), still_alive = std::weak_ptr<bool>(child->still_alive_)] {
-        if (!still_alive.expired() && !child->draining_) {
-          child->startDrainSequence([] {});
-        }
-      });
+  auto child_cb = children_->add(dispatcher, [child = child.get()] {
+    if (!child->draining_) {
+      child->startDrainSequence([] {});
+    }
+  });
   child->parent_callback_handle_ = std::move(child_cb);
   return child;
 }
