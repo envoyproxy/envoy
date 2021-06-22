@@ -19,6 +19,13 @@ namespace {
 
 class UpstreamRequestTest : public testing::Test {
 public:
+  UpstreamRequestTest() {
+    HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
+    ON_CALL(router_filter_interface_, downstreamHeaders())
+        .WillByDefault(Return(&downstream_request_header_map_));
+  }
+
+  Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   UpstreamRequest upstream_request_{router_filter_interface_,
                                     std::make_unique<NiceMock<Router::MockGenericConnPool>>()};
@@ -57,11 +64,6 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   address_provider->setLocalAddress(Network::Utility::parseInternetAddressAndPort("5.6.7.8:5678"));
   address_provider->setDirectRemoteAddressForTest(
       Network::Utility::parseInternetAddressAndPort("1.2.3.4:5678"));
-  Http::TestRequestHeaderMapImpl downstream_request_header_map;
-  HttpTestUtility::addDefaultHeaders(downstream_request_header_map);
-
-  EXPECT_CALL(router_filter_interface_, downstreamHeaders())
-      .WillOnce(Return(&downstream_request_header_map));
 
   // Dump State
   std::array<char, 1024> buffer;

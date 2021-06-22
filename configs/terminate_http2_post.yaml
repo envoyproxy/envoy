@@ -26,19 +26,19 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains:
-                - "*"
+              - "*"
               routes:
-                - match:
-                    prefix: "/"
-                    headers:
-                      - name: ":method"
-                        exact_match: "POST"
-                  route:
-                    cluster: service_google
-                    upgrade_configs:
-                      - upgrade_type: CONNECT
-                        connect_config:
-                          allow_post: true
+              - match:
+                  prefix: "/"
+                  headers:
+                  - name: ":method"
+                    exact_match: "POST"
+                route:
+                  cluster: service_google
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      allow_post: true
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:

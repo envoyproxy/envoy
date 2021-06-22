@@ -870,6 +870,8 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
   EXPECT_EQ("remote error with CONNECT request",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
+  EXPECT_EQ("overload manager reset",
+            Utility::resetReasonToString(Http::StreamResetReason::OverloadManager));
 }
 
 class TestConfig : public Router::RouteSpecificFilterConfig {

@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace IpTagging {
 class IpTaggingFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::ip_tagging::v3::IPTagging> {
 public:
-  IpTaggingFilterFactory() : FactoryBase(HttpFilterNames::get().IpTagging) {}
+  IpTaggingFilterFactory() : FactoryBase("envoy.filters.http.ip_tagging") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

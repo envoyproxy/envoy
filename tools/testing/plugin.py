@@ -41,13 +41,13 @@ def patches():
     return _patches
 
 
-def _command_main(main, handler):
+def _command_main(main, handler, args=("arg0", "arg1", "arg2")):
     class_mock = patch(handler)
 
     with class_mock as m_class:
-        assert (main("arg0", "arg1", "arg2") == m_class.return_value.run.return_value)
+        assert (main(*args) == m_class.return_value.run.return_value)
 
-    assert (list(m_class.call_args) == [('arg0', 'arg1', 'arg2'), {}])
+    assert (list(m_class.call_args) == [args, {}])
     assert (list(m_class.return_value.run.call_args) == [(), {}])
 
 

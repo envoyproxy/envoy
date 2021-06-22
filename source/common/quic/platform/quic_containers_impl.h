@@ -12,7 +12,7 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
-#include "quiche/common/simple_linked_hash_map.h"
+#include "quiche/common/quiche_linked_hash_map.h"
 #include "quiche/quic/platform/api/quic_flags.h"
 
 // NOLINT(namespace-envoy)
@@ -36,7 +36,7 @@ template <typename Key, typename Hash> using QuicHashSetImpl = absl::flat_hash_s
 template <typename Key, typename Hash> using QuicUnorderedSetImpl = absl::node_hash_set<Key, Hash>;
 
 template <typename Key, typename Value, typename Hash>
-using QuicLinkedHashMapImpl = quiche::SimpleLinkedHashMap<Key, Value, Hash>;
+using QuicLinkedHashMapImpl = quiche::QuicheLinkedHashMap<Key, Value, Hash>;
 
 template <typename Key, typename Value, int Size>
 using QuicSmallMapImpl = absl::flat_hash_map<Key, Value>;

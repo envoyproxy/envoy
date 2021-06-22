@@ -6,10 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "1999:1999"
-      - "8001:8001"
+    - "1999:1999"
+    - "8001:8001"
 
   redis:
     build:
@@ -18,7 +18,7 @@ services:
     networks:
       envoymesh:
         aliases:
-          - redis_server
+        - redis_server
 
 networks:
   envoymesh: {}

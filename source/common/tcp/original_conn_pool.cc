@@ -128,7 +128,7 @@ OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
     return pending_requests_.front().get();
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, "", nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
@@ -184,7 +184,7 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
         host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(reason, conn.real_host_description_);
+        request->callbacks_.onPoolFailure(reason, "", conn.real_host_description_);
       }
     }
 

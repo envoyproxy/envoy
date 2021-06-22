@@ -204,10 +204,10 @@ public:
   }
 
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
-                     absl::string_view, ConnectionPool::PoolFailureReason reason,
+                     absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
-    callbacks->onPoolFailure(reason, host_description);
+    callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
 
   // These two functions exist for testing parity between old and new Tcp Connection Pools.

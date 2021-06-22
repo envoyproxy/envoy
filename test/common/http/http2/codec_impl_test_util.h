@@ -77,6 +77,7 @@ public:
 
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
+  using ServerConnectionImpl::sendPendingFrames;
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().

@@ -6,7 +6,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,7 +40,7 @@ public:
         envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol>();
   }
 
-  std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }
+  std::string name() const override { return "envoy.filters.listener.proxy_protocol"; }
 };
 
 /**

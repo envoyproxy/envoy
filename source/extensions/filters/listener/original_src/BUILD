@@ -43,7 +43,6 @@ envoy_cc_extension(
         ":original_src_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
     ],
 )

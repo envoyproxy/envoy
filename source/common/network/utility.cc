@@ -586,7 +586,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
     const uint64_t max_rx_datagram_size_with_gro =
-        NUM_DATAGRAMS_PER_GRO_RECEIVE * udp_packet_processor.maxDatagramSize();
+        NUM_DATAGRAMS_PER_RECEIVE * udp_packet_processor.maxDatagramSize();
     ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
     Api::IoCallUint64Result result =
@@ -636,17 +636,17 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       Buffer::ReservationSingleSlice reservation_;
     };
     constexpr uint32_t num_slices_per_packet = 1u;
-    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_MMSG_RECEIVE> buffers;
-    RawSliceArrays slices(NUM_DATAGRAMS_PER_MMSG_RECEIVE,
+    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_RECEIVE> buffers;
+    RawSliceArrays slices(NUM_DATAGRAMS_PER_RECEIVE,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_MMSG_RECEIVE; i++) {
+    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_RECEIVE; i++) {
       buffers.push_back(max_rx_datagram_size);
       slices[i][0] = buffers[i].reservation_.slice();
     }
 
-    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_MMSG_RECEIVE, packets_dropped);
-    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}",
-                   NUM_DATAGRAMS_PER_MMSG_RECEIVE, max_rx_datagram_size);
+    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_RECEIVE, packets_dropped);
+    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", NUM_DATAGRAMS_PER_RECEIVE,
+                   max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;
@@ -703,8 +703,8 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
       MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
   const bool use_gro = prefer_gro && handle.supportsUdpGro();
   size_t num_reads =
-      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_GRO_RECEIVE)
-              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_MMSG_RECEIVE)
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
                                        : num_packets_to_read);
   // Make sure to read at least once.
   num_reads = std::max<size_t>(1, num_reads);
