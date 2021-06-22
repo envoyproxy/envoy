@@ -81,18 +81,5 @@ private:
 
   const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
 };
-
-class MockSingleFamilySocketInterface : public SocketInterfaceImpl {
-public:
-  explicit MockSingleFamilySocketInterface(Address::IpVersion version) : version_(version) {}
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
-              (const));
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
-  bool ipFamilySupported(int domain) override {
-    return (version_ == Address::IpVersion::v4) ? domain == AF_INET : domain == AF_INET6;
-  }
-  const Address::IpVersion version_;
-};
-
 } // namespace Network
 } // namespace Envoy

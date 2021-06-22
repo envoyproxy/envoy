@@ -20,11 +20,11 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
-#include "source/common/network/socket_interface_impl.h"
 
 #include "test/mocks/init/mocks.h"
 #include "test/server/utility.h"
@@ -45,21 +45,6 @@ using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
-
-class MockSingleFamilySocketInterface : public Network::SocketInterfaceImpl {
-public:
-  explicit MockSingleFamilySocketInterface(Network::Address::IpVersion version)
-      : version_(version) {}
-  MOCK_METHOD(Network::IoHandlePtr, socket,
-              (Network::Socket::Type, Network::Address::Type, Network::Address::IpVersion, bool),
-              (const));
-  MOCK_METHOD(Network::IoHandlePtr, socket,
-              (Network::Socket::Type, const Network::Address::InstanceConstSharedPtr), (const));
-  bool ipFamilySupported(int domain) override {
-    return (version_ == Network::Address::IpVersion::v4) ? domain == AF_INET : domain == AF_INET6;
-  }
-  const Network::Address::IpVersion version_;
-};
 
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
@@ -1653,8 +1638,8 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
-  auto mock_interface =
-      std::make_unique<MockSingleFamilySocketInterface>(Network::Address::IpVersion::v4);
+  auto mock_interface = std::make_unique<Network::MockSocketInterface>(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
   StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
@@ -1691,8 +1676,8 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
   InSequence s;
-  auto mock_interface =
-      std::make_unique<MockSingleFamilySocketInterface>(Network::Address::IpVersion::v4);
+  auto mock_interface = std::make_unique<Network::MockSocketInterface>(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
   StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
@@ -1735,7 +1720,7 @@ filter_chains:
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
 
   EXPECT_TRUE(manager_->removeListener("foo"));
-  
+
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
 

@@ -41,24 +41,12 @@ envoy_cc_mock(
     ],
 )
 
-# envoy_cc_mock(
-#     name = "socket_interface_mocks",
-#     srcs = ["socket_interface.cc"],
-#     hdrs = ["socket_interface_mocks.h"],
-#     deps = [
-#          "//source/common/network:address_lib",
-#         "//source/common/network:listen_socket_lib",
-#     ],
-# )
-
-
 envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
         ":connection_mocks",
-        #":socket_interface_mocks",
         ":transport_socket_mocks",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
@@ -68,6 +56,7 @@ envoy_cc_mock(
         "//envoy/network:transport_socket_interface",
         "//envoy/server:listener_manager_interface",
         "//source/common/network:address_lib",
+        "//source/common/network:socket_interface_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/event:event_mocks",
