@@ -323,11 +323,11 @@ lifecycle events and are invoked as data becomes available from the transport so
 Network filters are composed as a pipeline, unlike transport sockets which are one-per-connection.
 Network filters come in three varieties:
 
-* :repo:`ReadFilter <include/envoy/network/filter.h>` implementing ``onData()``, called when data is
+* :repo:`ReadFilter <envoy/network/filter.h>` implementing ``onData()``, called when data is
   available from the connection (due to some request).
-* :repo:`WriteFilter <include/envoy/network/filter.h>` implementing ``onWrite()``, called when data
+* :repo:`WriteFilter <envoy/network/filter.h>` implementing ``onWrite()``, called when data
   is about to be written to the connection (due to some response).
-* :repo:`Filter <include/envoy/network/filter.h>` implementing both *ReadFilter* and *WriteFilter*.
+* :repo:`Filter <envoy/network/filter.h>` implementing both *ReadFilter* and *WriteFilter*.
 
 The method signatures for the key filter methods are:
 
