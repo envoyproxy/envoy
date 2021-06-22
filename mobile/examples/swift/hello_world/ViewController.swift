@@ -19,9 +19,9 @@ final class ViewController: UITableViewController {
 
     let engine = EngineBuilder()
       .addLogLevel(.debug)
-      .addPlatformFilter(factory: DemoFilter.init)
-      .addPlatformFilter(factory: BufferDemoFilter.init)
-      .addPlatformFilter(factory: AsyncDemoFilter.init)
+      .addPlatformFilter(DemoFilter.init)
+      .addPlatformFilter(BufferDemoFilter.init)
+      .addPlatformFilter(AsyncDemoFilter.init)
       // swiftlint:disable:next line_length
       .addNativeFilter(name: "envoy.filters.http.buffer", typedConfig: "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       // swiftlint:disable:next line_length

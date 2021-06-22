@@ -54,7 +54,7 @@ static_resources:
     let expectation = self.expectation(description: "Run called with expected http status")
     let client = EngineBuilder(yaml: config)
       .addLogLevel(.debug)
-      .addPlatformFilter(factory: DemoFilter.init)
+      .addPlatformFilter(DemoFilter.init)
       .build()
       .streamClient()
 

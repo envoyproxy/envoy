@@ -152,9 +152,22 @@ open class EngineBuilder(
    *
    * @return this builder.
    */
-  fun addPlatformFilter(name: String = UUID.randomUUID().toString(), factory: () -> Filter):
+  fun addPlatformFilter(name: String, factory: () -> Filter):
     EngineBuilder {
       this.platformFilterChain.add(FilterFactory(name, factory))
+      return this
+    }
+
+  /**
+   * Add an HTTP filter factory used to create platform filters for streams sent by this client.
+   *
+   * @param factory closure returning an instantiated filter.
+   *
+   * @return this builder.
+   */
+  fun addPlatformFilter(factory: () -> Filter):
+    EngineBuilder {
+      this.platformFilterChain.add(FilterFactory(UUID.randomUUID().toString(), factory))
       return this
     }
 

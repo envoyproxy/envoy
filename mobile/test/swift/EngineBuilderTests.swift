@@ -104,7 +104,7 @@ final class EngineBuilderTests: XCTestCase {
 
     _ = EngineBuilder()
       .addEngineType(MockEnvoyEngine.self)
-      .addPlatformFilter(factory: TestFilter.init)
+      .addPlatformFilter(TestFilter.init)
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
