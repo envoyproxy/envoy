@@ -16,7 +16,7 @@ namespace {
 // Validates that `field_mask` is valid for `message` and applies `TrimMessage`.
 // Necessary because TrimMessage crashes if `field_mask` is invalid.
 // Returns `true` on success.
-bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
+bool checkFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
                                   Protobuf::Message& message) {
   for (const auto& path : field_mask.paths()) {
     if (!ProtobufUtil::FieldMaskUtil::GetFieldDescriptors(message.GetDescriptor(), path, nullptr)) {
@@ -32,8 +32,6 @@ bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
 // resource. Unfortunately, since the "cluster" field is Any and the in-built
 // FieldMask utils can't mask inside an Any field, we need to do additional work
 // below.
-//
-//
 //
 // We take advantage of the fact that for the most part (with the exception of
 // DynamicListener) that ConfigDump resources have a single Any field where the
@@ -107,14 +105,15 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
       MessageUtil::unpackTo(any_message, *inner_message);
       // Trim message.
-      if (!CheckFieldMaskAndTrimMessage(inner_field_mask, *inner_message))
+      if (!checkFieldMaskAndTrimMessage(inner_field_mask, *inner_message)) {
         return false;
+      }
       // Pack it back into the Any resource.
       any_message.PackFrom(*inner_message);
       reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
     }
   }
-  return CheckFieldMaskAndTrimMessage(outer_field_mask, message);
+  return checkFieldMaskAndTrimMessage(outer_field_mask, message);
 }
 
 // Helper method to get the resource parameter.
@@ -243,7 +242,7 @@ ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields.
-      if (!CheckFieldMaskAndTrimMessage(field_mask, *message)) {
+      if (!checkFieldMaskAndTrimMessage(field_mask, *message)) {
         return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
             Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
                                                  " could not be successfully used."))};
