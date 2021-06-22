@@ -1,13 +1,11 @@
 package org.chromium.net.impl;
 
 import android.content.Context;
-
+import java.util.Arrays;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.CronetProvider;
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
-
-import java.util.Arrays;
 
 /**
  * Implementation of {@link CronetProvider} that creates {@link CronetEngine.Builder}
@@ -35,8 +33,7 @@ public class NativeCronetProvider extends CronetProvider {
 
   @Override
   public String getVersion() {
-    // TODO(carloseltuerto) please fix
-    return "ImplVersion.getCronetVersion()";
+    return ImplVersion.getCronetVersion();
   }
 
   @Override

@@ -6,6 +6,7 @@ import android.content.Context;
 import android.util.Base64;
 import androidx.annotation.IntDef;
 import androidx.annotation.VisibleForTesting;
+import io.envoyproxy.envoymobile.LogLevel;
 import java.io.File;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -22,7 +23,7 @@ import org.chromium.net.ICronetEngineBuilder;
 import org.chromium.net.impl.Annotations.HttpCacheType;
 
 /** Implementation of {@link ICronetEngineBuilder} that builds Envoy-Mobile based Cronet engine. */
-abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
+public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
 
   /** A hint that a host supports QUIC. */
   final static class QuicHint {
@@ -81,6 +82,7 @@ abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
   protected long mMockCertVerifier;
   private boolean mNetworkQualityEstimatorEnabled;
   private int mThreadPriority = INVALID_THREAD_PRIORITY;
+  private LogLevel mLogLevel = LogLevel.INFO;
 
   /**
    * Default config enables SPDY and QUIC, disables SDCH and HTTP cache.
@@ -359,6 +361,13 @@ abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
   int threadPriority(int defaultThreadPriority) {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
+
+  CronetEngineBuilderImpl setLogLevel(LogLevel logLevel) {
+    mLogLevel = logLevel;
+    return this;
+  }
+
+  LogLevel getLogLevel() { return mLogLevel; }
 
   /**
    * Returns {@link Context} for builder.
