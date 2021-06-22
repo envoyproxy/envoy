@@ -34,7 +34,6 @@ static_resources:
           - name: envoy.filters.http.grpc_http1_bridge
             typed_config: {}
           - name: envoy.filters.http.router
-            typed_config: {"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}
   clusters:
   - name: backend-proxy
     type: LOGICAL_DNS
