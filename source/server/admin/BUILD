@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -20,6 +21,7 @@ envoy_cc_library(
         ":init_dump_handler_lib",
         ":listeners_handler_lib",
         ":logs_handler_lib",
+        ":pprof_handler_lib",
         ":profiling_handler_lib",
         ":runtime_handler_lib",
         ":server_cmd_handler_lib",
@@ -169,6 +171,31 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "profile",
+    srcs = ["profile.proto"],
+)
+
+envoy_cc_library(
+    name = "pprof_handler_lib",
+    srcs = ["pprof_handler.cc"],
+    hdrs = ["pprof_handler.h"],
+    external_deps = ["zlib"],
+    tcmalloc_dep = 1,
+    deps = [
+        ":handler_ctx_lib",
+        ":profile_cc_proto",
+        "//envoy/http:codes_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "@com_google_absl//absl/debugging:symbolize",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

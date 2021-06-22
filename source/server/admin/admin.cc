@@ -155,7 +155,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       config_dump_handler_(config_tracker_, server), init_dump_handler_(server),
       stats_handler_(server), logs_handler_(server), profiling_handler_(profile_path),
       runtime_handler_(server), listeners_handler_(server), server_cmd_handler_(server),
-      server_info_handler_(server),
+      server_info_handler_(server), pprof_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
@@ -215,6 +215,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
           {"/reopen_logs", "reopen access logs",
            MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
+          {"/pprof/heap", "return pprof heap profile",
+           MAKE_ADMIN_HANDLER(pprof_handler_.handlerHeapProfile), false, true},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),

@@ -43,6 +43,7 @@
 #include "source/server/admin/init_dump_handler.h"
 #include "source/server/admin/listeners_handler.h"
 #include "source/server/admin/logs_handler.h"
+#include "source/server/admin/pprof_handler.h"
 #include "source/server/admin/profiling_handler.h"
 #include "source/server/admin/runtime_handler.h"
 #include "source/server/admin/server_cmd_handler.h"
@@ -431,6 +432,7 @@ private:
   Server::ListenersHandler listeners_handler_;
   Server::ServerCmdHandler server_cmd_handler_;
   Server::ServerInfoHandler server_info_handler_;
+  Server::PprofHandler pprof_handler_;
   std::list<UrlHandler> handlers_;
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
