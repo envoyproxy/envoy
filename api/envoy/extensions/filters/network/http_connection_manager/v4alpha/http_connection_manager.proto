@@ -879,6 +879,7 @@ message ScopedRoutes {
         }
       }
 
+      // Specifies how dynamic metadata values should be extracted.
       message DynamicMetadataValueExtractor {
         option (udpa.annotations.versioning).previous_message_type =
             "envoy.extensions.filters.network.http_connection_manager.v3.ScopedRoutes."
@@ -887,7 +888,7 @@ message ScopedRoutes {
         oneof metadata_extract_type {
           option (validate.required) = true;
 
-          // Extract the entire value for the provided metadata key.
+          // Extract the entire string value for the provided metadata key.
           type.metadata.v3.MetadataKey metadata_key = 1;
         }
       }

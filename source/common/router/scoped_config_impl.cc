@@ -110,10 +110,13 @@ std::unique_ptr<ScopeKeyFragmentBase>
 FragmentBuilderImpl::computeFragmentFromMetadata(const Metadata& meta,
                                                  const MetadataValueExtractorConfig& config) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(&meta, config.metadata_key());
-  if (value.kind_case() != value.kStringValue && value.kind_case() != value.KIND_NOT_SET) {
-    ENVOY_LOG_EVERY_POW_2(warn, "metadata key must be string type, got {}", value.kind_case());
+  switch (value.kind_case()) {
+  case value.kStringValue:
+    return std::make_unique<StringKeyFragment>(value.string_value());
+  default:
+    // TODO (tonya11en): Support structured metadata fragments.
+    return nullptr;
   }
-  return std::make_unique<StringKeyFragment>(value.string_value());
 }
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
