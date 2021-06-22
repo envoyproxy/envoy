@@ -20,6 +20,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RocketmqProxy {
 
+static constexpr absl::string_view BrokerName = "broker_name";
+static constexpr absl::string_view ClusterName = "cluster_name";
+static constexpr absl::string_view WriteQueueNum = "write_queue_num";
+static constexpr absl::string_view ReadQueueNum = "read_queue_num";
+static constexpr absl::string_view BrokerId = "broker_id";
+static constexpr absl::string_view Perm = "perm";
+
 class ConnectionManager;
 
 /**

@@ -364,12 +364,12 @@ route_config:
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ProtobufWkt::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
-  (*fields)["read_queue_num"] = ValueUtil::numberValue(4);
-  (*fields)["write_queue_num"] = ValueUtil::numberValue(4);
-  (*fields)["cluster_name"] = ValueUtil::stringValue("DefaultCluster");
-  (*fields)["broker_name"] = ValueUtil::stringValue("broker-a");
-  (*fields)["broker_id"] = ValueUtil::numberValue(0);
-  (*fields)["perm"] = ValueUtil::numberValue(6);
+  (*fields)[ReadQueueNum] = ValueUtil::numberValue(4);
+  (*fields)[WriteQueueNum] = ValueUtil::numberValue(4);
+  (*fields)[ClusterName] = ValueUtil::stringValue("DefaultCluster");
+  (*fields)[BrokerName] = ValueUtil::stringValue("broker-a");
+  (*fields)[BrokerId] = ValueUtil::numberValue(0);
+  (*fields)[Perm] = ValueUtil::numberValue(6);
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);
@@ -463,12 +463,12 @@ route_config:
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   ProtobufWkt::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
-  (*fields)["read_queue_num"] = ValueUtil::numberValue(4);
-  (*fields)["write_queue_num"] = ValueUtil::numberValue(4);
-  (*fields)["cluster_name"] = ValueUtil::stringValue("DefaultCluster");
-  (*fields)["broker_name"] = ValueUtil::stringValue("broker-a");
-  (*fields)["broker_id"] = ValueUtil::numberValue(0);
-  (*fields)["perm"] = ValueUtil::numberValue(6);
+  (*fields)[ReadQueueNum] = ValueUtil::numberValue(4);
+  (*fields)[WriteQueueNum] = ValueUtil::numberValue(4);
+  (*fields)[ClusterName] = ValueUtil::stringValue("DefaultCluster");
+  (*fields)[BrokerName] = ValueUtil::stringValue("broker-a");
+  (*fields)[BrokerId] = ValueUtil::numberValue(0);
+  (*fields)[Perm] = ValueUtil::numberValue(6);
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);
