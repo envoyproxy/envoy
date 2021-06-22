@@ -81,5 +81,6 @@ private:
 
   const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
 };
+
 } // namespace Network
 } // namespace Envoy

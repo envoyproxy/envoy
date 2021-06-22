@@ -53,7 +53,8 @@ template <>
 NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
     const Address::InstanceConstSharedPtr& address,
     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-    : ListenSocketImpl(Network::ioHandleForAddr(Socket::Type::Datagram, address), address) {
+    : ListenSocketImpl(Network::ioHandleForAddr(Socket::Type::Datagram, address), address),
+      bind_to_port_(bind_to_port) {
   setPrebindSocketOptions();
   setupSocket(options, bind_to_port);
 }
