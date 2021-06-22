@@ -232,9 +232,12 @@ Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
-  if (!subject_alt_name_matchers.empty() && !matchSubjectAltName(cert, subject_alt_name_matchers)) {
-    stats_.fail_verify_san_.inc();
-    return Envoy::Ssl::ClientValidationStatus::Failed;
+  if (!subject_alt_name_matchers.empty()) {
+    if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
+      stats_.fail_verify_san_.inc();
+      return Envoy::Ssl::ClientValidationStatus::Failed;
+    }
+    validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
   if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
