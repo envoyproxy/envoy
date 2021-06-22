@@ -13,7 +13,9 @@ namespace Server {
 
 namespace {
 
-//
+// Validates that `field_mask` is valid for `message` and applies `TrimMessage`.
+// Necessary because TrimMessage crashes if `field_mask` is invalid.
+// Returns `true` on success.
 bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
                                   Protobuf::Message& message) {
   for (const auto& path : field_mask.paths()) {
@@ -31,6 +33,8 @@ bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
 // FieldMask utils can't mask inside an Any field, we need to do additional work
 // below.
 //
+//
+//
 // We take advantage of the fact that for the most part (with the exception of
 // DynamicListener) that ConfigDump resources have a single Any field where the
 // embedded resources lives. This allows us to construct an inner field mask for
@@ -44,6 +48,9 @@ bool CheckFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
 // this to allow arbitrary indexing through Any fields. This is pretty
 // complicated, we would need to build a FieldMask tree similar to how the C++
 // Protobuf library does this internally.
+/**
+ * @return true on success, false if `field_mask` is invalid.
+ */
 bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
@@ -140,24 +147,18 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
 
   envoy::admin::v3::ConfigDump dump;
 
+  absl::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
-    if (err.has_value()) {
-      response_headers.addReference(Http::Headers::get().XContentTypeOptions,
-                                    Http::Headers::get().XContentTypeOptionValues.Nosniff);
-      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-      response.add(err.value().second);
-      return err.value().first;
-    }
+    err = addResourceToDump(dump, mask, resource.value(), include_eds);
   } else {
-    auto err = addAllConfigToDump(dump, mask, include_eds);
-    if (err.has_value()) {
-      response_headers.addReference(Http::Headers::get().XContentTypeOptions,
-                                    Http::Headers::get().XContentTypeOptionValues.Nosniff);
-      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
-      response.add(err.value().second);
-      return err.value().first;
-    }
+    err = addAllConfigToDump(dump, mask, include_eds);
+  }
+  if (err.has_value()) {
+    response_headers.addReference(Http::Headers::get().XContentTypeOptions,
+                                  Http::Headers::get().XContentTypeOptionValues.Nosniff);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+    response.add(err.value().second);
+    return err.value().first;
   }
   MessageUtil::redact(dump);
 
