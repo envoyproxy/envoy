@@ -7,14 +7,14 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/string_accessor_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/string_accessor_impl.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
@@ -100,6 +100,119 @@ private:
   std::string raw_string_;
 };
 
+// Test tests command tokenize utility.
+TEST(SubstitutionFormatParser, tokenizer) {
+  std::vector<absl::string_view> tokens;
+  absl::optional<size_t> max_length;
+
+  std::string command = "COMMAND(item1)";
+
+  // The second parameter indicates where command name and opening bracket ends.
+  // In this case "COMMAND(" ends at index 8 (counting from zero).
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 1);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  command = "COMMAND(item1:item2:item3)";
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 3);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(tokens.at(1), "item2");
+  ASSERT_EQ(tokens.at(2), "item3");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  command = "COMMAND(item1:item2:item3:item4):234";
+  SubstitutionFormatParser::tokenizeCommand(command, 8, ':', tokens, max_length);
+  ASSERT_EQ(tokens.size(), 4);
+  ASSERT_EQ(tokens.at(0), "item1");
+  ASSERT_EQ(tokens.at(1), "item2");
+  ASSERT_EQ(tokens.at(2), "item3");
+  ASSERT_EQ(tokens.at(3), "item4");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 234);
+
+  // Tokenizing the following commands should fail.
+  std::vector<std::string> wrong_commands = {
+      "COMMAND(item1:item2",           // Missing closing bracket.
+      "COMMAND(item1:item2))",         // Unexpected second closing bracket.
+      "COMMAND(item1:item2):",         // Missing length field.
+      "COMMAND(item1:item2):LENGTH",   // Length field must be integer.
+      "COMMAND(item1:item2):100:23",   // Length field must be integer.
+      "COMMAND(item1:item2):100):23"}; // Extra fields after length.
+
+  for (const auto& test_command : wrong_commands) {
+    EXPECT_THROW(
+        SubstitutionFormatParser::tokenizeCommand(test_command, 8, ':', tokens, max_length),
+        EnvoyException)
+        << test_command;
+  }
+}
+
+// Test tests multiple versions of variadic template method parseCommand
+// extracting tokens.
+TEST(SubstitutionFormatParser, commandParser) {
+  std::vector<absl::string_view> tokens;
+  absl::optional<size_t> max_length;
+  std::string token1;
+
+  std::string command = "COMMAND(item1)";
+  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  std::string token2;
+  command = "COMMAND(item1:item2)";
+  SubstitutionFormatParser::parseCommand(command, 8, ':', max_length, token1, token2);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(max_length, absl::nullopt);
+
+  // Three tokens with optional length.
+  std::string token3;
+  command = "COMMAND(item1?item2?item3):345";
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(token3, "item3");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 4 tokens but 3 are expected.
+  // The first 3 will be read, the fourth will be ignored.
+  command = "COMMAND(item1?item2?item3?item4):345";
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(token3, "item3");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 2 tokens but 3 are expected.
+  // The third extracted token should be empty.
+  command = "COMMAND(item1?item2):345";
+  token3.erase();
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, token3);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_TRUE(token3.empty());
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+
+  // Command string has 4 tokens. Get first 2 into the strings
+  // and remaining 2 into a vector of strings.
+  command = "COMMAND(item1?item2?item3?item4):345";
+  std::vector<std::string> bucket;
+  SubstitutionFormatParser::parseCommand(command, 8, '?', max_length, token1, token2, bucket);
+  ASSERT_EQ(token1, "item1");
+  ASSERT_EQ(token2, "item2");
+  ASSERT_EQ(bucket.size(), 2);
+  ASSERT_EQ(bucket.at(0), "item3");
+  ASSERT_EQ(bucket.at(1), "item4");
+  ASSERT_TRUE(max_length.has_value());
+  ASSERT_EQ(max_length.value(), 345);
+}
+
 TEST(SubstitutionFormatUtilsTest, protocolToString) {
   EXPECT_EQ("HTTP/1.0",
             SubstitutionFormatUtils::protocolToString(Http::Protocol::Http10).value().get());
@@ -160,6 +273,29 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                                             response_trailers, stream_info, body));
     EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
                                                     response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
+    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
+    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
+    EXPECT_EQ("15", request_tx_duration_format.format(request_headers, response_headers,
+                                                      response_trailers, stream_info, body));
+    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(15.0)));
+  }
+
+  {
+    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
+    absl::optional<std::chrono::nanoseconds> dur;
+    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
+    EXPECT_EQ(absl::nullopt,
+              request_tx_duration_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
@@ -1267,6 +1403,18 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    EXPECT_EQ("test_value", formatter.format(request_headers, response_headers, response_trailers,
+                                             stream_info, body));
+    EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
+                                      stream_info, body),
+                ProtoEq(ValueUtil::stringValue("test_value")));
+  }
+  // Disable string value unquoting and expect the same result as above but quoted.
+  {
+    TestScopedRuntime scoped_runtime;
+    Runtime::LoaderSingleton::getExisting()->mergeValues(
+        {{"envoy.reloadable_features.unquote_log_string_values", "false"}});
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
     EXPECT_EQ("\"test_value\"", formatter.format(request_headers, response_headers,
                                                  response_trailers, stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -1289,8 +1437,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "inner_key"},
                                        absl::optional<size_t>());
-    EXPECT_EQ("\"inner_value\"", formatter.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
+    EXPECT_EQ("inner_value", formatter.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
                                       stream_info, body),
                 ProtoEq(ValueUtil::stringValue("inner_value")));
@@ -1326,8 +1474,8 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFormatter) {
   // size limit
   {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
-    EXPECT_EQ("\"test", formatter.format(request_headers, response_headers, response_trailers,
-                                         stream_info, body));
+    EXPECT_EQ("test_", formatter.format(request_headers, response_headers, response_trailers,
+                                        stream_info, body));
 
     // N.B. Does not truncate.
     EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
@@ -1999,9 +2147,9 @@ TEST(SubstitutionFormatterTest, StructFormatterDynamicMetadataTest) {
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""}};
+      {"test_obj.inner_key", "inner_value"}};
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
@@ -2064,9 +2212,9 @@ TEST(SubstitutionFormatterTest, StructFormatterClusterMetadataTest) {
   EXPECT_CALL(Const(stream_info), upstreamClusterInfo()).WillRepeatedly(ReturnPointee(cluster));
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {
-      {"test_key", "\"test_value\""},
+      {"test_key", "test_value"},
       {"test_obj", "{\"inner_key\":\"inner_value\"}"},
-      {"test_obj.inner_key", "\"inner_value\""},
+      {"test_obj.inner_key", "inner_value"},
       {"test_obj.non_existing_key", "-"},
   };
 
@@ -2512,7 +2660,7 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     FormatterImpl formatter(format, false);
 
     EXPECT_EQ(
-        "\"test_value\"|{\"inner_key\":\"inner_value\"}|\"inner_value\"",
+        "test_value|{\"inner_key\":\"inner_value\"}|inner_value",
         formatter.format(request_header, response_header, response_trailer, stream_info, body));
   }
 

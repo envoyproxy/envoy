@@ -9,8 +9,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "server/admin/config_tracker_impl.h"
-#include "server/admin/handler_ctx.h"
+#include "source/server/admin/config_tracker_impl.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 

@@ -14,14 +14,13 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/ttl.h"
-#include "common/config/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/ttl.h"
+#include "source/common/config/utility.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -62,7 +61,6 @@ public:
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
-  void registerVersionedTypeUrl(const std::string& type_url);
   void
   onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
                       ControlPlaneStats& control_plane_stats) override;
@@ -142,6 +140,9 @@ private:
     // This resource type must have a Node sent at next request.
     bool must_send_node_{};
     TtlManager ttl_;
+    // The identifier for the server that sent the most recent response, or
+    // empty if there is none.
+    std::string control_plane_identifier_{};
   };
 
   bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
@@ -177,7 +178,6 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 
   Event::Dispatcher& dispatcher_;
-  bool enable_type_url_downgrade_and_upgrade_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
 };
 

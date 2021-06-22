@@ -1,4 +1,4 @@
-#include "common/router/router.h"
+#include "source/common/router/router.h"
 
 #include <chrono>
 #include <cstdint>
@@ -15,34 +15,32 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/network/upstream_subject_alt_names.h"
-#include "common/router/config_impl.h"
-#include "common/router/debug_config.h"
-#include "common/router/retry_state_impl.h"
-#include "common/router/upstream_request.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stream_info/uint32_accessor_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/debug_config.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/router/upstream_request.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -299,6 +297,8 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     const bool is_canary = (upstream_canary_header && upstream_canary_header->value() == "true") ||
                            (upstream_host ? upstream_host->canary() : false);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
+    const bool exclude_http_code_stats =
+        grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
     Stats::StatName upstream_zone = upstreamZone(upstream_host);
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
@@ -314,7 +314,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    code_stats.chargeResponseStat(info);
+    code_stats.chargeResponseStat(info, exclude_http_code_stats);
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
@@ -327,7 +327,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  config_.zone_name_,
                                                  upstream_zone,
                                                  is_canary};
-      code_stats.chargeResponseStat(alt_info);
+      code_stats.chargeResponseStat(alt_info, exclude_http_code_stats);
     }
 
     if (dropped) {
@@ -1144,6 +1144,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::ResponseFlag::UpstreamProtocolError;
+  case Http::StreamResetReason::OverloadManager:
+    return StreamInfo::ResponseFlag::OverloadManager;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

@@ -10,7 +10,7 @@
 #include <iostream>
 #include <memory>
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 

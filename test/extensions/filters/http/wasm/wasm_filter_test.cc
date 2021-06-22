@@ -1,6 +1,5 @@
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/wasm/wasm_filter.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
@@ -947,6 +946,9 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
       callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onSuccessRaw(std::move(response), span);
     }
   }
@@ -1369,8 +1371,10 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
@@ -1417,8 +1421,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "ok");
@@ -1465,8 +1471,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "close");
@@ -1511,8 +1519,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     EXPECT_NE(callbacks, nullptr);
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestResponseHeaderMapImpl{{"test", "reset"}}));
     }
@@ -1557,8 +1567,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     EXPECT_NE(callbacks, nullptr);
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
@@ -1603,7 +1615,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
   rootContext().onTick(0);
@@ -1648,7 +1660,7 @@ TEST_P(WasmHttpFilterTest, Property) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
@@ -1818,6 +1830,163 @@ TEST_P(WasmHttpFilterTest, RootId2) {
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter().decodeHeaders(request_headers, true));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnRequestHeaders) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().onRequestHeaders(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnRequestBody) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onRequestBody(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnRequestTrailers) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+
+  auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
+  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterTrailersStatus::StopIteration, filter().onRequestTrailers(0));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseHeaders) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter().onResponseHeaders(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseBody) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, filter().onResponseBody(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  setupTest("panic");
+  setupFilter();
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks,
+              sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                             testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                             testing::Eq("wasm_fail_stream")));
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterTrailersStatus::StopIteration, filter().onResponseTrailers(0));
+}
+
+TEST_P(WasmHttpFilterTest, CloseRequest) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupTest("close_stream");
+  setupFilter();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
+  EXPECT_CALL(decoder_callbacks, resetStream());
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterHeadersStatus::Continue, filter().onRequestHeaders(0, false));
+}
+
+TEST_P(WasmHttpFilterTest, CloseResponse) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(mathetake): not yet supported in the Rust SDK.
+    return;
+  }
+  setupTest("close_stream");
+  setupFilter();
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter().setEncoderFilterCallbacks(encoder_callbacks);
+  EXPECT_CALL(encoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, setResponseCodeDetails("wasm_close_stream"));
+  EXPECT_CALL(encoder_callbacks, resetStream());
+
+  // Create in-VM context.
+  filter().onCreate();
+  EXPECT_EQ(proxy_wasm::FilterHeadersStatus::Continue, filter().onResponseHeaders(0, false));
 }
 
 } // namespace Wasm

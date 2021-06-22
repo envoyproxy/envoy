@@ -1,4 +1,5 @@
-#include "extensions/tracers/skywalking/tracer.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/tracer.h"
 
 #include "test/extensions/tracers/skywalking/skywalking_test_helper.h"
 #include "test/mocks/common.h"
@@ -122,6 +123,11 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     EXPECT_EQ(1, span->spanEntity()->logs().size());
     EXPECT_LT(0, span->spanEntity()->logs().at(0).time());
     EXPECT_EQ("abc", span->spanEntity()->logs().at(0).data().at(0).value());
+
+    absl::string_view sample{"GETxx"};
+    sample.remove_suffix(2);
+    span->setTag(Tracing::Tags::get().HttpMethod, sample);
+    EXPECT_EQ("GET", span->spanEntity()->tags().at(5).second);
   }
 
   {

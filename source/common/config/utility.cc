@@ -1,4 +1,4 @@
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -9,18 +9,18 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/tag_producer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_type_oracle.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -252,22 +252,6 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
-}
-
-envoy::config::endpoint::v3::ClusterLoadAssignment Utility::translateClusterHosts(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts) {
-  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
-  envoy::config::endpoint::v3::LocalityLbEndpoints* locality_lb_endpoints =
-      load_assignment.add_endpoints();
-  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
-  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
-  for (const envoy::config::core::v3::Address& host : hosts) {
-    envoy::config::endpoint::v3::LbEndpoint* lb_endpoint =
-        locality_lb_endpoints->add_lb_endpoints();
-    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
-    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
-  }
-  return load_assignment;
 }
 
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,

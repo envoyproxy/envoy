@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -49,9 +49,7 @@ public:
       : singleton_manager_(singleton_manager), dispatcher_(dispatcher), tls_(tls), random_(random),
         loader_(loader), root_scope_(root_scope) {}
 
-  DnsCacheManagerSharedPtr get() override {
-    return getCacheManager(singleton_manager_, dispatcher_, tls_, random_, loader_, root_scope_);
-  }
+  DnsCacheManagerSharedPtr get() override;
 
 private:
   Singleton::Manager& singleton_manager_;

@@ -9,9 +9,9 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/empty_string.h"
-#include "common/json/json_loader.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -87,7 +87,7 @@ private:
       default_cvc_;
   std::vector<Secret::TlsCertificateConfigProviderSharedPtr> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
-  Envoy::Common::CallbackHandlePtr tc_update_callback_handle_;
+  std::vector<Envoy::Common::CallbackHandlePtr> tc_update_callback_handles_;
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.

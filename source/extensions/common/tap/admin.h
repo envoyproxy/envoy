@@ -3,7 +3,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
 
-#include "extensions/common/tap/tap.h"
+#include "source/extensions/common/tap/tap.h"
 
 #include "absl/container/node_hash_set.h"
 

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include <memory>
 
@@ -6,11 +6,10 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/utility.h"
-#include "common/router/metadatamatchcriteria_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"
 
@@ -281,9 +280,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     passthrough_supported_ = true;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!conn_pool_data) {
     stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
@@ -303,7 +301,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *conn_pool, metadata, transport, protocol);
+      std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata, transport, protocol);
   return upstream_request_->start();
 }
 
@@ -316,6 +314,10 @@ FilterStatus Router::messageEnd() {
 
   upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
                                              upstream_request_buffer_);
+
+  request_size_ += transport_buffer.length();
+  recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
+
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
@@ -323,6 +325,8 @@ FilterStatus Router::messageEnd() {
 
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
+
+  response_size_ += data.length();
 
   if (upstream_request_->upgrade_response_ != nullptr) {
     ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
@@ -351,6 +355,9 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
     if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
+      recordClusterScopeHistogram({upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
+                                  response_size_);
+
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
         incClusterScopeCounter({upstream_resp_reply_});
@@ -373,6 +380,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       cleanup();
       return;
     } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      // Note: invalid responses are not accounted in the response size histogram.
       ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
       upstream_request_->resetStream();
       return;
@@ -422,10 +430,10 @@ void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
 
 void Router::cleanup() { upstream_request_.reset(); }
 
-Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+Router::UpstreamRequest::UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                                          MessageMetadataSharedPtr& metadata,
                                          TransportType transport_type, ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+    : parent_(parent), conn_pool_data_(pool_data), metadata_(metadata),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
@@ -437,7 +445,7 @@ Router::UpstreamRequest::~UpstreamRequest() {
 }
 
 FilterStatus Router::UpstreamRequest::start() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_data_.newConnection(*this);
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
@@ -475,6 +483,7 @@ void Router::UpstreamRequest::releaseConnection(const bool close) {
 void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 
@@ -503,6 +512,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
     upgrade_response_ =
         protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
+      parent_.request_size_ += parent_.upstream_request_buffer_.length();
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
     }
@@ -584,7 +594,7 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
 }
 
 void Router::UpstreamRequest::chargeResponseTiming() {
-  if (charged_response_timing_) {
+  if (charged_response_timing_ || !request_complete_) {
     return;
   }
   charged_response_timing_ = true;

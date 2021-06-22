@@ -4,10 +4,10 @@
 
 #include "envoy/common/time.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/event/event_impl_base.h"
-#include "common/event/file_event_impl.h"
-#include "common/network/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/event_impl_base.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/network/utility.h"
 
 #include "base_listener_impl.h"
 
@@ -46,6 +46,9 @@ public:
                      MonotonicTime receive_time) override;
   uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
+  size_t numPacketsExpectedPerEventLoop() const override {
+    return cb_.numPacketsExpectedPerEventLoop();
+  }
 
 protected:
   void handleWriteCallback();

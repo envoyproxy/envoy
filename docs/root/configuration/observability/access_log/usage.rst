@@ -181,7 +181,7 @@ The following command operators are supported:
 
 %PROTOCOL%
   HTTP
-    Protocol. Currently either *HTTP/1.1* or *HTTP/2*.
+    Protocol. Currently either *HTTP/1.1* *HTTP/2* or *HTTP/3*.
 
   TCP
     Not implemented ("-").
@@ -262,6 +262,15 @@ The following command operators are supported:
 
   Renders a numeric value in typed JSON logs.
 
+%REQUEST_TX_DURATION%
+  HTTP
+    Total duration in milliseconds of the request from the start time to the last byte sent upstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %RESPONSE_DURATION%
   HTTP
     Total duration in milliseconds of the request from the start time to the first byte read from the
@@ -295,6 +304,7 @@ The following command operators are supported:
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code, or no matching filter chain for a downstream connection.
     * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_v3_api_field_config.route.v3.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` was reached.
     * **NC**: Upstream cluster not found.
+    * **DT**: When a request or connection exceeded :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` or :ref:`max_downstream_connection_duration <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_downstream_connection_duration>`.
   HTTP only
     * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
@@ -313,6 +323,7 @@ The following command operators are supported:
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached to max stream duration.
+    * **OM**: Overload Manager terminated the request.
 
 %ROUTE_NAME%
   Name of the route.
@@ -322,7 +333,7 @@ The following command operators are supported:
 
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. If runtime feature
-  `envoy.reloadable_features.use_observable_cluster_name` is enabled, then :ref:`alt_stat_name
+  ``envoy.reloadable_features.use_observable_cluster_name`` is enabled, then :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.
 
 %UPSTREAM_LOCAL_ADDRESS%
@@ -406,6 +417,8 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_PORT%
     Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
+
+.. _config_access_log_format_req:
 
 %REQ(X?Y):Z%
   HTTP

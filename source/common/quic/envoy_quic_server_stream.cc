@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -14,19 +14,19 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "common/quic/platform/quic_mem_slice_span_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/common/assert.h"
-#include "common/http/header_utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -45,7 +45,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           [this]() { runLowWatermarkCallbacks(); }, [this]() { runHighWatermarkCallbacks(); },
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {
-  ASSERT(GetReceiveWindow() > 8 * 1024, "Send buffer limit should be larger than 8KB.");
+  ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
+         "Send buffer limit should be larger than 8KB.");
 }
 
 EnvoyQuicServerStream::EnvoyQuicServerStream(
@@ -113,7 +114,8 @@ void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trail
 
 void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*metadata_map_vector*/) {
   // Metadata Frame is not supported in QUIC.
-  // TODO(danzh): add stats for metadata not supported error.
+  ENVOY_STREAM_LOG(debug, "METADATA is not supported in Http3.", *this);
+  stats_.metadata_not_supported_error_.inc();
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -160,7 +162,8 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     end_stream_decoded_ = true;
   }
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
-      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(header_list, *this);
+      quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
   if (headers == nullptr) {
     onStreamError(close_connection_upon_invalid_header_);
     return;
@@ -242,6 +245,11 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    if (received_trailers().size() > filterManagerConnection()->maxIncomingHeadersCount()) {
+      details_ = Http3ResponseCodeDetailValues::too_many_trailers;
+      onStreamError(close_connection_upon_invalid_header_);
+      return;
+    }
     request_decoder_->decodeTrailers(
         spdyHeaderBlockToEnvoyHeaders<Http::RequestTrailerMapImpl>(received_trailers()));
     MarkTrailersConsumed();
@@ -258,11 +266,15 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
+  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  stats_.rx_reset_.inc();
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
 }
 
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error);
+  stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
   quic::QuicSpdyServerStreamBase::Reset(error);
@@ -283,7 +295,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

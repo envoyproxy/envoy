@@ -1,7 +1,7 @@
 #include "envoy/matcher/matcher.h"
 
-#include "common/matcher/field_matcher.h"
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/field_matcher.h"
+#include "source/common/matcher/matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 
@@ -101,6 +101,23 @@ TEST_F(FieldMatcherTest, AllMatcher) {
               {std::make_pair(false,
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
                std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)}))
+          .match(TestData())
+          .match_state_,
+      MatchState::UnableToMatch);
+}
+
+TEST_F(FieldMatcherTest, NotMatcher) {
+  EXPECT_TRUE(NotFieldMatcher<TestData>(
+                  std::make_unique<AllFieldMatcher<TestData>>(createMatchers({true, false})))
+                  .match(TestData())
+                  .result());
+
+  EXPECT_EQ(
+      NotFieldMatcher<TestData>(
+          std::make_unique<AllFieldMatcher<TestData>>(createMatchers(
+              {std::make_pair(false,
+                              DataInputGetResult::DataAvailability::MoreDataMightBeAvailable),
+               std::make_pair(false, DataInputGetResult::DataAvailability::AllDataAvailable)})))
           .match(TestData())
           .match_state_,
       MatchState::UnableToMatch);

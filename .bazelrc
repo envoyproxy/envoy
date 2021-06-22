@@ -10,6 +10,9 @@
 # Startup options cannot be selected via config.
 startup --host_jvm_args=-Xmx2g
 
+run --color=yes
+
+build --color=yes
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --experimental_strict_action_env=true
 build --host_force_python=PY3
@@ -45,6 +48,10 @@ build:sanitizer --test_tag_filters=-no_san
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --linkopt=-fuse-ld=lld
+
+# Flags for Clang + PCH
+build:clang-pch --spawn_strategy=local
+build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1
@@ -105,9 +112,12 @@ build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
+build:clang-msan --linkopt -fuse-ld=lld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
+build:clang-msan --copt -fno-optimize-sibling-calls
 
 # Clang with libc++
 build:libc++ --config=clang
@@ -237,6 +247,10 @@ build:remote-msan --config=remote
 build:remote-msan --config=rbe-toolchain-clang-libc++
 build:remote-msan --config=rbe-toolchain-msan
 
+build:remote-tsan --config=remote
+build:remote-tsan --config=rbe-toolchain-clang-libc++
+build:remote-tsan --config=rbe-toolchain-tsan
+
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
 build:remote-msvc-cl --config=rbe-toolchain-msvc-cl
@@ -247,7 +261,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:3d0491e2034287959a292806e3891fd0b7dd2703
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:55d9e4719d2bd0accce8f829b44dab70cd42112a
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -264,6 +278,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-asan --config=docker-sandbox
+build:docker-asan --config=rbe-toolchain-clang-libc++
+build:docker-asan --config=rbe-toolchain-asan
 
 build:docker-msan --config=docker-sandbox
 build:docker-msan --config=rbe-toolchain-clang-libc++

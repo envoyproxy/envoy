@@ -3,7 +3,7 @@
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
-#include "extensions/retry/host/previous_hosts/previous_hosts.h"
+#include "source/extensions/retry/host/previous_hosts/previous_hosts.h"
 
 namespace Envoy {
 namespace Extensions {

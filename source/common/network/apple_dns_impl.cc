@@ -1,4 +1,4 @@
-#include "common/network/apple_dns_impl.h"
+#include "source/common/network/apple_dns_impl.h"
 
 #include <dns_sd.h>
 
@@ -11,10 +11,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -323,8 +323,6 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     // object upon resolution.
     return;
   }
-
-  ENVOY_BUG(interface_index == 0, fmt::format("unexpected interface_index={}", interface_index));
 
   // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are only
   // additive.

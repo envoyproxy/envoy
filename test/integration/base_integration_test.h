@@ -8,10 +8,9 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -64,7 +63,7 @@ public:
   // Finalize the config and spin up an Envoy instance.
   virtual void createEnvoy();
   // Sets upstream_protocol_ and alters the upstream protocol in the config_helper_
-  void setUpstreamProtocol(FakeHttpConnection::Type protocol);
+  void setUpstreamProtocol(Http::CodecType protocol);
   // Sets fake_upstreams_count_
   void setUpstreamCount(uint32_t count) { fake_upstreams_count_ = count; }
   // Skip validation that ensures that all upstream ports are referenced by the
@@ -73,7 +72,7 @@ public:
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministic() { deterministic_ = true; }
 
-  FakeHttpConnection::Type upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
+  Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
   IntegrationTcpClientPtr
   makeTcpConnection(uint32_t port,
@@ -274,7 +273,8 @@ public:
    * @param if the connection should be terminated once '\r\n\r\n' has been read.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
-                                     bool disconnect_after_headers_complete = false);
+                                     bool disconnect_after_headers_complete = false,
+                                     Network::TransportSocketPtr transport_socket = nullptr);
 
   /**
    * Helper to create ConnectionDriver.
@@ -285,10 +285,11 @@ public:
    **/
   std::unique_ptr<RawConnectionDriver> createConnectionDriver(
       uint32_t port, const std::string& initial_data,
-      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
     Buffer::OwnedImpl buffer(initial_data);
     return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
-                                                 *dispatcher_);
+                                                 *dispatcher_, std::move(transport_socket));
   }
 
   /**
@@ -307,52 +308,27 @@ public:
                                                  *dispatcher_, std::move(transport_socket));
   }
 
-  // Helper to create FakeUpstream.
-  // Creates a fake upstream bound to the specified unix domain socket path.
-  std::unique_ptr<FakeUpstream> createFakeUpstream(const std::string& uds_path,
-                                                   FakeHttpConnection::Type type) {
+  FakeUpstreamConfig configWithType(Http::CodecType type) const {
     FakeUpstreamConfig config = upstream_config_;
     config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(uds_path, config);
+    if (type != Http::CodecType::HTTP3) {
+      config.udp_fake_upstream_ = absl::nullopt;
+    }
+    return config;
   }
-  // Creates a fake upstream bound to the specified |address|.
-  std::unique_ptr<FakeUpstream>
-  createFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                     FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(address, config);
+
+  FakeUpstream& addFakeUpstream(Http::CodecType type) {
+    auto config = configWithType(type);
+    fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(0, version_, config));
+    return *fake_upstreams_.back();
   }
-  // Creates a fake upstream bound to INADDR_ANY and there is no specified port.
-  std::unique_ptr<FakeUpstream> createFakeUpstream(FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(0, version_, config);
-  }
-  std::unique_ptr<FakeUpstream>
-  createFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                     FakeHttpConnection::Type type) {
-    FakeUpstreamConfig config = upstream_config_;
-    config.upstream_protocol_ = type;
-    return std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config);
-  }
-  // Helper to add FakeUpstream.
-  // Add a fake upstream bound to the specified unix domain socket path.
-  void addFakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(uds_path, type));
-  }
-  // Add a fake upstream bound to the specified |address|.
-  void addFakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                       FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(address, type));
-  }
-  // Add a fake upstream bound to INADDR_ANY and there is no specified port.
-  void addFakeUpstream(FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(type));
-  }
-  void addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                       FakeHttpConnection::Type type) {
-    fake_upstreams_.emplace_back(createFakeUpstream(std::move(transport_socket_factory), type));
+
+  FakeUpstream& addFakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                                Http::CodecType type) {
+    auto config = configWithType(type);
+    fake_upstreams_.emplace_back(
+        std::make_unique<FakeUpstream>(std::move(transport_socket_factory), 0, version_, config));
+    return *fake_upstreams_.back();
   }
 
 protected:
@@ -426,7 +402,8 @@ protected:
   bool use_lds_{true}; // Use the integration framework's LDS set up.
   bool upstream_tls_{false};
 
-  Network::TransportSocketFactoryPtr createUpstreamTlsContext();
+  Network::TransportSocketFactoryPtr
+  createUpstreamTlsContext(const FakeUpstreamConfig& upstream_config);
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
 
@@ -469,8 +446,6 @@ protected:
   bool v2_bootstrap_{false};
 
 private:
-  friend class MixedUpstreamIntegrationTest;
-
   // Configuration for the fake upstream.
   FakeUpstreamConfig upstream_config_{time_system_};
   // True if initialized() has been called.

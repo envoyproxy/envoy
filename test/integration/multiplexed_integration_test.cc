@@ -7,10 +7,11 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/http/header_map_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/header_map_impl.h"
 
+#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -26,14 +27,14 @@ namespace Envoy {
 
 // TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {                                    \
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
   }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2, Http::CodecClient::Type::HTTP3},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -41,20 +42,20 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyNoBuffer) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // sort out timeouts
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBody) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBody) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // sort out timeouts
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, false, nullptr,
@@ -66,20 +67,20 @@ TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyAndContentLengthNoB
 }
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithGiantBodyAndContentLengthNoBuffer) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // sort out timeouts
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, FlowControlOnAndGiantBodyWithContentLength) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
                                        TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(Http2IntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLength) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // sort out timeouts
+  config_helper_.addConfigModifier(ConfigHelper::adjustUpstreamTimeoutForTsan);
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
@@ -122,7 +123,7 @@ TEST_P(Http2IntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTra
 
 // Verify downstream codec stream flush timeout.
 TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_DOWNSTREAM_HTTP3; // Need to support stream_idle_timeout.
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -146,6 +147,7 @@ TEST_P(Http2IntegrationTest, CodecStreamIdleTimeout) {
 }
 
 TEST_P(Http2IntegrationTest, Http2DownstreamKeepalive) {
+  // TODO(#16751) Need to support keepalive.
   EXCLUDE_DOWNSTREAM_HTTP3;
   constexpr uint64_t interval_ms = 1;
   constexpr uint64_t timeout_ms = 250;
@@ -306,6 +308,12 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
   // Verifies stream is reset.
   ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
+
+  // The cluster should have received the reset.
+  // The downstream codec should send one.
+  std::string counter =
+      absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset");
+  test_server_->waitForCounterEq(counter, 1);
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
@@ -882,6 +890,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
+  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
   EXCLUDE_DOWNSTREAM_HTTP3;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -899,7 +908,7 @@ TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
 }
 
 TEST_P(Http2IntegrationTest, Http2BadMagic) {
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // The "magic" payload is an HTTP/2 specific thing.
     return;
   }
@@ -1297,7 +1306,7 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   initialize();
 
@@ -1327,7 +1336,7 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
   config_helper_.addFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
+    "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   initialize();
 
@@ -1398,18 +1407,18 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2RingHashIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2MetadataIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 void Http2RingHashIntegrationTest::sendMultipleRequests(
@@ -1779,11 +1788,27 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The filter will send a local reply when receiving headers, the client
+  // should get a complete response.
   {
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
+    EXPECT_EQ("original_reply", response->body());
   }
+  // The filter will send a local reply when receiving headers, and interrupt
+  // that with a second reply sent from the encoder chain. The client will see
+  // the second response.
+  {
+    default_request_headers_.addCopy("dual-local-reply", "yes");
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("second_reply", response->body());
+  }
+  // The filter will send a local reply when receiving headers and reset the
+  // stream onLocalReply. The client will get a reset and no response even if
+  // dual local replies are on (from the prior request).
   {
     default_request_headers_.addCopy("reset", "yes");
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

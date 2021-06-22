@@ -2,10 +2,12 @@
 
 from subprocess import check_output
 from subprocess import check_call
+import argparse
 import glob
 import os
 import shlex
 import shutil
+import sys
 import re
 
 # Needed for CI to pass down bazel options.
@@ -13,7 +15,6 @@ BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 TARGETS = '@envoy_api//...'
 IMPORT_BASE = 'github.com/envoyproxy/go-control-plane'
-OUTPUT_BASE = 'build_go'
 REPO_BASE = 'go-control-plane'
 BRANCH = 'main'
 MIRROR_MSG = 'Mirrored from envoyproxy/envoy @ '
@@ -21,12 +22,12 @@ USER_NAME = 'go-control-plane(Azure Pipelines)'
 USER_EMAIL = 'go-control-plane@users.noreply.github.com'
 
 
-def generate_protobufs(output):
+def generate_protobufs(targets, output, api_repo):
     bazel_bin = check_output(['bazel', 'info', 'bazel-bin']).decode().strip()
     go_protos = check_output([
         'bazel',
         'query',
-        'kind("go_proto_library", %s)' % TARGETS,
+        'kind("go_proto_library", %s)' % targets,
     ]).split()
 
     # Each rule has the form @envoy_api//foo/bar:baz_go_proto.
@@ -46,9 +47,10 @@ def generate_protobufs(output):
         #
         # Example output directory:
         # go_out/envoy/config/bootstrap/v2
-        rule_dir, proto = rule.decode()[len('@envoy_api//'):].rsplit(':', 1)
-        input_dir = os.path.join(
-            bazel_bin, 'external', 'envoy_api', rule_dir, proto + '_', IMPORT_BASE, rule_dir)
+        rule_dir, proto = rule.decode().rsplit('//', 1)[1].rsplit(':', 1)
+
+        prefix = '' if not api_repo else os.path.join('external', api_repo)
+        input_dir = os.path.join(bazel_bin, prefix, rule_dir, proto + '_', IMPORT_BASE, rule_dir)
         input_files = glob.glob(os.path.join(input_dir, '*.go'))
         output_dir = os.path.join(output, rule_dir)
 
@@ -121,9 +123,21 @@ def updated(repo):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Generate Go protobuf files and sync with go-control-plane')
+    parser.add_argument('--sync', action='store_true')
+    parser.add_argument('--output_base', default='build_go')
+    parser.add_argument('--targets', default=TARGETS)
+    parser.add_argument('--api_repo', default="envoy_api")
+    args = parser.parse_args()
+
     workspace = check_output(['bazel', 'info', 'workspace']).decode().strip()
-    output = os.path.join(workspace, OUTPUT_BASE)
-    generate_protobufs(output)
+    output = os.path.join(workspace, args.output_base)
+    generate_protobufs(args.targets, output, args.api_repo)
+    if not args.sync:
+        print('Skipping sync with go-control-plane')
+        sys.exit()
+
     repo = os.path.join(workspace, REPO_BASE)
     clone_go_protobufs(repo)
     sync_go_protobufs(output, repo)

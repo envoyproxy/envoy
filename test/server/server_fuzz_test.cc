@@ -3,12 +3,11 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/random_generator.h"
-#include "common/network/address_impl.h"
-#include "common/thread_local/thread_local_impl.h"
-
-#include "server/listener_hooks.h"
-#include "server/server.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/server.h"
 
 #include "test/common/runtime/utility.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -64,10 +63,6 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
         health_check.mutable_http_health_check()->clear_codec_client_type();
       }
     }
-    // We may have both deprecated hosts() or load_assignment().
-    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
-      makePortHermetic(test_env, host);
-    }
     for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -82,7 +77,42 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
+// When single_host_per_subset is set to be true, only expect 1 subset selector and 1 key inside the
+// selector. Reject the misconfiguration as the use of single_host_per_subset is well documented.
+// https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#config-cluster-v3-cluster-lbsubsetconfig-lbsubsetselector
+bool validateLbSubsetConfig(const envoy::config::bootstrap::v3::Bootstrap& input) {
+  for (auto& cluster : input.static_resources().clusters()) {
+    bool use_single_host_per_subset = false;
+    int subset_selectors = 0;
+    for (auto& subset_selector : cluster.lb_subset_config().subset_selectors()) {
+      subset_selectors++;
+      if (subset_selector.single_host_per_subset()) {
+        use_single_host_per_subset = true;
+        const auto& keys = subset_selector.keys();
+        // Only expect 1 key inside subset selector when use_single_host_per_subset is set to true.
+        if (keys.size() != 1) {
+          return false;
+        }
+        // Expect key to be non-empty when use_single_host_per_subset is set to true.
+        if (keys[0].empty()) {
+          return false;
+        }
+      }
+      // Only expect 1 subset selector when use_single_host_per_subset is set to true.
+      if (use_single_host_per_subset && subset_selectors != 1) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
+
+  if (!validateLbSubsetConfig(input)) {
+    return;
+  }
+
   testing::NiceMock<MockOptions> options;
   DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;

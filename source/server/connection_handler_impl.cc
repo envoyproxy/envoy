@@ -1,14 +1,13 @@
-#include "server/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 
-#include "common/event/deferred_task.h"
-#include "common/network/utility.h"
-
-#include "server/active_tcp_listener.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/network/utility.h"
+#include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
 namespace Server {
@@ -88,12 +87,13 @@ void ConnectionHandlerImpl::removeFilterChains(
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
       listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
-      // Completion is deferred because the above removeFilterChains() may defer delete connection.
-      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
-      return;
+      break;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  // Reach here if the target listener is found or the target listener was removed by a full
+  // listener update. In either case, the completion must be deferred so that any active connection
+  // referencing the filter chain can finish prior to deletion.
+  Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {

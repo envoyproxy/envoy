@@ -4,10 +4,10 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quic_file_utils_impl.h"
+#include "source/common/quic/platform/quic_file_utils_impl.h"
 
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -46,11 +46,7 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
 // Reads the contents of |filename| as a string into |contents|.
 // NOLINTNEXTLINE(readability-identifier-naming)
 void ReadFileContentsImpl(absl::string_view filename, std::string* contents) {
-#ifdef WIN32
-  Envoy::Filesystem::InstanceImplWin32 fs;
-#else
-  Envoy::Filesystem::InstanceImplPosix fs;
-#endif
+  Envoy::Filesystem::InstanceImpl fs;
   *contents = fs.fileReadToEnd(std::string(filename.data(), filename.size()));
 }
 

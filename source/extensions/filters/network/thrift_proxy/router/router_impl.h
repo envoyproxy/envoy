@@ -11,15 +11,14 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "common/common/logger.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
-#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -190,6 +189,8 @@ public:
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
+        upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
+        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
         passthrough_supported_(false) {}
 
   ~Router() override = default;
@@ -222,7 +223,7 @@ public:
 
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+    UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -233,6 +234,7 @@ private:
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -245,7 +247,7 @@ private:
     void chargeResponseTiming();
 
     Router& parent_;
-    Tcp::ConnectionPool::Instance& conn_pool_;
+    Upstream::TcpPoolData& conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
@@ -299,6 +301,8 @@ private:
   const Stats::StatName upstream_resp_exception_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_rq_time_;
+  const Stats::StatName upstream_rq_size_;
+  const Stats::StatName upstream_resp_size_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};
@@ -309,6 +313,8 @@ private:
   Buffer::OwnedImpl upstream_request_buffer_;
 
   bool passthrough_supported_ : 1;
+  uint64_t request_size_{};
+  uint64_t response_size_{};
 };
 
 } // namespace Router

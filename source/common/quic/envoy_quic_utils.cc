@@ -1,14 +1,13 @@
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include <memory>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/socket_option_factory.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -236,11 +235,45 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
       std::make_unique<QuicIoHandleWrapper>(io_handle),
       quicAddressToEnvoyAddressInstance(self_address),
       quicAddressToEnvoyAddressInstance(peer_address));
-  connection_socket->setDetectedTransportProtocol(
-      Extensions::TransportSockets::TransportProtocolNames::get().Quic);
+  connection_socket->setDetectedTransportProtocol("quic");
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});
   return connection_socket;
+}
+
+void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
+                                        quic::QuicConfig& quic_config) {
+  size_t stream_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_stream_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+  if (stream_flow_control_window_to_send < quic::kMinimumFlowControlSendWindow) {
+    // If the configured value is smaller than 16kB, only use it for IETF QUIC, because Google QUIC
+    // requires minimum 16kB stream flow control window. The QUICHE default 16kB will be used for
+    // Google QUIC connections.
+    quic_config.SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(
+        stream_flow_control_window_to_send);
+  } else {
+    // Both Google QUIC and IETF Quic can be configured from this.
+    quic_config.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window_to_send);
+  }
+
+  uint32_t session_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      config, initial_connection_window_size,
+      Http3::Utility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  // Config connection level flow control window shouldn't be smaller than the minimum flow control
+  // window supported in QUICHE which is 16kB.
+  quic_config.SetInitialSessionFlowControlWindowToSend(
+      std::max(quic::kMinimumFlowControlSendWindow,
+               static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
+}
+
+void adjustNewConnectionIdForRoutine(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id) {
+  char* new_connection_id_data = new_connection_id.mutable_data();
+  const char* old_connection_id_ptr = old_connection_id.data();
+  auto* first_four_bytes = reinterpret_cast<const uint32_t*>(old_connection_id_ptr);
+  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
+  safeMemcpyUnsafeDst(new_connection_id_data, first_four_bytes);
 }
 
 } // namespace Quic

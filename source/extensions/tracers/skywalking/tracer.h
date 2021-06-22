@@ -2,9 +2,11 @@
 
 #include <memory>
 
-#include "common/tracing/http_tracer_impl.h"
+#include "envoy/tracing/trace_driver.h"
 
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
 #include "cpp2sky/tracing_context.h"
 #include "cpp2sky/well_known_names.h"

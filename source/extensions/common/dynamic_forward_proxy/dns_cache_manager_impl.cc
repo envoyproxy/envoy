@@ -1,10 +1,9 @@
-#include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -33,16 +32,11 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
   return new_cache;
 }
 
-DnsCacheManagerSharedPtr getCacheManager(Singleton::Manager& singleton_manager,
-                                         Event::Dispatcher& main_thread_dispatcher,
-                                         ThreadLocal::SlotAllocator& tls,
-                                         Random::RandomGenerator& random, Runtime::Loader& loader,
-                                         Stats::Scope& root_scope) {
-  return singleton_manager.getTyped<DnsCacheManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),
-      [&main_thread_dispatcher, &tls, &random, &loader, &root_scope] {
-        return std::make_shared<DnsCacheManagerImpl>(main_thread_dispatcher, tls, random, loader,
-                                                     root_scope);
+DnsCacheManagerSharedPtr DnsCacheManagerFactoryImpl::get() {
+  return singleton_manager_.getTyped<DnsCacheManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager), [this] {
+        return std::make_shared<DnsCacheManagerImpl>(dispatcher_, tls_, random_, loader_,
+                                                     root_scope_);
       });
 }
 
