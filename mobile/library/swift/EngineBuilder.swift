@@ -135,10 +135,24 @@ public class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addPlatformFilter(name: String = UUID().uuidString,
+  public func addPlatformFilter(name: String,
                                 factory: @escaping () -> Filter) -> Self
   {
     self.platformFilterChain.append(EnvoyHTTPFilterFactory(filterName: name, factory: factory))
+    return self
+  }
+
+  /// Add an HTTP platform filter factory used to construct filters for streams sent by this client.
+  ///
+  /// - parameter factory: Closure returning an instantiated filter. Called once per stream.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addPlatformFilter(_ factory: @escaping () -> Filter) -> Self
+  {
+    self.platformFilterChain.append(
+      EnvoyHTTPFilterFactory(filterName: UUID().uuidString, factory: factory)
+    )
     return self
   }
 
