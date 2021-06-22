@@ -55,7 +55,7 @@ Route Scope
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
 A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
 For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
-RouteConfiguration associated with scopejj can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
+RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
 along with a :ref:`ScopeKeyBuilder <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes.ScopeKeyBuilder>`
