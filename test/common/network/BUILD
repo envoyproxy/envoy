@@ -98,6 +98,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "happy_eyeballs_connection_impl_test",
+    srcs = ["happy_eyeballs_connection_impl_test.cc"],
+    deps = [
+        "//source/common/network:happy_eyeballs_connection_impl_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "apple_dns_impl_test",
     srcs = select({
         "//bazel:apple": ["apple_dns_impl_test.cc"],

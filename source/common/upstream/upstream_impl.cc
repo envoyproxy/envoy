@@ -36,6 +36,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/happy_eyeballs_connection_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
@@ -337,6 +338,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
   ASSERT(!address->envoyInternalAddress());
+  if (true) {
+    return std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options);
+  }
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
       address, cluster.sourceAddress(),
       socket_factory.createTransportSocket(std::move(transport_socket_options)),
