@@ -29,7 +29,6 @@ fi
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
 IFS=" " read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
 BAZEL_BUILD_OPTIONS+=(
-    "--color=yes"
     "--remote_download_outputs=all"
     "--strategy=protodoc=sandboxed,local"
     "--action_env=DOCS_TAG"
