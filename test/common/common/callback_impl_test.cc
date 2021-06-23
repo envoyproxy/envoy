@@ -63,6 +63,8 @@ public:
   MOCK_METHOD(void, called, (int arg));
 };
 
+// Test basic behaviors of the thread-safe callback-manager with respect to callback registration,
+// de-registration, and execution.
 TEST_F(ThreadSafeCallbackManagerTest, All) {
   InSequence s;
 
@@ -92,6 +94,8 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   manager->runCallbacks();
 }
 
+// Validate that the handles returned from callback-registration can outlive the manager
+// and can be destructed without error.
 TEST_F(ThreadSafeCallbackManagerTest, DestroyManagerBeforeHandle) {
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
@@ -108,6 +112,8 @@ TEST_F(ThreadSafeCallbackManagerTest, DestroyManagerBeforeHandle) {
   handle.reset();
 }
 
+// Validate that a callback added and removed from a thread (and thus dispatcher) that
+// no longer exist is a safe operation.
 TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
   auto manager = ThreadSafeCallbackManager::create();
 

@@ -27,7 +27,7 @@ public:
    * Child managers can be used to construct "drain trees" where each node in the tree can drain
    * independently of it's parent node, but the drain status cascades to child nodes.
    *
-   * A notable different to drain callbacks is that child managers are notified immediately and
+   * A notable difference to drain callbacks is that child managers are notified immediately and
    * without a delay timing. Additionally, notifications from parent to child is a thread-safe
    * operation whereas callback registration and triggering is not.
    *
