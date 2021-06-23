@@ -440,7 +440,7 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
-    cluster->mutable_max_requests_per_connection()->set_value(1);
+    cluster->mutable_common_http_protocol_options()->set_max_requests_per_connection(1);
     auto* circuit_breakers = cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
   });
