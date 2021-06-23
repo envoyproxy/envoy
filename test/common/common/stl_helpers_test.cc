@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "common/common/stl_helpers.h"
+#include "source/common/common/stl_helpers.h"
 
 #include "gtest/gtest.h"
 

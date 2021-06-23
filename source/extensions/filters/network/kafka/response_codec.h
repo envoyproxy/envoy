@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/kafka/codec.h"
-#include "extensions/filters/network/kafka/kafka_response_parser.h"
+#include "source/extensions/filters/network/kafka/codec.h"
+#include "source/extensions/filters/network/kafka/kafka_response_parser.h"
 
 namespace Envoy {
 namespace Extensions {

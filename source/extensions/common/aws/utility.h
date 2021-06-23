@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/http/headers.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Extensions {

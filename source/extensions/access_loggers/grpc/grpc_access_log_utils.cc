@@ -1,10 +1,10 @@
-#include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,7 +37,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -139,6 +139,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoClusterFound)) {
     common_access_log.mutable_response_flags()->set_no_cluster_found(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
+    common_access_log.mutable_response_flags()->set_overload_manager(true);
   }
 }
 

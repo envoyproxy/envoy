@@ -2,11 +2,10 @@
 #include <string>
 #include <vector>
 
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -62,8 +61,6 @@ public:
     ON_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillByDefault(ReturnRef(path_string));
     const std::vector<std::string> empty_string_list;
-    ON_CALL(cert_validation_ctx_config_, verifySubjectAltNameList())
-        .WillByDefault(ReturnRef(empty_string_list));
     const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers;
     ON_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillByDefault(ReturnRef(san_matchers));

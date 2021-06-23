@@ -5,14 +5,14 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
 
-#include "common/common/c_smart_ptr.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/memory/stats.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -828,10 +828,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
 
   // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()
-      ->mutable_exclusion_list()
-      ->add_patterns()
-      ->set_hidden_envoy_deprecated_regex(".*[A-Z].*");
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*[A-Z].*"));
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.

@@ -13,11 +13,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/thread.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -200,6 +200,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
+  Stats::ScopePtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

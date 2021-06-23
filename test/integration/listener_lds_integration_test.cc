@@ -8,8 +8,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -33,7 +33,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -98,9 +98,9 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream (fake_upstreams_[2]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {

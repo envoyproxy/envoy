@@ -37,8 +37,18 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
+        name = "docs_pip3",
+        requirements = "@envoy//tools/docs:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "deps_pip3",
         requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "extensions_pip3",
+        requirements = "@envoy//tools/extensions:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
@@ -58,18 +68,6 @@ def _python_deps():
         # version = "1.1.1",
         # release_date = "2019-02-23"
         # use_category = ["test"],
-    )
-    pip_install(
-        name = "headersplit_pip3",
-        requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "Clang",
-        # project_url = "https://clang.llvm.org/",
-        # version = "10.0.1",
-        # release_date = "2020-07-21"
-        # use_category = ["devtools"],
-        # cpe = "cpe:2.3:a:llvm:clang:*",
     )
     pip_install(
         name = "protodoc_pip3",

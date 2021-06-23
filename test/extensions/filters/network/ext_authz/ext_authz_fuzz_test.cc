@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"

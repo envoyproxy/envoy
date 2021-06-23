@@ -1,4 +1,4 @@
-#include "common/common/thread.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Thread {
@@ -11,6 +11,16 @@ bool MainThread::isMainThread() {
   }
   // When threading is on, compare thread id with main thread id.
   return main_thread_singleton->inMainThread() || main_thread_singleton->inTestThread();
+}
+
+bool MainThread::isWorkerThread() {
+  auto main_thread_singleton = MainThreadSingleton::getExisting();
+  // Allow worker thread code to be executed in test thread.
+  if (main_thread_singleton == nullptr) {
+    return true;
+  }
+  // When threading is on, compare thread id with main thread id.
+  return !main_thread_singleton->inMainThread();
 }
 
 void MainThread::clear() {

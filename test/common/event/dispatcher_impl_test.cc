@@ -3,15 +3,15 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/thread/thread.h"
 
-#include "common/api/api_impl.h"
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/lock_guard.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/event/deferred_task.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/timer_impl.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/deferred_task.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/server/watch_dog.h"
@@ -593,7 +593,7 @@ TEST_F(DispatcherImplTest, Timer) {
 
 TEST_F(DispatcherImplTest, TimerWithScope) {
   TimerPtr timer;
-  MockScopedTrackedObject scope;
+  MockScopeTrackedObject scope;
   dispatcher_->post([this, &timer, &scope]() {
     {
       // Expect a call to dumpState. The timer will call onFatalError during

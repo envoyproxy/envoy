@@ -1,8 +1,8 @@
-#include "extensions/transport_sockets/tap/tap.h"
+#include "source/extensions/transport_sockets/tap/tap.h"
 
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

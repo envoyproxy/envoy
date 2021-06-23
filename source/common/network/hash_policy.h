@@ -3,7 +3,7 @@
 #include "envoy/network/hash_policy.h"
 #include "envoy/type/v3/hash_policy.pb.h"
 
-#include "common/common/hash.h"
+#include "source/common/common/hash.h"
 
 namespace Envoy {
 namespace Network {

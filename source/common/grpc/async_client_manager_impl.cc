@@ -1,15 +1,15 @@
-#include "common/grpc/async_client_manager_impl.h"
+#include "source/common/grpc/async_client_manager_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/base64.h"
-#include "common/grpc/async_client_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/grpc/async_client_impl.h"
 
 #include "absl/strings/match.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 #endif
 
 namespace Envoy {

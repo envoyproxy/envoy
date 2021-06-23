@@ -13,10 +13,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/api_version.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/router/scoped_rds.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -384,6 +384,9 @@ key:
   EXPECT_EQ(2UL,
             server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
+  EXPECT_TRUE(server_factory_context_.scope_.findGaugeByString(
+      "foo.scoped_rds.foo_scoped_routes.config_reload_time_ms"));
+
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),

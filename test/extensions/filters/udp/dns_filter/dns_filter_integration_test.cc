@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -88,18 +88,22 @@ listener_filters:
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
-      upstream_resolvers:
-      - socket_address:
-          address: {}
-          port_value: {}
+      dns_resolution_config:
+        resolvers:
+        - socket_address:
+            address: {}
+            port_value: {}
+        dns_resolver_options:
+          use_tcp_for_dns_lookups: false
+          no_default_search_domain: false
       max_pending_lookups: 256
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "foo1.com"
-        - suffix: "cluster_0"
         virtual_domains:
+        - name: "im_just_here_so_coverage_doesnt_fail.foo1.com"
+          endpoint:
+            cluster_name: "cluster_0"
         - name: "www.foo1.com"
           endpoint:
             address_list:
@@ -153,8 +157,6 @@ listener_filters:
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "google.com"
         virtual_domains:
         - name: "www.google.com"
           endpoint:

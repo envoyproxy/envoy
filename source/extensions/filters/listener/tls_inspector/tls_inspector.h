@@ -6,7 +6,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "openssl/ssl.h"
 
@@ -73,6 +73,11 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr config);
+  ~Filter() override {
+    if (cb_) {
+      cb_->socket().ioHandle().resetFileEvents();
+    }
+  }
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
@@ -85,7 +90,7 @@ private:
   void onServername(absl::string_view name);
 
   ConfigSharedPtr config_;
-  Network::ListenerFilterCallbacks* cb_;
+  Network::ListenerFilterCallbacks* cb_{};
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

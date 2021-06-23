@@ -22,8 +22,9 @@ configured to be returned.
 <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.request_headers_to_add_when_not_enforced>` can be
 configured to be added to forwarded requests to the upstream when the local rate limit filter is enabled but not enforced.
 
-.. note::
-  The token bucket is shared across all workers, thus the rate limits are applied per Envoy process.
+Depending on the value of the config :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>`,
+the token bucket is either shared across all workers or on a per connection basis. This results in the local rate limits being applied either per Envoy process or per downstream connection.
+By default the rate limits are applied per Envoy process.
 
 Example configuration
 ---------------------
@@ -55,6 +56,7 @@ Example filter configuration for a globally set rate limiter (e.g.: all vhosts/r
         header:
           key: x-local-rate-limit
           value: 'true'
+    local_rate_limit_per_downstream_connection: false
 
 
 Example filter configuration for a globally disabled rate limiter but enabled for a specific route:
@@ -125,69 +127,10 @@ the default token bucket is used.
 
 Example filter configuration using descriptors:
 
-.. validated-code-block:: yaml
-  :type-name:  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { prefix: "/foo" }
-        route: { cluster: service_protected_by_rate_limit }
-        typed_per_filter_config:
-          envoy.filters.http.local_ratelimit:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
-            stat_prefix: test
-            token_bucket:
-              max_tokens: 1000
-              tokens_per_fill: 1000
-              fill_interval: 60s
-            filter_enabled:
-              runtime_key: test_enabled
-              default_value:
-                numerator: 100
-                denominator: HUNDRED
-            filter_enforced:
-              runtime_key: test_enforced
-              default_value:
-                numerator: 100
-                denominator: HUNDRED
-            response_headers_to_add:
-              - append: false
-                header:
-                  key: x-test-rate-limit
-                  value: 'true'
-            descriptors:
-            - entries:
-              - key: client_cluster
-                value: foo
-              - key: path
-                value: /foo/bar
-              token_bucket:
-                max_tokens: 10
-                tokens_per_fill: 10
-                fill_interval: 60s
-            - entries:
-              - key: client_cluster
-                value: foo
-              - key: path
-                value: /foo/bar2
-              token_bucket:
-                max_tokens: 100
-                tokens_per_fill: 100
-                fill_interval: 60s
-      - match: { prefix: "/" }
-        route: { cluster: default_service }
-      rate_limits:
-      - actions: # any actions in here
-        - request_headers:
-            header_name: x-envoy-downstream-service-cluster
-            descriptor_key: client_cluster
-        - request_headers:
-            header_name: ":path"
-            descriptor_key: path
+.. literalinclude:: _include/local-rate-limit-with-descriptors.yaml
+   :language: yaml
+   :lines: 15-75
+   :caption: :download:`local-rate-limit-with-descriptors.yaml <_include/local-rate-limit-with-descriptors.yaml>`
 
 In this example, requests are rate-limited for routes prefixed with "/foo" as
 follow. If requests come from a downstream service cluster "foo" for "/foo/bar"

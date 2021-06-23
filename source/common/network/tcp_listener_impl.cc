@@ -1,18 +1,18 @@
-#include "common/network/tcp_listener_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/event/file_event_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -42,6 +42,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() {
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
+  ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
   // TODO(fcoras): Add limit on number of accepted calls per wakeup
@@ -82,12 +83,13 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     // Pass the 'v6only' parameter as true if the local_address is an IPv6 address. This has no
     // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
     // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
-    const Address::InstanceConstSharedPtr& remote_address =
+
+    const Address::InstanceConstSharedPtr remote_address =
         (remote_addr.ss_family == AF_UNIX)
             ? io_handle->peerAddress()
-            : Address::addressFromSockAddr(remote_addr, remote_addr_len,
-                                           local_address->ip()->version() ==
-                                               Address::IpVersion::v6);
+            : Address::addressFromSockAddrOrThrow(remote_addr, remote_addr_len,
+                                                  local_address->ip()->version() ==
+                                                      Address::IpVersion::v6);
 
     cb_.onAccept(
         std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address, remote_address));
@@ -95,6 +97,8 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 }
 
 void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
+  ASSERT(bind_to_port_);
+
   socket.ioHandle().listen(backlog_size_);
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
@@ -114,15 +118,27 @@ TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::Rand
                                  SocketSharedPtr socket, TcpListenerCallbacks& cb,
                                  bool bind_to_port, uint32_t backlog_size)
     : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
-      random_(random), reject_fraction_(0.0) {
+      random_(random), bind_to_port_(bind_to_port), reject_fraction_(0.0) {
   if (bind_to_port) {
     setupServerSocket(dispatcher, *socket_);
   }
 }
 
-void TcpListenerImpl::enable() { socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read); }
+void TcpListenerImpl::enable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be enabled since it's not bind to port.");
+  }
+}
 
-void TcpListenerImpl::disable() { socket_->ioHandle().enableFileEvents(0); }
+void TcpListenerImpl::disable() {
+  if (bind_to_port_) {
+    socket_->ioHandle().enableFileEvents(0);
+  } else {
+    FANCY_LOG(debug, "The listener cannot be disable since it's not bind to port.");
+  }
+}
 
 void TcpListenerImpl::setRejectFraction(const UnitFloat reject_fraction) {
   reject_fraction_ = reject_fraction;

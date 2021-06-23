@@ -12,7 +12,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_stream.h"
+#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -53,6 +53,10 @@ public:
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {
     // TODO(mattklein123): Actually implement this for HTTP/3 similar to HTTP/2.
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // TODO(kbaichoo): implement account tracking for QUIC.
   }
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;

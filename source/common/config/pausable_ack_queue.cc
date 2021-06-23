@@ -1,8 +1,8 @@
-#include "common/config/pausable_ack_queue.h"
+#include "source/common/config/pausable_ack_queue.h"
 
 #include <list>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Config {
