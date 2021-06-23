@@ -174,10 +174,12 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
-      // TODO(chaoqin-li1123): remove this exception catching by refactoring.
-      //  We can't add a main thread assertion here because both this code is reused by dns filter
-      //  and executed in both main thread and worker thread. Maybe split the code for filter and
-      //  main thread.
+      // Use a raw try here because it is used in both main thread and filter.
+      // Can not convert to use status code as there may be unexpected exceptions in server fuzz
+      // tests, which must be handled. Potential exception may come from getAddressWithPort() or
+      // portFromTcpUrl().
+      // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
+      // exception in fuzz tests.
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());

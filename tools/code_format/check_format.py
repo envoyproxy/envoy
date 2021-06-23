@@ -117,11 +117,10 @@ MEMCPY_WHITELIST = (
 EXCEPTION_DENYLIST = (
     "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
 
+# Files that are allowed to use try without main thread assertion.
 RAW_TRY_ALLOWLIST = (
-    "./source/common/common/regex.cc",
-    "./source/common/common/thread.h",
-    "./source/common/network/utility.cc",
-)
+    "./source/common/common/regex.cc", "./source/common/common/thread.h",
+    "./source/common/network/utility.cc")
 
 # These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
 # now this is just WASM which makes use of std::string_view heavily so we need to convert to
