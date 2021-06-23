@@ -69,6 +69,17 @@ to be correlated.
   field can be used to disable this behavior at the expense of also disabling stable trace reason
   propagation and associated features within a deployment.
 
+.. attention::
+
+  The sampling policy of Envoy is determined by the value of :ref:`x-request-id <config_http_conn_man_headers_x-request-id>`,
+  if no additional settings are made. However, such a sampling policy is only valid for
+  fleets of Envoys, and if a service proxy that is not an Envoy is present in the fleet,
+  sampling will be performed without considering its policy. In such a mesh consisting of
+  multiple types of service proxies, it is more effective to bypass the sampling policy of
+  Envoy and perform span processing based on the sampling policy of the tracing provider.
+  This can be achieved by setting the :ref:`trace_request_id_sample_decision_policy <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.trace_request_id_sample_decision_policy>`
+  to ByPass.
+
 The tracing providers also require additional context, to enable the parent/child relationships
 between the spans (logical units of work) to be understood. This can be achieved by using the
 LightStep (via OpenTracing API) or Zipkin tracer directly within the service itself, to extract the
