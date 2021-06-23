@@ -133,6 +133,7 @@ matcher_list:
             "@type": type.googleapis.com/google.protobuf.StringValue
         custom_match:
           name: never_match
+          typed_config: {}
   )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;

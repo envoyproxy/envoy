@@ -99,6 +99,7 @@ codec_type: auto
 stat_prefix: foo
 http_filters:
 - name: http_dynamo_filter
+  typed_config: {}
     )EOF";
 
     if (!override_config.empty()) {
