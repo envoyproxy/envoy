@@ -52,7 +52,6 @@ message VmConfig {
   // The Wasm runtime type.
   // Available Wasm runtime types are registered as extensions. The following runtimes are included
   // in Envoy code base:
-  // [#extension-category: envoy.wasm.runtime]
   //
   // .. _extension_envoy.wasm.runtime.null:
   //
@@ -78,6 +77,7 @@ message VmConfig {
   // **envoy.wasm.runtime.wasmtime**: `Wasmtime <https://wasmtime.dev/>`_-based WebAssembly runtime.
   // This runtime is not enabled in the official build.
   //
+  // [#extension-category: envoy.wasm.runtime]
   string runtime = 2 [(validate.rules).string = {min_len: 1}];
 
   // The Wasm code that Envoy will execute.
