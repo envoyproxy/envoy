@@ -53,6 +53,7 @@ The following statistics are generated for all subscriptions.
  :widths: 1, 1, 2
 
  config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
+ config_reload_time_ms, Gauge, Timestamp of the last config reload as milliseconds since the epoch
  init_fetch_timeout, Counter, Total :ref:`initial fetch timeouts <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`
  update_attempt, Counter, Total API fetches attempted
  update_success, Counter, Total API fetches completed successfully
