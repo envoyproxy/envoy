@@ -462,27 +462,6 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;
-  const auto escaped_slashes_action = config.pathWithEscapedSlashesAction();
-  ASSERT(escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::
-                                       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT);
-  if (escaped_slashes_action != envoy::extensions::filters::network::http_connection_manager::v3::
-                                    HttpConnectionManager::KEEP_UNCHANGED) {
-    auto escaped_slashes_result = PathUtil::unescapeSlashes(request_headers);
-    if (escaped_slashes_result == PathUtil::UnescapeSlashesResult::FoundAndUnescaped) {
-      if (escaped_slashes_action == envoy::extensions::filters::network::http_connection_manager::
-                                        v3::HttpConnectionManager::REJECT_REQUEST) {
-        return NormalizePathAction::Reject;
-      } else if (escaped_slashes_action ==
-                 envoy::extensions::filters::network::http_connection_manager::v3::
-                     HttpConnectionManager::UNESCAPE_AND_REDIRECT) {
-        final_action = NormalizePathAction::Redirect;
-      } else {
-        ASSERT(escaped_slashes_action ==
-               envoy::extensions::filters::network::http_connection_manager::v3::
-                   HttpConnectionManager::UNESCAPE_AND_FORWARD);
-      }
-    }
-  }
 
   const auto original_path = request_headers.getPathValue();
   absl::optional<std::string> forwarding_path =

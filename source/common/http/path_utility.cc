@@ -125,8 +125,32 @@ absl::optional<std::string> PathTransformer::unescapeSlashes(absl::string_view o
   return absl::StrCat(decoded_path, query);
 }
 
-PathTransformer::PathTransformer(const bool should_normalize_path,
-                                 const bool should_merge_slashes) {
+PathTransformer::PathTransformer(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        PathWithEscapedSlashesAction escaped_slashes_action,
+    const bool should_normalize_path, const bool should_merge_slashes) {
+  switch (escaped_slashes_action) {
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      KEEP_UNCHANGED:
+    break;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      REJECT_REQUEST:
+    transformations_.emplace_back(PathTransformer::unescapeSlashes);
+    normalize_path_actions_.push_back(NormalizePathAction::Reject);
+    break;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      UNESCAPE_AND_REDIRECT:
+    transformations_.emplace_back(PathTransformer::unescapeSlashes);
+    normalize_path_actions_.push_back(NormalizePathAction::Redirect);
+    break;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      UNESCAPE_AND_FORWARD:
+    transformations_.emplace_back(PathTransformer::unescapeSlashes);
+    normalize_path_actions_.push_back(NormalizePathAction::Continue);
+    break;
+  default:
+    ASSERT(false);
+  }
   if (should_normalize_path) {
     transformations_.emplace_back(PathTransformer::rfcNormalize);
     normalize_path_actions_.push_back(NormalizePathAction::Continue);
@@ -145,8 +169,8 @@ PathTransformer::PathTransformer(
     uint64_t operation_hash = MessageUtil::hash(operation);
     if (find(operation_hashes.begin(), operation_hashes.end(), operation_hash) !=
         operation_hashes.end()) {
-      // Currently we only have RFC normalization and merge slashes, don't expect duplicates for
-      // these transformations.
+      // Currently we have unescape slashes, RFC normalization and merge slashes, don't expect
+      // duplicates for these transformations.
       throw EnvoyException("Duplicate path transformation");
     }
     // The transformation to apply
@@ -174,6 +198,7 @@ PathTransformer::PathTransformer(
     operation_hashes.push_back(operation_hash);
   }
 }
+
 PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& headers) {
   ASSERT(headers.Path());
   const auto original_path = headers.getPathValue();

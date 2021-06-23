@@ -2,6 +2,8 @@
 
 #include <list>
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/type/http/v3/path_transformation.pb.h"
 
@@ -50,7 +52,9 @@ enum class NormalizePathAction {
 class PathTransformer {
 public:
   PathTransformer() = default;
-  PathTransformer(const bool should_normalize_path, const bool should_merge_slashes);
+  PathTransformer(const envoy::extensions::filters::network::http_connection_manager::v3::
+                      HttpConnectionManager::PathWithEscapedSlashesAction escaped_slashes_action,
+                  const bool should_normalize_path, const bool should_merge_slashes);
   PathTransformer(envoy::type::http::v3::PathTransformation const& path_transformation);
 
   // Take a string_view as argument and return an optional string.

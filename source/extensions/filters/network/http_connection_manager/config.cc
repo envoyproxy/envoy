@@ -340,7 +340,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     filter_path_transformer_ =
         Http::PathTransformer(config.path_normalization_options().http_filter_transformation());
   } else {
-    forwarding_path_transformer_ = Http::PathTransformer(normalize_path_, merge_slashes_);
+    forwarding_path_transformer_ =
+        Http::PathTransformer(path_with_escaped_slashes_action_, normalize_path_, merge_slashes_);
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
