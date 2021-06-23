@@ -340,7 +340,7 @@ TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
   ON_CALL(config_, schemeToSet()).WillByDefault(Return(scheme));
   ON_CALL(config_, schemeHeaderTransformation())
       .WillByDefault(
-          Return(ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_SCHEME_IF_ABSENT));
+          Return(ConnectionManagerConfig::HttpConnectionManagerProto::SET_SCHEME_IF_ABSENT));
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   TestRequestHeaderMapImpl headers{};

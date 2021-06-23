@@ -917,7 +917,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
 TEST_F(HttpConnectionManagerConfigTest, SchemeAppendIfAbsent) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  scheme_header_transformation: APPEND_SCHEME_IF_ABSENT
+  scheme_header_transformation: SET_SCHEME_IF_ABSENT
   scheme: http
   route_config:
     name: local_route
@@ -932,14 +932,14 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeAppendIfAbsent) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::APPEND_SCHEME_IF_ABSENT,
+  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::SET_SCHEME_IF_ABSENT,
             config.schemeHeaderTransformation());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, SchemeINvalid) {
+TEST_F(HttpConnectionManagerConfigTest, SchemeInvalid) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  scheme_header_transformation: APPEND_SCHEME_IF_ABSENT
+  scheme_header_transformation: SET_SCHEME_IF_ABSENT
   scheme: foo
   route_config:
     name: local_route

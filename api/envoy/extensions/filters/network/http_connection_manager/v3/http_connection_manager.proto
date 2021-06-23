@@ -76,12 +76,17 @@ message HttpConnectionManager {
   }
 
   enum SchemeHeaderTransformation {
-    // Overwrite any Scheme header with the contents of scheme
+    // Overwrite any Scheme header with the contents of
+    // :ref:`scheme
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`.
     OVERWRITE_SCHEME = 0;
 
-    // If no Scheme header is present, append Scheme scheme
+    // If no Scheme header is present (for HTTP/1.1 requests without a fully
+    // qualifiged URL) append Scheme
+    // :ref:`scheme
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`.
     // If a Scheme header is present, pass it through.
-    APPEND_SCHEME_IF_ABSENT = 1;
+    SET_SCHEME_IF_ABSENT = 1;
   }
 
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
@@ -381,12 +386,18 @@ message HttpConnectionManager {
       [(validate.rules).enum = {defined_only: true}];
 
   // Defines the action to be applied to the Scheme header on the request path
-  // if scheme is set in the config. Defaults to OVERWRITE_SCHEME.
+  // if
+  // :ref:`scheme
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`
+  // is set in the config. Defaults to OVERWRITE_SCHEME.
   SchemeHeaderTransformation scheme_header_transformation = 48
       [(validate.rules).enum = {defined_only: true}];
 
   // An optional override. If set, the connection manager will set the request
-  // scheme to this value based on scheme_header_transformation. Valid values are 'http' and
+  // scheme to this value based on
+  // :ref:`scheme_header_transformation
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`.
+  // Valid values are 'http' and
   // 'https'. If absent, Envoy will pass through downstream scheme if present or
   // set scheme based on downstream encryption level.
   string scheme = 49
