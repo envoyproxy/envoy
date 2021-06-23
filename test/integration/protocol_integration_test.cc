@@ -2446,7 +2446,6 @@ TEST_P(DownstreamProtocolIntegrationTest, BasicMaxStreamTimeoutLegacy) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionNotReached) {
-  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
   config_helper_.setDownstreamMaxRequestsPerConnection(3);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2454,13 +2453,15 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionNotReached) {
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  test_server_->waitForCounterEq("http.config_test.downstream_cx_max_requests", 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests")->value(), 0);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
@@ -2468,16 +2469,42 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
+  // Sending first request and waiting to complete the response.
+  auto encoder_decoder_1 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_1.first;
+  auto response_1 = std::move(encoder_decoder_1.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
-  codec_client_->sendData(*request_encoder_, 1024 * 65, true);
+  ASSERT_TRUE(response_1->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_1->complete());
 
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
+  // Sending second request and waiting to complete the response.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  auto response_2 = std::move(encoder_decoder_2.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response_2->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_2->complete());
+
+  // Sending third request and waiting to complete the response.
+  auto encoder_decoder_3 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_3.first;
+  auto response_3 = std::move(encoder_decoder_3.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response_3->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_3->complete());
+
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests")->value(), 1);
 }
 
