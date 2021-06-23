@@ -117,11 +117,10 @@ MEMCPY_WHITELIST = (
 EXCEPTION_DENYLIST = (
     "./source/common/http/http2/codec_impl.h", "./source/common/http/http2/codec_impl.cc")
 
+# Files that are allowed to use try without main thread assertion.
 RAW_TRY_ALLOWLIST = (
-    "./source/common/common/regex.cc",
-    "./source/common/common/thread.h",
-    "./source/common/network/utility.cc",
-)
+    "./source/common/common/regex.cc", "./source/common/common/thread.h",
+    "./source/common/network/utility.cc")
 
 # These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
 # now this is just WASM which makes use of std::string_view heavily so we need to convert to
@@ -275,7 +274,6 @@ UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
   "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
   "envoy.reloadable_features.upstream_http2_flood_checks",
   "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 }

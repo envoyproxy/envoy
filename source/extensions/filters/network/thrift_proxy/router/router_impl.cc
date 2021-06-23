@@ -483,6 +483,7 @@ void Router::UpstreamRequest::releaseConnection(const bool close) {
 void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void Router::UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 

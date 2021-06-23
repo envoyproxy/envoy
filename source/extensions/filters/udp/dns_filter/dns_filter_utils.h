@@ -46,6 +46,12 @@ std::string buildServiceName(const std::string& name, const std::string& proto,
 absl::optional<uint16_t>
 getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr);
 
+/**
+ * @brief For a given fully qualified domain name, extract up to the last two labels to form a
+ * domain suffix.
+ */
+absl::string_view getDomainSuffix(const absl::string_view name);
+
 } // namespace Utils
 } // namespace DnsFilter
 } // namespace UdpFilters

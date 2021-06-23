@@ -10,6 +10,7 @@ exports_files([
     "v2_mapping.json",
     "empty_extensions.json",
     "redirects.txt",
+    "VERSION",
 ])
 
 envoy_package()
@@ -189,5 +190,27 @@ genrule(
         ":examples_rst",
         ":extensions_security_rst",
         ":external_deps_rst",
+    ],
+)
+
+genrule(
+    name = "html",
+    outs = ["html.tar"],
+    cmd = """
+    $(location //tools/docs:sphinx_runner) \\
+         --build_sha="$${BUILD_SHA:-}" \\
+         --docs_tag="$${DOCS_TAG:-}" \\
+         --version_file=$(location //:VERSION) \\
+         --validator_path=$(location //tools/config_validation:validate_fragment) \\
+         --descriptor_path=$(location //tools/type_whisperer:all_protos_with_ext_pb_text.pb_text) \\
+         $(location rst) \\
+         $@
+    """,
+    exec_tools = [
+        "//tools/docs:sphinx_runner",
+        ":rst",
+        "//tools/config_validation:validate_fragment",
+        "//tools/type_whisperer:all_protos_with_ext_pb_text.pb_text",
+        "//:VERSION",
     ],
 )
