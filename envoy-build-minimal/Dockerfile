@@ -56,8 +56,5 @@ RUN apt-get update \
     && groupadd -r pcap \
     && apt-get autoremove -y \
     && apt-get clean \
-    && which clang-format \
-    && which buildozer \
-    && which buildifier \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
