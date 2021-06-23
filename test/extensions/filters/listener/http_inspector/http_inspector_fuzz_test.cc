@@ -22,7 +22,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   auto filter = std::make_unique<Filter>(cfg);
 
   ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input);
+  fuzzer.fuzz(std::move(filter), input);
 }
 
 } // namespace HttpInspector

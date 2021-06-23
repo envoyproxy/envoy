@@ -88,7 +88,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
       local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
-      stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stat_prefix_(stat_prefix),
+      stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();
@@ -131,6 +132,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
+    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
     if (config_update_info_->protobufConfiguration().has_vhds() &&
         config_update_info_->vhdsConfigurationChanged()) {
       ENVOY_LOG(
