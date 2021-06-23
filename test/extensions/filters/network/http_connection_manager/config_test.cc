@@ -589,8 +589,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   EXPECT_EQ(200, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(300, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -623,8 +623,8 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   EXPECT_EQ(20, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(0, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(30, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
