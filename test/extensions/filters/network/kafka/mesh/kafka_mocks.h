@@ -63,6 +63,8 @@ public:
                std::string&),
               ());
   MOCK_METHOD(RdKafka::ErrorCode, oauthbearer_set_token_failure, (const std::string&), ());
+  MOCK_METHOD(void*, mem_malloc, (size_t), ());
+  MOCK_METHOD(void, mem_free, (void*), ());
 };
 
 class MockKafkaMessage : public RdKafka::Message {
