@@ -435,12 +435,12 @@ typed_config:
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
-TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
+TEST_P(IntegrationTest, DEPRECATED_FEATURE_TEST(UpstreamDisconnectWithTwoRequests)) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
-    cluster->mutable_common_http_protocol_options()->set_max_requests_per_connection(1);
+    cluster->mutable_max_requests_per_connection()->set_value(1);
     auto* circuit_breakers = cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
   });

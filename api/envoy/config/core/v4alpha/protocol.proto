@@ -163,7 +163,7 @@ message HttpProtocolOptions {
   // Note: upstream responses are not affected by this setting.
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 
-  // Optional maximum requests for a downstream connection.
+  // Optional maximum requests for both upstream and downstream connections.
   // If not specified, there is no limit.
   uint32 max_requests_per_connection = 6;
 }
