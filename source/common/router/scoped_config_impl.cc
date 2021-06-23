@@ -71,7 +71,7 @@ std::unique_ptr<ScopeKeyFragmentBase> FragmentBuilderImpl::computeFragmentFromHe
     const ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::HeaderValueExtractor&
         header_value_extractor_config) const {
 
-  const auto header_entry =
+  const auto& header_entry =
       headers.get(Envoy::Http::LowerCaseString(header_value_extractor_config.name()));
   if (header_entry.empty()) {
     return nullptr;
@@ -111,7 +111,7 @@ FragmentBuilderImpl::computeFragmentFromMetadata(const Metadata& meta,
                                                  const MetadataValueExtractorConfig& config) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(&meta, config.metadata_key());
   switch (value.kind_case()) {
-  case value.kStringValue:
+  case ProtobufWkt::Value::kStringValue:
     return std::make_unique<StringKeyFragment>(value.string_value());
   default:
     // TODO (tonya11en): Support structured metadata fragments.
