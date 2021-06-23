@@ -68,9 +68,9 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
-  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, "foo", _));
   conn_pool_->onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                            host_);
+                            "foo", host_);
 
   // Make sure that the pool failure nulled out the pending request.
   EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());

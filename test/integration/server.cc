@@ -41,7 +41,7 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setDrainTime(drain_time);
   test_options.setParentShutdownTime(std::chrono::seconds(2));
   test_options.setDrainStrategy(drain_strategy);
-  test_options.setAllowUnkownFields(validation_config.allow_unknown_static_fields);
+  test_options.setAllowUnknownFields(validation_config.allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
   test_options.setConcurrency(concurrency);

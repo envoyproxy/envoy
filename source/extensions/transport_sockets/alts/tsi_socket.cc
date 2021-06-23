@@ -151,7 +151,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     frame_protector_ = std::make_unique<TsiFrameProtector>(frame_protector);
 
     handshake_complete_ = true;
-    callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    if (raw_write_buffer_.length() == 0) {
+      callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
+    }
   }
 
   if (read_error_ || (!handshake_complete_ && end_stream_read_)) {
@@ -167,8 +169,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
   // Try to write raw buffer when next call is done, even this is not in do[Read|Write] stack.
   if (raw_write_buffer_.length() > 0) {
     Network::IoResult result = raw_buffer_socket_->doWrite(raw_write_buffer_, false);
-    if (handshake_complete_ && raw_write_buffer_.length() > 0) {
-      write_buffer_contains_handshake_bytes_ = true;
+    if (handshake_complete_ && result.action_ != Network::PostIoAction::Close) {
+      callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
     }
     return result.action_;
   }
@@ -266,13 +268,13 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
 Network::IoResult TsiSocket::repeatProtectAndWrite(Buffer::Instance& buffer, bool end_stream) {
   uint64_t total_bytes_written = 0;
   Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
-
-  ASSERT(!write_buffer_contains_handshake_bytes_);
+  // There should be no handshake bytes in raw_write_buffer_.
+  ASSERT(!(raw_write_buffer_.length() > 0 && prev_bytes_to_drain_ == 0));
   while (true) {
     uint64_t bytes_to_drain_this_iteration =
         prev_bytes_to_drain_ > 0
             ? prev_bytes_to_drain_
-            : std::min<size_t>(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_);
+            : std::min<uint64_t>(buffer.length(), actual_frame_size_to_use_ - frame_overhead_size_);
     // Consumed all data. Exit.
     if (bytes_to_drain_this_iteration == 0) {
       break;
@@ -327,8 +329,7 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   } else {
     ASSERT(frame_protector_);
     // Check if we need to flush outstanding handshake bytes.
-    if (write_buffer_contains_handshake_bytes_) {
-      ASSERT(raw_write_buffer_.length() > 0);
+    if (raw_write_buffer_.length() > 0 && prev_bytes_to_drain_ == 0) {
       ENVOY_CONN_LOG(debug, "TSI: raw_write length {} end_stream {}", callbacks_->connection(),
                      raw_write_buffer_.length(), end_stream);
       Network::IoResult result =
@@ -337,7 +338,6 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
       if (raw_write_buffer_.length() > 0) {
         return {result.action_, 0, false};
       }
-      write_buffer_contains_handshake_bytes_ = false;
     }
     return repeatProtectAndWrite(buffer, end_stream);
   }

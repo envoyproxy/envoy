@@ -610,9 +610,6 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    RELEASE_ASSERT(
-        cluster->hidden_envoy_deprecated_hosts().empty(),
-        "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -831,9 +828,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.
-      RELEASE_ASSERT(
-          cluster->hidden_envoy_deprecated_hosts().empty(),
-          "Hosts should be specified via load_assignment() in the integration test framework.");
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
