@@ -1,13 +1,9 @@
 package io.envoyproxy.envoymobile.engine;
 
-import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 
 /**
  * Class to assist with passing types from native code over the JNI. Currently supports
@@ -31,7 +27,7 @@ class JvmBridgeUtility {
     if (start) {
       assert headerAccumulator == null;
       assert headerCount == 0;
-      headerAccumulator = new HashMap<>();
+      headerAccumulator = new LinkedHashMap<>();
     }
     assert headerAccumulator != null;
 
