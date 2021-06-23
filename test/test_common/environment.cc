@@ -230,17 +230,6 @@ bool TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion type
   return true;
 }
 
-bool TestEnvironment::allowListenersOnBothIPFamilyTypes() {
-  const char* value = std::getenv("ENVOY_IP_FAMILY_TEST");
-  std::string option(value ? value : "");
-
-  if (option == "true") {
-    return true;
-  }
-
-  return false;
-}
-
 std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
   std::vector<Network::Address::IpVersion> parameters;
   for (auto version : {Network::Address::IpVersion::v4, Network::Address::IpVersion::v6}) {
