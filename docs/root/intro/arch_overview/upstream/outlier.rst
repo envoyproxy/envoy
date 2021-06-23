@@ -13,7 +13,8 @@ independently, and form the basis for an overall upstream health checking soluti
 Outlier detection is part of the :ref:`cluster configuration <envoy_v3_api_msg_config.cluster.v3.OutlierDetection>`
 and it needs filters to report errors, timeouts, and resets. Currently, the following filters support
 outlier detection: :ref:`http router <config_http_filters_router>`,
-:ref:`tcp proxy <config_network_filters_tcp_proxy>`  and :ref:`redis proxy <config_network_filters_redis_proxy>`.
+:ref:`tcp proxy <config_network_filters_tcp_proxy>`,
+:ref:`redis proxy <config_network_filters_redis_proxy>` and :ref:`thrift proxy <config_network_filters_thrift_proxy>`.
 
 Detected errors fall into two categories: externally and locally originated errors. Externally generated errors
 are transaction specific and occur on the upstream server in response to the received request. For example, an HTTP server returning error code 500 or a redis server returning a payload which cannot be decoded. Those errors are generated on the upstream host after Envoy has connected to it successfully.
