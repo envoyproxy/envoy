@@ -114,6 +114,7 @@ New Features
 * stats: added native :ref:`Graphite-formatted tag <envoy_v3_api_msg_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink>` support.
 * tcp: added support for :ref:`preconnecting <v1.18.0:envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>`. Preconnecting is off by default, but recommended for clusters serving latency-sensitive traffic.
 * thrift_proxy: added per upstream metrics within the :ref:`thrift router <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>` for request and response size histograms.
+* thrift_proxy: added support for :ref:`outlier detection <arch_overview_outlier_detection>`.
 * tls: allow dual ECDSA/RSA certs via SDS. Previously, SDS only supported a single certificate per context, and dual cert was only supported via non-SDS.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
 * windows container image: added user, EnvoyUser which is part of the Network Configuration Operators group to the container image.
