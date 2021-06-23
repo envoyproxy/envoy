@@ -555,8 +555,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(100, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(10000, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
