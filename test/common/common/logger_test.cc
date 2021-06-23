@@ -1,8 +1,8 @@
 #include <memory>
 #include <string>
 
-#include "common/common/json_escape_string.h"
-#include "common/common/logger.h"
+#include "source/common/common/json_escape_string.h"
+#include "source/common/common/logger.h"
 
 #include "test/test_common/environment.h"
 

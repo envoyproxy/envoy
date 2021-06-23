@@ -1,17 +1,16 @@
-#include "extensions/transport_sockets/alts/config.h"
+#include "source/extensions/transport_sockets/alts/config.h"
 
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
 #include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/google_grpc_context.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/transport_sockets/alts/grpc_tsi.h"
-#include "extensions/transport_sockets/alts/tsi_socket.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/google_grpc_context.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/transport_sockets/alts/grpc_tsi.h"
+#include "source/extensions/transport_sockets/alts/tsi_socket.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"

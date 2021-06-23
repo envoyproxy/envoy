@@ -113,11 +113,11 @@ organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
 1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/extensions/filter/http/cache/v3alpha/cache.proto)
+   below. Refer to the [Cache filter config](envoy/extensions/filters/http/cache/v3alpha/cache.proto)
    as an example of `v3alpha`, and the
-   [Buffer filter config](envoy/extensions/filter/http/buffer/v3/buffer.proto) as an example of `v3`.
+   [Buffer filter config](envoy/extensions/filters/http/buffer/v3/buffer.proto) as an example of `v3`.
 1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
-   `api/envoy/extensions/filter/http/foobar/v3/foobar.proto` together with an initial BUILD file:
+   `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
@@ -230,7 +230,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergnomics (such as not using `oneof` when we would prefer
+  fields or reduced ergonomics (such as not using `oneof` when we would prefer
   to), in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,

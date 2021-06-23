@@ -6,12 +6,11 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/common/hex.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"

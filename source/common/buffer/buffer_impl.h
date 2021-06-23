@@ -8,10 +8,10 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/event/libevent.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/libevent.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -709,6 +709,11 @@ public:
    * @param data the string to append to the buffer.
    */
   virtual void appendSliceForTest(absl::string_view data);
+
+  /**
+   * @return the BufferMemoryAccount bound to this buffer, if any.
+   */
+  BufferMemoryAccountSharedPtr getAccountForTest();
 
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer

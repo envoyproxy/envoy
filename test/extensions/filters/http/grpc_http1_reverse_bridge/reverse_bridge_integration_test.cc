@@ -2,9 +2,7 @@
 
 #include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/message_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -27,13 +25,12 @@ namespace {
 class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
-  ReverseBridgeIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  ReverseBridgeIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void initialize() override { initialize(absl::nullopt); }
 
   void initialize(const absl::optional<std::string> response_size_header) {
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
 
     const std::string filter = fmt::format(
         R"EOF(
@@ -62,7 +59,7 @@ typed_config:
   void TearDown() override { fake_upstream_connection_.reset(); }
 
 protected:
-  FakeHttpConnection::Type upstream_protocol_;
+  Http::CodecType upstream_protocol_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
@@ -73,7 +70,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseBridgeIntegrationTest,
 // doesn't enable the bridge.
 // Regression test of https://github.com/envoyproxy/envoy/issues/9922
 TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP2;
+  upstream_protocol_ = Http::CodecType::HTTP2;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -122,7 +119,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
 }
 
 TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  upstream_protocol_ = Http::CodecType::HTTP1;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -180,7 +177,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
 }
 
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
-  upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
+  upstream_protocol_ = Http::CodecType::HTTP1;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

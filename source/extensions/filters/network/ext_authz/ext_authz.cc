@@ -1,14 +1,13 @@
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include <cstdint>
 #include <string>
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

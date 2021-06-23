@@ -34,6 +34,7 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RCVBUF
 RTCP
 RTP
 STATNAME
@@ -443,6 +444,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -934,6 +937,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc
@@ -1241,6 +1246,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll

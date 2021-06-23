@@ -2,7 +2,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/http/match_wrapper/config.h"
+#include "source/common/http/match_wrapper/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
@@ -164,7 +164,7 @@ matcher:
 )EOF");
 
   MatchWrapperConfig match_wrapper_config;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "

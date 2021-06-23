@@ -5,12 +5,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/protobuf_link_hacks.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -328,7 +328,8 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   response->mutable_resources()->at(0).add_aliases("prefix/domain1.test");
   response->mutable_resources()->at(0).add_aliases("prefix/domain2.test");
 
-  grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  EXPECT_LOG_CONTAINS("debug", "for " + type_url + " from HAL 9000",
+                      grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_));
 
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);

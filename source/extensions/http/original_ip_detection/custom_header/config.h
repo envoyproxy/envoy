@@ -2,8 +2,9 @@
 
 #include "envoy/extensions/http/original_ip_detection/custom_header/v3/custom_header.pb.h"
 #include "envoy/http/original_ip_detection.h"
+#include "envoy/registry/registry.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +29,8 @@ public:
 
   std::string name() const override { return "envoy.http.original_ip_detection.custom_header"; }
 };
+
+DECLARE_FACTORY(CustomHeaderIPDetectionFactory);
 
 } // namespace CustomHeader
 } // namespace OriginalIPDetection

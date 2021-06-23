@@ -1,4 +1,4 @@
-#include "common/router/config_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include <algorithm>
 #include <chrono>
@@ -18,28 +18,26 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/logger.h"
-#include "common/common/regex.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/http/headers.h"
-#include "common/http/path_utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/router/reset_header_parser.h"
-#include "common/router/retry_state_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/http/common/utility.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/regex.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/reset_header_parser.h"
+#include "source/common/router/retry_state_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/http/common/utility.h"
 
 #include "absl/strings/match.h"
 
@@ -224,16 +222,6 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3::CorsPolicy& confi
       legacy_enabled_(config.has_hidden_envoy_deprecated_enabled()
                           ? config.hidden_envoy_deprecated_enabled().value()
                           : true) {
-  for (const auto& origin : config.hidden_envoy_deprecated_allow_origin()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_exact(origin);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
-  for (const auto& regex : config.hidden_envoy_deprecated_allow_origin_regex()) {
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    matcher_config.set_hidden_envoy_deprecated_regex(regex);
-    allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher_config));
-  }
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }
@@ -626,24 +614,29 @@ void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::HeaderTransforms
-RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const {
+RouteEntryImplBase::responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                             bool do_formatting) const {
   Http::HeaderTransforms transforms;
   if (!vhost_.globalRouteConfig().mostSpecificHeaderMutationsWins()) {
     // Append user-specified request headers from most to least specific: route-level headers,
     // virtual host level headers and finally global connection manager level headers.
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
   } else {
     // Most specific mutations (route-level) take precedence by being applied
     // last: if a header is specified at all levels, the last one applied wins.
-    mergeTransforms(
-        transforms,
-        vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, vhost_.responseHeaderParser().getHeaderTransforms(stream_info));
-    mergeTransforms(transforms, response_headers_parser_->getHeaderTransforms(stream_info));
+    mergeTransforms(transforms,
+                    vhost_.globalRouteConfig().responseHeaderParser().getHeaderTransforms(
+                        stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    vhost_.responseHeaderParser().getHeaderTransforms(stream_info, do_formatting));
+    mergeTransforms(transforms,
+                    response_headers_parser_->getHeaderTransforms(stream_info, do_formatting));
   }
   return transforms;
 }
@@ -752,7 +745,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
       host_end += 1; // advance to :
     }
   } else {
-    host_end = request_host.rfind(":");
+    host_end = request_host.rfind(':');
   }
 
   if (host_end != absl::string_view::npos) {
@@ -840,8 +833,7 @@ std::multimap<std::string, std::string>
 RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& route) {
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
-    auto filter_metadata = route.metadata().filter_metadata().find(
-        Extensions::HttpFilters::HttpFilterNames::get().Router);
+    auto filter_metadata = route.metadata().filter_metadata().find("envoy.filters.http.router");
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       // TODO(zuercher): simply return `ret` when deprecated filter names are removed.
       filter_metadata = route.metadata().filter_metadata().find(DEPRECATED_ROUTER_NAME);
@@ -850,8 +842,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       }
 
       Extensions::Common::Utility::ExtensionNameUtil::checkDeprecatedExtensionName(
-          "http filter", DEPRECATED_ROUTER_NAME,
-          Extensions::HttpFilters::HttpFilterNames::get().Router);
+          "http filter", DEPRECATED_ROUTER_NAME, "envoy.filters.http.router");
     }
     for (const auto& it : filter_metadata->second.fields()) {
       if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
@@ -1047,9 +1038,10 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info) const {
-  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info);
-  mergeTransforms(transforms, DynamicRouteEntry::responseHeaderTransforms(stream_info));
+    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
+  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  mergeTransforms(transforms,
+                  DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
 }
 
@@ -1123,19 +1115,11 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
-    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator) {
-  // TODO(yangminzhu): Use PathMatcher once hidden_envoy_deprecated_regex is removed.
-  if (route.match().path_specifier_case() ==
-      envoy::config::route::v3::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
-        route.match().hidden_envoy_deprecated_regex());
-    regex_str_ = route.match().hidden_envoy_deprecated_regex();
-  } else {
-    ASSERT(route.match().path_specifier_case() ==
-           envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
-    regex_ = Regex::Utility::parseRegex(route.match().safe_regex());
-    regex_str_ = route.match().safe_regex().regex();
-  }
+    : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
+      regex_str_(route.match().safe_regex().regex()),
+      path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
+  ASSERT(route.match().path_specifier_case() ==
+         envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1143,7 +1127,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
   const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(regex_->match(path));
+  ASSERT(path_matcher_->match(path));
   finalizePathHeader(headers, path, insert_envoy_original_path);
 }
 
@@ -1158,7 +1142,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     const absl::string_view path = Http::PathUtil::removeQueryAndFragment(headers.getPathValue());
-    if (regex_->match(path)) {
+    if (path_matcher_->match(path)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1298,30 +1282,12 @@ VirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
       VirtualClusterBase(stat_name_storage_.statName(),
                          scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
-  if (virtual_cluster.hidden_envoy_deprecated_pattern().empty() ==
-      virtual_cluster.headers().empty()) {
-    throw EnvoyException("virtual clusters must define either 'pattern' or 'headers'");
+  if (virtual_cluster.headers().empty()) {
+    throw EnvoyException("virtual clusters must define 'headers'");
   }
 
-  if (!virtual_cluster.hidden_envoy_deprecated_pattern().empty()) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Path.get());
-    matcher_config.set_hidden_envoy_deprecated_regex_match(
-        virtual_cluster.hidden_envoy_deprecated_pattern());
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  } else {
-    ASSERT(!virtual_cluster.headers().empty());
-    headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
-  }
-
-  if (virtual_cluster.hidden_envoy_deprecated_method() !=
-      envoy::config::core::v3::METHOD_UNSPECIFIED) {
-    envoy::config::route::v3::HeaderMatcher matcher_config;
-    matcher_config.set_name(Http::Headers::get().Method.get());
-    matcher_config.set_exact_match(envoy::config::core::v3::RequestMethod_Name(
-        virtual_cluster.hidden_envoy_deprecated_method()));
-    headers_.push_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher_config));
-  }
+  ASSERT(!virtual_cluster.headers().empty());
+  headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers());
 }
 
 const Config& VirtualHostImpl::routeConfig() const { return global_route_config_; }

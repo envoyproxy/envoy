@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -14,19 +14,19 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "common/quic/platform/quic_mem_slice_span_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/common/assert.h"
-#include "common/http/header_utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -266,11 +266,15 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
+  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  stats_.rx_reset_.inc();
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
   runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
 }
 
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error);
+  stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
   quic::QuicSpdyServerStreamBase::Reset(error);
@@ -291,7 +295,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

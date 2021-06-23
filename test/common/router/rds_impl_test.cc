@@ -9,11 +9,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/json/json_loader.h"
-#include "common/router/rds_impl.h"
-
-#include "server/admin/admin.h"
+#include "source/common/config/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/router/rds_impl.h"
+#include "source/server/admin/admin.h"
 
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -291,6 +290,7 @@ TEST_F(RdsImplTest, Basic) {
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
   EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_TRUE(scope_.findGaugeByString("foo.rds.foo_route_config.config_reload_time_ms"));
 }
 
 // validate there will be exception throw when unknown factory found for per virtualhost typed
