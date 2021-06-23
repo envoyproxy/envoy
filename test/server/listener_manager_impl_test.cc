@@ -4071,7 +4071,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
-      typed_config: {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
