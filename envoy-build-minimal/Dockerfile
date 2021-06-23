@@ -10,6 +10,7 @@ RUN apt-get update \
             curl \
             git \
             gnupg-agent \
+            gnupg2 \
             jq \
             locales \
             lsb-release \
