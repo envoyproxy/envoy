@@ -385,22 +385,33 @@ const std::vector<TopicProduceData> makeTopicProduceData(const unsigned int stag
   }
   if (5 == stage) {
     // No record length after common fields.
-    bytes[61] = 128;
+    bytes[61] = 128; // This will force variable-length deserializer to wait for more bytes.
     bytes.erase(bytes.begin() + 62, bytes.end());
   }
   if (6 == stage) {
-    // Attributes fields missing.
+    // Record length is higher than size of real data.
     bytes.erase(bytes.begin() + 62, bytes.end());
   }
   if (7 == stage) {
-    bytes[77] = 128;
-    bytes.erase(bytes.begin() + 77, bytes.end());
+    // Attributes field has negative length.
+    bytes[61] = 3; /* -1 */
+    bytes.erase(bytes.begin() + 62, bytes.end());
   }
   if (8 == stage) {
-    // Negative variable length integer.
-    bytes[77] = 17;
+    // Attributes field is missing - length is valid, but there is no more data to read.
+    bytes[61] = 0;
+    bytes.erase(bytes.begin() + 62, bytes.end());
   }
   if (9 == stage) {
+    // Header count not present - we are going to drop all 21 header bytes after value.
+    bytes[61] = (36 - 21) << 1; // Length is encoded as variable length.
+    bytes.erase(bytes.begin() + 77, bytes.end());
+  }
+  if (10 == stage) {
+    // Negative variable length integer for header count.
+    bytes[77] = 17;
+  }
+  if (11 == stage) {
     // Last header value is going to be shorter, so there will be one unconsumed byte.
     bytes[92] = 8;
   }
@@ -422,12 +433,16 @@ TEST(RecordExtractorImpl, shouldHandleInvalidRecordBytes) {
   EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(5)), EnvoyException,
                           "no length");
   EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(6)), EnvoyException,
-                          "attributes not present");
+                          "not enough bytes provided");
   EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(7)), EnvoyException,
-                          "header count not present");
+                          "has invalid length");
   EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(8)), EnvoyException,
-                          "invalid header count");
+                          "attributes not present");
   EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(9)), EnvoyException,
+                          "header count not present");
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(10)), EnvoyException,
+                          "invalid header count");
+  EXPECT_THROW_WITH_REGEX(testee.extractRecords(makeTopicProduceData(11)), EnvoyException,
                           "data left after consuming record");
 }
 

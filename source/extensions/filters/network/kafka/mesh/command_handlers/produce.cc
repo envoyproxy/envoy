@@ -203,6 +203,14 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
         fmt::format("record for [{}-{}] is too short (no length)", topic, partition));
   }
   const int32_t len = length.get();
+  if (len < 0) {
+    throw EnvoyException(
+        fmt::format("record for [{}-{}] has invalid length: {}", topic, partition, len));
+  }
+  if (static_cast<uint32_t>(len) > data.length()) {
+    throw EnvoyException(fmt::format("record for [{}-{}] is too short (not enough bytes provided)",
+                                     topic, partition));
+  }
 
   const absl::string_view expected_end_of_record = {data.data() + len, data.length() - len};
 
