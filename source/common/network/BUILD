@@ -18,6 +18,8 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:safe_memcpy_lib",
+        "//source/common/common:statusor_lib",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
 )
