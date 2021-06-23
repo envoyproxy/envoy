@@ -124,7 +124,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1.0, it should result in a ~98%
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
   // throttling rate.
   EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
@@ -164,7 +164,7 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1.0, it should result in a ~98%
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
   // throttling rate.
   EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
