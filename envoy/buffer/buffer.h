@@ -480,6 +480,7 @@ private:
 using InstancePtr = std::unique_ptr<Instance>;
 
 /**
+ * A factory for creating buffers which call callbacks when reaching high and low watermarks.
  */
 class WatermarkFactory {
 public:
