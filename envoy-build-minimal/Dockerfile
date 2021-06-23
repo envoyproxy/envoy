@@ -1,6 +1,7 @@
 FROM ubuntu:bionic
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CLANG_FORMAT=clang-format-11.0.1
 
 RUN apt-get update \
     && apt-get install -y -qq --no-install-recommends \
