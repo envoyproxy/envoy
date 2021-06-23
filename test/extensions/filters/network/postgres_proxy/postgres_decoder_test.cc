@@ -33,7 +33,7 @@ public:
   PostgresProxyDecoderTestBase() {
     decoder_ = std::make_unique<DecoderImpl>(&callbacks_);
     decoder_->initialize();
-    decoder_->setStartup(false);
+    decoder_->state(DecoderImpl::State::InSyncState);
   }
 
 protected:
@@ -60,6 +60,10 @@ class PostgresProxyFrontendEncrDecoderTest : public PostgresProxyDecoderTestBase
 class PostgresProxyBackendDecoderTest : public PostgresProxyDecoderTestBase,
                                         public ::testing::TestWithParam<std::string> {};
 
+class PostgresProxyBackendStatementTest
+    : public PostgresProxyDecoderTestBase,
+      public ::testing::TestWithParam<std::pair<std::string, bool>> {};
+
 class PostgresProxyErrorTest
     : public PostgresProxyDecoderTestBase,
       public ::testing::TestWithParam<std::tuple<std::string, DecoderCallbacks::ErrorType>> {};
@@ -75,7 +79,7 @@ class PostgresProxyNoticeTest
 // startup message the server should start using message format
 // with command as 1st byte.
 TEST_F(PostgresProxyDecoderTest, StartupMessage) {
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   buf_[0] = '\0';
   // Startup message has the following structure:
@@ -98,29 +102,25 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   // Some other attribute
   data_.add("attribute"); // 9 bytes
   data_.add(buf_, 1);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
   data_.add("blah"); // 4 bytes
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
   data_.add(buf_, 1);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
+  // Decoder should move to InSyncState
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   // Verify parsing attributes
   ASSERT_THAT(decoder_->getAttributes().at("user"), "postgres");
   ASSERT_THAT(decoder_->getAttributes().at("database"), "testdb");
   // This attribute should not be found
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
-
-  // Now feed normal message with 1bytes as command.
-  data_.add("P");
-  // Add length.
-  data_.writeBEInt<uint32_t>(6); // 4 bytes of length + 2 bytes of data.
-  data_.add("AB");
-  decoder_->onData(data_, true);
-  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test verifies that when Startup message does not carry
 // "database" attribute, it is derived from "user".
 TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   buf_[0] = '\0';
   // Startup message has the following structure:
@@ -141,7 +141,8 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   data_.add(buf_, 1);
   data_.add("blah"); // 4 bytes
   data_.add(buf_, 1);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
 
   // Verify parsing attributes
@@ -151,53 +152,109 @@ TEST_F(PostgresProxyDecoderTest, StartupMessageNoAttr) {
   ASSERT_THAT(decoder_->getAttributes().find("no"), decoder_->getAttributes().end());
 }
 
+TEST_F(PostgresProxyDecoderTest, InvalidStartupMessage) {
+  decoder_->state(DecoderImpl::State::InitState);
+
+  // Create a bogus message with incorrect syntax.
+  // Length is 10 bytes.
+  data_.writeBEInt<uint32_t>(10);
+  for (auto i = 0; i < 6; i++) {
+    data_.writeBEInt<uint8_t>(i);
+  }
+
+  // Decoder should move to OutOfSync state.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
+  ASSERT_THAT(data_.length(), 0);
+
+  // All-zeros message.
+  data_.writeBEInt<uint32_t>(0);
+  for (auto i = 0; i < 6; i++) {
+    data_.writeBEInt<uint8_t>(0);
+  }
+
+  // Decoder should move to OutOfSync state.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
+  ASSERT_THAT(data_.length(), 0);
+}
+
+// Test that decoder does not crash when it receives
+// random data in InitState.
+TEST_F(PostgresProxyDecoderTest, StartupMessageRandomData) {
+  srand(time(nullptr));
+  for (auto i = 0; i < 10000; i++) {
+    decoder_->state(DecoderImpl::State::InSyncState);
+    // Generate random length.
+    uint32_t len = rand() % 20000;
+    // Now fill the buffer with random data.
+    for (uint32_t j = 0; j < len; j++) {
+      data_.writeBEInt<uint32_t>(rand() % 1024);
+      uint8_t data = static_cast<uint8_t>(rand() % 256);
+      data_.writeBEInt<uint8_t>(data);
+    }
+    // Feed the buffer to the decoder. It should not crash.
+    decoder_->onData(data_, true);
+
+    // Reset the buffer for the next iteration.
+    data_.drain(data_.length());
+  }
+}
+
 // Test processing messages which map 1:1 with buffer.
 // The buffer contains just a single entire message and
 // nothing more.
 TEST_F(PostgresProxyDecoderTest, ReadingBufferSingleMessages) {
-
+  decoder_->state(DecoderImpl::State::InSyncState);
   // Feed empty buffer - should not crash.
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 
   // Put one byte. This is not enough to parse the message and that byte
   // should stay in the buffer.
-  data_.add("P");
-  decoder_->onData(data_, true);
+  data_.add("H");
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 1);
 
   // Add length of 4 bytes. It would mean completely empty message.
   // but it should be consumed.
   data_.writeBEInt<uint32_t>(4);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
 
   // Create a message with 5 additional bytes.
-  data_.add("P");
+  data_.add("d");
   // Add length.
   data_.writeBEInt<uint32_t>(9); // 4 bytes of length field + 5 of data.
   data_.add(buf_, 5);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 // Test simulates situation when decoder is called with incomplete message.
 // The message should not be processed until the buffer is filled
 // with missing bytes.
 TEST_F(PostgresProxyDecoderTest, ReadingBufferLargeMessages) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   // Fill the buffer with message of 100 bytes long
   // but the buffer contains only 98 bytes.
   // It should not be processed.
-  data_.add("P");
+  data_.add("d");
   // Add length.
   data_.writeBEInt<uint32_t>(100); // This also includes length field
   data_.add(buf_, 94);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   // The buffer contains command (1 byte), length (4 bytes) and 94 bytes of message.
   ASSERT_THAT(data_.length(), 99);
 
   // Add 2 missing bytes and feed again to decoder.
   data_.add("AB");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
 }
 
@@ -205,14 +262,15 @@ TEST_F(PostgresProxyDecoderTest, ReadingBufferLargeMessages) {
 // message. Call to the decoder should consume only one message
 // at a time and only when the buffer contains the entire message.
 TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   // Create the first message of 50 bytes long (+1 for command).
-  data_.add("P");
+  data_.add("d");
   // Add length.
   data_.writeBEInt<uint32_t>(50);
   data_.add(buf_, 46);
 
   // Create the second message of 50 + 46 bytes (+1 for command).
-  data_.add("P");
+  data_.add("d");
   // Add length.
   data_.writeBEInt<uint32_t>(96);
   data_.add(buf_, 46);
@@ -223,49 +281,72 @@ TEST_F(PostgresProxyDecoderTest, TwoMessagesInOneBuffer) {
   // 2nd: command (1 byte), length (4 bytes), 92 bytes of data
   ASSERT_THAT(data_.length(), 148);
   // Process the first message.
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 97);
   // Process the second message.
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_THAT(data_.length(), 0);
 }
 
 TEST_F(PostgresProxyDecoderTest, Unknown) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   // Create invalid message. The first byte is invalid "="
   // Message must be at least 5 bytes to be parsed.
   EXPECT_CALL(callbacks_, incMessagesUnknown());
   createPostgresMsg(data_, "=", "some not important string which will be ignored anyways");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(data_.length(), 0);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
-// Test if each frontend command calls incMessagesFrontend() method.
-TEST_P(PostgresProxyFrontendDecoderTest, FrontendInc) {
+// Test verifies that decoder goes into OutOfSyncState when
+// it encounters a message with wrong syntax.
+TEST_F(PostgresProxyDecoderTest, IncorrectMessages) {
+  decoder_->state(DecoderImpl::State::InSyncState);
+
+  // Create incorrect message. Message syntax is
+  // 1 byte type ('f'), 4 bytes of length and zero terminated string.
+  data_.add("f");
+  data_.writeBEInt<uint32_t>(8);
+  // Do not write terminating zero for the string.
+  data_.add("test");
+
+  // The decoder will indicate that is is ready for more data, but
+  // will enter OutOfSyncState.
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::OutOfSyncState);
+}
+
+// Test if frontend command calls incMessagesFrontend() method.
+TEST_F(PostgresProxyFrontendDecoderTest, FrontendInc) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   EXPECT_CALL(callbacks_, incMessagesFrontend());
-  createPostgresMsg(data_, GetParam(), "SELECT 1;");
-  decoder_->onData(data_, true);
+  createPostgresMsg(data_, "f", "some text");
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 
   // Make sure that decoder releases memory used during message processing.
   ASSERT_TRUE(decoder_->getMessage().empty());
 }
 
-// Run the above test for each frontend message.
-INSTANTIATE_TEST_SUITE_P(FrontEndMessagesTests, PostgresProxyFrontendDecoderTest,
-                         ::testing::Values("B", "C", "d", "c", "f", "D", "E", "H", "F", "p", "P",
-                                           "p", "Q", "S", "X"));
-
 // Test if X message triggers incRollback and sets proper state in transaction.
 TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   // Set decoder state NOT to be in_transaction.
   decoder_->getSession().setInTransaction(false);
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
   createPostgresMsg(data_, "X");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 
   // Now set the decoder to be in_transaction state.
   decoder_->getSession().setInTransaction(true);
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "X");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   ASSERT_FALSE(decoder_->getSession().inTransaction());
 }
 
@@ -273,7 +354,8 @@ TEST_F(PostgresProxyFrontendDecoderTest, TerminateMessage) {
 TEST_F(PostgresProxyFrontendDecoderTest, QueryMessage) {
   EXPECT_CALL(callbacks_, processQuery);
   createPostgresMsg(data_, "Q", "SELECT * FROM whatever;");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 // Parse message has optional Query name which may be in front of actual
@@ -295,7 +377,8 @@ TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
   query_name.reserve(1);
   query_name += '\0';
   createPostgresMsg(data_, "P", query_name + query + query_params);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 
   // Message with optional name query_name
   query_name.clear();
@@ -303,21 +386,18 @@ TEST_F(PostgresProxyFrontendDecoderTest, ParseMessage) {
   query_name += "P0_8";
   query_name += '\0';
   createPostgresMsg(data_, "P", query_name + query + query_params);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
-// Test if each backend command calls incMessagesBackend()) method.
-TEST_P(PostgresProxyBackendDecoderTest, BackendInc) {
+// Test if backend command calls incMessagesBackend()) method.
+TEST_F(PostgresProxyBackendDecoderTest, BackendInc) {
   EXPECT_CALL(callbacks_, incMessagesBackend());
-  createPostgresMsg(data_, GetParam(), "Some not important message");
-  decoder_->onData(data_, false);
+  createPostgresMsg(data_, "I");
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
-// Run the above test for each backend message.
-INSTANTIATE_TEST_SUITE_P(BackendMessagesTests, PostgresProxyBackendDecoderTest,
-                         ::testing::Values("R", "K", "2", "3", "C", "d", "c", "G", "H", "D", "I",
-                                           "E", "V", "v", "n", "N", "A", "t", "S", "1", "s", "Z",
-                                           "T"));
 // Test parsing backend messages.
 // The parser should react only to the first word until the space.
 TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
@@ -325,80 +405,93 @@ TEST_F(PostgresProxyBackendDecoderTest, ParseStatement) {
   // Rollback counter should be bumped up.
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK 123");
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 
   // Now try just keyword without a space at the end.
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 
   // Partial message should be ignored.
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   createPostgresMsg(data_, "C", "ROLL");
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 
   // Keyword without a space  should be ignored.
   EXPECT_CALL(callbacks_, incTransactionsRollback()).Times(0);
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   createPostgresMsg(data_, "C", "ROLLBACK123");
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 }
 
 // Test Backend messages and make sure that they
 // trigger proper stats updates.
 TEST_F(PostgresProxyDecoderTest, Backend) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   // C message
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   createPostgresMsg(data_, "C", "BEGIN 123");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
   ASSERT_TRUE(decoder_->getSession().inTransaction());
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   createPostgresMsg(data_, "C", "START TR");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "COMMIT");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Select));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "SELECT");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Other));
   EXPECT_CALL(callbacks_, incTransactionsRollback());
   createPostgresMsg(data_, "C", "ROLLBACK");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Insert));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "INSERT 1");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Update));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "UPDATE 123");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 
   EXPECT_CALL(callbacks_, incStatements(DecoderCallbacks::StatementType::Delete));
   EXPECT_CALL(callbacks_, incTransactionsCommit());
   createPostgresMsg(data_, "C", "DELETE 88");
-  decoder_->onData(data_, false);
-  data_.drain(data_.length());
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
+  ASSERT_THAT(data_.length(), 0);
 }
 
 // Test checks deep inspection of the R message.
@@ -412,7 +505,8 @@ TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
   // sessions must not be increased.
   EXPECT_CALL(callbacks_, incSessionsUnencrypted()).Times(0);
   createPostgresMsg(data_, "R", "blah blah");
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 
   // Create the correct payload which means that
@@ -423,7 +517,8 @@ TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
   data_.writeBEInt<uint32_t>(8);
   // Add 4-byte code.
   data_.writeBEInt<uint32_t>(0);
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
   data_.drain(data_.length());
 }
 
@@ -432,7 +527,8 @@ TEST_F(PostgresProxyBackendDecoderTest, AuthenticationMsg) {
 TEST_P(PostgresProxyErrorTest, ParseErrorMsgs) {
   EXPECT_CALL(callbacks_, incErrors(std::get<1>(GetParam())));
   createPostgresMsg(data_, "E", std::get<0>(GetParam()));
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -461,7 +557,8 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(PostgresProxyNoticeTest, ParseNoticeMsgs) {
   EXPECT_CALL(callbacks_, incNotices(std::get<1>(GetParam())));
   createPostgresMsg(data_, "N", std::get<0>(GetParam()));
-  decoder_->onData(data_, false);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -478,10 +575,10 @@ INSTANTIATE_TEST_SUITE_P(
 // that protocol uses encryption.
 TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // Set decoder to wait for initial message.
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   // Initial state is no-encryption.
-  ASSERT_FALSE(decoder_->encrypted());
+  // ASSERT_FALSE(decoder_->encrypted());
 
   // Indicate that decoder should continue with processing the message.
   ON_CALL(callbacks_, onSSLRequest).WillByDefault(testing::Return(true));
@@ -493,8 +590,11 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
   // Add 4 bytes long code
   data_.writeBEInt<uint32_t>(GetParam());
-  decoder_->onData(data_, true);
-  ASSERT_TRUE(decoder_->encrypted());
+  // Decoder should indicate that it is ready for mode data and entered
+  // encrypted state.
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::EncryptedState);
+  // ASSERT_TRUE(decoder_->encrypted());
   // Decoder should drain data.
   ASSERT_THAT(data_.length(), 0);
 
@@ -503,7 +603,8 @@ TEST_P(PostgresProxyFrontendEncrDecoderTest, EncyptedTraffic) {
   EXPECT_CALL(callbacks_, incMessagesFrontend()).Times(0);
 
   createPostgresMsg(data_, "P", "Some message just to fill the payload.");
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::EncryptedState);
   // Decoder should drain data.
   ASSERT_THAT(data_.length(), 0);
 }
@@ -517,7 +618,7 @@ INSTANTIATE_TEST_SUITE_P(FrontendEncryptedMessagesTests, PostgresProxyFrontendEn
 // Test onSSLRequest callback.
 TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   // Set decoder to wait for initial message.
-  decoder_->setStartup(true);
+  decoder_->state(DecoderImpl::State::InitState);
 
   // Indicate that decoder should not continue with processing the message
   // because filter will try to terminate SSL session.
@@ -528,9 +629,10 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
   // 1234 in the most significant 16 bits, and some code in the least significant 16 bits.
   // Add 4 bytes long code
   data_.writeBEInt<uint32_t>(80877103);
-  decoder_->onData(data_, true);
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::Stopped);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InitState);
 
-  // Decoder should interpret the session as encrypted stream.
+  // Decoder should interpret the session as clear-text stream.
   ASSERT_FALSE(decoder_->encrypted());
 }
 
@@ -569,10 +671,9 @@ public:
 // Test verifies that decoder calls Buffer::linearize method
 // for messages which have associated 'action'.
 TEST_F(PostgresProxyDecoderTest, Linearize) {
+  decoder_->state(DecoderImpl::State::InSyncState);
   testing::NiceMock<FakeBuffer> fake_buf;
   uint8_t body[] = "test\0";
-
-  decoder_->setStartup(false);
 
   // Simulate that decoder reads message which needs processing.
   // Query 'Q' message's body is just string.
@@ -600,7 +701,8 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
   // It should call "Buffer::linearize".
   EXPECT_CALL(fake_buf, linearize).WillOnce([&](uint32_t) -> void* { return body; });
 
-  decoder_->onData(fake_buf, false);
+  ASSERT_THAT(decoder_->onData(fake_buf, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 
   // Simulate that decoder reads message which does not need processing.
   // BindComplete message has type '2' and empty body.
@@ -622,7 +724,8 @@ TEST_F(PostgresProxyDecoderTest, Linearize) {
   // Make sure that decoder does not call linearize.
   EXPECT_CALL(fake_buf, linearize).Times(0);
 
-  decoder_->onData(fake_buf, false);
+  ASSERT_THAT(decoder_->onData(fake_buf, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 } // namespace PostgresProxy

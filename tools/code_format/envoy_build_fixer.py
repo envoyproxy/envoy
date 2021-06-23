@@ -150,6 +150,8 @@ def fix_api_deps(path, contents):
         kind, name, srcs, hdrs, deps = match.groups()
         if not name:
             continue
+        if kind == "envoy_pch_library":
+            continue
         source_paths = []
         if srcs != 'missing':
             source_paths.extend(
