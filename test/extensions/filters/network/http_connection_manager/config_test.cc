@@ -417,6 +417,23 @@ http_filters:
   EXPECT_THAT(config.tracer(), Eq(http_tracer_));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, TracingConfigWithTraceRequestIdSampleDecisionPolicy) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  name: local_route
+tracing:
+  trace_request_id_sample_decision_policy: ByPass
+  )EOF";
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  const Tracing::TraceRequestIdSampleDecisionPolicy policy =
+      config.tracingConfig()->trace_request_id_sample_decision_policy_;
+  EXPECT_EQ(policy, Tracing::TraceRequestIdSampleDecisionPolicy::ByPass);
+}
+
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
