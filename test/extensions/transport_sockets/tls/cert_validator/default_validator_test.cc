@@ -146,6 +146,20 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
 
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  EXPECT_EQ(default_validator->doVerifyCertChain(nullptr, nullptr, *cert, nullptr), 0);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
