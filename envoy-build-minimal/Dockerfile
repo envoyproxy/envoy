@@ -27,7 +27,7 @@ RUN apt-get update \
     && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-11 main" >> /etc/apt/sources.list \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
     && apt-get update \
-    && apt-get install -y -qq --no-install-recommends clang-format \
+    && apt-get install -y -qq --no-install-recommends clang-format-11 clang-tidy-11 \
     && cd /tmp || exit 1 \
     # buildozer
     && wget https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildozer \
