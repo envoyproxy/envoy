@@ -6,8 +6,6 @@ RUN apt-get update \
     && apt-get install -y -qq --no-install-recommends \
             build-essential \
             ca-certificates \
-            clang-format-11 \
-            clang-tidy-11 \
             cmake \
             curl \
             git \
@@ -24,6 +22,10 @@ RUN apt-get update \
             xz-utils \
     # aspell installed without --no-install-recommends
     && apt-get install -y -qq aspell \
+    && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-11 main" >> /etc/apt/sources.list \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
+    && apt-get update \
+    && apt-get install -y -qq --no-install-recommends clang-format \
     && cd /tmp || exit 1 \
     # buildozer
     && wget https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildozer \
