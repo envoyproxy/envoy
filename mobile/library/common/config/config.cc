@@ -144,6 +144,7 @@ static_resources:
       api_listener:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         stat_prefix: hcm
+        server_header_transformation: PASS_THROUGH
         stream_idle_timeout: *stream_idle_timeout
         route_config:
           name: api_router
