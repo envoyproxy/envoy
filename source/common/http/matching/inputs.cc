@@ -19,7 +19,7 @@ Matcher::DataInputGetResult HttpRequestCookiesDataInput::get(const HttpMatchingD
 
   const auto ret =
       Http::Utility::parseCookieValues(*maybe_headers, cookie_name_, 0, false /* reversed_order */);
-  if (ret.size() == 0) {
+  if (ret.empty()) {
     return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::StrJoin(ret, ",")};
