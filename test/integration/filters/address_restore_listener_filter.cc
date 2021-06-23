@@ -16,8 +16,15 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override {
     FANCY_LOG(debug, "in FakeOriginalDstListenerFilter::onAccept");
     Network::ConnectionSocket& socket = cb.socket();
-    socket.addressProvider().restoreLocalAddress(
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 80));
+
+    // if (cb.socket().ipVersion().value() == Network::Address::IpVersion::v6) {
+    //   socket.addressProvider().restoreLocalAddress(
+    //       std::make_shared<Network::Address::Ipv6Instance>("::2", 8001));
+
+    // } else {
+      socket.addressProvider().restoreLocalAddress(
+          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2", 80));
+    // }
     FANCY_LOG(debug, "current local socket address is {} restored = {}",
               socket.addressProvider().localAddress()->asString(),
               socket.addressProvider().localAddressRestored());

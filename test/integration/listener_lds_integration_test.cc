@@ -619,11 +619,11 @@ struct PerConnection {
 // listener.
 // Currently flaky because the virtual listener create listen socket anyway despite the socket is
 // never used. Will enable this test once https://github.com/envoyproxy/envoy/pull/16259 is merged.
-TEST_P(RebalancerTest, DISABLED_RedirectConnectionIsBalancedOnDestinationListener) {
+TEST_P(RebalancerTest, RedirectConnectionIsBalancedOnDestinationListener) {
   auto ip_address_str =
       Network::Test::getLoopbackAddressUrlString(TestEnvironment::getIpVersionsForTest().front());
-  concurrency_ = 2;
-  int repeats = 10;
+  concurrency_ = 1;
+  int repeats = 1;
   initialize();
 
   // The balancer is balanced as per active connection instead of total connection.
@@ -656,6 +656,157 @@ TEST_P(RebalancerTest, DISABLED_RedirectConnectionIsBalancedOnDestinationListene
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RebalancerTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+
+class RebalancerDualStackTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                       public BaseIntegrationTest {
+public:
+  RebalancerDualStackTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+
+  void initialize() override {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          // add an ipv6 cluster
+          auto& src_cluster_config = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+          auto& cluster_1 = *bootstrap.mutable_static_resources()->add_clusters();
+          cluster_1 = src_cluster_config;
+          cluster_1.set_name("cluster_1");
+          cluster_1.mutable_load_assignment()->set_cluster_name("cluster_1");
+          cluster_1.mutable_load_assignment()->mutable_endpoints()->mutable_data()[0]->mutable_lb_endpoints()->mutable_data()[0]->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("::");
+          cluster_1.mutable_load_assignment()->mutable_endpoints()->mutable_data()[0]->mutable_lb_endpoints()->mutable_data()[0]->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(0);
+
+          auto& src_listener_config = *bootstrap.mutable_static_resources()->mutable_listeners(0);
+          src_listener_config.mutable_use_original_dst()->set_value(true);
+          src_listener_config.mutable_address()->mutable_socket_address()->set_port_value(8000);
+          src_listener_config.mutable_address()->mutable_socket_address()->set_address("0.0.0.0");
+
+          // // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
+          // // link time.
+          src_listener_config.add_listener_filters()->set_name(
+              "envoy.filters.listener.original_dst");
+          auto& listener_1 = *bootstrap.mutable_static_resources()->add_listeners();
+          listener_1 = src_listener_config;
+          listener_1.set_name("listener_1");
+          listener_1.mutable_address()->mutable_socket_address()->set_address("::");
+          listener_1.mutable_address()->mutable_socket_address()->set_port_value(8000);
+
+          auto& virtual_listener_0 = *bootstrap.mutable_static_resources()->add_listeners();
+          virtual_listener_0 = src_listener_config;
+          virtual_listener_0.mutable_use_original_dst()->set_value(false);
+          virtual_listener_0.clear_listener_filters();
+          virtual_listener_0.mutable_bind_to_port()->set_value(false);
+          virtual_listener_0.set_name("virtual_listener_ipv4");
+          virtual_listener_0.mutable_connection_balance_config()->mutable_exact_balance();
+          virtual_listener_0.mutable_address()->mutable_socket_address()->set_address("127.0.0.2");
+          virtual_listener_0.mutable_address()->mutable_socket_address()->set_port_value(8001);
+
+          auto& virtual_listener_1 = *bootstrap.mutable_static_resources()->add_listeners();
+          virtual_listener_1 = src_listener_config;
+          virtual_listener_1.mutable_use_original_dst()->set_value(false);
+          virtual_listener_1.clear_listener_filters();
+          virtual_listener_1.mutable_bind_to_port()->set_value(false);
+          virtual_listener_1.set_name("virtual_listener_ipv6");
+          virtual_listener_1.mutable_connection_balance_config()->mutable_exact_balance();
+          virtual_listener_1.mutable_address()->mutable_socket_address()->set_address("::2");
+          virtual_listener_1.mutable_address()->mutable_socket_address()->set_port_value(8001);
+
+        });
+    BaseIntegrationTest::initialize();
+  }
+
+  void createUpstreams() override {
+      setUpstreamCount(2);
+      Network::TransportSocketFactoryPtr factory = Network::Test::createRawBufferSocketFactory();
+      auto ipv4_endpoint = Network::Utility::parseInternetAddress(
+                Network::Test::getLoopbackAddressString(Network::Address::IpVersion::v4), 0);
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), ipv4_endpoint, upstreamConfig()));
+
+      auto ipv6_endpoint = Network::Utility::parseInternetAddress(
+                Network::Test::getLoopbackAddressString(Network::Address::IpVersion::v6), 0);
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(std::move(factory), ipv6_endpoint, upstreamConfig()));
+  }
+
+  std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(Network::Address::IpVersion version,
+                                                                const std::string& request,
+                                                                std::string& response) {
+
+    ENVOY_LOG(debug, "createConnectionAddr");
+    Buffer::OwnedImpl buffer(request);
+    return std::make_unique<RawConnectionDriver>(
+        8000, buffer,
+        [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+          response.append(data.toString());
+        },
+        version, *dispatcher_);
+  }
+};
+
+// Verify the connections are distributed evenly on the 2 worker threads of the redirected
+// listener.
+// Currently flaky because the virtual listener create listen socket anyway despite the socket is
+// never used. Will enable this test once https://github.com/envoyproxy/envoy/pull/16259 is merged.
+TEST_P(RebalancerDualStackTest, ChoosesProperListener) {
+
+  FANCY_LOG(debug, "starting");
+  // ipv4 and ipv6 are required for this test to run
+  auto ipVersions = TestEnvironment::getIpVersionsForTest();
+  if (ipVersions.size() != 2) {
+  FANCY_LOG(debug, "wtf");
+    return;
+  }
+  TestEnvironment::setEnvVar("ENVOY_IP_FAMILY_TEST", "true", 0);
+
+  FANCY_LOG(debug, "continuing");
+
+  auto ip_address_str =
+      Network::Test::getLoopbackAddressUrlString(TestEnvironment::getIpVersionsForTest().front());
+  initialize();
+
+  std::vector<PerConnection> connections;
+  connections.emplace_back();
+  connections.back().client_conn_ =
+      createConnectionAndWrite(Network::Address::IpVersion::v4, "dummy", connections.back().response_);
+  connections.back().client_conn_->waitForConnection();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+
+  // connections.back().client_conn_ =
+  //     createConnectionAndWrite(Network::Address::IpVersion::v6, "dummy", connections.back().response_);
+  // connections.back().client_conn_->waitForConnection();
+  // ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(connections.back().upstream_conn_));
+
+  for (auto& conn : connections) {
+    conn.client_conn_->close();
+    while (!conn.client_conn_->closed()) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  // ASSERT_EQ(TestUtility::findCounter(
+  //               test_server_->statStore(),
+  //               absl::StrCat("listener.[::1]_80000.worker_0.downstream_cx_total"))
+  //               ->value(),
+  //           2);
+  ASSERT_EQ(TestUtility::findCounter(
+                test_server_->statStore(),
+                absl::StrCat("listener.127.0.0.1_80.worker_0.downstream_cx_total"))
+                ->value(),
+            3);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RebalancerDualStackTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 

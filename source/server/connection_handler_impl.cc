@@ -174,6 +174,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // This is a linear operation, may need to add a map<address, listener> to improve performance.
   // However, linear performance might be adequate since the number of listeners is small.
   // We do not return stopped listeners.
+    ENVOY_LOG(debug, "getBalancedHandlerByAddress");
   auto listener_it =
       std::find_if(listeners_.begin(), listeners_.end(),
                    [&address](std::pair<Network::Address::InstanceConstSharedPtr,
@@ -189,11 +190,16 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
         listener_it->second.tcpListener().value().get());
   }
 
+    ENVOY_LOG(debug, "getBalancedHandlerByAddress: no match found");
+
+
+  ENVOY_LOG(debug, "wildcard matching");
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
+    ENVOY_LOG(debug, "wildcard matching: RUNTIME enabled");
     listener_it =
         std::find_if(listeners_.begin(), listeners_.end(),
                      [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
@@ -207,6 +213,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                               p.first->ip()->version() == address.ip()->version();
                      });
   } else {
+    ENVOY_LOG(debug, "wildcard matching: RUNTIME disabled");
     listener_it =
         std::find_if(listeners_.begin(), listeners_.end(),
                      [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
