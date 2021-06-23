@@ -181,7 +181,6 @@ admin {
 enable_dispatcher_stats: true
 stats_server_version_override {
 }
-use_tcp_for_dns_lookups: true
 default_config_source {
   self {
   }
