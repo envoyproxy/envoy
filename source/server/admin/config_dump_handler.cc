@@ -243,11 +243,9 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-absl::optional<std::pair<Http::Code, std::string>>
-ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                      const absl::optional<std::string>& mask,
-                                      const Matchers::StringMatcher& name_matcher,
-                                      bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
+    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+    const Matchers::StringMatcher& name_matcher, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
