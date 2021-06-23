@@ -9,6 +9,7 @@ RUN apt-get update \
             cmake \
             curl \
             git \
+            gpg \
             jq \
             locales \
             lsb-release \
