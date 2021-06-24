@@ -13,7 +13,7 @@ import utils
 class GenerateApiVersionHeaderTest(unittest.TestCase):
     EXPECTED_TEMPLATE = string.Template(
         """#pragma once
-#include "common/version/api_version_struct.h"
+#include "source/common/version/api_version_struct.h"
 
 namespace Envoy {
 

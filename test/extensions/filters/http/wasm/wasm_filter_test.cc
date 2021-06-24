@@ -1,6 +1,5 @@
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/wasm/wasm_filter.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
@@ -1661,7 +1660,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
   rootContext().onTick(0);
@@ -1706,7 +1705,7 @@ TEST_P(WasmHttpFilterTest, Property) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));

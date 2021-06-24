@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/starttls/starttls_socket.h"
+#include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,7 +23,7 @@ bool StartTlsSocket::startSecureTransport() {
 }
 
 Network::TransportSocketPtr StartTlsSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   return std::make_unique<StartTlsSocket>(
       raw_socket_factory_->createTransportSocket(transport_socket_options),
       tls_socket_factory_->createTransportSocket(transport_socket_options),

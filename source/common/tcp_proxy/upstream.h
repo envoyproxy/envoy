@@ -8,9 +8,9 @@
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/http/codec_client.h"
-#include "common/router/header_parser.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -29,6 +29,7 @@ public:
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Upstream::HostDescriptionConstSharedPtr host) override;

@@ -17,9 +17,9 @@ envoy_cc_library(
     srcs = ["decompressor_filter.cc"],
     hdrs = ["decompressor_filter.h"],
     deps = [
-        "//include/envoy/compression/decompressor:decompressor_config_interface",
-        "//include/envoy/compression/decompressor:decompressor_interface",
-        "//include/envoy/http:filter_interface",
+        "//envoy/compression/decompressor:decompressor_config_interface",
+        "//envoy/compression/decompressor:decompressor_interface",
+        "//envoy/http:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/http:headers_lib",
@@ -35,9 +35,8 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         ":decompressor_filter_lib",
-        "//include/envoy/compression/decompressor:decompressor_config_interface",
+        "//envoy/compression/decompressor:decompressor_config_interface",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
     ],

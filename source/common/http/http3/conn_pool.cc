@@ -1,16 +1,16 @@
-#include "common/http/http3/conn_pool.h"
+#include "source/common/http/http3/conn_pool.h"
 
 #include <cstdint>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/config/utility.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/http/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -32,7 +32,7 @@ void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterIn
 Http3ConnPoolImpl::Http3ConnPoolImpl(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
     TimeSource& time_source)
@@ -44,10 +44,11 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
   Network::TransportSocketFactory& transport_socket_factory = host->transportSocketFactory();
+  quic::QuicConfig quic_config;
+  setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
   quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      dispatcher, transport_socket_factory, time_source, source_address,
+      dispatcher, transport_socket_factory, time_source, source_address, quic_config,
       host->cluster().perConnectionBufferLimitBytes());
-  setQuicConfigFromClusterConfig(host_->cluster(), quic_info_->quic_config_);
 }
 
 // Make sure all connections are torn down before quic_info_ is deleted.
@@ -57,7 +58,7 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,

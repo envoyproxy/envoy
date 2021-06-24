@@ -10,15 +10,21 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "statsd_lib",
-    srcs = ["statsd.cc"],
-    hdrs = ["statsd.h"],
+    srcs = [
+        "statsd.cc",
+        "tag_formats.cc",
+    ],
+    hdrs = [
+        "statsd.h",
+        "tag_formats.h",
+    ],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",

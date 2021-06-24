@@ -1,10 +1,10 @@
 dynamic_resources:
   lds_config:
     resource_api_version: V3
-    path: {{ lds_json_path }}
+    path: "{{ lds_json_path }}"
   cds_config:
     resource_api_version: V3
-    path: {{ cds_json_path }}
+    path: "{{ cds_json_path }}"
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -13,5 +13,5 @@ admin:
       path: "{{ null_device_path }}"
   address:
     socket_address:
-      address: {{ ntop_ip_loopback_address }}
+      address: "{{ ntop_ip_loopback_address }}"
       port_value: 0

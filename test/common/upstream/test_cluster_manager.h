@@ -10,20 +10,19 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/api/api_impl.h"
-#include "common/config/utility.h"
-#include "common/http/context_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/singleton/manager_impl.h"
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
-#include "common/upstream/subset_lb.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/common/upstream/subset_lb.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/utility.h"
@@ -83,7 +82,7 @@ public:
                    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource&, ClusterConnectivityState& state) override {
     return Http::ConnectionPool::InstancePtr{allocateConnPool_(
         host, alternate_protocol_options, options, transport_socket_options, state)};
@@ -92,7 +91,7 @@ public:
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
-                      Network::TransportSocketOptionsSharedPtr,
+                      Network::TransportSocketOptionsConstSharedPtr,
                       Upstream::ClusterConnectivityState&) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
@@ -124,7 +123,7 @@ public:
                const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
-               Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState&));
+               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

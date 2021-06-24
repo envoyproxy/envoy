@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/csrf/csrf_filter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/csrf/csrf_filter.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"

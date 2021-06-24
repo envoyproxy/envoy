@@ -7,9 +7,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/network/socket_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
@@ -135,7 +134,6 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty

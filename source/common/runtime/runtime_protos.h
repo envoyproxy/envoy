@@ -6,12 +6,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Runtime {
 
-// TODO(WeavingGao): use for #16392
 // Helper class for runtime-derived uint32.
 class UInt32 : Logger::Loggable<Logger::Id::runtime> {
 public:

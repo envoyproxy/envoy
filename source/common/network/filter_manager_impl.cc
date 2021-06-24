@@ -1,10 +1,10 @@
-#include "common/network/filter_manager_impl.h"
+#include "source/common/network/filter_manager_impl.h"
 
 #include <list>
 
 #include "envoy/network/connection.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Network {

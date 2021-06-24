@@ -17,14 +17,14 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/http/http3/codec_stats.h"
-#include "common/network/connection_impl_base.h"
-#include "common/quic/quic_network_connection.h"
-#include "common/quic/envoy_quic_simulated_watermark_buffer.h"
-#include "common/quic/send_buffer_monitor.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/http3/codec_stats.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/send_buffer_monitor.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 
@@ -137,13 +137,10 @@ public:
   uint32_t bytesToSend() { return bytes_to_send_; }
 
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
-    http3_options_ =
-        std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>(http3_options);
+    http3_options_ = http3_options;
   }
 
-  void setCodecStats(Http::Http3::CodecStats& stats) {
-    codec_stats_ = std::reference_wrapper<Http::Http3::CodecStats>(stats);
-  }
+  void setCodecStats(Http::Http3::CodecStats& stats) { codec_stats_ = stats; }
 
   uint32_t maxIncomingHeadersCount() { return max_headers_count_; }
 
@@ -154,7 +151,8 @@ public:
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
-                              quic::ConnectionCloseSource source);
+                              quic::ConnectionCloseSource source,
+                              const quic::ParsedQuicVersion& version);
 
   void closeConnectionImmediately() override;
 
@@ -166,9 +164,8 @@ protected:
 
   QuicNetworkConnection* network_connection_{nullptr};
 
-  absl::optional<std::reference_wrapper<Http::Http3::CodecStats>> codec_stats_;
-  absl::optional<std::reference_wrapper<const envoy::config::core::v3::Http3ProtocolOptions>>
-      http3_options_;
+  OptRef<Http::Http3::CodecStats> codec_stats_;
+  OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
 
 private:

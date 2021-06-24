@@ -26,15 +26,15 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/subscription_factory_impl.h"
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/alternate_protocols_cache_manager_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/upstream/load_stats_reporter.h"
-#include "common/upstream/priority_conn_pool_map.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/priority_conn_pool_map.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -74,13 +74,13 @@ public:
                    const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                        alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state) override;
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

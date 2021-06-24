@@ -12,12 +12,14 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_client_session.h"
-#include "common/quic/envoy_quic_client_connection.h"
-#include "common/quic/codec_impl.h"
-#include "common/quic/envoy_quic_connection_helper.h"
-#include "common/quic/envoy_quic_alarm_factory.h"
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_client_session.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_alarm_factory.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
+
 #include "test/common/quic/test_utils.h"
 
 #include "envoy/stats/stats_macros.h"
@@ -74,22 +76,17 @@ public:
   bool encryption_established() const override { return true; }
 };
 
-class TestEnvoyQuicClientSession : public EnvoyQuicClientSession {
+class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
 public:
-  TestEnvoyQuicClientSession(const quic::QuicConfig& config,
-                             const quic::ParsedQuicVersionVector& supported_versions,
-                             std::unique_ptr<EnvoyQuicClientConnection> connection,
-                             const quic::QuicServerId& server_id,
-                             std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
-                             quic::QuicClientPushPromiseIndex* push_promise_index,
-                             Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
-      : EnvoyQuicClientSession(config, supported_versions, std::move(connection), server_id,
-                               crypto_config, push_promise_index, dispatcher, send_buffer_limit) {}
-
-  std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override {
-    return std::make_unique<TestQuicCryptoClientStream>(
-        server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(),
-        crypto_config(), this, true);
+  std::unique_ptr<quic::QuicCryptoClientStreamBase>
+  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
+                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
+                                    quic::QuicCryptoClientConfig* crypto_config,
+                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
+                                    bool has_application_state) override {
+    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
+                                                        std::move(verify_context), crypto_config,
+                                                        proof_handler, has_application_state);
   }
 };
 
@@ -100,6 +97,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -115,7 +113,7 @@ public:
                             std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
                             quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024),
+                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -175,7 +173,8 @@ protected:
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
-  TestEnvoyQuicClientSession envoy_quic_session_;
+  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
+  EnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
   testing::StrictMock<Stats::MockCounter> read_total_;
@@ -206,6 +205,45 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
       }));
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
+  // We always allow for reading packets, even if there's no stream.
+  EXPECT_EQ(0, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  NiceMock<Http::MockResponseDecoder> response_decoder;
+  NiceMock<Http::MockStreamCallbacks> stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+
+  quic::QuicHeaderList headers;
+  headers.OnHeaderBlockStart();
+  headers.OnHeader(":status", "200");
+  headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+  // Response headers should be propagated to decoder.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ("200", decoded_headers->getStatusValue());
+      }));
+  stream.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
+  // With one stream, still read 16 packets.
+  EXPECT_EQ(1, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(16, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ("200", decoded_headers->getStatusValue());
+      }));
+  stream2.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
+  // With 2 streams, read 32 packets.
+  EXPECT_EQ(2, envoy_quic_session_.GetNumActiveStreams());
+  EXPECT_EQ(32, envoy_quic_session_.numPacketsExpectedPerEventLoop());
+
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
 }
 
 TEST_P(EnvoyQuicClientSessionTest, OnResetFrame) {
@@ -258,6 +296,129 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
   envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_TRUE(stream.write_side_closed() && stream.reading_stopped());
+}
+
+class EnvoyQuicClientSessionAllQuicVersionTest
+    : public testing::TestWithParam<quic::ParsedQuicVersion> {
+public:
+  EnvoyQuicClientSessionAllQuicVersionTest()
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
+        alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
+        peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
+                                                        12345)),
+        self_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
+                                                        54321)),
+        quic_connection_(new TestEnvoyQuicClientConnection(
+            quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
+            quic::test::SupportedVersions(GetParam()), *dispatcher_,
+            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+        crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
+            quic::test::crypto_test_utils::ProofVerifierForTesting())),
+        envoy_quic_session_(quic_config_, quic::test::SupportedVersions(GetParam()),
+                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
+                            *dispatcher_,
+                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
+                         64 * 1024, 100) {
+    EXPECT_EQ(time_system_.systemTime(), envoy_quic_session_.streamInfo().startTime());
+    EXPECT_EQ(EMPTY_STRING, envoy_quic_session_.nextProtocol());
+    EXPECT_EQ(Http::Protocol::Http3, http_connection_.protocol());
+
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1));
+    ON_CALL(writer_, WritePacket(_, _, _, _, _))
+        .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 1)));
+  }
+
+  void SetUp() override {
+    envoy_quic_session_.Initialize();
+    setQuicConfigWithDefaultValues(envoy_quic_session_.config());
+    envoy_quic_session_.OnConfigNegotiated();
+    envoy_quic_session_.addConnectionCallbacks(network_connection_callbacks_);
+    envoy_quic_session_.setConnectionStats(
+        {read_total_, read_current_, write_total_, write_current_, nullptr, nullptr});
+    EXPECT_EQ(&read_total_, &quic_connection_->connectionStats().read_total_);
+  }
+
+  void TearDown() override {
+    if (quic_connection_->connected()) {
+      EXPECT_CALL(*quic_connection_,
+                  SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
+      EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+      envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+
+protected:
+  Event::SimulatedTimeSystemHelper time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  EnvoyQuicConnectionHelper connection_helper_;
+  EnvoyQuicAlarmFactory alarm_factory_;
+  testing::NiceMock<quic::test::MockPacketWriter> writer_;
+  Network::Address::InstanceConstSharedPtr peer_addr_;
+  Network::Address::InstanceConstSharedPtr self_addr_;
+  TestEnvoyQuicClientConnection* quic_connection_;
+  quic::QuicConfig quic_config_;
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
+  TestQuicCryptoClientStreamFactory crypto_stream_factory_;
+  EnvoyQuicClientSession envoy_quic_session_;
+  Network::MockConnectionCallbacks network_connection_callbacks_;
+  Http::MockServerConnectionCallbacks http_connection_callbacks_;
+  testing::StrictMock<Stats::MockCounter> read_total_;
+  testing::StrictMock<Stats::MockGauge> read_current_;
+  testing::StrictMock<Stats::MockCounter> write_total_;
+  testing::StrictMock<Stats::MockGauge> write_current_;
+  Stats::IsolatedStoreImpl scope_;
+  Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  QuicHttpClientConnectionImpl http_connection_;
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionAllQuicVersionTests,
+                         EnvoyQuicClientSessionAllQuicVersionTest,
+                         testing::ValuesIn(quic::AllSupportedVersions()));
+
+TEST_P(EnvoyQuicClientSessionAllQuicVersionTest, ConnectionClosePopulatesQuicVersionStats) {
+  std::string error_details("dummy details");
+  quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
+  quic::QuicConnectionCloseFrame frame(GetParam().transport_version, error,
+                                       quic::NO_IETF_QUIC_ERROR, error_details,
+                                       /* transport_close_frame_type = */ 0);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  quic_connection_->OnConnectionCloseFrame(frame);
+  EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
+            envoy_quic_session_.transportFailureReason());
+  EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+  std::string quic_version_stat_name;
+  switch (GetParam().transport_version) {
+  case quic::QUIC_VERSION_43:
+    quic_version_stat_name = "43";
+    break;
+  case quic::QUIC_VERSION_46:
+    quic_version_stat_name = "46";
+    break;
+  case quic::QUIC_VERSION_50:
+    quic_version_stat_name = "50";
+    break;
+  case quic::QUIC_VERSION_51:
+    quic_version_stat_name = "51";
+    break;
+  case quic::QUIC_VERSION_IETF_DRAFT_29:
+    quic_version_stat_name = "h3_29";
+    break;
+  case quic::QUIC_VERSION_IETF_RFC_V1:
+    quic_version_stat_name = "rfc_v1";
+    break;
+  default:
+    break;
+  }
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    scope_, absl::StrCat("http3.quic_version_", quic_version_stat_name))
+                    ->value());
 }
 
 } // namespace Quic

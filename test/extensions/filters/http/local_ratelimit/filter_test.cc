@@ -1,6 +1,6 @@
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 
-#include "extensions/filters/http/local_ratelimit/local_ratelimit.h"
+#include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"

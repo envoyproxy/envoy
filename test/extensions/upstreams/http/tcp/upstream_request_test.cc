@@ -1,11 +1,10 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-#include "common/router/config_impl.h"
-#include "common/router/router.h"
-#include "common/router/upstream_request.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/router/upstream_request.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -69,9 +68,9 @@ TEST_F(TcpConnPoolTest, OnPoolFailure) {
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
-  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, _, _));
+  EXPECT_CALL(mock_generic_callbacks_, onPoolFailure(_, "foo", _));
   conn_pool_->onPoolFailure(Envoy::Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                            host_);
+                            "foo", host_);
 
   // Make sure that the pool failure nulled out the pending request.
   EXPECT_FALSE(conn_pool_->cancelAnyPendingStream());
@@ -94,6 +93,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    EXPECT_CALL(mock_router_filter_, downstreamHeaders())
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(&request_));
+    EXPECT_CALL(mock_router_filter_, cluster()).Times(AnyNumber());
     mock_router_filter_.requests_.push_back(std::make_unique<UpstreamRequest>(
         mock_router_filter_, std::make_unique<NiceMock<Router::MockGenericConnPool>>()));
     auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
@@ -104,15 +107,15 @@ public:
   ~TcpUpstreamTest() override { EXPECT_CALL(mock_router_filter_, config()).Times(AnyNumber()); }
 
 protected:
-  NiceMock<Network::MockClientConnection> connection_;
-  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
-  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
-  std::unique_ptr<TcpUpstream> tcp_upstream_;
   TestRequestHeaderMapImpl request_{{":method", "CONNECT"},
                                     {":path", "/"},
                                     {":protocol", "bytestream"},
                                     {":scheme", "https"},
                                     {":authority", "host"}};
+  NiceMock<Network::MockClientConnection> connection_;
+  NiceMock<Router::MockRouterFilterInterface> mock_router_filter_;
+  Envoy::Tcp::ConnectionPool::MockConnectionData* mock_connection_data_;
+  std::unique_ptr<TcpUpstream> tcp_upstream_;
 };
 
 TEST_F(TcpUpstreamTest, Basic) {

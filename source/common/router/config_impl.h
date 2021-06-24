@@ -19,17 +19,17 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/matchers.h"
-#include "common/config/metadata.h"
-#include "common/http/hash_policy.h"
-#include "common/http/header_utility.h"
-#include "common/router/config_utility.h"
-#include "common/router/header_formatter.h"
-#include "common/router/header_parser.h"
-#include "common/router/metadatamatchcriteria_impl.h"
-#include "common/router/router_ratelimit.h"
-#include "common/router/tls_context_match_criteria_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/hash_policy.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/router/config_utility.h"
+#include "source/common/router/header_formatter.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/router_ratelimit.h"
+#include "source/common/router/tls_context_match_criteria_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -771,6 +771,9 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       request_headers_parser_->evaluateHeaders(headers, stream_info);
+      if (!host_rewrite_.empty()) {
+        headers.setHost(host_rewrite_);
+      }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -791,6 +794,7 @@ private:
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
+    const std::string host_rewrite_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;

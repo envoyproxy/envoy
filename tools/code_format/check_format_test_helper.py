@@ -121,7 +121,7 @@ def check_tool_not_found_error():
     # Temporarily change PATH to test the error about lack of external tools.
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = "/sbin:/usr/sbin"
-    clang_format = os.getenv("CLANG_FORMAT", "clang-format-9")
+    clang_format = os.getenv("CLANG_FORMAT", "clang-format-11")
     # If CLANG_FORMAT points directly to the binary, skip this test.
     if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
         os.environ["PATH"] = oldPath
@@ -265,7 +265,8 @@ def run_checks():
     errors += check_unfixable_error(
         "std_optional.cc", "Don't use std::optional; use absl::optional instead")
     errors += check_unfixable_error(
-        "std_string_view.cc", "Don't use std::string_view; use absl::string_view instead")
+        "std_string_view.cc",
+        "Don't use std::string_view or toStdStringView; use absl::string_view instead")
     errors += check_unfixable_error(
         "std_variant.cc", "Don't use std::variant; use absl::variant instead")
     errors += check_unfixable_error("std_visit.cc", "Don't use std::visit; use absl::visit instead")

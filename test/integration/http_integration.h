@@ -4,9 +4,9 @@
 #include <memory>
 #include <string>
 
-#include "common/http/codec_client.h"
-#include "common/http/http3/quic_client_connection_factory.h"
-#include "common/network/filter_impl.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/http3/quic_client_connection_factory.h"
+#include "source/common/network/filter_impl.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"

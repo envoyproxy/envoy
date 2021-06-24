@@ -4,13 +4,13 @@
 
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/conn_pool_base.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/quic/client_connection_factory_impl.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #else
 #error "http3 conn pool should not be built with QUIC disabled"
 #endif
@@ -40,7 +40,7 @@ public:
   Http3ConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                     Event::Dispatcher& dispatcher,
                     const Network::ConnectionSocket::OptionsSharedPtr& options,
-                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     Random::RandomGenerator& random_generator,
                     Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
                     CreateCodecFn codec_fn, std::vector<Http::Protocol> protocol,
@@ -65,7 +65,7 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state, TimeSource& time_source);
 
 } // namespace Http3

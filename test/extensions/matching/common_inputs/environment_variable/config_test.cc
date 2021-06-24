@@ -1,6 +1,5 @@
-#include "common/config/utility.h"
-
-#include "extensions/matching/common_inputs/environment_variable/config.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/matching/common_inputs/environment_variable/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
@@ -31,16 +30,16 @@ TEST(ConfigTest, TestConfig) {
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
 
   {
-    auto input = factory.createCommonProtocolInput(*message, context);
-    EXPECT_NE(nullptr, input);
-    EXPECT_EQ(input->get(), absl::nullopt);
+    auto input_factory = factory.createCommonProtocolInputFactoryCb(*message, context);
+    EXPECT_NE(nullptr, input_factory);
+    EXPECT_EQ(input_factory()->get(), absl::nullopt);
   }
 
   TestEnvironment::setEnvVar("foo", "bar", 1);
   {
-    auto input = factory.createCommonProtocolInput(*message, context);
-    EXPECT_NE(nullptr, input);
-    EXPECT_EQ(input->get(), absl::make_optional("bar"));
+    auto input_factory = factory.createCommonProtocolInputFactoryCb(*message, context);
+    EXPECT_NE(nullptr, input_factory);
+    EXPECT_EQ(input_factory()->get(), absl::make_optional("bar"));
   }
 
   TestEnvironment::unsetEnvVar("foo");

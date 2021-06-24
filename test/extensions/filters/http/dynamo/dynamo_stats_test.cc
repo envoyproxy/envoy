@@ -1,6 +1,6 @@
 #include <string>
 
-#include "extensions/filters/http/dynamo/dynamo_stats.h"
+#include "source/extensions/filters/http/dynamo/dynamo_stats.h"
 
 #include "test/mocks/stats/mocks.h"
 

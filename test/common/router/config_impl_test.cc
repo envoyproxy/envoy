@@ -12,14 +12,14 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/config/metadata.h"
-#include "common/config/well_known_names.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/router/config_impl.h"
-#include "common/router/string_accessor_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/common/router/route_fuzz.pb.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -2201,7 +2201,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersWithMultipleValues) {
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"bar"}));
 
-    EXPECT_NE(0, generateHash({"bar", "foo"}));
+    EXPECT_NE(0UL, generateHash({"bar", "foo"}));
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"bar", "foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"foo", "bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"abc", "def"}));
@@ -2250,7 +2250,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashHeadersRegexSubstitutionWithMultipleValu
     EXPECT_FALSE(generateHash({}));
     EXPECT_TRUE(generateHash({"/bar"}));
 
-    EXPECT_NE(0, generateHash({"/bar", "/foo"}));
+    EXPECT_NE(0UL, generateHash({"/bar", "/foo"}));
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/bar", "/foo"})); // deterministic
     EXPECT_EQ(generateHash({"bar", "foo"}), generateHash({"/foo", "/bar"})); // order independent
     EXPECT_NE(generateHash({"abcd", "ef"}), generateHash({"/abc", "/def"}));
@@ -5202,6 +5202,7 @@ virtual_hosts:
                       key: x-resp-cluster
                       value: cluster1
                 response_headers_to_remove: [ "x-remove-cluster1" ]
+                host_rewrite_literal: "new_host1"
               - name: cluster2
                 weight: 50
                 request_headers_to_add:
@@ -5227,6 +5228,7 @@ virtual_hosts:
 
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
+    EXPECT_EQ("new_host1", headers.getHostValue());
 
     route->finalizeResponseHeaders(resp_headers, stream_info);
     EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));

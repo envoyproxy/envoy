@@ -1,10 +1,10 @@
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "envoy/http/header_map.h"
 
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

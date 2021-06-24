@@ -1,4 +1,4 @@
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/test_common/utility.h"

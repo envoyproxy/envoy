@@ -1,9 +1,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -288,7 +287,7 @@ TEST_F(ProxyFilterTest, HostRewrite) {
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(callbacks_.route_->route_entry_,
-              perFilterConfig(HttpFilterNames::get().DynamicForwardProxy))
+              perFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
       .WillOnce(Return(&config));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 80, _))
       .WillOnce(Return(
@@ -317,7 +316,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Extensions::Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
   EXPECT_CALL(callbacks_.route_->route_entry_,
-              perFilterConfig(HttpFilterNames::get().DynamicForwardProxy))
+              perFilterConfig("envoy.filters.http.dynamic_forward_proxy"))
       .WillOnce(Return(&config));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _))
       .WillOnce(Return(

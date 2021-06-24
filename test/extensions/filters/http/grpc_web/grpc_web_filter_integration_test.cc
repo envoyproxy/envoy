@@ -1,8 +1,6 @@
 #include <memory>
 
-#include "common/common/base64.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/base64.h"
 
 #include "test/integration/http_integration.h"
 

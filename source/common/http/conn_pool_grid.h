@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common/http/alternate_protocols_cache_impl.h"
-#include "common/http/conn_pool_base.h"
-#include "common/http/http3_status_tracker.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http3_status_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -130,7 +130,7 @@ public:
   ConnectivityGrid(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
@@ -186,7 +186,7 @@ private:
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Upstream::ClusterConnectivityState& state_;
   std::chrono::milliseconds next_attempt_duration_;
   TimeSource& time_source_;

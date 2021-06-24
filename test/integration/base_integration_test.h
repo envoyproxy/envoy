@@ -8,10 +8,9 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
-
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/utility.h"
@@ -274,7 +273,8 @@ public:
    * @param if the connection should be terminated once '\r\n\r\n' has been read.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
-                                     bool disconnect_after_headers_complete = false);
+                                     bool disconnect_after_headers_complete = false,
+                                     Network::TransportSocketPtr transport_socket = nullptr);
 
   /**
    * Helper to create ConnectionDriver.
@@ -285,10 +285,11 @@ public:
    **/
   std::unique_ptr<RawConnectionDriver> createConnectionDriver(
       uint32_t port, const std::string& initial_data,
-      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback) {
+      std::function<void(Network::ClientConnection&, const Buffer::Instance&)>&& data_callback,
+      Network::TransportSocketPtr transport_socket = nullptr) {
     Buffer::OwnedImpl buffer(initial_data);
     return std::make_unique<RawConnectionDriver>(port, buffer, data_callback, version_,
-                                                 *dispatcher_);
+                                                 *dispatcher_, std::move(transport_socket));
   }
 
   /**
