@@ -179,8 +179,8 @@ void ActiveMessage::onQueryTopicRoute() {
           write_queue_num = static_cast<int32_t>(metadata_fields.at(WriteQueueNum).number_value());
         }
         int32_t perm = 0;
-        if (metadata_fields.contains("perm")) {
-          perm = static_cast<int32_t>(metadata_fields.at("perm").number_value());
+        if (metadata_fields.contains(Perm)) {
+          perm = static_cast<int32_t>(metadata_fields.at(Perm).number_value());
         }
         int32_t broker_id = 0;
         if (metadata_fields.contains(BrokerId)) {
