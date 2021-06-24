@@ -601,10 +601,13 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
-    if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
-      listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
-    } else {
-      listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+
+    if (!TestEnvironment::allowListenersOnBothIPFamilyTypes()) {
+      if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
+        listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
+      } else {
+        listener_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+      }
     }
   }
 
