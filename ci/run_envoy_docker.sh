@@ -44,9 +44,6 @@ else
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
-    && env \
-    && which clang-format-11 \
-    && which buildozer \
     && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
 fi
 
