@@ -8,11 +8,11 @@ SYSTEM="$$(uname -s)"
 PLATFORM="$${SYSTEM}-$${ARCH}"
 
 detect::compiler() {
-  if ${CXX} --version 2>&1 | grep -q clang ; then
+  if $${CXX} --version 2>&1 | grep -q clang ; then
     echo clang
   fi
 
-  if ${CXX} --version 2>&1 | grep -q gcc ; then
+  if $${CXX} --version 2>&1 | grep -q gcc ; then
     echo gcc
   fi
 
