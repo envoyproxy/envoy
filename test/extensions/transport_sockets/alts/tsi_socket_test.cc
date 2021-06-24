@@ -171,8 +171,8 @@ protected:
     EXPECT_EQ(0L, client_.read_buffer_.length());
 
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
-    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    server_.tsi_socket_->doRead(server_.read_buffer_));
@@ -342,8 +342,8 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
   client_to_server_.add(makeFakeTsiFrame(ClientToServerData));
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
@@ -378,8 +378,8 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
     buffer.move(client_to_server_);
     return result;
   }));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   expectIoResult({Network::PostIoAction::KeepOpen, 17UL, true},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
@@ -841,7 +841,6 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
   EXPECT_EQ(0L, client_.read_buffer_.length());
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
 
   // Write the first part of handshake data (14 bytes).
   EXPECT_CALL(*server_.raw_socket_, doWrite(_, false))
@@ -850,6 +849,7 @@ TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
         server_to_client_.move(buffer, 14);
         return result;
       }));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));

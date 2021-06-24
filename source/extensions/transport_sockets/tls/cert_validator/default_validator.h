@@ -116,7 +116,6 @@ private:
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
-  std::vector<std::string> verify_subject_alt_name_list_;
   bool verify_trusted_ca_{false};
 };
 

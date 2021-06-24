@@ -172,7 +172,7 @@ void TcpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   }
 }
 
-void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+void TcpConnPool::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                 Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
   callbacks_->onGenericPoolFailure(reason, host);

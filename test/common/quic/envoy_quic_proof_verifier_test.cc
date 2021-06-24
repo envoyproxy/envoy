@@ -57,8 +57,6 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_));
     EXPECT_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillRepeatedly(ReturnRef(path_string_));
-    EXPECT_CALL(cert_validation_ctx_config_, verifySubjectAltNameList())
-        .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillRepeatedly(ReturnRef(san_matchers_));
     EXPECT_CALL(cert_validation_ctx_config_, verifyCertificateHashList())
