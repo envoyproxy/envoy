@@ -53,11 +53,11 @@ steps:
     path: $(Pipeline.Workspace)/docker
     cacheHitVar: DOCKER_CACHE_HIT
   displayName: Cache Docker images
-  condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'), eq('${{ parameters.imageID }}', 'minimal'))
+  # condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'), eq('${{ parameters.imageID }}', 'minimal'))
 - script: |
     docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
   displayName: Restore Docker image
-  condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'), eq('${{ parameters.imageID }}', 'minimal'))
+  # condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'), eq('${{ parameters.imageID }}', 'minimal'))
 
 - script: IMAGE_ID=${{ parameters.imageID }} ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
   workingDirectory: $(Build.SourcesDirectory)
