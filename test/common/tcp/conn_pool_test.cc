@@ -99,7 +99,7 @@ public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                Network::ConnectionSocket::OptionsSharedPtr options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                bool test_new_connection_pool);
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
@@ -155,14 +155,14 @@ public:
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
 protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         Network::ConnectionSocket::OptionsSharedPtr options,
-                        Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                         ConnPoolBase& parent)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                        transport_socket_options, state_),
@@ -187,10 +187,11 @@ protected:
 
   class OriginalConnPoolImplForTest : public OriginalConnPoolImpl {
   public:
-    OriginalConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                                Network::ConnectionSocket::OptionsSharedPtr options,
-                                Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                                ConnPoolBase& parent)
+    OriginalConnPoolImplForTest(
+        Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
+        Network::ConnectionSocket::OptionsSharedPtr options,
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+        ConnPoolBase& parent)
         : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                                transport_socket_options),
           parent_(parent) {}
@@ -229,7 +230,7 @@ protected:
 ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                            NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                            Network::ConnectionSocket::OptionsSharedPtr options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            bool test_new_connection_pool)
     : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
       test_new_connection_pool_(test_new_connection_pool), options_(options),
@@ -285,7 +286,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<ConnPoolBase> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
