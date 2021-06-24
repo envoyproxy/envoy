@@ -155,9 +155,14 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
           /*CertificateValidationContextConfig=*/nullptr, stats,
           Event::GlobalTimeSystem().timeSystem());
 
-  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
-      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
-  EXPECT_EQ(default_validator->doVerifyCertChain(nullptr, nullptr, *cert, nullptr), 0);
+  EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
+                                                 /*subject_alt_name_matchers=*/{}),
+            Envoy::Ssl::ClientValidationStatus::NotValidated);
+  X509 cert = {};
+  EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
+                                                 /*ssl_extended_info=*/nullptr, /*leaf_cert=*/cert,
+                                                 /*transport_socket_options=*/nullptr),
+            0);
 }
 
 } // namespace Tls
