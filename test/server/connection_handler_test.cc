@@ -748,7 +748,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
@@ -764,8 +764,8 @@ TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
 
   Network::TcpListenerCallbacks* ipv4_any_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
-  TestListener* ipv4_any_listener =
-      addListener(1, false, false, "ipv4_any_test_listener", listener2, &ipv4_any_listener_callbacks);
+  TestListener* ipv4_any_listener = addListener(1, false, false, "ipv4_any_test_listener",
+                                                listener2, &ipv4_any_listener_callbacks);
   Network::Address::InstanceConstSharedPtr any_address(
       new Network::Address::Ipv4Instance("0.0.0.0", 80));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address));
@@ -773,8 +773,8 @@ TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
 
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
   auto listener3 = new NiceMock<Network::MockListener>();
-  TestListener* ipv6_any_listener =
-      addListener(1, false, false, "ipv6_any_test_listener", listener3, &ipv6_any_listener_callbacks);
+  TestListener* ipv6_any_listener = addListener(1, false, false, "ipv6_any_test_listener",
+                                                listener3, &ipv6_any_listener_callbacks);
   Network::Address::InstanceConstSharedPtr any_address_ipv6(
       new Network::Address::Ipv6Instance("::", 80));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address_ipv6));
@@ -818,7 +818,7 @@ TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
 }
 
 TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
+  auto scoped_runtime = std::make_unique<TestScopedRuntime>();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.listener_wildcard_match_ip_family", "false"}});
@@ -834,8 +834,8 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
 
   Network::TcpListenerCallbacks* ipv4_any_listener_callbacks;
   auto listener2 = new NiceMock<Network::MockListener>();
-  TestListener* ipv4_any_listener =
-      addListener(1, false, false, "ipv4_any_test_listener", listener2, &ipv4_any_listener_callbacks);
+  TestListener* ipv4_any_listener = addListener(1, false, false, "ipv4_any_test_listener",
+                                                listener2, &ipv4_any_listener_callbacks);
   Network::Address::InstanceConstSharedPtr any_address(
       new Network::Address::Ipv4Instance("0.0.0.0", 80));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address));
@@ -843,8 +843,8 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
 
   Network::TcpListenerCallbacks* ipv6_any_listener_callbacks;
   auto listener3 = new NiceMock<Network::MockListener>();
-  TestListener* ipv6_any_listener =
-      addListener(1, false, false, "ipv6_any_test_listener", listener3, &ipv6_any_listener_callbacks);
+  TestListener* ipv6_any_listener = addListener(1, false, false, "ipv6_any_test_listener",
+                                                listener3, &ipv6_any_listener_callbacks);
   Network::Address::InstanceConstSharedPtr any_address_ipv6(
       new Network::Address::Ipv6Instance("::", 80));
   EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(any_address_ipv6));
