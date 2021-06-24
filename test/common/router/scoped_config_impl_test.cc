@@ -84,7 +84,7 @@ TEST(HeaderValueExtractorImplDeathTest, InvalidConfig) {
   EXPECT_DEATH((FragmentBuilderImpl(config)), "value extractor is not set.");
 #else
   EXPECT_THROW_WITH_REGEX((FragmentBuilderImpl(config)), ProtoValidationException,
-                          "HeaderValueExtractor extract_type not set.+");
+                          "value extractor is not set.+");
 #endif // !defined(NDEBUG)
 
   // Index non-zero when element separator is an empty string.

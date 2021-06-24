@@ -48,6 +48,7 @@ FragmentBuilderImpl::FragmentBuilderImpl(ScopedRoutes::ScopeKeyBuilder::Fragment
     break;
   case FragmentBuilderConfig::TYPE_NOT_SET:
     ASSERT(false, "value extractor is not set.");
+    throw ProtoValidationException("value extractor is not set.", config);
   default:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
