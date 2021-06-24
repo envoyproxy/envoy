@@ -1883,7 +1883,7 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
@@ -1960,6 +1960,10 @@ message HeaderMatcher {
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
+
+  // If true, indicates the exact_match/prefix_match/suffix_match/contains_match should be case
+  // insensitive. This has no effect for the safe_regex_match.
+  bool ignore_case = 13;
 }
 
 // Query parameter matching treats the query string of a request's :path header
