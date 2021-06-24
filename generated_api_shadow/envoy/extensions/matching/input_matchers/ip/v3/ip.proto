@@ -27,7 +27,7 @@ message Ip {
   repeated config.core.v3.CidrRange cidr_ranges = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // The human readable prefix to use when emitting statistics for the IP input
-  // matcher.
+  // matcher. Names in the table below are concatenated to this prefix.
   //
   // .. csv-table::
   //    :header: Name, Type, Description
