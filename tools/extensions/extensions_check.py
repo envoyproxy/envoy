@@ -53,8 +53,8 @@ EXTENSION_CATEGORIES = (
     "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
     "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
     "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers",
-    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream", "envoy.tls.cert_validator",
-    "envoy.upstreams", "envoy.wasm.runtime")
+    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
+    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
