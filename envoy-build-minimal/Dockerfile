@@ -6,6 +6,7 @@ RUN apt-get update \
     && apt-get install -y -qq --no-install-recommends \
             build-essential \
             ca-certificates \
+            clang-format-9 \
             cmake \
             curl \
             git \
@@ -30,20 +31,20 @@ RUN apt-get update \
     && apt-get remove --purge -y -qq python3-pip \
     # clang-tidy, clang-format
     && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-11 main" >> /etc/apt/sources.list \
-    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
+    && wget -q -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
     && apt-get update \
     && apt-get install -y -qq --no-install-recommends clang-format-11 clang-tidy-11 \
     && cd /tmp || exit 1 \
     # buildozer
-    && wget https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildozer \
+    && wget -q https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildozer \
     && cp -a buildozer /usr/local/bin \
     && chmod +x /usr/local/bin/buildozer \
     # buildifier
-    && wget https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildifier \
+    && wget -q https://github.com/bazelbuild/buildtools/releases/download/2.2.1/buildifier \
     && cp -a buildifier /usr/local/bin \
     && chmod +x /usr/local/bin/buildifier \
     # bazelisk
-    && wget https://github.com/bazelbuild/bazelisk/releases/download/v1.7.4/bazelisk-linux-amd64 \
+    && wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.7.4/bazelisk-linux-amd64 \
     && chmod +x bazelisk-linux-amd64 \
     && cp -a bazelisk-linux-amd64 /usr/bin/bazel \
     && bazel --version \
@@ -54,6 +55,8 @@ RUN apt-get update \
     && sudo cp shellcheck-v0.7.0/shellcheck /usr/local/bin \
     && rm -rf shellcheck-v0.7.0/ sc.checksum \
     && cd || exit 1 \
+    && update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-11 1 \
+    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-11 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 \
     && mkdir -p /src/workspace \
