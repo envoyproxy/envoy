@@ -2,9 +2,9 @@
 # It is not intended for manual editing.
 [[package]]
 name = "protobuf"
-version = "2.23.0"
+version = "2.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45604fc7a88158e7d514d8e22e14ac746081e7a70d7690074dd0029ee37458d6"
+checksum = "db50e77ae196458ccd3dc58a31ea1a90b0698ab1b7928d89f644c25d72070267"
 
 [[package]]
 name = "proxy-wasm-envoy-tests"

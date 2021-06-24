@@ -9,7 +9,7 @@ In order to update Cargo dependencies, please make sure that Rust and Cargo
 are installed, and run this tool:
 
 ```
-bash tools/update_cargo.sh
+bash tools/update_crates.sh
 ```
 
 which will regenerate Bazel rules in `bazel/external/cargo/`.

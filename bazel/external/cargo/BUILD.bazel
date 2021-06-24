@@ -14,7 +14,7 @@ licenses([
 # Aliased targets
 alias(
     name = "protobuf",
-    actual = "@raze__protobuf__2_23_0//:protobuf",
+    actual = "@raze__protobuf__2_24_1//:protobuf",
     tags = [
         "cargo-raze",
         "manual",
