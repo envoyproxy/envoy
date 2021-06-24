@@ -242,7 +242,7 @@ stages:
           CI_TARGET: "bazel.tsan"
         compile_time_options:
           CI_TARGET: "bazel.compile_time_options"
-    timeoutInMinutes: 120
+    timeoutInMinutes: 1200
     pool:
       vmImage: "ubuntu-18.04"
     steps:
