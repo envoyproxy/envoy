@@ -8,28 +8,15 @@ SYSTEM="$$(uname -s)"
 PLATFORM="$${SYSTEM}-$${ARCH}"
 
 detect::compiler() {
-  local out=$$(mktemp -d)
+  if ${CXX} --version 2>&1 | grep -q clang ; then
+    echo clang
+  fi
 
-  cat >$${out}/detect.cc <<EOF
-#include <stdio.h>
+  if ${CXX} --version 2>&1 | grep -q gcc ; then
+    echo gcc
+  fi
 
-// See https://sourceforge.net/p/predef/wiki/Compilers/
-
-int main(void)
-{
-#if __clang__
-    ::printf("clang\n");
-#elif __GNUC__
-    printf("gcc\n");
-#else
-    ::printf("unknown\n");
-#endif
-    return 0;
-}
-EOF
-
-  $${CXX} -o $${out}/detect $${out}/detect.cc
-  $${out}/detect
+  echo unknown
 }
 
 case $${PLATFORM} in
