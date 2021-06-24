@@ -409,8 +409,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
         selectedTransport = value;
       }
       if (!headerKey.startsWith(X_ANDROID) && !headerKey.startsWith(X_ENVOY) &&
-          !headerKey.equals("server") && !headerKey.equals("date") &&
-          !headerKey.equals(":status")) {
+          !headerKey.equals("date") && !headerKey.equals(":status")) {
         headerList.add(new SimpleEntry<>(headerKey.toLowerCase(), value));
       }
     }
