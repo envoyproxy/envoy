@@ -161,6 +161,14 @@ function run_ci_verify () {
           docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
       fi
   done
+
+  # this is a workaround to ensure that in release builds verify_examples
+  # tests the just built images
+  if ! docker images | grep -q envoy-dev; then
+      docker tag envoyproxy/envoy:latest envoyproxy/envoy-dev:latest
+      docker tag envoyproxy/envoy-alpine:latest envoyproxy/envoy-alpine-dev:latest
+  fi
+
   docker images
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
