@@ -3063,6 +3063,84 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSourceIPMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        # empty
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem" }
+    - filter_chain_match:
+        direct_source_prefix_ranges: { address_prefix: 192.168.0.1, prefix_len: 32 }
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+    - filter_chain_match:
+        direct_source_prefix_ranges: { address_prefix: 192.168.0.0, prefix_len: 16 }
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to default IP - using 1st filter chain.
+  auto filter_chain =
+      findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "127.0.0.1");
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
+
+  // IPv4 client connects to exact IP match - using 2nd filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.0.1");
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // IPv4 client connects to wildcard IP match - using 3rd filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "192.168.1.1");
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 2);
+  EXPECT_EQ(server_names.front(), "*.example.com");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNamesMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
