@@ -52,7 +52,7 @@ steps:
 
 - task: Cache@2
   inputs:
-    key: 'docker | envoy-build-minimal | v28'
+    key: 'docker | envoy-build-minimal | v29'
     path: $(Pipeline.Workspace)/docker
     cacheHitVar: DOCKER_CACHE_HIT
   displayName: Cache Docker images
