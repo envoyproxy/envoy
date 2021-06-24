@@ -21,7 +21,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
@@ -31,7 +31,9 @@ stages:
         docker build . -t envoyproxy/envoy-build-ubuntu:minimal
         cd ../envoy-build-upload
         docker build . -t envoyproxy/envoy-build-ubuntu:upload
-        docker save envoyproxy/envoy-build-ubuntu:minimal envoyproxy/envoy-build-ubuntu:upload | gzip > $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
+        cd ../envoy-build-upload
+        docker build . -t envoyproxy/envoy-build-ubuntu:build
+        docker save envoyproxy/envoy-build-ubuntu:build envoyproxy/envoy-build-ubuntu:minimal envoyproxy/envoy-build-ubuntu:upload | gzip > $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
       displayName: Create Docker image
       condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
 
@@ -42,7 +44,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
@@ -72,7 +74,7 @@ stages:
     steps:
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
@@ -108,7 +110,7 @@ stages:
       continueOnError: true
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
@@ -145,7 +147,7 @@ stages:
       continueOnError: true
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
@@ -184,7 +186,7 @@ stages:
       continueOnError: true
     - task: Cache@2
       inputs:
-        key: 'docker | envoy-build-minimal | v27'
+        key: 'docker | envoy-build-minimal | v28'
         path: $(Pipeline.Workspace)/docker
         cacheHitVar: DOCKER_CACHE_HIT
       displayName: Cache Docker images
