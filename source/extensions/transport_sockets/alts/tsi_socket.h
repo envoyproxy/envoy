@@ -130,7 +130,7 @@ public:
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

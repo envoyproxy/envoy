@@ -7,7 +7,7 @@ set -e
 
 build_setup_args=""
 if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" ]]; then
+          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -143,8 +143,12 @@ function bazel_binary_build() {
 }
 
 function run_process_test_result() {
-  echo "running flaky test reporting script"
-  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  if [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
+      echo "running flaky test reporting script"
+      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  else
+      echo "no flaky test results found"
+  fi
 }
 
 function run_ci_verify () {

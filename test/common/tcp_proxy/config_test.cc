@@ -911,7 +911,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   // override-server-name
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_TRUE(transport_socket_options->serverNameOverride().has_value());
@@ -941,7 +941,7 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   // override-application-protocol
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
-        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());

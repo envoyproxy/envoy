@@ -290,6 +290,7 @@ TEST_F(RdsImplTest, Basic) {
   // Old config use count should be 1 now.
   EXPECT_EQ(1, config.use_count());
   EXPECT_EQ(2UL, scope_.counter("foo.rds.foo_route_config.config_reload").value());
+  EXPECT_TRUE(scope_.findGaugeByString("foo.rds.foo_route_config.config_reload_time_ms"));
 }
 
 // validate there will be exception throw when unknown factory found for per virtualhost typed

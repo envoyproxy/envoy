@@ -86,6 +86,7 @@ private:
   COUNTER(config_reload)                                                                           \
   COUNTER(update_empty)                                                                            \
   GAUGE(all_scopes, Accumulate)                                                                    \
+  GAUGE(config_reload_time_ms, NeverImport)                                                        \
   GAUGE(on_demand_scopes, Accumulate)                                                              \
   GAUGE(active_scopes, Accumulate)
 
