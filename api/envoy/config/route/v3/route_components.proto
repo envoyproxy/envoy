@@ -311,7 +311,7 @@ message Route {
 message WeightedCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.WeightedCluster";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message ClusterWeight {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.WeightedCluster.ClusterWeight";
@@ -378,6 +378,13 @@ message WeightedCluster {
     // :ref:`FilterConfig<envoy_v3_api_msg_config.route.v3.FilterConfig>`
     // message to specify additional options.]
     map<string, google.protobuf.Any> typed_per_filter_config = 10;
+
+    oneof host_rewrite_specifier {
+      // Indicates that during forwarding, the host header will be swapped with
+      // this value.
+      string host_rewrite_literal = 11
+          [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+    }
   }
 
   // Specifies one or more upstream clusters associated with the route.

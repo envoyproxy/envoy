@@ -33,6 +33,25 @@ DnsCacheImpl::DnsCacheImpl(
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
       max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
+
+  if (static_cast<size_t>(config.preresolve_hostnames().size()) > max_hosts_) {
+    throw EnvoyException(fmt::format(
+        "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
+        config.name(), config.preresolve_hostnames().size(), max_hosts_));
+  }
+
+  // Preresolved hostnames are resolved without a read lock on primary hosts because it is done
+  // during object construction.
+  for (const auto& hostname : config.preresolve_hostnames()) {
+    // No need to get a resolution handle on this resolution as the only outcome needed is for the
+    // cache to load an entry. Further if this particular resolution fails all the is lost is the
+    // potential optimization of having the entry be preresolved the first time a true consumer of
+    // this DNS cache asks for it.
+    main_thread_dispatcher_.post(
+        [this, host = hostname.address(), default_port = hostname.port_value()]() {
+          startCacheLoad(host, default_port);
+        });
+  }
 }
 
 DnsCacheImpl::~DnsCacheImpl() {

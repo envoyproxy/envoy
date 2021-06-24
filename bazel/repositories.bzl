@@ -831,8 +831,18 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_lib_descriptor_reflection",
+        actual = "@upb//:descriptor_upb_proto_reflection",
+    )
+
+    native.bind(
         name = "upb_textformat_lib",
         actual = "@upb//:textformat",
+    )
+
+    native.bind(
+        name = "upb_json_lib",
+        actual = "@upb//:json",
     )
 
 def _upb():

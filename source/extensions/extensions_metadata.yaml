@@ -308,6 +308,11 @@ envoy.filters.network.client_ssl_auth:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.filters.network.connection_limit:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.filters.network.direct_response:
   categories:
   - envoy.filters.network
@@ -549,6 +554,11 @@ envoy.stat_sinks.dog_statsd:
   - envoy.stats_sinks
   security_posture: data_plane_agnostic
   status: stable
+envoy.stat_sinks.graphite_statsd:
+  categories:
+  - envoy.stats_sinks
+  security_posture: data_plane_agnostic
+  status: alpha
 envoy.stat_sinks.hystrix:
   categories:
   - envoy.stats_sinks
