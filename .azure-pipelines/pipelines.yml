@@ -282,7 +282,7 @@ stages:
       parameters:
         ciTarget: bazel.release
         imageID: build
-        llvmRoot: /usr/bin
+        llvmRoot: /usr
 
 - stage: linux_arm64
   dependsOn: ["precheck"]
