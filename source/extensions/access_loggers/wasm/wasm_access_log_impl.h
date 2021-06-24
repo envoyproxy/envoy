@@ -10,13 +10,13 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-using Common::Wasm::PluginHandleSharedPtrThreadLocalObject;
+using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
   WasmAccessLog(const PluginSharedPtr& plugin,
-                ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocalObject>&& tls_slot,
+                ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot,
                 AccessLog::FilterPtr filter)
       : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
 
@@ -38,14 +38,14 @@ public:
     }
   }
 
-  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocalObject>&& tls_slot) {
+  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot) {
     ASSERT(tls_slot_ == nullptr);
     tls_slot_ = std::move(tls_slot);
   }
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocalObject> tls_slot_;
+  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   AccessLog::FilterPtr filter_;
 };
 

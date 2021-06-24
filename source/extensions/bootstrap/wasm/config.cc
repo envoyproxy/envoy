@@ -39,10 +39,10 @@ void WasmServiceExtension::createWasm(Server::Configuration::ServerFactoryContex
     // Per-thread WASM VM.
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     auto tls_slot =
-        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocalObject>::makeUnique(
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
             context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::make_shared<Common::Wasm::PluginHandleSharedPtrThreadLocalObject>(
+      return std::make_shared<Common::Wasm::PluginHandleSharedPtrThreadLocal>(
           Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
     });
     wasm_service_ = std::make_unique<WasmService>(plugin, std::move(tls_slot));

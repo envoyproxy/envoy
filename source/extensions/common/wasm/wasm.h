@@ -154,9 +154,9 @@ private:
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
-class PluginHandleSharedPtrThreadLocalObject : public ThreadLocal::ThreadLocalObject {
+class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocalObject(PluginHandleSharedPtr handle) : handle_(handle){};
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
   PluginHandleSharedPtr& handle() { return handle_; }
 
 private:

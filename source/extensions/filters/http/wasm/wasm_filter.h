@@ -17,7 +17,7 @@ namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::Context;
 using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
-using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocalObject;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
 
@@ -46,7 +46,7 @@ public:
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocalObject> tls_slot_;
+  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
