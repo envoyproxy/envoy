@@ -33,7 +33,7 @@ stages:
         docker build . -t envoyproxy/envoy-build-ubuntu:upload
         docker save envoyproxy/envoy-build-ubuntu:minimal envoyproxy/envoy-build-ubuntu:upload | gzip > $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
       displayName: Create Docker image
-      # condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
+      condition: and(not(canceled()), or(failed(), ne(variables.DOCKER_CACHE_HIT, 'true')))
 
   - job: format_pre
     dependsOn: ["docker_cache"]
