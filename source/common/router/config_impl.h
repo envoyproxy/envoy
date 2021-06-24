@@ -771,6 +771,9 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       request_headers_parser_->evaluateHeaders(headers, stream_info);
+      if (!host_rewrite_.empty()) {
+        headers.setHost(host_rewrite_);
+      }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -791,6 +794,7 @@ private:
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
+    const std::string host_rewrite_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
