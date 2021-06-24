@@ -329,6 +329,8 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: $(CI_TARGET)
+        imageID: build
+        llvmRoot: /usr
 
   - job: coverage
     displayName: "linux_x64"
@@ -347,6 +349,8 @@ stages:
       parameters:
         managedAgent: false
         ciTarget: bazel.$(CI_TARGET)
+        imageID: build
+        llvmRoot: /usr
         rbe: false
         # /tmp/sandbox_base is a tmpfs in CI environment to optimize large I/O for coverage traces
         bazelBuildExtraOptions: "--define=no_debug_info=1 --linkopt=-Wl,-s --test_env=ENVOY_IP_TEST_VERSIONS=v4only --sandbox_base=/tmp/sandbox_base"
