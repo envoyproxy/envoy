@@ -16,6 +16,7 @@ RUN apt-get update \
             lsb-release \
             ninja-build \
             python3.8 \
+            python3.8-dev \
             python3.8-distutils \
             python3.8-venv \
             sudo \
