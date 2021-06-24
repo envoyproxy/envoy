@@ -50,7 +50,7 @@ stages:
         docker load < $(Pipeline.Workspace)/docker/envoy-build-minimal.tar.gz
       displayName: Restore Docker image
       condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'))
-    - script: IMAGE_ID=minimal ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
+    - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format_pre'
       workingDirectory: $(Build.SourcesDirectory)
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
@@ -267,7 +267,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -279,6 +279,7 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
+        imageID: minimal
 
 - stage: linux_arm64
   dependsOn: ["precheck"]
