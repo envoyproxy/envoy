@@ -256,7 +256,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ipp-crypto-ippcp_2021.2",
         urls = ["https://github.com/intel/ipp-crypto/archive/ippcp_2021.2.tar.gz"],
         release_date = "2021-04-19",
-        use_category = ["dataplane_core", "controlplane"],
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.private_key_providers.cryptomb"],
         cpe = "N/A",
     ),
     com_github_luajit_luajit = dict(
