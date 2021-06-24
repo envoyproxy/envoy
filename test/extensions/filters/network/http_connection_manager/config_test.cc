@@ -140,7 +140,7 @@ http_filters:
 
 // When deprecating v2, remove the old style "operation_name: egress" config
 // but retain the rest of the test.
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscDeprecatedConfig)) {
   TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 codec_type: http1
