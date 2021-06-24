@@ -62,7 +62,7 @@ steps:
   displayName: Restore Docker image
   # condition: and(not(canceled()), eq(variables.DOCKER_CACHE_HIT, 'true'), eq('${{ parameters.imageID }}', 'minimal'))
 
-- script: IMAGE_ID=${{ parameters.imageID }} ci/run_envoy_docker.sh 'LLVM_ROOT=${{ paramaters.llvmRoot }} ci/do_ci.sh ${{ parameters.ciTarget }}'
+- script: IMAGE_ID=${{ parameters.imageID }} ci/run_envoy_docker.sh 'LLVM_ROOT=${{ parameters.llvmRoot }} ci/do_ci.sh ${{ parameters.ciTarget }}'
   workingDirectory: $(Build.SourcesDirectory)
   env:
     ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
