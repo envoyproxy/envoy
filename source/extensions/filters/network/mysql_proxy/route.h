@@ -21,9 +21,13 @@ public:
   virtual ~Route() = default;
   /**
    * Return the connection pool manager of this cluster.
-   * @return connection pool manager
+   * @return thread local cluster which belong to this route
    */
   virtual Upstream::ThreadLocalCluster* upstream() PURE;
+  /**
+   * Return the name of this cluster.
+   * @return name of route.cluster
+   */
   virtual const std::string& name() PURE;
 };
 
@@ -39,7 +43,7 @@ public:
   virtual RouteSharedPtr upstreamPool(const std::string& db) PURE;
   /**
    * Returns a connection pool of default cluster.
-   * @return a handle to the connection pool.
+   * @return a handle to the catch_all connection pool.
    */
   virtual RouteSharedPtr defaultPool() PURE;
 };

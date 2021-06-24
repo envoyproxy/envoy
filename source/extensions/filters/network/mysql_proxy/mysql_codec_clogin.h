@@ -25,7 +25,7 @@ public:
   const std::vector<uint8_t>& getAuthResp() const { return auth_resp_; }
   const std::string& getDb() const { return db_; }
   const std::string& getAuthPluginName() const { return auth_plugin_name_; }
-  const std::vector<std::pair<std::string, std::string>> getConnectionAttribute() const {
+  const std::vector<std::pair<std::string, std::string>>& getConnectionAttribute() const {
     return conn_attr_;
   }
   bool isResponse41() const;

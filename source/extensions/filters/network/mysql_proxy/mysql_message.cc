@@ -50,13 +50,13 @@ ClientLogin MessageHelper::encodeSslUpgrade() {
 ServerGreeting MessageHelper::encodeGreeting(const std::vector<uint8_t>& seed,
                                              const std::string& auth_plugin_name) {
   ServerGreeting greet{};
+  // TODO(qinggniq) note these constants at the doc
   greet.setProtocol(MYSQL_PROTOCOL_10);
-  greet.setVersion("5.7.6");
+  greet.setVersion("envoy-5.7");
   greet.setAuthPluginData(seed);
   greet.setThreadId(10);
   greet.setServerCharset(DEFAULT_MYSQL_CHARSET);
   greet.setServerStatus(DEFALUT_MYSQL_SERVER_STATUS);
-
   greet.setServerCap(CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_PROTOCOL_41 |
                      CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION | CLIENT_CONNECT_WITH_DB);
   greet.setAuthPluginName(auth_plugin_name);
@@ -114,6 +114,10 @@ ErrMessage MessageHelper::authError(const std::string& username, const std::stri
 ErrMessage MessageHelper::dbError(const std::string& db) {
   return encodeErr(ER_ER_BAD_DB_ERROR, MYSQL_SQL_STATE_MARKER, "42000",
                    fmt::format("Unknown database {}", db));
+}
+
+ErrMessage MessageHelper::defaultError(std::string&& msg) {
+  return encodeErr(ER_UNKNOWN_ERROR, MYSQL_SQL_STATE_MARKER, "HY000", std::move(msg));
 }
 
 ClientSwitchResponse MessageHelper::encodeSwithResponse(const std::vector<uint8_t>& auth_resp) {

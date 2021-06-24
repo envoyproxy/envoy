@@ -63,8 +63,10 @@ enum class AuthMethod : uint8_t {
   ClearPassword
 };
 
+// Helper function collection of old_password
 struct OldPassword {
 public:
+  static std::vector<uint8_t> generateSeed();
   static std::vector<uint8_t> signature(const std::string& password,
                                         const std::vector<uint8_t>& seed);
   static std::vector<uint32_t> hash(const std::string& text) {
@@ -89,7 +91,9 @@ private:
   };
 };
 
+// Helper function collection of native_password
 struct NativePassword {
+  static std::vector<uint8_t> generateSeed();
   static std::vector<uint8_t> signature(const std::string& password,
                                         const std::vector<uint8_t>& seed);
 
@@ -105,12 +109,10 @@ struct NativePassword {
 
 /**
  * Auth helpers for auth MySQL client and server.
- * Now MySQL Proxy only support OldPassword and NativePassword auth method.
  */
 class AuthHelper {
 public:
   static AuthMethod authMethod(uint32_t cap, const std::string& auth_plugin_name);
-  static std::vector<uint8_t> generateSeed(int len);
 };
 
 } // namespace MySQLProxy

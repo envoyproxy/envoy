@@ -55,9 +55,7 @@ void MySQLTerminalFilter::onEvent(Network::ConnectionEvent event) {
       canceler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
       canceler_ = nullptr;
     }
-    if (upstream_conn_data_) {
-      upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    }
+    closeRemote();
     read_callbacks_ = nullptr;
   }
 }
@@ -66,9 +64,8 @@ void MySQLTerminalFilter::UpstreamEventHandler::onEvent(Network::ConnectionEvent
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_LOG(debug, "upstream connection closed");
-    if (parent.read_callbacks_) {
-      parent.closeLocal();
-    }
+    parent.closeLocal();
+    parent.upstream_conn_data_ = nullptr;
     parent.canceler_ = nullptr;
   }
 }
@@ -113,11 +110,9 @@ void MySQLTerminalFilter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason r
   closeLocal();
 }
 
-void MySQLTerminalFilter::initUpstreamAuthInfo(Upstream::ThreadLocalCluster* cluster,
-                                               const std::string& db) {
+void MySQLTerminalFilter::initUpstreamAuthInfo(Upstream::ThreadLocalCluster* cluster) {
   upstream_username_ = ProtocolOptionsConfigImpl::authUsername(cluster->info(), api_);
   upstream_password_ = ProtocolOptionsConfigImpl::authPassword(cluster->info(), api_);
-  connect_db_ = db;
 }
 void MySQLTerminalFilter::initDownstreamAuthInfo(const std::string& username,
                                                  const std::string& password) {
@@ -149,13 +144,15 @@ Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& buffer, bool
 }
 
 void MySQLTerminalFilter::sendLocal(const MySQLCodec& message) {
-  auto buffer = message.encodePacket();
+  Buffer::OwnedImpl buffer;
+  message.encodePacket(buffer);
   ENVOY_LOG(debug, "send data to client, len {}", buffer.length());
   read_callbacks_->connection().write(buffer, false);
 }
 
 void MySQLTerminalFilter::sendRemote(const MySQLCodec& message) {
-  auto buffer = message.encodePacket();
+  Buffer::OwnedImpl buffer;
+  message.encodePacket(buffer);
   ENVOY_LOG(debug, "send data to server, len {}", buffer.length());
   upstream_conn_data_->connection().write(buffer, false);
 }
@@ -192,31 +189,38 @@ void MySQLTerminalFilter::stepRemoteSession(uint8_t expected_seq,
 
 void MySQLTerminalFilter::closeLocal() {
   if (read_callbacks_) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    // if there are any error information, we need to notify client
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
 void MySQLTerminalFilter::closeRemote() {
   if (upstream_conn_data_) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    upstream_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
-void MySQLTerminalFilter::onFailure(const ErrMessage& err) {
-  auto buffer = err.encodePacket();
+void MySQLTerminalFilter::onFailure(ErrMessage& err, uint8_t seq) {
+  config_->stats_.login_failures_.inc();
+  err.setSeq(seq);
+  Buffer::OwnedImpl buffer;
+  err.encodePacket(buffer);
   read_callbacks_->connection().write(buffer, false);
   closeLocal();
+  closeRemote();
 }
 
-void MySQLTerminalFilter::DownstreamEventHandler::onAuthSucc(const OkMessage& ok) {
-  ENVOY_LOG(debug, "downstream auth ok, wait for upstream connection ready");
+void MySQLTerminalFilter::DownstreamEventHandler::onBothAuthSucc() {
+  ASSERT(pending_response.has_value());
+  ENVOY_LOG(debug, "downstream/upstream auth ok, notify client to command phase");
   parent.stepLocalSession(MYSQL_REQUEST_PKT_NUM, MySQLSession::State::Req);
-  parent.sendLocal(ok);
+  parent.sendLocal(pending_response.value());
+  pending_response.reset();
 }
 
 absl::optional<ErrMessage>
 MySQLTerminalFilter::DownstreamEventHandler::checkAuth(const std::string& name,
-                                                       const std::vector<uint8_t>& login,
+                                                       const std::vector<uint8_t>& sig,
                                                        const std::vector<uint8_t>& expect_sig) {
 
   if (parent.downstream_username_ != name) {
@@ -225,12 +229,12 @@ MySQLTerminalFilter::DownstreamEventHandler::checkAuth(const std::string& name,
         name, parent.read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
         true);
   }
-  if (login.size() != expect_sig.size()) {
+  if (sig.size() != expect_sig.size()) {
     ENVOY_LOG(info, "filter: password length error of client login, expected {}, got {}",
-              expect_sig.size(), login.size());
-    return MessageHelper::passwordLengthError(login.size());
+              expect_sig.size(), sig.size());
+    return MessageHelper::passwordLengthError(sig.size());
   }
-  if (expect_sig != login) {
+  if (expect_sig != sig) {
     ENVOY_LOG(info, "filter: password is not correct");
     return MessageHelper::authError(
         name, parent.read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
@@ -241,8 +245,7 @@ MySQLTerminalFilter::DownstreamEventHandler::checkAuth(const std::string& name,
 
 Network::FilterStatus MySQLTerminalFilter::onNewConnection() {
   MySQLMonitorFilter::onNewConnection();
-  downstream_event_handler_->seed = AuthHelper::generateSeed(NativePassword::SEED_LENGTH);
-  // send local packet
+  downstream_event_handler_->seed = NativePassword::generateSeed();
   auto packet = MessageHelper::encodeGreeting(downstream_event_handler_->seed);
   packet.setSeq(0);
   sendLocal(packet);
@@ -255,20 +258,24 @@ void MySQLTerminalFilter::DownstreamEventHandler::onNewMessage(MySQLSession::Sta
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onServerGreeting(ServerGreeting&) {
-  ENVOY_LOG(error, "mysql filter: onMoreClientLoginResponse impossible callback is called");
+  ENVOY_LOG(error,
+            "mysql filter: downstream impossible callback onMoreClientLoginResponse is called");
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onClientLogin(ClientLogin& login) {
   parent.onClientLogin(login);
+
   if (login.isSSLRequest()) {
     ENVOY_LOG(info, "communication failure due to proxy not support ssl upgrade");
-    parent.closeLocal();
+    auto err = MessageHelper::defaultError("envoy mysql proxy is now not support ssl");
+    parent.onFailure(err, login.getSeq() + 1);
     return;
   }
   ENVOY_LOG(debug, "user {} try to login into database {}", login.getUsername(), login.getDb());
 
   auto auth_method = AuthHelper::authMethod(login.getClientCap(), login.getAuthPluginName());
   absl::optional<ErrMessage> err;
+  parent.connect_db_ = login.getDb();
   switch (auth_method) {
   case AuthMethod::OldPassword:
     err = checkAuth(login.getUsername(), login.getAuthResp(),
@@ -284,45 +291,14 @@ void MySQLTerminalFilter::DownstreamEventHandler::onClientLogin(ClientLogin& log
     auto auth_switch = MessageHelper::encodeAuthSwitch(seed);
     auth_switch.setSeq(login.getClientCap() + 1);
     parent.sendLocal(auth_switch);
-    parent.stepLocalSession(auth_switch.getSeq() + 1, MySQLSession::State::AuthSwitchResp);
+    parent.stepLocalSession(login.getClientCap() + 2, MySQLSession::State::AuthSwitchResp);
     return;
   }
   if (err.has_value()) {
-    err.value().setSeq(login.getSeq() + 1);
-    parent.onFailure(err.value());
+    parent.onFailure(err.value(), login.getSeq() + 1);
     return;
   }
-
-  RouteSharedPtr route;
-  if (login.getClientCap() & CLIENT_CONNECT_WITH_DB) {
-    route = parent.router_->upstreamPool(login.getDb());
-  } else {
-    route = parent.router_->defaultPool();
-  }
-  if (route == nullptr) {
-    ENVOY_LOG(info, "closed due to there is no cluster in route");
-    parent.closeLocal();
-    return;
-  }
-  auto cluster = route->upstream();
-  if (cluster == nullptr) {
-    ENVOY_LOG(info, "closed due to there is no cluster");
-    parent.closeLocal();
-    return;
-  }
-  auto pool = cluster->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
-
-  if (!pool.has_value()) {
-    ENVOY_LOG(info, "closed due to there is no host in cluster {}", cluster->info()->name());
-    parent.closeLocal();
-    return;
-  }
-  parent.initUpstreamAuthInfo(cluster, login.getDb());
-  parent.canceler_ = pool->newConnection(parent);
-
-  auto ok = MessageHelper::encodeOk();
-  ok.setSeq(login.getSeq() + 1);
-  onAuthSucc(ok);
+  tryConnectUpstream(login.getSeq() + 1);
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onClientLoginResponse(ClientLoginResponse&) {
@@ -335,13 +311,46 @@ void MySQLTerminalFilter::DownstreamEventHandler::onClientSwitchResponse(
   auto err = checkAuth(parent.downstream_username_, switch_resp.getAuthPluginResp(),
                        NativePassword::signature(parent.downstream_password_, seed));
   if (err.has_value()) {
-    err.value().setSeq(switch_resp.getSeq() + 1);
-    parent.onFailure(err.value());
+    parent.onFailure(err.value(), switch_resp.getSeq() + 1);
     return;
   }
+  tryConnectUpstream(switch_resp.getSeq() + 1);
+}
+
+void MySQLTerminalFilter::DownstreamEventHandler::tryConnectUpstream(uint8_t seq) {
+  RouteSharedPtr route = parent.router_->upstreamPool(parent.connect_db_);
+  if (route == nullptr) {
+    route = parent.router_->defaultPool();
+  }
+  if (route == nullptr) {
+    ENVOY_LOG(info, "closed due to there is no suitable cluster in route");
+    auto err = MessageHelper::dbError(parent.connect_db_);
+    parent.onFailure(err, seq);
+    return;
+  }
+  auto cluster = route->upstream();
+  if (cluster == nullptr) {
+    ENVOY_LOG(info, "closed due to there is no cluster");
+    auto err = MessageHelper::defaultError(
+        fmt::format("cluster {} is not exists in envoy", route->name()));
+    parent.onFailure(err, seq);
+    return;
+  }
+  auto pool = cluster->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
+
+  if (!pool.has_value()) {
+    ENVOY_LOG(info, "closed due to there is no host in cluster {}", cluster->info()->name());
+    auto err =
+        MessageHelper::defaultError(fmt::format("there is no host in cluster {}", route->name()));
+    parent.onFailure(err, seq);
+    return;
+  }
+  parent.initUpstreamAuthInfo(cluster);
+  parent.canceler_ = pool->newConnection(parent);
   auto ok = MessageHelper::encodeOk();
-  ok.setSeq(switch_resp.getSeq() + 1);
-  onAuthSucc(ok);
+  ok.setSeq(seq);
+  // wait upstream connection ready
+  pending_response = ok;
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onMoreClientLoginResponse(
@@ -354,6 +363,7 @@ void MySQLTerminalFilter::DownstreamEventHandler::onMoreClientLoginResponse(
 void MySQLTerminalFilter::DownstreamEventHandler::onCommand(Command& command) {
   ASSERT(parent.upstream_event_handler_ != nullptr);
   parent.onCommand(command);
+
   parent.sendRemote(command);
 
   if (command.getCmd() == Command::Cmd::Quit) {
@@ -374,7 +384,6 @@ void MySQLTerminalFilter::UpstreamEventHandler::onNewMessage(MySQLSession::State
   if (state == MySQLSession::State::NotHandled || state == MySQLSession::State::Error) {
     ENVOY_LOG(info, "connection closed due to unexpected state occurs on communication");
     parent.closeRemote();
-    // read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
@@ -390,10 +399,10 @@ void MySQLTerminalFilter::UpstreamEventHandler::onServerGreeting(ServerGreeting&
   seed = greet.getAuthPluginData();
   auto login = MessageHelper::encodeClientLogin(
       auth_method, parent.upstream_username_, parent.upstream_password_, parent.connect_db_, seed);
-
   login.setSeq(greet.getSeq() + 1);
+
   parent.sendRemote(login);
-  parent.stepRemoteSession(login.getSeq() + 1, MySQLSession::State::ChallengeResp41);
+  parent.stepRemoteSession(greet.getSeq() + 2, MySQLSession::State::ChallengeResp41);
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onClientLogin(ClientLogin&) {
@@ -401,6 +410,7 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLogin(ClientLogin&) {
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onAuthSucc() {
+  parent.downstream_event_handler_->onBothAuthSucc();
   ready = true;
   parent.stepRemoteSession(MYSQL_RESPONSE_PKT_NUM, MySQLSession::State::ReqResp);
   if (parent.downstream_event_handler_->buffer.length()) {
@@ -412,14 +422,18 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
     ClientLoginResponse& login_resp) {
   parent.onClientLoginResponse(login_resp);
 
+  absl::optional<ErrMessage> err;
+
   switch (login_resp.getRespCode()) {
   case MYSQL_RESP_AUTH_SWITCH: {
     auto& auth_switch = dynamic_cast<AuthSwitchMessage&>(login_resp);
     if (!auth_switch.isOldAuthSwitch() &&
         auth_switch.getAuthPluginName() != "mysql_native_password") {
       ENVOY_LOG(info, "auth plugin {} is not supported", auth_switch.getAuthPluginName());
-      parent.closeRemote();
-      return;
+      err = MessageHelper::defaultError(
+          "mysql proxy is failed to auth to upstream due to auth plugin is not support (now "
+          "support mysql_native_password, mysql_old_password)");
+      break;
     }
     auto auth_method =
         auth_switch.isOldAuthSwitch() ? AuthMethod::OldPassword : AuthMethod::NativePassword;
@@ -430,22 +444,30 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
                                          parent.upstream_password_, parent.connect_db_, seed);
     switch_resp.setSeq(login_resp.getSeq() + 1);
     parent.sendRemote(switch_resp);
-    parent.stepRemoteSession(switch_resp.getSeq() + 1, MySQLSession::State::AuthSwitchMore);
-    return;
+    parent.stepRemoteSession(login_resp.getSeq() + 2, MySQLSession::State::AuthSwitchMore);
+    break;
   }
   case MYSQL_RESP_OK:
     onAuthSucc();
-    return;
+    break;
   case MYSQL_RESP_ERR:
     ENVOY_LOG(info, "mysql proxy failed of auth, info {}",
               dynamic_cast<ErrMessage&>(login_resp).getErrorMessage());
-    parent.closeRemote();
-    return;
+    err = MessageHelper::defaultError(
+        fmt::format("mysql proxy is failed to auth upstream database server due to {}",
+                    dynamic_cast<ErrMessage&>(login_resp).getErrorMessage()));
+    break;
   case MYSQL_RESP_MORE:
   default:
     ENVOY_LOG(info, "unhandled message resp code {}", login_resp.getRespCode());
-    parent.closeRemote();
-    return;
+    err = MessageHelper::defaultError(fmt::format("mysql proxy is failed to auth upstream database "
+                                                  "server due to unhandled message resp code {}",
+                                                  login_resp.getRespCode()));
+    break;
+  }
+  if (err.has_value()) {
+    // send error message to client when proxy auth error
+    parent.onFailure(err.value(), parent.downstream_event_handler_->pending_response->getSeq());
   }
 }
 
@@ -456,21 +478,31 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientSwitchResponse(ClientSwi
 void MySQLTerminalFilter::UpstreamEventHandler::onMoreClientLoginResponse(
     ClientLoginResponse& resp) {
   parent.onMoreClientLoginResponse(resp);
+
+  absl::optional<ErrMessage> err;
+
   switch (resp.getRespCode()) {
   case MYSQL_RESP_MORE:
   case MYSQL_RESP_OK:
     onAuthSucc();
-    return;
+    break;
   case MYSQL_RESP_ERR:
     ENVOY_LOG(info, "mysql proxy failed of auth, info {} ",
               dynamic_cast<ErrMessage&>(resp).getErrorMessage());
-    parent.closeRemote();
-    return;
+    err = MessageHelper::defaultError(
+        fmt::format("mysql proxy is failed to auth upstream database server due to {}",
+                    dynamic_cast<ErrMessage&>(resp).getErrorMessage()));
+    break;
   case MYSQL_RESP_AUTH_SWITCH:
   default:
     ENVOY_LOG(info, "unhandled message resp code {}", resp.getRespCode());
-    parent.closeRemote();
-    return;
+    err = MessageHelper::defaultError(fmt::format("mysql proxy is failed to auth upstream database "
+                                                  "server due to unhandled message resp code {}",
+                                                  resp.getRespCode()));
+    break;
+  }
+  if (err.has_value()) {
+    parent.onFailure(err.value(), parent.downstream_event_handler_->pending_response->getSeq());
   }
 }
 

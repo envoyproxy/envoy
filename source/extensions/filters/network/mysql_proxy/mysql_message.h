@@ -35,6 +35,7 @@ public:
   static ErrMessage authError(const std::string& username, const std::string& destination,
                               bool using_password);
   static ErrMessage dbError(const std::string& db);
+  static ErrMessage defaultError(std::string&&);
   static ClientSwitchResponse encodeSwithResponse(const std::vector<uint8_t>& auth_resp);
   static Command encodeCommand(Command::Cmd cmd, const std::string& data, const std::string db,
                                bool is_query);

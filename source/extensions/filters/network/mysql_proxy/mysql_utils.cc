@@ -220,12 +220,6 @@ DecodeStatus BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint
   return DecodeStatus::Success;
 }
 
-std::vector<uint8_t> AuthHelper::generateSeed(int len) {
-  std::vector<uint8_t> res(len);
-  RAND_bytes(res.data(), len);
-  return res;
-}
-
 AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_name) {
 
   if (auth_plugin_name.empty()) {
@@ -279,6 +273,12 @@ std::vector<uint8_t> OldPassword::signature(const std::string& password,
   return to;
 }
 
+std::vector<uint8_t> NativePassword::generateSeed() {
+  std::vector<uint8_t> res(SEED_LENGTH);
+  RAND_bytes(res.data(), SEED_LENGTH);
+  return res;
+}
+
 std::vector<uint8_t> NativePassword::signature(const std::string& password,
                                                const std::vector<uint8_t>& seed) {
   auto hashstage1 = hash(password);
@@ -304,6 +304,12 @@ std::vector<uint8_t> NativePassword::hash(const char* text, int size) {
   rc = EVP_DigestFinal(ctx.get(), result.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   return result;
+}
+
+std::vector<uint8_t> OldPassword::generateSeed() {
+  std::vector<uint8_t> res(SEED_LENGTH);
+  RAND_bytes(res.data(), SEED_LENGTH);
+  return res;
 }
 
 std::vector<uint32_t> OldPassword::hash(const char* text, int size) {

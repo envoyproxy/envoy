@@ -166,7 +166,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
     // length of all key value pairs
     uint64_t kvs_len;
     if (BufferHelper::readLengthEncodedInteger(buffer, kvs_len) != DecodeStatus::Success) {
-      ENVOY_LOG(debug, "error when parsing length of all key-values in connect attributions of "
+      ENVOY_LOG(debug, "error when parsing length of all key-values in connection attributes of "
                        "client login message");
       return DecodeStatus::Failure;
     }
@@ -174,26 +174,28 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       uint64_t str_len;
       uint64_t prev_len = buffer.length();
       if (BufferHelper::readLengthEncodedInteger(buffer, str_len) != DecodeStatus::Success) {
-        ENVOY_LOG(debug,
-                  "error when parsing length of conn contribute key in connect attributions of "
-                  "client login message");
+        ENVOY_LOG(
+            debug,
+            "error when parsing length of connection attribute key in connection attributes of "
+            "client login message");
         return DecodeStatus::Failure;
       }
       std::string key;
       if (BufferHelper::readStringBySize(buffer, str_len, key) != DecodeStatus::Success) {
-        ENVOY_LOG(debug, "error when parsing conn contribute key in connect attributions of "
+        ENVOY_LOG(debug, "error when parsing connection attribute key in connection attributes of "
                          "client login message");
         return DecodeStatus::Failure;
       }
       if (BufferHelper::readLengthEncodedInteger(buffer, str_len) != DecodeStatus::Success) {
-        ENVOY_LOG(debug,
-                  "error when parsing length of conn contribute value in connect attributions of "
-                  "client login message");
+        ENVOY_LOG(
+            debug,
+            "error when parsing length of connection attribute value in connection attributes of "
+            "client login message");
         return DecodeStatus::Failure;
       }
       std::string val;
       if (BufferHelper::readStringBySize(buffer, str_len, val) != DecodeStatus::Success) {
-        ENVOY_LOG(debug, "error when parsing conn contribute val in connect attributions of "
+        ENVOY_LOG(debug, "error when parsing connection attribute val in connection attributes of "
                          "client login message");
         return DecodeStatus::Failure;
       }
@@ -201,7 +203,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       kvs_len -= prev_len - buffer.length();
     }
   }
-  ENVOY_LOG(debug, "parse client login protocol 41, comsumed len {}, remain {}",
+  ENVOY_LOG(debug, "parse client login protocol 41, consumed len {}, remain {}",
             total - buffer.length(), buffer.length());
   return DecodeStatus::Success;
 }

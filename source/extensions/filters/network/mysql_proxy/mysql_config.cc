@@ -44,15 +44,13 @@ NetworkFilters::MySQLProxy::MySQLConfigFactory::createFilterFactoryFromProtoType
 
   absl::flat_hash_map<std::string, RouteSharedPtr> routes;
   RouteSharedPtr catch_all_route = nullptr;
-  if (proto_config.has_database_routes()) {
-    for (const auto& route : proto_config.database_routes().routes()) {
-      routes.emplace(route.database(),
-                     RouteFactoryImpl::instance.create(&context.clusterManager(), route.cluster()));
-    }
-    if (proto_config.database_routes().has_catch_all_route()) {
-      catch_all_route = RouteFactoryImpl::instance.create(
-          &context.clusterManager(), proto_config.database_routes().catch_all_route().cluster());
-    }
+  for (const auto& route : proto_config.database_routes().routes()) {
+    routes.emplace(route.database(),
+                   RouteFactoryImpl::instance.create(&context.clusterManager(), route.cluster()));
+  }
+  if (proto_config.database_routes().has_catch_all_route()) {
+    catch_all_route = RouteFactoryImpl::instance.create(
+        &context.clusterManager(), proto_config.database_routes().catch_all_route().cluster());
   }
 
   auto router = std::make_shared<RouterImpl>(catch_all_route, std::move(routes));
