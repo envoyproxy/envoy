@@ -281,7 +281,7 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: bazel.release
-        imageID: minimal
+        imageID: build
         llvmRoot: /usr/bin
 
 - stage: linux_arm64
