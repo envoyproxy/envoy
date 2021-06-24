@@ -1001,6 +1001,20 @@ value:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  MessageUtil::redact(actual);
+  udpa::type::v1::TypedStruct expected = actual;
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
+  ProtobufWkt::Any actual;
+  MessageUtil::redact(actual);
+  ProtobufWkt::Any expected = actual;
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Deeply-nested opaque protos (`Any` and `TypedStruct`), which are reified using the
 // `DynamicMessageFactory`, should be redacted correctly.
 TEST_F(ProtobufUtilityTest, RedactDeeplyNestedOpaqueProtos) {

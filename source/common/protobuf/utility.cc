@@ -774,9 +774,9 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   const auto* reflection = message->GetReflection();
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
-  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
-         reflection->HasField(*message, type_url_field_descriptor));
-  if (!reflection->HasField(*message, value_field_descriptor)) {
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
+  if (!reflection->HasField(*message, type_url_field_descriptor) ||
+      !reflection->HasField(*message, value_field_descriptor)) {
     return true;
   }
 
