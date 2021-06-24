@@ -1,7 +1,5 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
-// doesnotexist
-
 #include <chrono>
 #include <memory>
 #include <string>
