@@ -82,8 +82,9 @@ TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler* reset_han
   return account;
 }
 
-void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account) {
-  WatermarkBufferFactory::unregisterAccount(account);
+void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                                                      int current_class) {
+  WatermarkBufferFactory::unregisterAccount(account, current_class);
   absl::MutexLock lock(&mutex_);
   ++total_accounts_unregistered_;
 }

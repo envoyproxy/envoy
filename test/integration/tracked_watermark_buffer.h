@@ -68,7 +68,7 @@ public:
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
-  void unregisterAccount(const BufferMemoryAccountSharedPtr& account) override;
+  void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;
@@ -137,7 +137,8 @@ public:
   // This differs from inspectAccounts as that has all accounts bounded to an
   // active buffer, while this might not track certain accounts (e.g. below
   // thresholds.) As implemented this is NOT thread-safe!
-  void inspectMemoryClasses(std::function<void(MemoryClassesToAccountsSet&)> func);
+  void inspectMemoryClasses(
+      std::function<void(WatermarkBufferFactory::MemoryClassesToAccountsSet&)> func);
 
 private:
   // Remove "dangling" accounts; accounts where the account_info map is the only

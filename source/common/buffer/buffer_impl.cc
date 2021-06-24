@@ -588,45 +588,5 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
   return slices;
 }
 
-BufferMemoryAccountSharedPtr
-BufferMemoryAccountImpl::createAccount(WatermarkFactory* factory,
-                                       Http::StreamResetHandler* reset_handler) {
-  // We use shared_ptr ctor directly rather than make shared since the
-  // constructor being invoked is private as we want users to use this static
-  // method to createAccounts.
-  auto account =
-      std::shared_ptr<BufferMemoryAccount>(new BufferMemoryAccountImpl(factory, reset_handler));
-  // Set shared_this_ in the account.
-  static_cast<BufferMemoryAccountImpl*>(account.get())->shared_this_ = account;
-  return account;
-}
-
-void BufferMemoryAccountImpl::credit(uint64_t amount) {
-  ASSERT(buffer_memory_allocated_ >= amount);
-  uint64_t prior_balance = buffer_memory_allocated_;
-  buffer_memory_allocated_ -= amount;
-  if (shared_this_) {
-    factory_->onAccountBalanceUpdate(shared_this_, prior_balance);
-  }
-}
-
-void BufferMemoryAccountImpl::charge(uint64_t amount) {
-  // Check overflow
-  ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
-  uint64_t prior_balance = buffer_memory_allocated_;
-  buffer_memory_allocated_ += amount;
-  if (shared_this_) {
-    factory_->onAccountBalanceUpdate(shared_this_, prior_balance);
-  }
-}
-
-void BufferMemoryAccountImpl::clearDownstream() {
-  ASSERT(reset_handler_ != nullptr);
-  reset_handler_ = nullptr;
-
-  factory_->unregisterAccount(shared_this_);
-  shared_this_ = nullptr;
-}
-
 } // namespace Buffer
 } // namespace Envoy

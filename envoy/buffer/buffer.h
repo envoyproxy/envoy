@@ -117,6 +117,7 @@ public:
 
   /**
    * Clears the associated downstream with this account.
+   * After this has been called, calls to reset the downstream become no-ops.
    */
   virtual void clearDownstream() PURE;
 
@@ -126,7 +127,7 @@ public:
    *
    * @param reason the reason for reseting the stream.
    */
-  virtual void resetStream(Http::StreamResetReason reason) PURE;
+  virtual void resetDownstream(Http::StreamResetReason reason) PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
@@ -525,18 +526,6 @@ public:
    * @return a BufferMemoryAccountSharedPtr of the newly created account.
    */
   virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) PURE;
-
-  /**
-   * Called by buffer memory accounts created by the factory on balance
-   * changes.
-   */
-  virtual void onAccountBalanceUpdate(const BufferMemoryAccountSharedPtr& account,
-                                      uint64_t prior_balance) PURE;
-
-  /**
-   * Unregister a buffer memory account.
-   */
-  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

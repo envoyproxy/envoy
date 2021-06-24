@@ -145,61 +145,99 @@ WatermarkBufferFactory::createAccount(Http::StreamResetHandler* reset_handler) {
   return BufferMemoryAccountImpl::createAccount(this, reset_handler);
 }
 
-void WatermarkBufferFactory::onAccountBalanceUpdate(const BufferMemoryAccountSharedPtr& account,
-                                                    uint64_t prior_balance) {
-
-  int prev_idx = accountBalanceToClassIndex(prior_balance);
-  int new_idx = accountBalanceToClassIndex(account->balance());
-
-  // No need for update, the expected common case.
-  if (prev_idx == new_idx) {
-    return;
-  }
+void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedPtr& account,
+                                                int current_class, int new_class) {
+  ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
   // Take out of prior bucket if previously tracked.
   BufferMemoryAccountSharedPtr account_in_bucket = nullptr;
-
-  if (prev_idx >= 0) {
-    ASSERT(size_class_account_sets_[prev_idx].contains(account));
+  if (current_class >= 0) {
+    ASSERT(size_class_account_sets_[current_class].contains(account));
     // Extract to reuse the existing shared_ptr
-    account_in_bucket = std::move(size_class_account_sets_[prev_idx].extract(account).value());
+    account_in_bucket = std::move(size_class_account_sets_[current_class].extract(account).value());
   }
 
   // Place into new bucket if will track
-  if (new_idx >= 0) {
-    ASSERT(!size_class_account_sets_[new_idx].contains(account));
+  if (new_class >= 0) {
+    ASSERT(!size_class_account_sets_[new_class].contains(account));
     if (account_in_bucket == nullptr) {
-      size_class_account_sets_[new_idx].insert(account);
+      size_class_account_sets_[new_class].insert(account);
     } else {
-      size_class_account_sets_[new_idx].insert(std::move(account_in_bucket));
+      size_class_account_sets_[new_class].insert(std::move(account_in_bucket));
     }
   }
 }
 
-void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account) {
-  int idx = accountBalanceToClassIndex(account->balance());
-  if (idx >= 0) {
-    ASSERT(size_class_account_sets_[idx].contains(account));
-    size_class_account_sets_[idx].erase(account);
+void WatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                                               int current_class) {
+  if (current_class >= 0) {
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    size_class_account_sets_[current_class].erase(account);
   }
 }
 
-int WatermarkBufferFactory::accountBalanceToClassIndex(uint64_t balance) {
-  uint64_t shifted_balance = balance >> 20; // shift by 1MB.
+WatermarkBufferFactory::~WatermarkBufferFactory() {
+  for (auto& account_set : size_class_account_sets_) {
+    ASSERT(account_set.empty(),
+           "Expected all Accounts to have unregistered from the Watermark Factory.");
+  }
+}
+
+BufferMemoryAccountSharedPtr
+BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
+                                       Http::StreamResetHandler* reset_handler) {
+  // We use shared_ptr ctor directly rather than make shared since the
+  // constructor being invoked is private as we want users to use this static
+  // method to createAccounts.
+  auto account =
+      std::shared_ptr<BufferMemoryAccount>(new BufferMemoryAccountImpl(factory, reset_handler));
+  // Set shared_this_ in the account.
+  static_cast<BufferMemoryAccountImpl*>(account.get())->shared_this_ = account;
+  return account;
+}
+
+int BufferMemoryAccountImpl::balanceToClassIndex() {
+  uint64_t shifted_balance = buffer_memory_allocated_ >> 20; // shift by 1MB.
 
   if (shifted_balance == 0) {
     return -1; // Not worth tracking anything < 1MB.
   }
-  int class_idx = 0;
-  shifted_balance >>= 1;
 
-  const int last_idx = size_class_account_sets_.size() - 1;
-  while (shifted_balance > 0 && class_idx < last_idx) {
-    shifted_balance >>= 1;
-    ++class_idx;
+  const int class_idx = absl::bit_width(shifted_balance) - 1;
+  // TODO(kbaichoo): get rid of magic numbers (size_class_account_sets_.size() -
+  // 1)
+  return std::min<int>(class_idx, 7);
+}
+
+void BufferMemoryAccountImpl::credit(uint64_t amount) {
+  ASSERT(buffer_memory_allocated_ >= amount);
+  buffer_memory_allocated_ -= amount;
+
+  const int new_class = balanceToClassIndex();
+  if (shared_this_ && new_class != current_bucket_idx_) {
+    factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
+    current_bucket_idx_ = new_class;
   }
+}
 
-  return class_idx;
+void BufferMemoryAccountImpl::charge(uint64_t amount) {
+  // Check overflow
+  ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
+  buffer_memory_allocated_ += amount;
+
+  const int new_class = balanceToClassIndex();
+  if (shared_this_ && new_class != current_bucket_idx_) {
+    factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
+    current_bucket_idx_ = new_class;
+  }
+}
+
+void BufferMemoryAccountImpl::clearDownstream() {
+  ASSERT(reset_handler_ != nullptr);
+  reset_handler_ = nullptr;
+
+  factory_->unregisterAccount(shared_this_, current_bucket_idx_);
+  shared_this_ = nullptr;
 }
 
 } // namespace Buffer

@@ -14,6 +14,8 @@ namespace {
 
 using testing::_;
 
+using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>, 8>;
+
 constexpr uint64_t kMinimumBalanceToTrack = 1024 * 1024;
 constexpr uint64_t kThresholdForFinalBucket = 128 * 1024 * 1024;
 
@@ -343,7 +345,7 @@ TEST_F(BufferMemoryAccountTest, AccountCanResetStream) {
   auto account = factory_.createAccount(&mock_reset_handler_);
 
   EXPECT_CALL(mock_reset_handler_, resetStream(_));
-  account->resetStream(Http::StreamResetReason::LocalReset);
+  account->resetDownstream(Http::StreamResetReason::LocalReset);
 }
 
 TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases) {
@@ -354,7 +356,8 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases)
     EXPECT_EQ(memory_classes_to_account[0].size(), 1);
   });
 
-  for (int i = 0; i < memory_classes_to_account.size() - 1; ++i) {
+  // TODO(kbaichoo): avoid magic numbers (size of set - 1)
+  for (int i = 0; i < 8 - 1; ++i) {
     // Double the balance to enter the higher buckets.
     account->charge(account->balance());
     factory_.inspectMemoryClasses([i](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -374,7 +377,8 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases)
     EXPECT_EQ(memory_classes_to_account[7].size(), 1);
   });
 
-  const int second_largest_index = memory_classes_to_account.size() - 2;
+  // TODO(kbaichoo): UN magic number this.
+  const int second_largest_index = 6;
 
   for (int i = second_largest_index; i > 0; --i) {
     // Halve the balance to enter the lower buckets.
