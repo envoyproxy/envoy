@@ -170,6 +170,10 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
             ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME ||
         (!request_headers.Scheme() && !request_headers.ForwardedProto())) {
       request_headers.setScheme(config.schemeToSet().value().get());
+      if (!request_headers.getForwardedProtoValue().empty() &&
+          request_headers.getForwardedProtoValue() != request_headers.getSchemeValue()) {
+        request_headers.setForwardedProto(request_headers.getSchemeValue());
+      }
     }
   }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,

@@ -77,6 +77,7 @@ message HttpConnectionManager {
     // Overwrite any Scheme header with the contents of
     // :ref:`scheme
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`.
+    // Any non-matching x-forwarded-proto header will be updated to the configured scheme.
     OVERWRITE_SCHEME = 0;
 
     // If no Scheme header is present (for HTTP/1.1 requests without a fully
@@ -84,6 +85,7 @@ message HttpConnectionManager {
     // :ref:`scheme
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`.
     // If a Scheme header is present, pass it through.
+    // If scheme is changed, any non-matching x-forwarded-proto header will be updated as well.
     SET_SCHEME_IF_ABSENT = 1;
   }
 

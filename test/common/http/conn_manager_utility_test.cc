@@ -350,17 +350,20 @@ TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
   // Scheme was absent. Append HTTP.
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("http", headers.getSchemeValue());
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
 
-  // Scheme was present. Do not overwrite.
+  // Scheme was present. Do not overwrite anything
   scheme_string = "https";
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("http", headers.getSchemeValue());
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
 
-  // Scheme will be overwritten.
+  // Scheme and X-Forwarded-Proto will be overwritten.
   ON_CALL(config_, schemeHeaderTransformation())
       .WillByDefault(Return(ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME));
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("https", headers.getSchemeValue());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
