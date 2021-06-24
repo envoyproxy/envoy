@@ -466,15 +466,15 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
   EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &sin.sin_addr));
   sin.sin_port = htons(6502);
 
-  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, sizeof(sockaddr_in) - 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, sizeof(sockaddr_in) + 1), "ss_len");
 
-  EXPECT_EQ("1.2.3.4:6502", addressFromSockAddr(ss, sizeof(sockaddr_in))->asString());
+  EXPECT_EQ("1.2.3.4:6502", (*addressFromSockAddr(ss, sizeof(sockaddr_in)))->asString());
 
   // Invalid family.
   sin.sin_family = AF_UNSPEC;
-  EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in)), EnvoyException);
+  EXPECT_FALSE(addressFromSockAddr(ss, sizeof(sockaddr_in)).ok());
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
@@ -485,20 +485,22 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
   EXPECT_EQ(1, inet_pton(AF_INET6, "01:023::00Ef", &sin6.sin6_addr));
   sin6.sin6_port = htons(32000);
 
-  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, sizeof(sockaddr_in6) - 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, sizeof(sockaddr_in6) + 1), "ss_len");
 
-  EXPECT_EQ("[1:23::ef]:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6))->asString());
+  EXPECT_EQ("[1:23::ef]:32000", (*addressFromSockAddr(ss, sizeof(sockaddr_in6)))->asString());
 
   // Test that IPv4-mapped IPv6 address is returned as an Ipv4Instance when 'v6only' parameter is
   // 'false', but not otherwise.
   EXPECT_EQ(1, inet_pton(AF_INET6, "::ffff:192.0.2.128", &sin6.sin6_addr));
-  EXPECT_EQ(IpVersion::v4, addressFromSockAddr(ss, sizeof(sockaddr_in6), false)->ip()->version());
-  EXPECT_EQ("192.0.2.128:32000", addressFromSockAddr(ss, sizeof(sockaddr_in6), false)->asString());
-  EXPECT_EQ(IpVersion::v6, addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->ip()->version());
+  EXPECT_EQ(IpVersion::v4,
+            (*addressFromSockAddr(ss, sizeof(sockaddr_in6), false))->ip()->version());
+  EXPECT_EQ("192.0.2.128:32000",
+            (*addressFromSockAddr(ss, sizeof(sockaddr_in6), false))->asString());
+  EXPECT_EQ(IpVersion::v6, (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->ip()->version());
   EXPECT_EQ("[::ffff:192.0.2.128]:32000",
-            addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
+            (*addressFromSockAddr(ss, sizeof(sockaddr_in6), true))->asString());
 }
 
 TEST(AddressFromSockAddrDeathTest, Pipe) {
@@ -508,20 +510,20 @@ TEST(AddressFromSockAddrDeathTest, Pipe) {
 
   StringUtil::strlcpy(sun.sun_path, "/some/path", sizeof sun.sun_path);
 
-  EXPECT_DEATH(addressFromSockAddr(ss, 1), "ss_len");
-  EXPECT_DEATH(addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, 1), "ss_len");
+  EXPECT_DEATH(*addressFromSockAddr(ss, offsetof(struct sockaddr_un, sun_path)), "ss_len");
 
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
-  EXPECT_EQ("/some/path", addressFromSockAddr(ss, ss_len)->asString());
+  EXPECT_EQ("/some/path", (*addressFromSockAddr(ss, ss_len))->asString());
 
   // Abstract socket namespace.
   StringUtil::strlcpy(&sun.sun_path[1], "/some/abstract/path", sizeof sun.sun_path);
   sun.sun_path[0] = '\0';
   ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen("/some/abstract/path");
 #if defined(__linux__)
-  EXPECT_EQ("@/some/abstract/path", addressFromSockAddr(ss, ss_len)->asString());
+  EXPECT_EQ("@/some/abstract/path", (*addressFromSockAddr(ss, ss_len))->asString());
 #else
-  EXPECT_THROW(addressFromSockAddr(ss, ss_len), EnvoyException);
+  EXPECT_FALSE(addressFromSockAddr(ss, ss_len).ok());
 #endif
 }
 

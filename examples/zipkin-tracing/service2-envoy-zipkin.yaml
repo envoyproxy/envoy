@@ -35,7 +35,6 @@ static_resources:
                   operation: checkStock
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
     type: STRICT_DNS
