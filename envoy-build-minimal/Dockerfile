@@ -24,6 +24,11 @@ RUN apt-get update \
             xz-utils \
     # aspell installed without --no-install-recommends
     && apt-get install -y -qq aspell \
+    # google.api py
+    && apt-get install -y -qq --no-install-recommends --no-install-suggests python3-pip \
+    && python3.8 -m pip install googleapis-common-protos \
+    && apt-get remove --purge -y -qq python3-pip \
+    # clang-tidy, clang-format
     && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-11 main" >> /etc/apt/sources.list \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add - \
     && apt-get update \
@@ -53,7 +58,7 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 \
     && mkdir -p /src/workspace \
     && groupadd -r pcap \
-    && apt-get autoremove -y \
+    && apt-get autoremove --purge -y \
     && apt-get clean \
     && rm -rf /tmp/* /var/tmp/* \
     && rm -rf /var/lib/apt/lists/*
