@@ -22,6 +22,7 @@ bring_up_example_stack () {
 	docker-compose pull
 	echo
     fi
+    docker images
     run_log "Bring up services ($path)"
     docker-compose "${up_args[@]}" || return 1
     echo
