@@ -21,7 +21,7 @@
 
 namespace Envoy {
 namespace {
-std::string ProtocolTestParamsAndBoolToString(
+std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
   return fmt::format("{}_{}",
                      HttpProtocolIntegrationTest::protocolTestParamsToString(
@@ -100,7 +100,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
                      testing::Bool()),
-    ProtocolTestParamsAndBoolToString);
+    protocolTestParamsAndBoolToString);
 
 // We should create four buffers each billing the same downstream request's
 // account which originated the chain.
@@ -234,7 +234,28 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
 // fully wired through with H2, but it's important to test that H1 and H3 end
 // up notifying the BufferMemoryAccount when the dtor of the downstream stream
 // occurs.
-class ProtocolsBufferWatermarksTest : public Http2BufferWatermarksTest {};
+class ProtocolsBufferWatermarksTest
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+      public HttpIntegrationTest {
+public:
+  ProtocolsBufferWatermarksTest()
+      : HttpIntegrationTest(
+            std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
+            ConfigHelper::httpProxyConfig(
+                /*downstream_is_quic=*/std::get<0>(GetParam()).downstream_protocol ==
+                Http::CodecType::HTTP3)) {
+    config_helper_.addRuntimeOverride("envoy.test_only.per_stream_buffer_accounting",
+                                      streamBufferAccounting() ? "true" : "false");
+    setServerBufferFactory(buffer_factory_);
+    setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
+  }
+
+protected:
+  std::shared_ptr<Buffer::TrackedWatermarkBufferFactory> buffer_factory_ =
+      std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
+
+  bool streamBufferAccounting() { return std::get<1>(GetParam()); }
+};
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, ProtocolsBufferWatermarksTest,
@@ -242,7 +263,7 @@ INSTANTIATE_TEST_SUITE_P(
                          {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                          {FakeHttpConnection::Type::HTTP2})),
                      testing::Bool()),
-    ProtocolTestParamsAndBoolToString);
+    protocolTestParamsAndBoolToString);
 
 TEST_P(ProtocolsBufferWatermarksTest, AccountShouldBeRegisteredAndUnregisteredOnce) {
   FakeStreamPtr upstream_request1;

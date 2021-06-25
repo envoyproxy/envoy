@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+
 // Stream Reset is refactored from the codec to avoid cyclical dependencies with
 // the BufferMemoryAccount interface.
 namespace Envoy {

@@ -296,8 +296,6 @@ public:
  */
 class Stream : public StreamResetHandler {
 public:
-  virtual ~Stream() = default;
-
   /**
    * Add stream callbacks.
    * @param callbacks supplies the callbacks to fire on stream events.

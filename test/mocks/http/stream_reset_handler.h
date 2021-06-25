@@ -10,7 +10,6 @@ namespace Http {
 class MockStreamResetHandler : public StreamResetHandler {
 public:
   MockStreamResetHandler() = default;
-  ~MockStreamResetHandler() = default;
 
   // Http::StreamResetHandler
   MOCK_METHOD(void, resetStream, (StreamResetReason reason));

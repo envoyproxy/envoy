@@ -149,22 +149,20 @@ void WatermarkBufferFactory::updateAccountClass(const BufferMemoryAccountSharedP
                                                 int current_class, int new_class) {
   ASSERT(current_class != new_class, "Expected the current_class and new_class to be different");
 
-  // Take out of prior bucket if previously tracked.
-  BufferMemoryAccountSharedPtr account_in_bucket = nullptr;
-  if (current_class >= 0) {
-    ASSERT(size_class_account_sets_[current_class].contains(account));
-    // Extract to reuse the existing shared_ptr
-    account_in_bucket = std::move(size_class_account_sets_[current_class].extract(account).value());
-  }
-
-  // Place into new bucket if will track
-  if (new_class >= 0) {
+  if (current_class == -1 && new_class >= 0) {
+    // Start tracking
     ASSERT(!size_class_account_sets_[new_class].contains(account));
-    if (account_in_bucket == nullptr) {
-      size_class_account_sets_[new_class].insert(account);
-    } else {
-      size_class_account_sets_[new_class].insert(std::move(account_in_bucket));
-    }
+    size_class_account_sets_[new_class].insert(account);
+  } else if (current_class >= 0 && new_class == -1) {
+    // No longer track
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    size_class_account_sets_[current_class].erase(account);
+  } else {
+    // Moving between buckets
+    ASSERT(size_class_account_sets_[current_class].contains(account));
+    ASSERT(!size_class_account_sets_[new_class].contains(account));
+    size_class_account_sets_[new_class].insert(
+        std::move(size_class_account_sets_[current_class].extract(account).value()));
   }
 }
 

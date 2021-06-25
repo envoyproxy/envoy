@@ -21,7 +21,7 @@ constexpr uint64_t kThresholdForFinalBucket = 128 * 1024 * 1024;
 
 class BufferMemoryAccountTest : public testing::Test {
 public:
-  static void NoAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_account) {
+  static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_account) {
     for (const auto& set : memory_classes_to_account) {
       EXPECT_TRUE(set.empty());
     }
@@ -75,6 +75,8 @@ TEST_F(BufferMemoryAccountTest, ManagesAccountBalance) {
     buffer.drain(std::string("Extra Slice").length());
     EXPECT_EQ(account->balance(), 0);
   }
+
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
@@ -91,6 +93,8 @@ TEST_F(BufferMemoryAccountTest, BufferAccountsForUnownedSliceMovedInto) {
 
   accounted_buffer.drain(accounted_buffer.length());
   EXPECT_EQ(account->balance(), 0);
+
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, BufferFragmentsShouldNotHaveAnAssociatedAccount) {
@@ -116,6 +120,9 @@ TEST_F(BufferMemoryAccountTest, BufferFragmentsShouldNotHaveAnAssociatedAccount)
   buffer_two.drain(buffer_two.length());
   EXPECT_EQ(buffer_two_account->balance(), 0);
   EXPECT_EQ(buffer_two.length(), 0);
+
+  buffer_one_account->clearDownstream();
+  buffer_two_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
@@ -139,6 +146,9 @@ TEST_F(BufferMemoryAccountTest, SliceRemainsAttachToOriginalAccountWhenMoved) {
   buffer_two.drain(buffer_two.length());
   EXPECT_EQ(buffer_one_account->balance(), 0);
   EXPECT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_one_account->clearDownstream();
+  buffer_two_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest,
@@ -164,6 +174,9 @@ TEST_F(BufferMemoryAccountTest,
   buffer_two.drain(std::string("To be Coalesce into:Will Coalesce").length());
   EXPECT_EQ(buffer_one_account->balance(), 0);
   EXPECT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_one_account->clearDownstream();
+  buffer_two_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, SliceCanRemainAttachedToOriginalAccountWhenMovedAndCoalescedInto) {
@@ -193,6 +206,10 @@ TEST_F(BufferMemoryAccountTest, SliceCanRemainAttachedToOriginalAccountWhenMoved
 
   buffer_three.drain(std::string("To be Coalesce into:Will Coalesce").length());
   EXPECT_EQ(buffer_two_account->balance(), 0);
+
+  buffer_one_account->clearDownstream();
+  buffer_two_account->clearDownstream();
+  buffer_three_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, LinearizedBufferShouldChargeItsAssociatedAccount) {
@@ -226,6 +243,10 @@ TEST_F(BufferMemoryAccountTest, LinearizedBufferShouldChargeItsAssociatedAccount
   EXPECT_EQ(buffer_one_account->balance(), 0);
   EXPECT_EQ(buffer_two_account->balance(), 0);
   EXPECT_EQ(buffer_three_account->balance(), 8192);
+
+  buffer_one_account->clearDownstream();
+  buffer_two_account->clearDownstream();
+  buffer_three_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, ManagesAccountBalanceWhenPrepending) {
@@ -254,6 +275,9 @@ TEST_F(BufferMemoryAccountTest, ManagesAccountBalanceWhenPrepending) {
   // Prepend a string view.
   buffer_to_prepend_to.prepend("Hello ");
   EXPECT_EQ(prepend_to_account->balance(), 8192);
+
+  prepend_account->clearDownstream();
+  prepend_to_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccountOnce) {
@@ -273,6 +297,8 @@ TEST_F(BufferMemoryAccountTest, ExtractingSliceWithExistingStorageCreditsAccount
   }
 
   EXPECT_EQ(buffer_account->balance(), 4096);
+
+  buffer_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, NewReservationSlicesOnlyChargedAfterCommit) {
@@ -286,6 +312,8 @@ TEST_F(BufferMemoryAccountTest, NewReservationSlicesOnlyChargedAfterCommit) {
   // We should only be charged for the slices committed.
   reservation.commit(16384);
   EXPECT_EQ(buffer_account->balance(), 16384);
+
+  buffer_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
@@ -302,17 +330,19 @@ TEST_F(BufferMemoryAccountTest, ReservationShouldNotChargeForExistingSlice) {
   auto reservation = buffer.reserveForRead();
   reservation.commit(2000);
   EXPECT_EQ(buffer_account->balance(), 4096);
+
+  buffer_account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, AccountShouldNotBeTrackedByFactoryUnlessAboveMinimumBalance) {
   auto account = factory_.createAccount(&mock_reset_handler_);
 
   // Check not tracked
-  factory_.inspectMemoryClasses(BufferMemoryAccountTest::NoAccountsTracked);
+  factory_.inspectMemoryClasses(BufferMemoryAccountTest::noAccountsTracked);
 
   // Still below minimum
   account->charge(2020);
-  factory_.inspectMemoryClasses(BufferMemoryAccountTest::NoAccountsTracked);
+  factory_.inspectMemoryClasses(BufferMemoryAccountTest::noAccountsTracked);
 
   account->charge(kMinimumBalanceToTrack);
 
@@ -322,6 +352,7 @@ TEST_F(BufferMemoryAccountTest, AccountShouldNotBeTrackedByFactoryUnlessAboveMin
   });
 
   account->credit(account->balance());
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, ClearingDownstreamShouldUnregisterTrackedAccounts) {
@@ -336,7 +367,7 @@ TEST_F(BufferMemoryAccountTest, ClearingDownstreamShouldUnregisterTrackedAccount
   account->clearDownstream();
 
   // Check no longer tracked
-  factory_.inspectMemoryClasses(BufferMemoryAccountTest::NoAccountsTracked);
+  factory_.inspectMemoryClasses(BufferMemoryAccountTest::noAccountsTracked);
 
   account->credit(account->balance());
 }
@@ -346,6 +377,7 @@ TEST_F(BufferMemoryAccountTest, AccountCanResetStream) {
 
   EXPECT_CALL(mock_reset_handler_, resetStream(_));
   account->resetDownstream(Http::StreamResetReason::LocalReset);
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases) {
@@ -367,6 +399,7 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases)
   }
 
   account->credit(account->balance());
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases) {
@@ -390,6 +423,7 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases)
   }
 
   account->credit(account->balance());
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, SizeSaturatesInLargestBucket) {
@@ -408,6 +442,7 @@ TEST_F(BufferMemoryAccountTest, SizeSaturatesInLargestBucket) {
   });
 
   account->credit(account->balance());
+  account->clearDownstream();
 }
 
 TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
@@ -433,6 +468,7 @@ TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
   });
 
   account->credit(account->balance());
+  account->clearDownstream();
 }
 
 } // namespace

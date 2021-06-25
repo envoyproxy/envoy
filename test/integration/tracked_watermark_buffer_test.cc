@@ -203,6 +203,9 @@ TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrue
 
   buffer2->add("Now we have expected balances!");
   EXPECT_TRUE(factory_.waitForExpectedAccountBalanceWithTimeout(std::chrono::seconds(0)));
+
+  account1->clearDownstream();
+  account2->clearDownstream();
 }
 
 } // namespace
