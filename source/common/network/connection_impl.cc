@@ -51,12 +51,7 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
   }
 
   if (new_total != previous_total) {
-    if (new_total > previous_total) {
-      stat_current.add(new_total - previous_total);
-    } else {
-      stat_current.sub(previous_total - new_total);
-    }
-
+    stat_current.set(new_total);
     previous_total = new_total;
   }
 }
