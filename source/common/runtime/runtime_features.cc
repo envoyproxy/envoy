@@ -115,6 +115,7 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    // Use shared cache in getOrCreateRawAsyncClient method.
     "envoy.reloadable_features.enable_grpc_async_client_cache",
 };
 
