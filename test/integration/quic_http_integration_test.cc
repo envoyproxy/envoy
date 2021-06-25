@@ -445,7 +445,7 @@ TEST_P(QuicHttpIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
 
   auto response = std::move(encoder_decoder.second);
   response->waitForHeaders();
-  // Reset stream while the quic server stream might have FIN bufferred in its send buffer.
+  // Reset stream while the quic server stream might have FIN buffered in its send buffer.
   codec_client_->sendReset(encoder);
 }
 
