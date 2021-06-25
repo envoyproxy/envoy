@@ -155,6 +155,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testSimpleGet() throws Exception {
     String url = NativeTestServer.getEchoMethodURL();
     TestUrlRequestCallback callback = startAndWaitForComplete(url);
@@ -191,7 +192,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
-  @Ignore("Not implemented yet")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1522")
   public void testLoadFlagsWithConnectionMigration() throws Exception {}
 
   /**
@@ -202,6 +203,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
   public void testRedirectAsync() throws Exception {
     // Start the request and wait to see the redirect.
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
@@ -390,6 +392,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // No canonical exception to assert on
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
   public void testContentLengthMismatchFailsOnce() throws Exception {
     String url = NativeTestServer.getFileURL("/content_length_mismatch.html");
     TestUrlRequestCallback callback = startAndWaitForComplete(url);
@@ -513,7 +516,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("MockWebServer does not handle header field with multiple values like NativeTestServer")
+  @Ignore("Debug me")
   public void testMultiRequestHeaders() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     String headerName = "header-name";
@@ -556,6 +559,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1551")
   public void testCustomReferer_changeToCanonical() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     String refererValueNoTrailingSlash = "http://example.com";
@@ -572,7 +576,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
-  @Ignore("Envoy Mobile feature gap")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1551")
   public void testCustomReferer_discardInvalid() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     String invalidRefererValue = "foobar";
@@ -658,6 +662,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
   public void testMockMultiRedirect() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(NativeTestServer.getMultiRedirectURL());
@@ -690,6 +695,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1426")
   public void testMockNotFound() throws Exception {
     TestUrlRequestCallback callback = startAndWaitForComplete(NativeTestServer.getNotFoundURL());
     UrlResponseInfo expected =
@@ -706,6 +712,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockStartAsyncError() throws Exception {
     final int arbitraryNetError = -3;
     TestUrlRequestCallback callback = startAndWaitForComplete(
@@ -723,7 +730,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
-  @Ignore("Can not inject errors yet")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockReadDataSyncError() throws Exception {
     final int arbitraryNetError = -4;
     TestUrlRequestCallback callback = startAndWaitForComplete(
@@ -745,6 +752,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockClientCertificateRequested() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(MockUrlRequestJobFactory.getMockUrlForClientCertificateRequest());
@@ -763,6 +771,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testMockSSLCertificateError() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(MockUrlRequestJobFactory.getMockUrlForSSLCertificateError());
@@ -783,7 +792,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
-  @Ignore("Not yet implemented")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testSSLCertificateError() throws Exception {}
 
   /**
@@ -1733,6 +1742,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
   public void testUploadFailsWithoutInitializingStream() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     // The port for PTP will always refuse a TCP connection
@@ -2039,6 +2049,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet // Java impl doesn't support MockUrlRequestJobFactory
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testErrorCodes() throws Exception {
     checkSpecificErrorCode(-105, NetworkException.ERROR_HOSTNAME_NOT_RESOLVED, "NAME_NOT_RESOLVED",
                            false);
@@ -2083,6 +2094,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testQuicErrorCode() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(MockUrlRequestJobFactory.getMockUrlWithFailure(
@@ -2101,6 +2113,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testQuicErrorCodeForNetworkChanged() throws Exception {
     TestUrlRequestCallback callback =
         startAndWaitForComplete(MockUrlRequestJobFactory.getMockUrlWithFailure(
@@ -2125,7 +2138,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
-  @Ignore("PLease debug")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1549")
   public void testLegacyOnFailedCallback() throws Exception {
     final int netError = -123;
     final AtomicBoolean failedExpectation = new AtomicBoolean();
@@ -2219,7 +2232,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunNativeCronet
-  @Ignore("Not yet implemented")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1550")
   public void testCleartextTrafficBlocked() throws Exception {
     // This feature only works starting from N.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -2289,7 +2302,7 @@ public class CronetUrlRequestTest {
   @SmallTest
   @Feature({"Cronet"})
   @RequiresMinApi(9) // Tagging support added in API level 9: crrev.com/c/chromium/src/+/930086
-  @Ignore("Not yet implemented")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1521")
   public void testTagging() throws Exception {}
 
   @Test

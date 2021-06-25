@@ -76,11 +76,7 @@ abstract class CronetUploadDataStream extends UploadDataSink {
         mBuffer.clear();
         mSinkState.set(SinkState.AWAITING_READ_RESULT);
         executeOnUploadExecutor(() -> mUploadProvider.read(this, mBuffer));
-      } else if (mTotalBytes == -1) {
-        finish();
-      } else if (mTotalBytes == mWrittenBytes) {
-        finish();
-      } else {
+      } else if (mTotalBytes != -1 && mTotalBytes != mWrittenBytes) {
         processUploadError(new IllegalArgumentException(String.format(
             Locale.getDefault(), "Read upload data length %d exceeds expected length %d",
             mWrittenBytes, mTotalBytes)));
@@ -139,7 +135,7 @@ abstract class CronetUploadDataStream extends UploadDataSink {
     executeOnUploadExecutor(() -> {
       mTotalBytes = mUploadProvider.getLength();
       if (mTotalBytes == 0) {
-        finish();
+        finishEmptyBody();
       } else {
         // If we know how much data we have to upload, and it's small, we can save
         // memory by allocating a reasonably sized buffer to read into.
@@ -195,7 +191,7 @@ abstract class CronetUploadDataStream extends UploadDataSink {
   abstract int processSuccessfulRead(ByteBuffer buffer, boolean finalChunk);
 
   /**
-   * Finishes this upload. Called when the upload is complete.
+   * Finishes this upload when the body is empty.
    */
-  abstract void finish() throws IOException;
+  abstract void finishEmptyBody() throws IOException;
 }

@@ -69,11 +69,11 @@ public final class CronetUrlRequest extends UrlRequestBase {
     int CANCELLED = 8;
   }
 
-  private static final String X_ANDROID = "X-Android";
   private static final String X_ENVOY = "x-envoy";
-  private static final String X_ANDROID_SELECTED_TRANSPORT = "X-Android-Selected-Transport";
+  private static final String X_ENVOY_SELECTED_TRANSPORT = "x-android-selected-transport";
   private static final String TAG = CronetUrlRequest.class.getSimpleName();
   private static final String USER_AGENT = "User-Agent";
+  private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocateDirect(0);
 
   private final AsyncUrlRequestCallback mCallbackAsync;
   private final PausableSerializingExecutor mCronvoyExecutor;
@@ -272,7 +272,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
     OutputStreamDataSink() { super(mUploadExecutor, mCronvoyExecutor, mUploadDataProvider); }
 
     @Override
-    protected void finish() {}
+    protected void finishEmptyBody() {
+      mStream.close(EMPTY_BYTE_BUFFER);
+    }
 
     @Override
     protected int processSuccessfulRead(ByteBuffer buffer, boolean finalChunk) {
@@ -400,17 +402,18 @@ public final class CronetUrlRequest extends UrlRequestBase {
     Set<Map.Entry<String, List<String>>> headers = responseHeaders.allHeaders().entrySet();
 
     for (Map.Entry<String, List<String>> headerEntry : headers) {
-      String headerKey = headerEntry.getKey();
-      String value = headerEntry.getValue().get(0);
-      if (value == null) {
+      String headerKey = headerEntry.getKey().toLowerCase();
+      if (headerEntry.getValue().get(0) == null) {
         continue;
       }
-      if (X_ANDROID_SELECTED_TRANSPORT.equalsIgnoreCase(headerKey)) {
-        selectedTransport = value;
+      if (X_ENVOY_SELECTED_TRANSPORT.equals(headerKey)) {
+        selectedTransport = headerEntry.getValue().get(0);
       }
-      if (!headerKey.startsWith(X_ANDROID) && !headerKey.startsWith(X_ENVOY) &&
-          !headerKey.equals("date") && !headerKey.equals(":status")) {
-        headerList.add(new SimpleEntry<>(headerKey.toLowerCase(), value));
+      if (!headerKey.startsWith(X_ENVOY) && !headerKey.equals("date") &&
+          !headerKey.equals(":status")) {
+        for (String value : headerEntry.getValue()) {
+          headerList.add(new SimpleEntry<>(headerKey.toLowerCase(), value));
+        }
       }
     }
     int responseCode =
@@ -420,7 +423,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
     // that would throw ConcurrentModificationException.
     // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1426) set receivedByteCount
     mUrlResponseInfo = new UrlResponseInfoImpl(
-        new ArrayList<>(mUrlChain), responseCode, textResponseCode(responseCode),
+        new ArrayList<>(mUrlChain), responseCode, HttpReason.getReason(responseCode),
         Collections.unmodifiableList(headerList), false, selectedTransport, "", 0);
     if (responseCode >= 300 && responseCode < 400) {
       List<String> locationFields = mUrlResponseInfo.getAllHeaders().get("location");
@@ -773,121 +776,6 @@ public final class CronetUrlRequest extends UrlRequestBase {
           mFallbackExecutor.execute(runnable);
         }
       }
-    }
-  }
-
-  private static String textResponseCode(int code) {
-    switch (code) {
-    case 100:
-      return "Continue";
-    case 101:
-      return "Switching Protocols";
-    case 103:
-      return "Early Hints";
-    case 200:
-      return "OK";
-    case 201:
-      return "Created";
-    case 202:
-      return "Accepted";
-    case 203:
-      return "Non-Authoritative Information";
-    case 204:
-      return "No Content";
-    case 205:
-      return "Reset Content";
-    case 206:
-      return "Partial Content";
-    case 300:
-      return "Multiple Choices";
-    case 301:
-      return "Moved Permanently";
-    case 302:
-      return "Found";
-    case 303:
-      return "See Other";
-    case 304:
-      return "Not Modified";
-    case 307:
-      return "Temporary Redirect";
-    case 308:
-      return "Permanent Redirect";
-    case 400:
-      return "Bad Request";
-    case 401:
-      return "Unauthorized";
-    case 402:
-      return "Payment Required";
-    case 403:
-      return "Forbidden";
-    case 404:
-      return "Not Found";
-    case 405:
-      return "Method Not Allowed";
-    case 406:
-      return "Not Acceptable";
-    case 407:
-      return "Proxy Authentication Required";
-    case 408:
-      return "Request Timeout";
-    case 409:
-      return "Conflict";
-    case 410:
-      return "Gone";
-    case 411:
-      return "Length Required";
-    case 412:
-      return "Precondition Failed";
-    case 413:
-      return "Payload Too Large";
-    case 414:
-      return "URI Too Long";
-    case 415:
-      return "Unsupported Media Type";
-    case 416:
-      return "Range Not Satisfiable";
-    case 417:
-      return "Expectation Failed";
-    case 418:
-      return "I'm a teapot";
-    case 422:
-      return "Unprocessable Entity";
-    case 425:
-      return "Too Early";
-    case 426:
-      return "Upgrade Required";
-    case 428:
-      return "Precondition Required";
-    case 429:
-      return "Too Many Requests";
-    case 431:
-      return "Request Header Fields Too Large";
-    case 451:
-      return "Unavailable For Legal Reasons";
-    case 500:
-      return "Internal Server Error";
-    case 501:
-      return "Not Implemented";
-    case 502:
-      return "Bad Gateway";
-    case 503:
-      return "Service Unavailable";
-    case 504:
-      return "Gateway Timeout";
-    case 505:
-      return "HTTP Version Not Supported";
-    case 506:
-      return "Variant Also Negotiates";
-    case 507:
-      return "Insufficient Storage";
-    case 508:
-      return "Loop Detected";
-    case 510:
-      return "Not Extended";
-    case 511:
-      return "Network Authentication Required";
-    default:
-      return "Unknown";
     }
   }
 
