@@ -186,17 +186,36 @@ TEST_F(MetricsServiceSinkTest, ReportCountersValues) {
 
 // Test that verifies counters are reported as the delta between flushes when configured to do so.
 TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
-  MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
-                     envoy::service::metrics::v3::StreamMetricsResponse>
-      sink(streamer_, true, false);
-
   addCounterToSnapshot("test_counter", 1, 100);
+  counter_storage_.back()->setTagExtractedName("tag-counter-name");
+  counter_storage_.back()->setTags({{"a", "b"}});
 
-  EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-    EXPECT_EQ(1, metrics->size());
-    EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
-  }));
-  sink.flush(snapshot_);
+  {
+    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                       envoy::service::metrics::v3::StreamMetricsResponse>
+        sink(streamer_, true, false);
+
+    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+      EXPECT_EQ(1, metrics->size());
+      EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
+    }));
+    sink.flush(snapshot_);
+  }
+
+  {
+    MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
+                       envoy::service::metrics::v3::StreamMetricsResponse>
+        sink(streamer_, true, true);
+
+    EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
+      EXPECT_EQ(1, metrics->size());
+      EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
+
+      EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
+      EXPECT_EQ(1, (*metrics)[0].metric(0).label().size());
+    }));
+    sink.flush(snapshot_);
+  }
 }
 
 // Test the behavior of tag emission based on the emit_tags_as_label flag.
@@ -217,7 +236,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
     // When the emit_tags flag is false, we don't emit the tags and use the full name.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
-        sink(streamer_, true, false);
+        sink(streamer_, false, false);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
       EXPECT_EQ(4, metrics->size());
@@ -244,7 +263,7 @@ TEST_F(MetricsServiceSinkTest, ReportMetricsWithTags) {
   // When the emit_tags flag is true, we emit the tags as labels and use the tag extracted name.
   MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                      envoy::service::metrics::v3::StreamMetricsResponse>
-      sink(streamer_, true, true);
+      sink(streamer_, false, true);
 
   EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([&expected_label_pair](MetricsPtr&& metrics) {
     EXPECT_EQ(4, metrics->size());
