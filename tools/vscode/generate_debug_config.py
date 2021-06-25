@@ -112,7 +112,7 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
                 for k in always_overwritten_fields:
                     config[k] = new_config[k]
                 print(
-                    f"old config exists, only {always_overwritten_fields} will be updated, use --overwirte to recreate config"
+                    f"old config exists, only {always_overwritten_fields} will be updated, use --overwrite to recreate config"
                 )
             break
     else:
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--overwrite',
         action="store_true",
-        help="recreate config in launch config rather than preserve old config")
+        help="recreate config without preserving any existing config")
     parser.add_argument('target', help="target binary which you want to build")
     args = parser.parse_args()
 
