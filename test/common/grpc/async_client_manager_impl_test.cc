@@ -54,14 +54,17 @@ TEST_F(AsyncClientManagerImplTest, CacheRawAsyncClient) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   RawAsyncClientSharedPtr foo_client0 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, true);
   RawAsyncClientSharedPtr foo_client1 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, true);
+  RawAsyncClientSharedPtr uncached_foo_client =
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, false);
   EXPECT_EQ(foo_client0.get(), foo_client1.get());
+  EXPECT_NE(foo_client1.get(), uncached_foo_client.get());
 
   grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
   RawAsyncClientSharedPtr bar_client =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, true);
   EXPECT_NE(foo_client1.get(), bar_client.get());
 }
 

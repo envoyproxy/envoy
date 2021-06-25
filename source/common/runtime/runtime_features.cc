@@ -64,7 +64,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
-    "envoy.reloadable_features.enable_grpc_async_client_cache",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
@@ -116,6 +115,7 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    "envoy.reloadable_features.enable_grpc_async_client_cache",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
