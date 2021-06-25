@@ -30,7 +30,7 @@ typed_config:
   max_rejection_probability:
     default_value:
       value: 100.0
-      runtime_key: "foo.mrp"
+    runtime_key: "foo.mrp"
   enabled:
     default_value: true
     runtime_key: "foo.enabled"
