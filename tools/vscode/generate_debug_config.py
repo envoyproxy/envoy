@@ -89,38 +89,28 @@ def lldb_config(target, binary, workspace, execroot, arguments):
     }
 
 
-def get_old_config(config_name, configurations):
-    for config in configurations:
-        if config.get("name", None) == config_name:
-            return config
-    else:
-        return None
-
-
-def update_old_config(debugger_type, old_config, generated_config):
-    print("existing config file found,", end=" ")
-    if debugger_type == "lldb":
-        print("only `args` will be updated", end="")
-        # just concat old and new config arguments, user should grarantee that the repeat arguments should  work as before.
-        old_config["args"] = old_config.get("args", []) + generated_config.get("args", [])
-    else:
-        print("only `arguments` will be updated", end="")
-        old_config["arguments"] = "{} {}".format(old_config.get("arguments", ""), generated_config.get("arguments", ""))
-    print(", use --overwrite if you want to recreate the config")
-
-
 def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type, overwrite):
+    launch = get_launch_json(workspace)
     new_config = {}
+    always_overwritten_fields = []
     if debugger_type == "lldb":
+        always_overwritten_fields = ["program", "sourceMap", "cwd", "type", "request"]
         new_config = lldb_config(target, binary, workspace, execroot, arguments)
     else:
+        always_overwritten_fields = ["request", "type", "target", "debugger_args", "cwd", "valuesFormatting"]
         new_config = gdb_config(target, binary, workspace, execroot, arguments)
 
-    launch = get_launch_json(workspace)
     configurations = launch.get("configurations", [])
-    old_config = get_old_config(new_config["name"], configurations)
-    if old_config and not overwrite:
-        update_old_config(debugger_type, old_config, new_config)
+    for config in configurations:
+        if config.get("name", None) == new_config["name"]:
+            if overwrite:
+                config.clear()
+                config.update(new_config)
+            else:
+                for k in always_overwritten_fields:
+                    config[k] = new_config[k]
+                print(f"old config exists, only {always_overwritten_fields} will be updated, use --overwirte to recreate config")
+            break
     else:
         configurations.append(new_config)
 
