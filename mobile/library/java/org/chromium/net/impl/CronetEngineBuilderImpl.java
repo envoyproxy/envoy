@@ -362,12 +362,12 @@ public abstract class CronetEngineBuilderImpl extends ICronetEngineBuilder {
     return mThreadPriority == INVALID_THREAD_PRIORITY ? defaultThreadPriority : mThreadPriority;
   }
 
-  CronetEngineBuilderImpl setLogLevel(LogLevel logLevel) {
+  public CronetEngineBuilderImpl setLogLevel(LogLevel logLevel) {
     mLogLevel = logLevel;
     return this;
   }
 
-  LogLevel getLogLevel() { return mLogLevel; }
+  public LogLevel getLogLevel() { return mLogLevel; }
 
   /**
    * Returns {@link Context} for builder.

@@ -20,6 +20,7 @@ android_library(
         "CronetUrlRequest.java",
         "CronetUrlRequestContext.java",
         "Executors.java",
+        "HttpReason.java",
         "ImplVersion.java",
         "InputStreamChannel.java",
         "JavaCronetEngine.java",
