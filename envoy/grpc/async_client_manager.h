@@ -51,7 +51,8 @@ public:
    */
   virtual RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
-                            Stats::Scope& scope, bool skip_cluster_check) PURE;
+                            Stats::Scope& scope, bool skip_cluster_check,
+                            bool always_use_cache = false) PURE;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and

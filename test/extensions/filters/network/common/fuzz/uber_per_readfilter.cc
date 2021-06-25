@@ -72,8 +72,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
                                   bool) { return async_client_; }));
 
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
@@ -101,8 +101,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         })));
 
     ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
-            getOrCreateRawAsyncClient(_, _, _))
-        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
                                   bool) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
