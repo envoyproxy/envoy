@@ -215,7 +215,7 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -262,7 +262,6 @@ public:
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
-  const uint64_t max_requests_per_connection_{0};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

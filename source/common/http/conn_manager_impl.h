@@ -455,7 +455,6 @@ private:
 
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
-  bool requests_overflow_{false};
 };
 
 } // namespace Http

@@ -278,7 +278,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_F(StrictDnsClusterImplTest, DEPRECATED_FEATURE_TEST(Basic)) {
+TEST_F(StrictDnsClusterImplTest, Basic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, dispatcher_);
   ResolverData resolver1(*dns_resolver_, dispatcher_);
@@ -603,7 +603,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, DEPRECATED_FEATURE_TEST(LoadAssignmentBasic)) {
+TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, dispatcher_);
   ResolverData resolver2(*dns_resolver_, dispatcher_);

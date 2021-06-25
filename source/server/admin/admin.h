@@ -204,7 +204,7 @@ public:
       return runCallback(path_and_query, response_headers, response, filter);
     };
   }
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
 private:
   /**
@@ -452,7 +452,6 @@ private:
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
-  const uint64_t max_requests_per_connection_{0};
 };
 
 } // namespace Server

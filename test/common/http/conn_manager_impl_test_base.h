@@ -152,7 +152,7 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -232,7 +232,6 @@ public:
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
               KEEP_UNCHANGED};
   bool strip_trailing_host_dot_ = false;
-  const uint64_t max_requests_per_connection_{0};
 };
 
 } // namespace Http
