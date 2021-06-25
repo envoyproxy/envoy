@@ -872,7 +872,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     }
     return buffer_.set(request_body_buffer_);
   case WasmBufferType::HttpResponseBody:
-    if (buffering_response_body_) {
+    if (buffering_response_body_ && encoder_callbacks_) {
       // TODO: consider adding a mutableDecodingBuffer() interface.
       ::Envoy::Buffer::Instance* buffer_instance{};
       encoder_callbacks_->modifyEncodingBuffer(
