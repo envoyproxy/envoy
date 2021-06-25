@@ -1,5 +1,5 @@
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/http_integration.h"
 
@@ -14,7 +14,7 @@ namespace {
 class PrevioustHostsIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   PrevioustHostsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
     setDeterministic();

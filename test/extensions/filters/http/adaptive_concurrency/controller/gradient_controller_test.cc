@@ -5,11 +5,10 @@
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
-#include "extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/gradient_controller.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"

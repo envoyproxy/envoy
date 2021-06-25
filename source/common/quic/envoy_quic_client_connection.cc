@@ -1,16 +1,14 @@
-#include "common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_connection.h"
 
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/quic/envoy_quic_packet_writer.h"
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -76,7 +74,8 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
   return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
 }
 
-void EnvoyQuicClientConnection::setUpConnectionSocket() {
+void EnvoyQuicClientConnection::setUpConnectionSocket(OptRef<PacketsToReadDelegate> delegate) {
+  delegate_ = delegate;
   if (connectionSocket()->ioHandle().isOpen()) {
     connectionSocket()->ioHandle().initializeFileEvent(
         dispatcher_, [this](uint32_t events) -> void { onFileEvent(events); },
@@ -99,10 +98,19 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
     Network::ConnectionSocketPtr&& connection_socket) {
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle()));
+  quic::QuicSocketAddress self_address =
+      envoyIpAddressToQuicSocketAddress(connection_socket->addressProvider().localAddress()->ip());
+  quic::QuicSocketAddress peer_address =
+      envoyIpAddressToQuicSocketAddress(connection_socket->addressProvider().remoteAddress()->ip());
+
   // The old socket is closed in this call.
   setConnectionSocket(std::move(connection_socket));
-  setUpConnectionSocket();
-  SetQuicPacketWriter(writer.release(), true);
+  setUpConnectionSocket(delegate_);
+  if (connection_migration_use_new_cid()) {
+    MigratePath(self_address, peer_address, writer.release(), true);
+  } else {
+    SetQuicPacketWriter(writer.release(), true);
+  }
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
@@ -121,7 +129,10 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connectionSocket()->ioHandle(), *connectionSocket()->addressProvider().localAddress(),
         *this, dispatcher_.timeSource(), true, packets_dropped_);
-    // TODO(danzh): Handle no error when we limit the number of packets read.
+    if (err == nullptr) {
+      connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+      return;
+    }
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());

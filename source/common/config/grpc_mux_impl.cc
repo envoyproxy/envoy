@@ -1,12 +1,12 @@
-#include "common/config/grpc_mux_impl.h"
+#include "source/common/config/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/memory/utils.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/memory/utils.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/container/node_hash_set.h"
@@ -25,8 +25,6 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
       first_stream_request_(true), transport_api_version_(transport_api_version),
       dispatcher_(dispatcher),
-      enable_type_url_downgrade_and_upgrade_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_type_url_downgrade_and_upgrade")),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
@@ -97,9 +95,6 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
     apiStateFor(type_url).request_.mutable_node()->MergeFrom(local_info_.node());
     apiStateFor(type_url).subscribed_ = true;
     subscriptions_.emplace_back(type_url);
-    if (enable_type_url_downgrade_and_upgrade_) {
-      registerVersionedTypeUrl(type_url);
-    }
   }
 
   // This will send an updated request on each subscription.
@@ -137,36 +132,11 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   });
 }
 
-void GrpcMuxImpl::registerVersionedTypeUrl(const std::string& type_url) {
-  TypeUrlMap& type_url_map = typeUrlMap();
-  if (type_url_map.find(type_url) != type_url_map.end()) {
-    return;
-  }
-  // If type_url is v3, earlier_type_url will contain v2 type url.
-  const absl::optional<std::string> earlier_type_url = ApiTypeOracle::getEarlierTypeUrl(type_url);
-  // Register v2 to v3 and v3 to v2 type_url mapping in the hash map.
-  if (earlier_type_url.has_value()) {
-    type_url_map[earlier_type_url.value()] = type_url;
-    type_url_map[type_url] = earlier_type_url.value();
-  }
-}
-
 void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
-  std::string type_url = message->type_url();
+  const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
-  if (message->has_control_plane()) {
-    control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
-  // If this type url is not watched(no subscriber or no watcher), try another version of type url.
-  if (enable_type_url_downgrade_and_upgrade_ && api_state_.count(type_url) == 0) {
-    registerVersionedTypeUrl(type_url);
-    TypeUrlMap& type_url_map = typeUrlMap();
-    if (type_url_map.find(type_url) != type_url_map.end()) {
-      type_url = type_url_map[type_url];
-    }
-  }
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -175,16 +145,28 @@ void GrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
-  if (apiStateFor(type_url).watches_.empty()) {
+  ApiState& api_state = apiStateFor(type_url);
+
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
+
+  if (message->control_plane().identifier() != api_state.control_plane_identifier_) {
+    api_state.control_plane_identifier_ = message->control_plane().identifier();
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", type_url,
+              api_state.control_plane_identifier_);
+  }
+
+  if (api_state.watches_.empty()) {
     // update the nonce as we are processing this response.
-    apiStateFor(type_url).request_.set_response_nonce(message->nonce());
+    api_state.request_.set_response_nonce(message->nonce());
     if (message->resources().empty()) {
       // No watches and no resources. This can happen when envoy unregisters from a
       // resource that's removed from the server as well. For example, a deleted cluster
       // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
       // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
       // this update. no need to send a discovery request, as we don't watch for anything.
-      apiStateFor(type_url).request_.set_version_info(message->version_info());
+      api_state.request_.set_version_info(message->version_info());
     } else {
       // No watches and we have resources - this should not happen. send a NACK (by not
       // updating the version).
@@ -208,27 +190,26 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourceImplPtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
-    OpaqueResourceDecoder& resource_decoder =
-        apiStateFor(type_url).watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
 
-    const auto scoped_ttl_update = apiStateFor(type_url).ttl_.scopedTtlUpdate();
+    const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
       if (!resource.Is<envoy::service::discovery::v3::Resource>() &&
-          message->type_url() != resource.type_url()) {
+          type_url != resource.type_url()) {
         throw EnvoyException(
             fmt::format("{} does not match the message-wide type URL {} in DiscoveryResponse {}",
-                        resource.type_url(), message->type_url(), message->DebugString()));
+                        resource.type_url(), type_url, message->DebugString()));
       }
 
       auto decoded_resource =
           DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
 
       if (decoded_resource->ttl()) {
-        apiStateFor(type_url).ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
+        api_state.ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
       } else {
-        apiStateFor(type_url).ttl_.clear(decoded_resource->name());
+        api_state.ttl_.clear(decoded_resource->name());
       }
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
@@ -238,7 +219,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
-    for (auto watch : apiStateFor(type_url).watches_) {
+    for (auto watch : api_state.watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
       // Listener) even if the message does not have resources so that update_empty stat
       // is properly incremented and state-of-the-world semantics are maintained.
@@ -262,21 +243,21 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
-    apiStateFor(type_url).request_.set_version_info(message->version_info());
+    api_state.request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
   }
   END_TRY
   catch (const EnvoyException& e) {
-    for (auto watch : apiStateFor(type_url).watches_) {
+    for (auto watch : api_state.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
-    ::google::rpc::Status* error_detail = apiStateFor(type_url).request_.mutable_error_detail();
+    ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
-  apiStateFor(type_url).request_.set_response_nonce(message->nonce());
-  ASSERT(apiStateFor(type_url).paused());
+  api_state.request_.set_response_nonce(message->nonce());
+  ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
 }
 

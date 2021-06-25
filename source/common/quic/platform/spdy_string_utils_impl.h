@@ -6,7 +6,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/string_utils.h"
+#include "source/common/quic/platform/string_utils.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"

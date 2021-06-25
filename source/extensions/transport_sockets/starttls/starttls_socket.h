@@ -6,10 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,7 +26,7 @@ public:
     callbacks_ = &callbacks;
   }
 
-  std::string protocol() const override { return TransportProtocolNames::get().StartTls; }
+  std::string protocol() const override { return "starttls"; }
 
   absl::string_view failureReason() const override { return active_socket_->failureReason(); }
 

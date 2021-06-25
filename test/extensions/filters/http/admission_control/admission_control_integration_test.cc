@@ -1,4 +1,4 @@
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -33,8 +33,7 @@ class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:
-  AdmissionControlIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  AdmissionControlIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 
@@ -118,9 +117,9 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
+  // throttling rate (default max_rejection_probability). Allowing an error of 10%.
+  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.10);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
@@ -133,7 +132,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
 
 TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   autonomous_upstream_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   // Drop the success rate to a very low value.
@@ -158,9 +157,9 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
+  // throttling rate (default max_rejection_probability). Allowing an error of 10%.
+  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.10);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));

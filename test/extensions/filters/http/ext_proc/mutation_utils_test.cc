@@ -1,4 +1,4 @@
-#include "extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/test_common/utility.h"
@@ -28,7 +28,7 @@ TEST(MutationUtils, TestBuildHeaders) {
   headers.addCopy(LowerCaseString("x-number"), 9999);
 
   envoy::config::core::v3::HeaderMap proto_headers;
-  MutationUtils::buildHttpHeaders(headers, proto_headers);
+  MutationUtils::headersToProto(headers, proto_headers);
 
   Http::TestRequestHeaderMapImpl expected{{":method", "GET"},
                                           {":path", "/foo/the/bar?size=123"},
@@ -101,7 +101,7 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key("X-Envoy-StrangeThing");
   s->mutable_header()->set_value("Yes");
 
-  MutationUtils::applyHeaderMutations(mutation, headers);
+  MutationUtils::applyHeaderMutations(mutation, headers, false);
 
   Http::TestRequestHeaderMapImpl expected_headers{
       {":scheme", "https"},

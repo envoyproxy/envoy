@@ -53,8 +53,8 @@ message StreamEventsRequest {
   //
   // The following events are supported:
   //
-  // * :ref:`HealthCheckEvent <envoy_api_msg_data.core.v3.HealthCheckEvent>`
-  // * :ref:`OutlierDetectionEvent <envoy_api_msg_data.cluster.v3.OutlierDetectionEvent>`
+  // * :ref:`HealthCheckEvent <envoy_v3_api_msg_data.core.v3.HealthCheckEvent>`
+  // * :ref:`OutlierDetectionEvent <envoy_v3_api_msg_data.cluster.v3.OutlierDetectionEvent>`
   repeated google.protobuf.Any events = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 

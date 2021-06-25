@@ -1,9 +1,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/ext_proc/client_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stats/mocks.h"

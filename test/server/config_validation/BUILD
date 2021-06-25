@@ -10,8 +10,8 @@ envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
     deps = [
-        "//include/envoy/upstream:resource_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stats:stats_lib",

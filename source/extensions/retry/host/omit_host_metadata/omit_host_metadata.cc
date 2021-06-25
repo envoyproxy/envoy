@@ -1,6 +1,6 @@
-#include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
+#include "source/extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
 
-#include "common/config/metadata.h"
+#include "source/common/config/metadata.h"
 
 namespace Envoy {
 namespace Extensions {

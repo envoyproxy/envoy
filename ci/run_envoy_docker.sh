@@ -27,7 +27,7 @@ if is_windows; then
   BUILD_DIR_MOUNT_DEST=C:/build
   SOURCE_DIR=$(echo "${PWD}" | sed -E "s#^/([a-zA-Z])/#\1:/#")
   SOURCE_DIR_MOUNT_DEST=C:/source
-  START_COMMAND=("bash" "-c" "cd source && $*")
+  START_COMMAND=("bash" "-c" "cd /c/source && export HOME=/c/build && $*")
 else
   [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
   # We run as root and later drop permissions. This is required to setup the USER
@@ -60,6 +60,8 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+
+time docker pull "${ENVOY_BUILD_IMAGE}"
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
 docker run --rm \

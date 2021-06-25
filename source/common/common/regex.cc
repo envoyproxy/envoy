@@ -1,13 +1,13 @@
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "re2/re2.h"
 
@@ -125,11 +125,6 @@ CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatc
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
   return std::make_unique<CompiledGoogleReMatcher>(matcher);
-}
-
-CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,
-                                                           std::regex::flag_type flags) {
-  return std::make_unique<CompiledStdMatcher>(parseStdRegex(regex, flags));
 }
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {

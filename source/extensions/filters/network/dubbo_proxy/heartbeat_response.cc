@@ -1,4 +1,4 @@
-#include "extensions/filters/network/dubbo_proxy/heartbeat_response.h"
+#include "source/extensions/filters/network/dubbo_proxy/heartbeat_response.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -4,12 +4,12 @@ gRPC
 ====
 
 `gRPC <https://www.grpc.io/>`_ is an RPC framework from Google. It uses protocol buffers as the
-underlying serialization/IDL format. At the transport layer it uses HTTP/2 for request/response
+underlying serialization/IDL format. At the transport layer it uses HTTP/2 or above for request/response
 multiplexing. Envoy has first class support for gRPC both at the transport layer as well as at the
 application layer:
 
-* gRPC makes use of HTTP/2 trailers to convey request status. Envoy is one of very few HTTP proxies
-  that correctly supports HTTP/2 trailers and is thus one of the few proxies that can transport
+* gRPC makes use of trailers to convey request status. Envoy is one of very few HTTP proxies
+  that correctly supports trailers and is thus one of the few proxies that can transport
   gRPC requests and responses.
 * The gRPC runtime for some languages is relatively immature. See :ref:`below <arch_overview_grpc_bridging>`
   for an overview of filters that can help bring gRPC to more languages.
@@ -29,7 +29,7 @@ gRPC bridging
 Envoy supports two gRPC bridges:
 
 * :ref:`grpc_http1_bridge filter <config_http_filters_grpc_bridge>` which allows gRPC requests to be sent to Envoy over
-  HTTP/1.1. Envoy then translates the requests to HTTP/2 for transport to the target server. The response is translated back to HTTP/1.1.
+  HTTP/1.1. Envoy then translates the requests to HTTP/2 or HTTP/3 for transport to the target server. The response is translated back to HTTP/1.1.
   When installed, the bridge filter gathers per RPC statistics in addition to the standard array of global HTTP statistics.
 * :ref:`grpc_http1_reverse_bridge filter <config_http_filters_grpc_http1_reverse_bridge>` which allows gRPC requests to be sent to Envoy
   and then translated to HTTP/1.1 when sent to the upstream. The response is then converted back into gRPC when sent to the downstream.
@@ -52,7 +52,7 @@ When specifying gRPC services, it's necessary to specify the use of either the
 discuss the tradeoffs in this choice below.
 
 The Envoy gRPC client is a minimal custom implementation of gRPC that makes use
-of Envoy's HTTP/2 upstream connection management. Services are specified as
+of Envoy's HTTP/2 or HTTP/3 upstream connection management. Services are specified as
 regular Envoy :ref:`clusters <arch_overview_cluster_manager>`, with regular
 treatment of :ref:`timeouts, retries <arch_overview_http_conn_man>`, endpoint
 :ref:`discovery <arch_overview_dynamic_config_eds>`/:ref:`load

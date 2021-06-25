@@ -9,13 +9,11 @@
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-
-#include "extensions/filters/http/fault/fault_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/fault/utility.h"
@@ -1198,10 +1196,10 @@ void FaultFilterTest::TestPerFilterConfigFault(
     const Router::RouteSpecificFilterConfig* vhost_fault) {
 
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
+          perFilterConfig("envoy.filters.http.fault"))
       .WillByDefault(Return(route_fault));
   ON_CALL(decoder_filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
+          perFilterConfig("envoy.filters.http.fault"))
       .WillByDefault(Return(vhost_fault));
 
   const std::string upstream_cluster("www1");

@@ -1,10 +1,10 @@
-#include "extensions/filters/network/postgres_proxy/postgres_filter.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "extensions/filters/network/postgres_proxy/postgres_decoder.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/postgres_proxy/postgres_decoder.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -231,11 +231,11 @@ Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool fron
   // that it cannot process data in the buffer.
   while (0 < data.length()) {
     switch (decoder_->onData(data, frontend)) {
-    case Decoder::NeedMoreData:
+    case Decoder::Result::NeedMoreData:
       return Network::FilterStatus::Continue;
-    case Decoder::ReadyForNext:
+    case Decoder::Result::ReadyForNext:
       continue;
-    case Decoder::Stopped:
+    case Decoder::Result::Stopped:
       return Network::FilterStatus::StopIteration;
     }
   }

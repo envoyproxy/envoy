@@ -20,14 +20,14 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "server/configuration_impl.h"
-#include "common/common/logger.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/quic/active_quic_listener.h"
-#include "common/http/utility.h"
+#include "source/server/configuration_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/quic/active_quic_listener.h"
+#include "source/common/http/utility.h"
 #include "test/common/quic/test_utils.h"
 #include "test/common/quic/test_proof_source.h"
 #include "test/test_common/simulated_time_system.h"
@@ -40,9 +40,11 @@
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
-#include "common/quic/platform/envoy_quic_clock.h"
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/udp_gso_batch_writer.h"
+#include "source/common/quic/platform/envoy_quic_clock.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/udp_gso_batch_writer.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
+#include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -86,8 +88,10 @@ protected:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
-        }()[0]) {}
+        }()[0]),
+        quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
   template <typename A, typename B>
   std::unique_ptr<A> staticUniquePointerCast(std::unique_ptr<B>&& source) {
@@ -155,7 +159,8 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
+                                                       quic_stat_names_);
   }
 
   void maybeConfigureMocks(int connection_count) {
@@ -193,6 +198,9 @@ protected:
       read_filters_.push_back(std::move(read_filter));
       // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
       // calls for the same object.
+      EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(transport_socket_factory_));
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
@@ -267,6 +275,15 @@ protected:
     enabled:
       default_value: true
       runtime_key: quic.enabled
+    packets_to_read_to_connection_count_ratio: 50
+    crypto_stream_config:
+      name: "envoy.quic.crypto_stream.server.quiche"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.crypto_stream.v3.CryptoServerStreamConfig
+    proof_source_config:
+      name: "envoy.quic.proof_source.filter_chain"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.proof_source.v3.ProofSourceConfig
 )EOF",
                        connection_window_size_, stream_window_size_);
   }
@@ -307,9 +324,11 @@ protected:
   // of elements are saved in expectations before new elements are added.
   std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
+  Network::MockTransportSocketFactory transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
+  QuicStatNames quic_stat_names_;
 };
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
@@ -323,13 +342,15 @@ TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
   options->emplace_back(std::move(option));
   quic_listener_.reset();
-  EXPECT_THROW_WITH_REGEX(
-      (void)std::make_unique<ActiveQuicListener>(
-          0, 1, *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_,
-          options, false,
-          ActiveQuicListenerFactoryPeer::runtimeEnabled(
-              static_cast<ActiveQuicListenerFactory*>(listener_factory_.get()))),
-      Network::CreateListenerException, "Failed to apply socket options.");
+  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
+  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
+  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
+                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
+                              listener_config_, quic_config_, options, false,
+                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
+                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
+                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
+                          Network::CreateListenerException, "Failed to apply socket options.");
 }
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
@@ -342,6 +363,10 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
   const quic::QuicSession* session =
       quic::test::QuicDispatcherPeer::FindSession(quic_dispatcher_, connection_id);
   ASSERT(session != nullptr);
@@ -389,7 +414,15 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
   const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
-  maybeConfigureMocks(count);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    maybeConfigureMocks(count + 1);
+    // Create 1 session to increase number of packet to read in the next read event.
+    sendCHLO(quic::test::TestConnectionId());
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  } else {
+    maybeConfigureMocks(count);
+  }
 
   // Generate one more CHLO than can be processed immediately.
   for (size_t i = 1; i <= count; ++i) {
@@ -407,6 +440,11 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_NE(0u, quic_dispatcher_->NumSessions());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
+    EXPECT_EQ(50 * quic_dispatcher_->NumSessions(),
+              quic_listener_->numPacketsExpectedPerEventLoop());
+  }
+
   readFromClientSockets();
 }
 
