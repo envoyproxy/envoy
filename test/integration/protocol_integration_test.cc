@@ -2478,11 +2478,11 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             1);
 
-  if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    EXPECT_TRUE(codec_client_->sawGoAway());
-  } else {
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
     EXPECT_EQ(nullptr, response->headers().Connection());
     EXPECT_EQ("close", response_2->headers().getConnectionValue());
+  } else {
+    EXPECT_TRUE(codec_client_->sawGoAway());
   }
 }
 
