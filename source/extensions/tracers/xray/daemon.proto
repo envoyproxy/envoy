@@ -17,6 +17,9 @@ message Segment {
   string origin = 9;
   string parent_id = 6;
   google.protobuf.Struct aws = 10;
+  bool error = 11;
+  bool fault = 12;
+  bool throttle = 13;
   http_annotations http = 7;
   message http_annotations {
     google.protobuf.Struct request = 1;

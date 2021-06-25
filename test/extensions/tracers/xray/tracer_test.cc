@@ -100,6 +100,142 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   span->finishSpan();
 }
 
+TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
+  constexpr auto expected_span_name = "Service 1";
+  constexpr auto expected_origin_name = "AWS::Service::Proxy";
+  constexpr auto expected_aws_key_value = "test_value";
+  constexpr auto expected_operation_name = "Create";
+  constexpr auto expected_http_method = "POST";
+  constexpr auto expected_http_url = "/first/second";
+  constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
+  constexpr auto expected_error = "true";
+  constexpr uint32_t expected_status_code = 503;
+
+  auto on_send = [&](const std::string& json) {
+    ASSERT_FALSE(json.empty());
+    daemon::Segment s;
+    MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
+    ASSERT_FALSE(s.trace_id().empty());
+    ASSERT_FALSE(s.id().empty());
+    ASSERT_TRUE(s.parent_id().empty());
+    ASSERT_STREQ(expected_span_name, s.name().c_str());
+    ASSERT_STREQ(expected_origin_name, s.origin().c_str());
+    ASSERT_STREQ(expected_aws_key_value, s.aws().fields().at("key").string_value().c_str());
+    ASSERT_STREQ(expected_http_method,
+                 s.http().request().fields().at("method").string_value().c_str());
+    ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
+    ASSERT_STREQ(expected_user_agent,
+                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_TRUE(s.fault());  /*server error*/
+    ASSERT_FALSE(s.error()); /*client error*/
+    ASSERT_DOUBLE_EQ(expected_status_code,
+                     s.http().response().fields().at("status").number_value());
+  };
+
+  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  aws_metadata_.insert({"key", ValueUtil::stringValue(expected_aws_key_value)});
+  Tracer tracer{expected_span_name, expected_origin_name, aws_metadata_,
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
+  auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
+  span->setTag("http.method", expected_http_method);
+  span->setTag("http.url", expected_http_url);
+  span->setTag("user_agent", expected_user_agent);
+  span->setTag("error", expected_error);
+  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->finishSpan();
+}
+
+TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
+  constexpr auto expected_span_name = "Service 1";
+  constexpr auto expected_origin_name = "AWS::Service::Proxy";
+  constexpr auto expected_aws_key_value = "test_value";
+  constexpr auto expected_operation_name = "Create";
+  constexpr auto expected_http_method = "POST";
+  constexpr auto expected_http_url = "/first/second";
+  constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
+  constexpr uint32_t expected_status_code = 404;
+
+  auto on_send = [&](const std::string& json) {
+    ASSERT_FALSE(json.empty());
+    daemon::Segment s;
+    MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
+    ASSERT_FALSE(s.trace_id().empty());
+    ASSERT_FALSE(s.id().empty());
+    ASSERT_TRUE(s.parent_id().empty());
+    ASSERT_STREQ(expected_span_name, s.name().c_str());
+    ASSERT_STREQ(expected_origin_name, s.origin().c_str());
+    ASSERT_STREQ(expected_aws_key_value, s.aws().fields().at("key").string_value().c_str());
+    ASSERT_STREQ(expected_http_method,
+                 s.http().request().fields().at("method").string_value().c_str());
+    ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
+    ASSERT_STREQ(expected_user_agent,
+                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_FALSE(s.fault());    /*server error*/
+    ASSERT_TRUE(s.error());     /*client error*/
+    ASSERT_FALSE(s.throttle()); /*request throttled*/
+    ASSERT_DOUBLE_EQ(expected_status_code,
+                     s.http().response().fields().at("status").number_value());
+  };
+
+  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  aws_metadata_.insert({"key", ValueUtil::stringValue(expected_aws_key_value)});
+  Tracer tracer{expected_span_name, expected_origin_name, aws_metadata_,
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
+  auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
+  span->setTag("http.method", expected_http_method);
+  span->setTag("http.url", expected_http_url);
+  span->setTag("user_agent", expected_user_agent);
+  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->finishSpan();
+}
+
+TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
+  constexpr auto expected_span_name = "Service 1";
+  constexpr auto expected_origin_name = "AWS::Service::Proxy";
+  constexpr auto expected_aws_key_value = "test_value";
+  constexpr auto expected_operation_name = "Create";
+  constexpr auto expected_http_method = "POST";
+  constexpr auto expected_http_url = "/first/second";
+  constexpr auto expected_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X)";
+  constexpr uint32_t expected_status_code = 429;
+
+  auto on_send = [&](const std::string& json) {
+    ASSERT_FALSE(json.empty());
+    daemon::Segment s;
+    MessageUtil::loadFromJson(json, s, ProtobufMessage::getNullValidationVisitor());
+    ASSERT_FALSE(s.trace_id().empty());
+    ASSERT_FALSE(s.id().empty());
+    ASSERT_TRUE(s.parent_id().empty());
+    ASSERT_STREQ(expected_span_name, s.name().c_str());
+    ASSERT_STREQ(expected_origin_name, s.origin().c_str());
+    ASSERT_STREQ(expected_aws_key_value, s.aws().fields().at("key").string_value().c_str());
+    ASSERT_STREQ(expected_http_method,
+                 s.http().request().fields().at("method").string_value().c_str());
+    ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
+    ASSERT_STREQ(expected_user_agent,
+                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_FALSE(s.fault());   /*server error*/
+    ASSERT_TRUE(s.error());    /*client error*/
+    ASSERT_TRUE(s.throttle()); /*request throttled*/
+    ASSERT_DOUBLE_EQ(expected_status_code,
+                     s.http().response().fields().at("status").number_value());
+  };
+
+  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  aws_metadata_.insert({"key", ValueUtil::stringValue(expected_aws_key_value)});
+  Tracer tracer{expected_span_name, expected_origin_name, aws_metadata_,
+                std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
+  auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
+                               absl::nullopt /*headers*/);
+  span->setTag("http.method", expected_http_method);
+  span->setTag("http.url", expected_http_url);
+  span->setTag("user_agent", expected_user_agent);
+  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->finishSpan();
+}
+
 TEST_F(XRayTracerTest, NonSampledSpansNotSerialized) {
   Tracer tracer{"" /*span name*/,   "" /*origin*/,        aws_metadata_,
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
