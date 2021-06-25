@@ -97,7 +97,9 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
         always_overwritten_fields = ["program", "sourceMap", "cwd", "type", "request"]
         new_config = lldb_config(target, binary, workspace, execroot, arguments)
     else:
-        always_overwritten_fields = ["request", "type", "target", "debugger_args", "cwd", "valuesFormatting"]
+        always_overwritten_fields = [
+            "request", "type", "target", "debugger_args", "cwd", "valuesFormatting"
+        ]
         new_config = gdb_config(target, binary, workspace, execroot, arguments)
 
     configurations = launch.get("configurations", [])
@@ -109,7 +111,9 @@ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_
             else:
                 for k in always_overwritten_fields:
                     config[k] = new_config[k]
-                print(f"old config exists, only {always_overwritten_fields} will be updated, use --overwirte to recreate config")
+                print(
+                    f"old config exists, only {always_overwritten_fields} will be updated, use --overwirte to recreate config"
+                )
             break
     else:
         configurations.append(new_config)
@@ -122,7 +126,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Build and generate launch config for VSCode')
     parser.add_argument('--debugger', default="gdb", help="debugger type, one of [gdb, lldb]")
     parser.add_argument('--args', default='', help="command line arguments if target binary")
-    parser.add_argument('--overwrite', action="store_true", help="recreate config in launch config rather than preserve old config")
+    parser.add_argument(
+        '--overwrite',
+        action="store_true",
+        help="recreate config in launch config rather than preserve old config")
     parser.add_argument('target', help="target binary which you want to build")
     args = parser.parse_args()
 
@@ -130,4 +137,5 @@ if __name__ == "__main__":
     execution_root = get_execution_root(workspace)
     debug_binary = build_binary_with_debug_info(args.target)
     add_to_launch_json(
-        args.target, debug_binary, workspace, execution_root, args.args, args.debugger, args.overwrite)
+        args.target, debug_binary, workspace, execution_root, args.args, args.debugger,
+        args.overwrite)
