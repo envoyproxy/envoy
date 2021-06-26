@@ -6,6 +6,7 @@ Incompatible Behavior Changes
 
 Minor Behavior Changes
 ----------------------
+*Changes that may cause incompatibilities for some users, but should not for most*
 
 * http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
   URI according to RFC3986 (3.5), RFC7230 (5.1) and RFC 7540 (8.1.2.3). Rejection of requests can be changed
@@ -14,6 +15,7 @@ Minor Behavior Changes
   ``envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled``. This runtime guard must only be set
   to false when existing non-compliant traffic relies on #fragment in URI. When this option is enabled, Envoy request
   authorization extensions may be bypassed. This override and its associated behavior will be decommissioned after the standard deprecation period.
+* http: stop processing pending H/2 frames if connection transitioned to the closed state. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` to false.
 
 Bug Fixes
 ---------
