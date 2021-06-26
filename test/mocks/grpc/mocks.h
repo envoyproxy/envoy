@@ -111,7 +111,7 @@ public:
 
   MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check, bool always_use_cache));
+               bool skip_cluster_check, Grpc::CacheOption cache_option));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {

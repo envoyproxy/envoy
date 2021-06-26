@@ -54,16 +54,16 @@ TEST_F(AsyncClientManagerImplTest, DisableRawAsyncClientCache) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  RawAsyncClientSharedPtr foo_client0 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, true);
+  RawAsyncClientSharedPtr foo_client0 = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::AlwaysCache);
 
-  RawAsyncClientSharedPtr uncached_foo_client =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  RawAsyncClientSharedPtr uncached_foo_client = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
   // Raw async client is not cached by default
   EXPECT_NE(foo_client0.get(), uncached_foo_client.get());
 
-  RawAsyncClientSharedPtr foo_client1 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true, true);
+  RawAsyncClientSharedPtr foo_client1 = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::AlwaysCache);
   // When always_use_cache is true, will use cache even when runtime is diabled.
   EXPECT_EQ(foo_client0.get(), foo_client1.get());
 }
@@ -76,16 +76,16 @@ TEST_F(AsyncClientManagerImplTest, EnableRawAsyncClientCache) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   // When runtime is enabled, will use cache by default.
-  RawAsyncClientSharedPtr foo_client0 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
-  RawAsyncClientSharedPtr foo_client1 =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  RawAsyncClientSharedPtr foo_client0 = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
+  RawAsyncClientSharedPtr foo_client1 = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
   EXPECT_EQ(foo_client0.get(), foo_client1.get());
 
   // Get a different raw async client with different cluster config.
   grpc_service.mutable_envoy_grpc()->set_cluster_name("bar");
-  RawAsyncClientSharedPtr bar_client =
-      async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true);
+  RawAsyncClientSharedPtr bar_client = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
   EXPECT_NE(foo_client1.get(), bar_client.get());
 }
 

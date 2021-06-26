@@ -30,6 +30,8 @@ private:
   friend class AsyncClientFactoryImpl;
 };
 
+enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled, NeverCache };
+
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 
 // Singleton gRPC client manager. Grpc::AsyncClientManager can be used to create per-service
@@ -54,7 +56,7 @@ public:
   virtual RawAsyncClientSharedPtr
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& grpc_service,
                             Stats::Scope& scope, bool skip_cluster_check,
-                            bool always_use_cache = false) PURE;
+                            CacheOption cache_option) PURE;
 
   /**
    * Create a Grpc::AsyncClients factory for a service. Validation of the service is performed and
