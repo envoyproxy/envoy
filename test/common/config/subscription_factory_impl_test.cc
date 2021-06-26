@@ -220,13 +220,6 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   collectionSubscriptionFromUrl(fmt::format("file:///{}", file_path), {})->start({});
 }
 
-TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
-  EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
-                            EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
-                            "'/blahblah' does not exist");
-}
-
 TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
