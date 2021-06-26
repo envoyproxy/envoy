@@ -33,8 +33,7 @@ def _pch(ctx):
         "\n".join(["#include \"{}\"".format(include) for include in ctx.attr.includes]) + "\n",
     )
 
-    # TODO: -fno-pch-timestamp / invalidation in that case doesn't work
-    pch_flags = ["-x", "c++-header"]
+    pch_flags = ["-x", "c++-header", "-Xclang", "-fno-pch-timestamp"]
     pch_file = ctx.actions.declare_file(ctx.label.name + ".pch")
 
     deps_ctx = deps_cc_info.compilation_context

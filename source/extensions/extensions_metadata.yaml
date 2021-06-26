@@ -499,6 +499,11 @@ envoy.matching.input_matchers.consistent_hashing:
   - envoy.matching.input_matchers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.matching.input_matchers.ip:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source

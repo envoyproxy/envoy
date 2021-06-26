@@ -209,11 +209,11 @@ public:
   }
   CreateConnectionData createConnection(
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-      Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
-  CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              const envoy::config::core::v3::Metadata* metadata) const override;
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const override;
+  CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      const envoy::config::core::v3::Metadata* metadata) const override;
 
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>
   gauges() const override {
@@ -260,7 +260,7 @@ protected:
                    const Network::Address::InstanceConstSharedPtr& address,
                    Network::TransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   Network::TransportSocketOptionsSharedPtr transport_socket_options);
+                   Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
 
 private:
   void setEdsHealthFlag(envoy::config::core::v3::HealthStatus health_status);

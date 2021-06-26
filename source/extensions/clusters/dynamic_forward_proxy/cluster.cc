@@ -24,8 +24,7 @@ Cluster::Cluster(
                                        added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {
-}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.

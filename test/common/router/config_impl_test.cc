@@ -5202,6 +5202,7 @@ virtual_hosts:
                       key: x-resp-cluster
                       value: cluster1
                 response_headers_to_remove: [ "x-remove-cluster1" ]
+                host_rewrite_literal: "new_host1"
               - name: cluster2
                 weight: 50
                 request_headers_to_add:
@@ -5227,6 +5228,7 @@ virtual_hosts:
 
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("cluster1", headers.get_("x-req-cluster"));
+    EXPECT_EQ("new_host1", headers.getHostValue());
 
     route->finalizeResponseHeaders(resp_headers, stream_info);
     EXPECT_EQ("cluster1", resp_headers.get_("x-resp-cluster"));
