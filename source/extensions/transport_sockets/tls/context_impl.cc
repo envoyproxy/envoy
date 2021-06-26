@@ -1172,7 +1172,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
   ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same
   // cert validation config.
-  SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
+  const SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
   X509_STORE* store = SSL_CTX_get_cert_store(ssl_ctx);
   if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
