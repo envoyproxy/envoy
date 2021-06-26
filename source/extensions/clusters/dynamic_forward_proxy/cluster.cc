@@ -25,19 +25,6 @@ Cluster::Cluster(
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {
-  // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
-  // support these parameters dynamically in the future. This is not an exhaustive list of
-  // parameters that don't make sense but should be the most obvious ones that a user might set
-  // in error.
-  if (!cluster.hidden_envoy_deprecated_tls_context().sni().empty() ||
-      !cluster.hidden_envoy_deprecated_tls_context()
-           .common_tls_context()
-           .validation_context()
-           .hidden_envoy_deprecated_verify_subject_alt_name()
-           .empty()) {
-    throw EnvoyException(
-        "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
-  }
 }
 
 void Cluster::startPreInit() {
