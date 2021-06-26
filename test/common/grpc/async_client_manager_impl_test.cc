@@ -59,12 +59,12 @@ TEST_F(AsyncClientManagerImplTest, DisableRawAsyncClientCache) {
 
   RawAsyncClientSharedPtr uncached_foo_client = async_client_manager_.getOrCreateRawAsyncClient(
       grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
-  // Raw async client is not cached by default
+  // Raw async client is not cached when runtime is disabled.
   EXPECT_NE(foo_client0.get(), uncached_foo_client.get());
 
   RawAsyncClientSharedPtr foo_client1 = async_client_manager_.getOrCreateRawAsyncClient(
       grpc_service, scope_, true, CacheOption::AlwaysCache);
-  // When always_use_cache is true, will use cache even when runtime is diabled.
+  // When cache option is AlwaysCache, will use cache even when runtime is disabled.
   EXPECT_EQ(foo_client0.get(), foo_client1.get());
 }
 
@@ -75,7 +75,7 @@ TEST_F(AsyncClientManagerImplTest, EnableRawAsyncClientCache) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
-  // When runtime is enabled, will use cache by default.
+  // Use cache when runtime is enabled.
   RawAsyncClientSharedPtr foo_client0 = async_client_manager_.getOrCreateRawAsyncClient(
       grpc_service, scope_, true, CacheOption::CacheWhenRuntimeEnabled);
   RawAsyncClientSharedPtr foo_client1 = async_client_manager_.getOrCreateRawAsyncClient(
