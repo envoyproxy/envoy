@@ -140,6 +140,9 @@ private:
     // This resource type must have a Node sent at next request.
     bool must_send_node_{};
     TtlManager ttl_;
+    // The identifier for the server that sent the most recent response, or
+    // empty if there is none.
+    std::string control_plane_identifier_{};
   };
 
   bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {

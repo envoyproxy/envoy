@@ -29,7 +29,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Stats::Scope& scope, SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
     const SubscriptionOptions& options) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
-  std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (config.config_source_specifier_case()) {
@@ -103,7 +102,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoder& resource_decoder) {
-  std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (collection_locator.scheme()) {

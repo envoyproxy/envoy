@@ -275,26 +275,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
 }
 
-Address::InstanceConstSharedPtr getAddressFromSockAddrOrDie(const sockaddr_storage& ss,
-                                                            socklen_t ss_len, os_fd_t fd) {
-  // TODO(chaoqin-li1123): remove exception catching and make Address::addressFromSockAddr return
-  // null on error.
-  TRY_NEEDS_AUDIT {
-    // Set v6only to false so that mapped-v6 address can be normalize to v4
-    // address. Though dual stack may be disabled, it's still okay to assume the
-    // address is from a dual stack socket. This is because mapped-v6 address
-    // must come from a dual stack socket. An actual v6 address can come from
-    // both dual stack socket and v6 only socket. If |peer_addr| is an actual v6
-    // address and the socket is actually v6 only, the returned address will be
-    // regarded as a v6 address from dual stack socket. However, this address is not going to be
-    // used to create socket. Wrong knowledge of dual stack support won't hurt.
-    return Address::addressFromSockAddr(ss, ss_len, /*v6only=*/false);
-  }
-  catch (const EnvoyException& e) {
-    PANIC(fmt::format("Invalid address for fd: {}, error: {}", fd, e.what()));
-  }
-}
-
 Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
                                                              uint32_t self_port, os_fd_t fd) {
   if (cmsg.cmsg_type == IPV6_PKTINFO) {
@@ -305,7 +285,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv6_addr->sin6_family = AF_INET6;
     ipv6_addr->sin6_addr = info->ipi6_addr;
     ipv6_addr->sin6_port = htons(self_port);
-    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in6), fd);
   }
 
   if (cmsg.cmsg_type == messageTypeContainsIP()) {
@@ -315,7 +295,7 @@ Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg
     ipv4_addr->sin_family = AF_INET;
     ipv4_addr->sin_addr = addressFromMessage(cmsg);
     ipv4_addr->sin_port = htons(self_port);
-    return getAddressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
+    return Address::addressFromSockAddrOrDie(ss, sizeof(sockaddr_in), fd);
   }
 
   return nullptr;
@@ -385,7 +365,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                  fmt::format("Incorrectly set control message length: {}", hdr.msg_controllen));
   RELEASE_ASSERT(hdr.msg_namelen > 0,
                  fmt::format("Unable to get remote address from recvmsg() for fd: {}", fd_));
-  output.msg_[0].peer_address_ = getAddressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
+  output.msg_[0].peer_address_ = Address::addressFromSockAddrOrDie(peer_addr, hdr.msg_namelen, fd_);
   output.msg_[0].gso_size_ = 0;
 
   if (hdr.msg_controllen > 0) {
@@ -492,7 +472,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     output.msg_[i].msg_len_ = mmsg_hdr[i].msg_len;
     // Get local and peer addresses for each packet.
     output.msg_[i].peer_address_ =
-        getAddressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
+        Address::addressFromSockAddrOrDie(raw_addresses[i], hdr.msg_namelen, fd_);
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
@@ -605,7 +585,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
@@ -616,7 +596,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.rc_ != 0) {
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {
@@ -630,7 +610,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::addressFromSockAddr(ss, ss_len);
+  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,

@@ -52,6 +52,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.input_matchers.consistent_hashing":       "//source/extensions/matching/input_matchers/consistent_hashing:config",
+    "envoy.matching.input_matchers.ip":                       "//source/extensions/matching/input_matchers/ip:config",
 
     #
     # Generic Inputs
@@ -125,6 +126,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
+    "envoy.filters.network.connection_limit":           "//source/extensions/filters/network/connection_limit:config",
     "envoy.filters.network.direct_response":            "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                       "//source/extensions/filters/network/echo:config",
@@ -165,6 +167,7 @@ EXTENSIONS = {
     #
 
     "envoy.stat_sinks.dog_statsd":                      "//source/extensions/stat_sinks/dog_statsd:config",
+    "envoy.stat_sinks.graphite_statsd":                 "//source/extensions/stat_sinks/graphite_statsd:config",
     "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
@@ -287,6 +290,11 @@ EXTENSIONS = {
     "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
     "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
 
+    #
+    # Formatter
+    #
+
+    "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

@@ -104,6 +104,10 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
 
     delegated_filter_->setDecoderFilterCallbacks(*decoder_callbacks_);
     delegated_filter_->setEncoderFilterCallbacks(*encoder_callbacks_);
+
+    // Size should be small, so a copy should be fine.
+    access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
+                           wrapper.access_loggers_.end());
   }
 
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,

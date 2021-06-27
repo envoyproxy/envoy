@@ -137,3 +137,7 @@ Some drawbacks to the Original Source filter:
   :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.
+
+.. note::
+
+ This feature is not supported on Windows.

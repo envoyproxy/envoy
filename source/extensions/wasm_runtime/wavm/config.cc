@@ -16,7 +16,7 @@ public:
   absl::string_view name() override { return "envoy.wasm.runtime.wavm"; }
 };
 
-#if defined(ENVOY_WASM_WAVM)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAVM)
 REGISTER_FACTORY(WavmRuntimeFactory, WasmRuntimeFactory);
 #endif
 

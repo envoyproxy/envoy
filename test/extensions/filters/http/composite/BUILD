@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/composite:config",
         "//source/extensions/filters/http/composite:filter_lib",
+        "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/http:http_mocks",
     ],
 )
