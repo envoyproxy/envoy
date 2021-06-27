@@ -939,7 +939,6 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
           "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
 
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1689,7 +1688,6 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_256_HASH);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1725,7 +1723,6 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_256_HASH);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1890,7 +1887,6 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_PASSWORD_PROTECTED_CERT_256_HASH);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1935,7 +1931,6 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1970,7 +1965,6 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2007,7 +2001,6 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
@@ -2035,7 +2028,6 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2066,7 +2058,6 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2101,7 +2092,6 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2138,7 +2128,6 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2176,7 +2165,6 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2213,7 +2201,6 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2251,7 +2238,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2281,7 +2267,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2313,7 +2298,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2349,7 +2333,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2387,7 +2370,6 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -4306,7 +4288,6 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"));
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   // Client RSA certificate.
@@ -4601,7 +4582,6 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
@@ -4621,7 +4601,6 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
@@ -4645,7 +4624,6 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
