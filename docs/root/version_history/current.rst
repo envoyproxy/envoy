@@ -58,6 +58,7 @@ Bug Fixes
 * udp: limit each UDP listener to read maxmium 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
 * xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
+* xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under 'annotations' section of the segment data.
 * zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
 
 Removed Config or Runtime
