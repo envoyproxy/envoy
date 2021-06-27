@@ -1560,7 +1560,8 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(listener, client, OptionalServerConfig{false});
+  configureServerAndExpiredClientCertificate(listener, client,
+                                             OptionalServerConfig{.allow_expired_cert = false});
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1572,7 +1573,8 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(listener, client, OptionalServerConfig{true});
+  configureServerAndExpiredClientCertificate(listener, client,
+                                             OptionalServerConfig{.allow_expired_cert = true});
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
