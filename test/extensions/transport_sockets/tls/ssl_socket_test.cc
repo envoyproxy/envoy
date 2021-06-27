@@ -829,7 +829,6 @@ void configureServerAndExpiredClientCertificate(
     server_validation_ctx->add_verify_certificate_hash(server_config.cert_hash.value());
   }
   updateFilterChain(filter_chain, tls_context);
-  ;
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
