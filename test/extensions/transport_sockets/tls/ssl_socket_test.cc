@@ -793,9 +793,9 @@ void updateFilterChain(
 }
 
 struct OptionalServerConfig {
-  absl::optional<bool> allow_expired_cert = {};
   absl::optional<std::string> cert_hash = {};
   absl::optional<std::string> trusted_ca = {};
+  absl::optional<bool> allow_expired_cert = {};
 };
 
 void configureServerAndExpiredClientCertificate(
@@ -1559,8 +1559,9 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(listener, client,
-                                             OptionalServerConfig{.allow_expired_cert = false});
+  OptionalServerConfig server_config = {};
+  server_config.allow_expired_cert = false;
+  configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1572,8 +1573,9 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(listener, client,
-                                             OptionalServerConfig{.allow_expired_cert = true});
+  OptionalServerConfig server_config = {};
+  server_config.allow_expired_cert = true;
+  configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1585,11 +1587,10 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(
-      listener, client,
-      OptionalServerConfig{.allow_expired_cert = true,
-                           .cert_hash =
-                               "0000000000000000000000000000000000000000000000000000000000000000"});
+  OptionalServerConfig server_config = {};
+  server_config.allow_expired_cert = true;
+  server_config.cert_hash = "0000000000000000000000000000000000000000000000000000000000000000";
+  configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_cert_hash")
@@ -1602,13 +1603,12 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
+  OptionalServerConfig server_config = {};
+  server_config.allow_expired_cert = true;
   // Fake CA is not used to sign the client's certificate.
-  configureServerAndExpiredClientCertificate(
-      listener, client,
-      OptionalServerConfig{
-          .allow_expired_cert = true,
-          .trusted_ca = "{{ test_rundir "
-                        "}}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"});
+  server_config.trusted_ca = "{{ test_rundir "
+                             "}}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem";
+  configureServerAndExpiredClientCertificate(listener, client, server_config);
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -4129,13 +4129,6 @@ TEST_P(SslSocketTest, CipherSuites) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  // TODO(tyxia) Pointer like solution
-  // auto* tls_context_ptr = filter_chain->mutable_transport_socket()->mutable_typed_config();
-  // //
-  // ASSERT_TRUE(tls_context_ptr->Is<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>());
-  // auto tls_context =
-  //       MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
-  //           *tls_context_ptr);
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -4165,7 +4158,6 @@ TEST_P(SslSocketTest, CipherSuites) {
       tls_context.mutable_common_tls_context()->mutable_tls_params();
   server_params->add_cipher_suites(common_cipher_suite);
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  // updateFilterChain(filter_chain, tls_context);
   TestUtilOptionsV2 cipher_test_options(listener, client, true, GetParam());
   cipher_test_options.setExpectedCiphersuite(common_cipher_suite);
   std::string stats = "ssl.ciphers." + common_cipher_suite;
