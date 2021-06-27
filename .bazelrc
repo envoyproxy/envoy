@@ -19,7 +19,6 @@ build --host_force_python=PY3
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --enable_platform_specific_config
-build --extra_toolchains=@rules_python//python:autodetecting_toolchain_nonstrict
 
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
@@ -383,19 +382,6 @@ build:windows --features=compiler_param_file
 build:windows --features=fully_static_link
 build:windows --features=static_link_msvcrt
 build:windows --dynamic_mode=off
-
-build --google_credentials=/usr/local/google/home/tyxia/.config/gcloud/application_default_credentials.json
-
-# GCP remote cache
-build --remote_instance_name=projects/envoy-rbe/instances/default_instance
-build --remote_cache=grpcs://remotebuildexecution.googleapis.com
-
-# GCP remote execution
-build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:remote --jobs=200
-build:remote --config=rbe-toolchain-clang-libc++
-build:remote --config=remote-ci
-build:remote --remote_download_outputs=minimal
 
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc

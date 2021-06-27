@@ -894,7 +894,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   // if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<

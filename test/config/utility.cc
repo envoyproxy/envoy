@@ -864,8 +864,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                                         envoy::config::core::v3::TransportSocket& transport_socket) {
+void ConfigHelper::setTapTransportSocket(
+    const std::string& tap_path, const std::string& type,
+    envoy::config::core::v3::TransportSocket& transport_socket) {
   // Determine inner transport socket.
   envoy::config::core::v3::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {

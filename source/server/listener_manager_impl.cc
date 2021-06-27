@@ -940,7 +940,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   // We copy by value first then override if necessary.
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
