@@ -668,6 +668,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/rules_python/releases/download/{version}/rules_python-{version}.tar.gz"],
         use_category = ["build"],
     ),
+    rules_pkg = dict(
+        project_name = "Packaging rules for Bazel",
+        project_desc = "Bazel rules for the packaging distributions",
+        project_url = "https://github.com/bazelbuild/rules_pkg",
+        version = "0.4.0",
+        sha256 = "038f1caa773a7e35b3663865ffb003169c6a71dc995e39bf4815792f385d837d",
+        urls = ["https://github.com/bazelbuild/rules_pkg/releases/download/{version}/rules_pkg-{version}.tar.gz"],
+        use_category = ["build"],
+        release_date = "2021-03-03",
+    ),
     six = dict(
         project_name = "Six",
         project_desc = "Python 2 and 3 compatibility library",
