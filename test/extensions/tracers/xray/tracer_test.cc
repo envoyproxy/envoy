@@ -73,6 +73,9 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
     ASSERT_STREQ(expected_user_agent,
                  s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_FALSE(s.fault());    /*server error*/
+    ASSERT_FALSE(s.error());    /*client error*/
+    ASSERT_FALSE(s.throttle()); /*request throttled*/
     ASSERT_DOUBLE_EQ(expected_status_code,
                      s.http().response().fields().at("status").number_value());
     ASSERT_DOUBLE_EQ(expected_content_length,
