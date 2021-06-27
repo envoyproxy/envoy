@@ -4158,6 +4158,7 @@ TEST_P(SslSocketTest, CipherSuites) {
       tls_context.mutable_common_tls_context()->mutable_tls_params();
   server_params->add_cipher_suites(common_cipher_suite);
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
+  updateFilterChain(filter_chain, tls_context);
   TestUtilOptionsV2 cipher_test_options(listener, client, true, GetParam());
   cipher_test_options.setExpectedCiphersuite(common_cipher_suite);
   std::string stats = "ssl.ciphers." + common_cipher_suite;
