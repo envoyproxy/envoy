@@ -16,7 +16,7 @@ public:
   absl::string_view name() override { return "envoy.wasm.runtime.v8"; }
 };
 
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 REGISTER_FACTORY(V8RuntimeFactory, WasmRuntimeFactory);
 #endif
 

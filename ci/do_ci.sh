@@ -6,9 +6,8 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
-          "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
-          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || \
+          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -144,8 +143,12 @@ function bazel_binary_build() {
 }
 
 function run_process_test_result() {
-  echo "running flaky test reporting script"
-  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  if [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
+      echo "running flaky test reporting script"
+      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  else
+      echo "no flaky test results found"
+  fi
 }
 
 function run_ci_verify () {
@@ -218,20 +221,11 @@ elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
   bazel_binary_build sizeopt
   exit 0
 elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  # Temporariliy exclude some extensions from the envoy binary to address build failures
-  # due to long command line. Tests will still run.
-  BAZEL_BUILD_OPTIONS+=(
-    "--test_env=HEAPCHECK="
-    "--//source/extensions/filters/network/rocketmq_proxy:enabled=False"
-    "--//source/extensions/filters/http/admission_control:enabled=False"
-    "--//source/extensions/filters/http/dynamo:enabled=False"
-    "--//source/extensions/filters/http/header_to_metadata:enabled=False"
-    "--//source/extensions/filters/http/on_demand:enabled=False")
+  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
   setup_gcc_toolchain
 
-  # Disable //test/config_test:example_configs_test so it does not fail because of excluded extensions above
-  echo "Testing ${TEST_TARGETS[*]} -//test/config_test:example_configs_test"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}" -//test/config_test:example_configs_test
+  echo "Testing ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
 
   echo "bazel release build with gcc..."
   bazel_binary_build fastbuild
@@ -302,11 +296,8 @@ elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   echo "Building..."
   bazel_binary_build fastbuild
 
-  echo "Building and testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
-  # TODO(foreseeable): consolidate this and the API tool tests in a dedicated target.
-  bazel_with_collection //tools/envoy_headersplit:headersplit_test --spawn_strategy=local
-  bazel_with_collection //tools/envoy_headersplit:replace_includes_test --spawn_strategy=local
+  echo "Testing ${TEST_TARGETS[*]}"
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # Right now, none of the available compile-time options conflict with each other. If this
@@ -431,32 +422,13 @@ elif [[ "$CI_TARGET" == "check_format" ]]; then
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
   exit 0
-elif [[ "$CI_TARGET" == "check_repositories" ]]; then
-  echo "check_repositories..."
-  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  exit 0
-elif [[ "$CI_TARGET" == "check_spelling" ]]; then
-  echo "check_spelling..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh check
-  exit 0
-elif [[ "$CI_TARGET" == "fix_spelling" ]];then
-  echo "fix_spell..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling.sh fix
-  exit 0
-elif [[ "$CI_TARGET" == "check_spelling_pedantic" ]]; then
-  echo "check_spelling_pedantic..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py --mark check
-  exit 0
-elif [[ "$CI_TARGET" == "fix_spelling_pedantic" ]]; then
-  echo "fix_spelling_pedantic..."
-  "${ENVOY_SRCDIR}"/tools/spelling/check_spelling_pedantic.py fix
-  exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
   # Build docs.
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
   exit 0
 elif [[ "$CI_TARGET" == "deps" ]]; then
+
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
   "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
@@ -467,6 +439,8 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
 
   # Validate repository metadata.
+  echo "check repositories..."
+  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
   "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
 
   # Run pip requirements tests

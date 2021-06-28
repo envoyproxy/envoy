@@ -218,8 +218,7 @@ public:
                        const Network::TransportSocketFactory& factory) const PURE;
 };
 
-// TODO(mattklein123): Rename to TransportSocketOptionsConstSharedPtr in a dedicated follow up.
-using TransportSocketOptionsSharedPtr = std::shared_ptr<const TransportSocketOptions>;
+using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
  * A factory for creating transport socket. It will be associated to filter chains and clusters.
@@ -238,7 +237,7 @@ public:
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsSharedPtr options) const PURE;
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
 
   /**
    * @return bool whether the transport socket will use proxy protocol options.

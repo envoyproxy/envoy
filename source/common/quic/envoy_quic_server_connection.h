@@ -35,6 +35,22 @@ public:
   // QuicNetworkConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+
+  // quic::QuicConnection
+  // Overridden to provide a CID manager which issues CIDs compatible with the existing BPF routing.
+  std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
+  MakeSelfIssuedConnectionIdManager() override;
+};
+
+// An implementation that issues connection IDs with stable first 4 types.
+class EnvoyQuicSelfIssuedConnectionIdManager : public quic::QuicSelfIssuedConnectionIdManager {
+public:
+  using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;
+
+  // quic::QuicSelfIssuedConnectionIdManager
+  // Overridden to return a new CID with the same first 4 bytes.
+  quic::QuicConnectionId
+  GenerateNewConnectionId(const quic::QuicConnectionId& old_connection_id) const override;
 };
 
 } // namespace Quic

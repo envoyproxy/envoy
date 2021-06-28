@@ -87,6 +87,8 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateC
   parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
 }
 
+ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
+
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
 }
@@ -101,7 +103,7 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state) {
   return std::make_unique<FixedHttpConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,

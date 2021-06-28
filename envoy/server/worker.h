@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/overload/overload_manager.h"
 
@@ -44,8 +45,9 @@ public:
   /**
    * Start the worker thread.
    * @param guard_dog supplies the guard dog to use for thread watching.
+   * @param cb a callback to run when the worker thread starts running.
    */
-  virtual void start(GuardDog& guard_dog) PURE;
+  virtual void start(GuardDog& guard_dog, const Event::PostCb& cb) PURE;
 
   /**
    * Initialize stats for this worker's dispatcher, if available. The worker will output

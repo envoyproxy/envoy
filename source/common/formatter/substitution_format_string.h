@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/formatter/substitution_formatter.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -20,7 +21,8 @@ public:
    * Generate a formatter object from config SubstitutionFormatString.
    */
   static FormatterPtr
-  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config, Api::Api& api);
+  fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
+                  Server::Configuration::CommonFactoryContext& context);
 
   /**
    * Generate a Json formatter object from proto::Struct config

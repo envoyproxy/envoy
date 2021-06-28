@@ -41,6 +41,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -220,6 +221,45 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
     }
   }
   return AssertionSuccess();
+}
+
+AssertionResult TestUtility::waitUntilHistogramHasSamples(Stats::Store& store,
+                                                          const std::string& name,
+                                                          Event::TestTimeSystem& time_system,
+                                                          Event::Dispatcher& main_dispatcher,
+                                                          std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (true) {
+    auto histo = findByName<Stats::ParentHistogramSharedPtr>(store.histograms(), name);
+    if (histo) {
+      uint64_t sample_count = readSampleCount(main_dispatcher, *histo);
+      if (sample_count) {
+        break;
+      }
+    }
+
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
+
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return AssertionFailure() << fmt::format("timed out waiting for {} to have samples", name);
+    }
+  }
+  return AssertionSuccess();
+}
+
+uint64_t TestUtility::readSampleCount(Event::Dispatcher& main_dispatcher,
+                                      const Stats::ParentHistogram& histogram) {
+  // Note: we need to read the sample count from the main thread, to avoid data races.
+  uint64_t sample_count = 0;
+  absl::Notification notification;
+
+  main_dispatcher.post([&] {
+    sample_count = histogram.cumulativeStatistics().sampleCount();
+    notification.Notify();
+  });
+  notification.WaitForNotification();
+
+  return sample_count;
 }
 
 std::list<Network::DnsResponse>

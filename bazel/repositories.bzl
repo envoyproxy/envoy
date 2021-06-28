@@ -175,6 +175,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
+    external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -831,8 +832,18 @@ def _com_github_grpc_grpc():
     )
 
     native.bind(
+        name = "upb_lib_descriptor_reflection",
+        actual = "@upb//:descriptor_upb_proto_reflection",
+    )
+
+    native.bind(
         name = "upb_textformat_lib",
         actual = "@upb//:textformat",
+    )
+
+    native.bind(
+        name = "upb_json_lib",
+        actual = "@upb//:json",
     )
 
 def _upb():
@@ -847,10 +858,7 @@ def _proxy_wasm_cpp_sdk():
     external_http_archive(name = "proxy_wasm_cpp_sdk")
 
 def _proxy_wasm_cpp_host():
-    external_http_archive(
-        name = "proxy_wasm_cpp_host",
-        build_file = "@envoy//bazel/external:proxy_wasm_cpp_host.BUILD",
-    )
+    external_http_archive(name = "proxy_wasm_cpp_host")
 
 def _emscripten_toolchain():
     external_http_archive(
@@ -967,6 +975,10 @@ def _com_github_wasm_c_api():
     external_http_archive(
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
+    )
+    native.bind(
+        name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 
 def _rules_fuzzing():
