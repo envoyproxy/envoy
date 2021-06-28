@@ -2415,6 +2415,52 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
   EXPECT_EQ(filter_chain, nullptr);
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSourceIPMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config: {}
+    filter_chains:
+    - filter_chain_match:
+        direct_source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
+      transport_socket:
+        name: tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(server_.api_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  // IPv4 client connects to unknown IP - no match.
+  auto filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "1.2.3.4");
+  EXPECT_EQ(filter_chain, nullptr);
+
+  // IPv4 client connects to valid IP - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "1.2.3.4", "", "tls", {}, "8.8.8.8", 111, "127.0.0.1");
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  auto ssl_socket =
+      dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  auto server_names = ssl_socket->ssl()->dnsSansLocalCertificate();
+  EXPECT_EQ(server_names.size(), 1);
+  EXPECT_EQ(server_names.front(), "server1.example.com");
+
+  // UDS client - no match.
+  filter_chain = findFilterChain(0, "/tmp/test.sock", "", "tls", {}, "/tmp/test.sock", 111);
+  EXPECT_EQ(filter_chain, nullptr);
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationIPMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -3023,7 +3069,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // IPv4 client connects to default IP - using 1st filter chain.
+  // UDS client connects - using 1st filter chain with no IP match
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
@@ -3031,6 +3077,15 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
+
+  // IPv4 client connects to default IP - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
@@ -3109,15 +3164,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
-  // IPv4 client connects to default IP - using 1st filter chain.
-  auto filter_chain =
-      findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "127.0.0.1");
+  // UDS client connects - using 1st filter chain with no IP match
+  auto filter_chain = findFilterChain(1234, "/uds_1", "", "tls", {}, "/uds_2", 111, "/uds_3");
   ASSERT_NE(filter_chain, nullptr);
   EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->ssl()->uriSanLocalCertificate();
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
+
+  // IPv4 client connects to default IP - using 1st filter chain.
+  filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "127.0.0.1", 111, "127.0.0.1");
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+  transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+  uri = ssl_socket->ssl()->uriSanLocalCertificate();
   EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
