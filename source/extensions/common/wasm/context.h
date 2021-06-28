@@ -46,10 +46,12 @@ using CapabilityRestrictionConfig = envoy::extensions::wasm::v3::CapabilityRestr
 using SanitizationConfig = envoy::extensions::wasm::v3::SanitizationConfig;
 using GrpcService = envoy::config::core::v3::GrpcService;
 
+class PluginHandle;
 class Wasm;
 
 using PluginBaseSharedPtr = std::shared_ptr<PluginBase>;
 using PluginHandleBaseSharedPtr = std::shared_ptr<PluginHandleBase>;
+using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 using WasmHandleBaseSharedPtr = std::shared_ptr<WasmHandleBase>;
 
 // Opaque context object.
@@ -110,10 +112,11 @@ class Context : public proxy_wasm::ContextBase,
                 public google::api::expr::runtime::BaseActivation,
                 public std::enable_shared_from_this<Context> {
 public:
-  Context();                                                                    // Testing.
-  Context(Wasm* wasm);                                                          // Vm Context.
-  Context(Wasm* wasm, const PluginSharedPtr& plugin);                           // Root Context.
-  Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin); // Stream context.
+  Context();                                          // Testing.
+  Context(Wasm* wasm);                                // Vm Context.
+  Context(Wasm* wasm, const PluginSharedPtr& plugin); // Root Context.
+  Context(Wasm* wasm, uint32_t root_context_id,
+          PluginHandleSharedPtr plugin_handle); // Stream context.
   ~Context() override;
 
   Wasm* wasm() const;
@@ -396,6 +399,7 @@ protected:
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
+  PluginHandleSharedPtr plugin_handle_{nullptr};
 
   uint32_t next_http_call_token_ = 1;
   uint32_t next_grpc_token_ = 1; // Odd tokens are for Calls even for Streams.
