@@ -32,8 +32,10 @@ envoy_cc_extension(
         "//library/common/http:header_utility_lib",
         "//library/common/http:internal_headers_lib",
         "//library/common/types:c_types_lib",
+        "@envoy//envoy/common:scope_tracker_interface",
         "@envoy//envoy/http:filter_interface",
         "@envoy//source/common/common:minimal_logger_lib",
+        "@envoy//source/common/common:scope_tracker",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

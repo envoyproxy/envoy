@@ -4,7 +4,6 @@ try-import ./envoy/.bazelrc
 # Common flags for all builds
 build --define=google_grpc=disabled
 build --define=hot_restart=disabled
-build --define=signal_trace=disabled
 build --define=tcmalloc=disabled
 build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules

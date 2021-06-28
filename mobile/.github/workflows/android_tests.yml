@@ -70,7 +70,7 @@ jobs:
       - name: 'Run Java library tests'
         if: steps.check_context.outputs.run_tests == 'true'
         run: |
-          bazelisk test --test_output=all --build_tests_only  //test/java/...
+          bazelisk test --test_output=all --build_tests_only --define=signal_trace=disabled //test/java/...
   kotlintestslinux:
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.

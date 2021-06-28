@@ -45,5 +45,26 @@ void ProvisionalDispatcher::deferredDelete(DeferredDeletablePtr&& to_delete) {
   event_dispatcher_->deferredDelete(std::move(to_delete));
 }
 
+void ProvisionalDispatcher::pushTrackedObject(const ScopeTrackedObject* object) {
+  RELEASE_ASSERT(
+      isThreadSafe(),
+      "ProvisionalDispatcher::pushTrackedObject must be called from a threadsafe context");
+  event_dispatcher_->pushTrackedObject(object);
+}
+
+void ProvisionalDispatcher::popTrackedObject(const ScopeTrackedObject* expected_object) {
+  RELEASE_ASSERT(
+      isThreadSafe(),
+      "ProvisionalDispatcher::popTrackedObject must be called from a threadsafe context");
+  event_dispatcher_->popTrackedObject(expected_object);
+}
+
+bool ProvisionalDispatcher::trackedObjectStackIsEmpty() const {
+  RELEASE_ASSERT(
+      isThreadSafe(),
+      "ProvisionalDispatcher::trackedObjectStackIsEmpty must be called from a threadsafe context");
+  return event_dispatcher_->trackedObjectStackIsEmpty();
+}
+
 } // namespace Event
 } // namespace Envoy

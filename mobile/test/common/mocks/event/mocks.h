@@ -37,6 +37,9 @@ public:
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(envoy_status_t, post_, (std::function<void()> callback));
   MOCK_METHOD(bool, isThreadSafe, (), (const));
+  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
+  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
+  MOCK_METHOD(bool, trackedObjectStackIsEmpty, (), (const));
 
   std::list<DeferredDeletablePtr> to_delete_;
   std::list<std::function<void()>> callbacks_;

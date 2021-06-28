@@ -65,70 +65,73 @@ public:
   } filter_invocations;
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, PlatformBridgeIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+// INSTANTIATE_TEST_SUITE_P(IpVersions, PlatformBridgeIntegrationTest,
+//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-TEST_P(PlatformBridgeIntegrationTest, MultipleFilters) {
-  envoy_http_filter platform_filter_1{};
-  filter_invocations invocations_1{};
-  platform_filter_1.static_context = &invocations_1;
-  platform_filter_1.init_filter = [](const void* context) -> const void* {
-    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
-    filter_invocations* invocations =
-        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
-    invocations->init_filter_calls++;
-    return invocations;
-  };
-  platform_filter_1.on_response_data = [](envoy_data c_data, bool,
-                                          const void* context) -> envoy_filter_data_status {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    invocations->on_response_data_calls++;
-    return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
-  };
-  platform_filter_1.release_filter = [](const void*) {};
+// TEST_P(PlatformBridgeIntegrationTest, MultipleFilters) {
+//   envoy_http_filter platform_filter_1{};
+//   filter_invocations invocations_1{};
+//   platform_filter_1.static_context = &invocations_1;
+//   platform_filter_1.init_filter = [](const void* context) -> const void* {
+//     envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+//     filter_invocations* invocations =
+//         static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
+//     invocations->init_filter_calls++;
+//     return invocations;
+//   };
+//   platform_filter_1.on_response_data = [](envoy_data c_data, bool,
+//                                           const void* context) -> envoy_filter_data_status {
+//     filter_invocations* invocations =
+//     static_cast<filter_invocations*>(const_cast<void*>(context));
+//     invocations->on_response_data_calls++;
+//     return {kEnvoyFilterDataStatusContinue, c_data, nullptr};
+//   };
+//   platform_filter_1.release_filter = [](const void*) {};
 
-  envoy_http_filter platform_filter_2{};
-  filter_invocations invocations_2{};
-  platform_filter_2.static_context = &invocations_2;
-  platform_filter_2.init_filter = [](const void* context) -> const void* {
-    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
-    filter_invocations* invocations =
-        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
-    invocations->init_filter_calls++;
-    return invocations;
-  };
-  platform_filter_2.on_response_data = [](envoy_data c_data, bool end_stream,
-                                          const void* context) -> envoy_filter_data_status {
-    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
-    invocations->on_response_data_calls++;
-    if (!end_stream) {
-      c_data.release(c_data.context);
-      return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
-    } else {
-      return {kEnvoyFilterDataStatusResumeIteration, c_data, nullptr};
-    }
-  };
-  platform_filter_2.release_filter = [](const void*) {};
+//   envoy_http_filter platform_filter_2{};
+//   filter_invocations invocations_2{};
+//   platform_filter_2.static_context = &invocations_2;
+//   platform_filter_2.init_filter = [](const void* context) -> const void* {
+//     envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+//     filter_invocations* invocations =
+//         static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
+//     invocations->init_filter_calls++;
+//     return invocations;
+//   };
+//   platform_filter_2.on_response_data = [](envoy_data c_data, bool end_stream,
+//                                           const void* context) -> envoy_filter_data_status {
+//     filter_invocations* invocations =
+//     static_cast<filter_invocations*>(const_cast<void*>(context));
+//     invocations->on_response_data_calls++;
+//     if (!end_stream) {
+//       c_data.release(c_data.context);
+//       return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
+//     } else {
+//       return {kEnvoyFilterDataStatusResumeIteration, c_data, nullptr};
+//     }
+//   };
+//   platform_filter_2.release_filter = [](const void*) {};
 
-  customInit(&platform_filter_1, &platform_filter_2);
+//   customInit(&platform_filter_1, &platform_filter_2);
 
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+//   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  // Wait for frames to arrive upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+//   // Wait for frames to arrive upstream.
+//   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_,
+//   fake_upstream_connection_));
+//   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+//   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+//   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
-  upstream_request_->encodeData(100, false);
-  upstream_request_->encodeData(100, true);
+//   upstream_request_->encodeData(100, false);
+//   upstream_request_->encodeData(100, true);
 
-  // Wait for frames to arrive downstream.
-  ASSERT_TRUE(response->waitForEndStream());
+//   // Wait for frames to arrive downstream.
+//   ASSERT_TRUE(response->waitForEndStream());
 
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-}
+//   EXPECT_TRUE(response->complete());
+//   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+// }
 
 } // namespace Envoy

@@ -1,7 +1,9 @@
 #include "library/common/http/client.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/dump_state_utils.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
@@ -31,6 +33,7 @@ Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
+  ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
 
@@ -82,6 +85,7 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
 }
 
 void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_stream) {
+  ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, data.length(), end_stream);
 
@@ -106,6 +110,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
 }
 
 void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& trailers) {
+  ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] response trailers for stream:\n{}", direct_stream_.stream_handle_,
             trailers);
 
@@ -135,6 +140,7 @@ void Client::DirectStreamCallbacks::onComplete() {
 }
 
 void Client::DirectStreamCallbacks::onError() {
+  ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
 
   // The stream should no longer be preset in the map, because onError() was either called from a
@@ -151,6 +157,7 @@ void Client::DirectStreamCallbacks::onError() {
 }
 
 void Client::DirectStreamCallbacks::onCancel() {
+  ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
   http_client_.stats().stream_cancel_.inc();
   bridge_callbacks_.on_cancel(bridge_callbacks_.context);
@@ -174,6 +181,15 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   }
   parent_.removeStream(stream_handle_);
   callbacks_->onError();
+}
+
+void Client::DirectStream::dumpState(std::ostream&, int indent_level) const {
+  // TODO(junr03): output to ostream arg - https://github.com/envoyproxy/envoy-mobile/issues/1497.
+  std::stringstream ss;
+  const char* spaces = spacesForLevel(indent_level);
+
+  ss << spaces << "DirectStream" << DUMP_MEMBER(stream_handle_) << std::endl;
+  ENVOY_LOG(error, "\n{}", ss.str());
 }
 
 void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks bridge_callbacks) {
@@ -202,6 +218,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // from the caller.
   // https://github.com/lyft/envoy-mobile/issues/301
   if (direct_stream) {
+    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
     // The second argument here specifies whether to use an 'alternate' cluster (see discussion
     // below in cluster definitions). Random selection avoids determinism resulting from consistent
@@ -238,6 +255,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   // from the caller.
   // https://github.com/lyft/envoy-mobile/issues/301
   if (direct_stream) {
+    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
     // of the InstancePtr to outlive this function call.
     Buffer::InstancePtr buf = Data::Utility::toInternalData(data);
@@ -261,6 +279,7 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   // from the caller.
   // https://github.com/lyft/envoy-mobile/issues/301
   if (direct_stream) {
+    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);
     ENVOY_LOG(debug, "[S{}] request trailers for stream:\n{}", stream, *internal_trailers);
     direct_stream->request_decoder_->decodeTrailers(std::move(internal_trailers));
@@ -271,6 +290,7 @@ void Client::cancelStream(envoy_stream_t stream) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream = getStream(stream);
   if (direct_stream) {
+    ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     removeStream(direct_stream->stream_handle_);
 
     direct_stream->callbacks_->onCancel();

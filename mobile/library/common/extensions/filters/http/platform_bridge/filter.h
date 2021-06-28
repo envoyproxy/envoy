@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/http/filter.h"
 
 #include "source/common/common/logger.h"
@@ -47,6 +48,7 @@ enum class IterationState { Ongoing, Stopped };
  * For more information on implementing platform filters, see the docs.
  */
 class PlatformBridgeFilter final : public Http::PassThroughFilter,
+                                   public ScopeTrackedObject,
                                    public Logger::Loggable<Logger::Id::filter>,
                                    public std::enable_shared_from_this<PlatformBridgeFilter> {
 public:
@@ -77,6 +79,9 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
 
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level = 0) const override;
+
   bool isAlive() { return alive_; }
 
 private:
@@ -88,8 +93,10 @@ private:
     FilterBase(PlatformBridgeFilter& parent, envoy_filter_on_headers_f on_headers,
                envoy_filter_on_data_f on_data, envoy_filter_on_trailers_f on_trailers,
                envoy_filter_on_resume_f on_resume)
-        : iteration_state_(IterationState::Ongoing), parent_(parent), on_headers_(on_headers),
-          on_data_(on_data), on_trailers_(on_trailers), on_resume_(on_resume) {}
+        : parent_(parent), on_headers_(on_headers), on_data_(on_data), on_trailers_(on_trailers),
+          on_resume_(on_resume) {
+      state_.iteration_state_ = IterationState::Ongoing;
+    }
 
     virtual ~FilterBase() = default;
 
@@ -110,13 +117,28 @@ private:
     virtual void resumeIteration() PURE;
     virtual Buffer::Instance* buffer() PURE;
 
-    IterationState iteration_state_;
+    void dumpState(std::ostream& os, int indent_level = 0);
+
+    // Struct that collects Filter state for keeping track of state transitions and to report via
+    // dumpState.
+    struct FilterState {
+      IterationState iteration_state_;
+      bool on_headers_called_{};
+      bool headers_forwarded_{};
+      bool on_data_called_{};
+      bool data_forwarded_{};
+      bool on_trailers_called_{};
+      bool trailers_forwarded_{};
+      bool on_resume_called_{};
+      bool stream_complete_{};
+    };
+
     PlatformBridgeFilter& parent_;
+    FilterState state_;
     envoy_filter_on_headers_f on_headers_;
     envoy_filter_on_data_f on_data_;
     envoy_filter_on_trailers_f on_trailers_;
     envoy_filter_on_resume_f on_resume_;
-    bool stream_complete_{};
     Http::HeaderMap* pending_headers_{};
     Http::HeaderMap* pending_trailers_{};
   };
@@ -152,6 +174,8 @@ private:
   };
 
   using ResponseFilterBasePtr = std::unique_ptr<ResponseFilterBase>;
+
+  Event::ScopeTracker& scopeTracker() const { return dispatcher_; }
 
   Event::Dispatcher& dispatcher_;
   const std::string filter_name_;
