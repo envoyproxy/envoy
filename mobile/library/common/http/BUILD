@@ -20,6 +20,7 @@ envoy_cc_library(
         "//library/common/thread:lock_guard_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/buffer:buffer_interface",
+        "@envoy//envoy/common:scope_tracker_interface",
         "@envoy//envoy/event:deferred_deletable",
         "@envoy//envoy/http:api_listener_interface",
         "@envoy//envoy/http:header_map_interface",
