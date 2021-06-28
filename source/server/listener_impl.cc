@@ -296,12 +296,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                               // ready.
                               listener_init_target_.ready();
                             }
-                          })
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+                          }),
+      quic_stat_names_(parent_.quicStatNames()) {
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -368,12 +364,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                           [this] {
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
-                          })
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+                          }),
+      quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);

@@ -196,3 +196,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/filters/http/set_metadata @aguinet @snowp
 # Formatters
 /*/extensions/formatter/req_without_query @dio @tsaarni
+# IP address input matcher
+/*/extensions/matching/input_matchers/ip @aguinet @snowp
