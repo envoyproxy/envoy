@@ -473,7 +473,7 @@ message RouteMatch {
   }
 
   // Indicates that prefix/path matching should be case sensitive. The default
-  // is true.
+  // is true. Ignored for safe_regex matching.
   google.protobuf.BoolValue case_sensitive = 4;
 
   // Indicates that the route should additionally match on a runtime key. Every time the route
