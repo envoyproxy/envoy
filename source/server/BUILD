@@ -381,6 +381,7 @@ envoy_cc_library(
         "active_raw_udp_listener_config",
         ":configuration_lib",
         ":drain_manager_lib",
+        ":factory_context_lib",
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
@@ -426,10 +427,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "factory_context_lib",
+    srcs = ["factory_context_impl.cc"],
+    hdrs = ["factory_context_impl.h"],
+    deps = [
+        "//envoy/server:filter_config_interface",
+        "//envoy/server:instance_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_chain_manager_lib",
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+        ":factory_context_lib",
         ":filter_chain_factory_context_callback",
         "//envoy/server:instance_interface",
         "//envoy/server:listener_manager_interface",

@@ -20,7 +20,7 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/factory_context_impl.h"
 
 namespace Envoy {
 namespace Server {
