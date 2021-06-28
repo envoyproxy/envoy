@@ -16,7 +16,8 @@ namespace NetworkFilters {
 namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::Context;
-using Envoy::Extensions::Common::Wasm::PluginHandle;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
 
@@ -27,9 +28,9 @@ public:
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
-    auto handle = tls_slot_->get();
-    if (handle.has_value()) {
-      wasm = handle->wasm().get();
+    PluginHandleSharedPtr handle = tls_slot_->get()->handle();
+    if (handle->wasmHandle()) {
+      wasm = handle->wasmHandle()->wasm().get();
     }
     if (!wasm || wasm->isFailed()) {
       if (plugin_->fail_open_) {
@@ -37,17 +38,17 @@ public:
         return nullptr;
       } else {
         // Fail closed is handled by an empty Context.
-        return std::make_shared<Context>(nullptr, 0, plugin_);
+        return std::make_shared<Context>(nullptr, 0, handle);
       }
     }
-    return std::make_shared<Context>(wasm, handle->rootContextId(), plugin_);
+    return std::make_shared<Context>(wasm, handle->rootContextId(), handle);
   }
 
-  Wasm* wasmForTest() { return tls_slot_->get()->wasm().get(); }
+  Wasm* wasmForTest() { return tls_slot_->get()->handle()->wasmHandle()->wasm().get(); }
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandle> tls_slot_;
+  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
   Config::DataSource::RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
