@@ -5,6 +5,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/config/datasource.h"
+
 #include "openssl/ec.h"
 #include "openssl/ssl.h"
 
@@ -348,9 +350,9 @@ ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_
 
 } // namespace
 
-CryptoMbQueue::CryptoMbQueue(int32_t pollDelayInUs, enum KeyType type, int keysize,
+CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                              IppCryptoSharedPtr ipp)
-    : us_(std::chrono::microseconds(pollDelayInUs)),
+    : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)),
       request_queue_(std::vector<CryptoMbContextSharedPtr>()), type_(type), key_size_(keysize),
       ipp_(ipp) {
   request_queue_.reserve(MULTIBUFF_BATCH);
@@ -609,17 +611,11 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     throw EnvoyException("Multi-buffer CPU instructions not available.");
   }
 
-  uint32_t poll_delay = conf.poll_delay();
+  std::chrono::milliseconds poll_delay =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(conf, poll_delay, 200));
 
-  std::string private_key;
-
-  if (conf.private_key_file() != "" && conf.inline_private_key() == "") {
-    private_key = factory_context.api().fileSystem().fileReadToEnd(conf.private_key_file());
-  } else if (conf.private_key_file() == "" && conf.inline_private_key() != "") {
-    private_key = conf.inline_private_key();
-  } else {
-    throw EnvoyException("Exactly one of private_key or inline_private_key must be configured.");
-  }
+  std::string private_key =
+      Config::DataSource::read(conf.private_key(), false, factory_context.api());
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));

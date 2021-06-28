@@ -31,6 +31,7 @@ envoy_cc_library(
         "//envoy/ssl/private_key:private_key_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:datasource_lib",
         "@envoy_api//envoy/extensions/private_key_providers/cryptomb/v3:pkg_cc_proto",
     ],
 )

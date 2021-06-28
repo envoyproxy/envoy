@@ -93,7 +93,8 @@ class CryptoMbQueue : public Logger::Loggable<Logger::Id::connection> {
 public:
   static constexpr uint32_t MULTIBUFF_BATCH = 8;
 
-  CryptoMbQueue(int32_t pollDelayInNs, enum KeyType type, int keysize, IppCryptoSharedPtr ipp);
+  CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
+                IppCryptoSharedPtr ipp);
   void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx, Event::Dispatcher& dispatcher);
 
 private:
@@ -170,8 +171,9 @@ public:
 private:
   // Thread local data containing a single queue per worker thread.
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalData(int32_t pollDelayInNs, enum KeyType type, int keysize, IppCryptoSharedPtr ipp)
-        : queue_(pollDelayInNs, type, keysize, ipp){};
+    ThreadLocalData(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
+                    IppCryptoSharedPtr ipp)
+        : queue_(poll_delay, type, keysize, ipp){};
     CryptoMbQueue queue_;
   };
 

@@ -24,6 +24,7 @@ envoy_cc_test_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/ssl/private_key:private_key_config_interface",
         "//envoy/ssl/private_key:private_key_interface",
+        "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/private_key_providers/cryptomb:config",

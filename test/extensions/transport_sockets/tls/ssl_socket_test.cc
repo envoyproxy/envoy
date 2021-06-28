@@ -5969,8 +5969,8 @@ TEST_P(SslSocketTest, RsaMBPrivateKeyProviderAsyncSign) {
         provider_name: cryptomb
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-          poll_delay: 0
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+          poll_delay: 0s
+          private_key: { "filename": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem" }
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
@@ -5999,8 +5999,8 @@ TEST_P(SslSocketTest, EcdsaMBPrivateKeyProviderAsyncSign) {
         provider_name: cryptomb
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-          poll_delay: 0
-          private_key_file: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+          poll_delay: 0s
+          private_key: { "filename": "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem" }
 )EOF";
 
   const std::string successful_client_ctx_yaml =

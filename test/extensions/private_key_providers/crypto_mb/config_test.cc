@@ -66,8 +66,8 @@ TEST(CryptoMbConfigTest, CreateRsa4096) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem"
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem" }
 )EOF";
 
   EXPECT_NE(nullptr, createWithConfig(yaml));
@@ -78,8 +78,8 @@ TEST(CryptoMbConfigTest, CreateRsa512) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-512.pem"
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-512.pem" }
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException,
@@ -91,8 +91,8 @@ TEST(CryptoMbConfigTest, CreateEcdsaP256) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/ecdsa-p256.pem"
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/ecdsa-p256.pem" }
 )EOF";
 
   EXPECT_NE(nullptr, createWithConfig(yaml));
@@ -103,13 +103,14 @@ TEST(CryptoMbConfigTest, CreateEcdsaP256Inline) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        inline_private_key: |
-          -----BEGIN PRIVATE KEY-----
-          MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIxp5QZ3YFaT8s+CR
-          rqUqeYSe5D9APgBZbyCvAkO2/JChRANCAARM53DFLHORcSyBpu5zpaG7/HfLXT8H
-          r1RaoGEiH9pi3MIKg1H+b8EaM1M4wURT2yXMjuvogQ6ixs0B1mvRkZnL
-          -----END PRIVATE KEY-----
+        poll_delay: 0.02s
+        private_key:
+          inline_string: |
+            -----BEGIN PRIVATE KEY-----
+            MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIxp5QZ3YFaT8s+CR
+            rqUqeYSe5D9APgBZbyCvAkO2/JChRANCAARM53DFLHORcSyBpu5zpaG7/HfLXT8H
+            r1RaoGEiH9pi3MIKg1H+b8EaM1M4wURT2yXMjuvogQ6ixs0B1mvRkZnL
+            -----END PRIVATE KEY-----
 )EOF";
 
   EXPECT_NE(nullptr, createWithConfig(yaml));
@@ -120,8 +121,8 @@ TEST(CryptoMbConfigTest, CreateEcdsaP384) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/ecdsa-p384.pem"
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/ecdsa-p384.pem" }
 )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException,
@@ -133,27 +134,9 @@ TEST(CryptoMbConfigTest, CreateMissingPrivateKey) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/missing.pem"
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/missing.pem" }
 )EOF";
-
-  EXPECT_THROW(createWithConfig(yaml), EnvoyException);
-}
-
-TEST(CryptoMbConfigTest, CreateBothInlineAndFile) {
-  const std::string yaml = R"EOF(
-      provider_name: cryptomb
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem"
-        inline_private_key: |
-          -----BEGIN PRIVATE KEY-----
-          MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgIxp5QZ3YFaT8s+CR
-          rqUqeYSe5D9APgBZbyCvAkO2/JChRANCAARM53DFLHORcSyBpu5zpaG7/HfLXT8H
-          r1RaoGEiH9pi3MIKg1H+b8EaM1M4wURT2yXMjuvogQ6ixs0B1mvRkZnL
-          -----END PRIVATE KEY-----
-        )EOF";
 
   EXPECT_THROW(createWithConfig(yaml), EnvoyException);
 }
@@ -163,11 +146,11 @@ TEST(CryptoMbConfigTest, CreateMissingKey) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        poll_delay: 1
+        poll_delay: 0.02s
         )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException,
-                            "Exactly one of private_key or inline_private_key must be configured.");
+                            "Unexpected DataSource::specifier_case(): 0");
 }
 
 TEST(CryptoMbConfigTest, CreateMissingPollDelay) {
@@ -175,10 +158,9 @@ TEST(CryptoMbConfigTest, CreateMissingPollDelay) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem"
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem" }
         )EOF";
 
-  // Default value 0 means that just one request is processed at once.
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
@@ -187,8 +169,8 @@ TEST(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
       provider_name: cryptomb
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
-        private_key_file: "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem"
-        poll_delay: 1
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-4096.pem" }
+        poll_delay: 0.02s
         )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml, false), EnvoyException,

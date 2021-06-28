@@ -7,6 +7,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/config/datasource.h"
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -159,24 +160,18 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
       std::make_shared<FakeIppCryptoImpl>(supported_instruction_set_);
 
   // We need to get more RSA key params in order to be able to use BoringSSL signing functions.
-  std::string private_key;
-  if (conf.private_key_file() != "" && conf.inline_private_key() == "") {
-    private_key =
-        private_key_provider_context.api().fileSystem().fileReadToEnd(conf.private_key_file());
-  } else if (conf.private_key_file() == "" && conf.inline_private_key() != "") {
-    private_key = conf.inline_private_key();
-  }
-  if (private_key != "") {
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+  std::string private_key =
+      Config::DataSource::read(conf.private_key(), false, private_key_provider_context.api());
 
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-      const BIGNUM *e, *n, *d;
-      RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-      RSA_get0_key(rsa, &n, &e, &d);
-      fakeIpp->set_rsa_key(n, e, d);
-    }
+  bssl::UniquePtr<BIO> bio(
+      BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
+
+  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  if (pkey != nullptr && EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
+    const BIGNUM *e, *n, *d;
+    RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
+    RSA_get0_key(rsa, &n, &e, &d);
+    fakeIpp->set_rsa_key(n, e, d);
   }
 
   PrivateKeyMethodProvider::IppCryptoSharedPtr ipp =
