@@ -1,0 +1,54 @@
+--- ./qinggniq/client.py	(original)
++++ ./qinggniq/client.py	(reformatted)
+@@ -1,8 +1,9 @@
+ import pymysql.cursors
+
+-connection = pymysql.connect(host='127.0.0.1',
+-                             user='root',
+-                             password='123',
+-                             database='test',
+-                             port=9001,
+-                             cursorclass=pymysql.cursors.DictCursor)
++connection = pymysql.connect(
++    host='127.0.0.1',
++    user='root',
++    password='123',
++    database='test',
++    port=9001,
++    cursorclass=pymysql.cursors.DictCursor)
+
+--- ./tools/vscode/generate_debug_config.py	(original)
++++ ./tools/vscode/generate_debug_config.py	(reformatted)
+@@ -88,17 +88,20 @@
+         "request": "launch"
+     }
+
++
+ def args_of_config(debugger_type, config):
+     if debugger_type == "lldb":
+         return config.get("args", "")
+     else:
+         return config.get("arguments", "")
+
++
+ def set_args(debugger_type, config, args):
+-   if debugger_type == "lldb":
++    if debugger_type == "lldb":
+         config["args"] = args
+-   else:
++    else:
+         config["arguments"] = args
++
+
+ def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type):
+     launch = get_launch_json(workspace)
+@@ -113,7 +116,7 @@
+         if config.get("name", None) == new_config["name"]:
+             old_args = args_of_config(debugger_type, config)
+             config.clear()
+-	    # preserve old argument only when no argument is set at the command line, and the old argument is not empty
++            # preserve old argument only when no argument is set at the command line, and the old argument is not empty
+             if len(old_args) != 0 and len(arguments) == 0:
+                 set_args(debugger_type, new_config, old_args)
+             config.update(new_config)
+

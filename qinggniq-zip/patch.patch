@@ -1,0 +1,189 @@
+From 36e8b5ce2e1ab9db3559a6ce964ee3eb95927c96 Mon Sep 17 00:00:00 2001
+From: David Schinazi <dschinazi@google.com>
+Date: Tue, 23 Mar 2021 15:28:55 -0700
+Subject: [PATCH 1/3] Prevent undefined behavior in QUICHE logging
+
+This change adds a NullGuard which will prevent us
+from sending null strings to output streams to avoid
+undefined behavior.
+
+Signed-off-by: David Schinazi <dschinazi@google.com>
+---
+ .../quiche/platform/quic_logging_impl.h       | 41 +++++++++++++++++--
+ .../quiche/platform/quic_platform_test.cc     |  2 +
+ 2 files changed, 39 insertions(+), 4 deletions(-)
+
+diff --git a/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h b/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
+index 993ee365c24..87ea331aa97 100644
+--- a/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
++++ b/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
+@@ -154,7 +154,39 @@ class QuicLogEmitter {
+     return *this;
+   }
+ 
+-  std::ostringstream& stream() { return stream_; }
++  // NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
++  // a nullptr_t, or a null char* or const char*, in which case it returns
++  // "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
++  // without hitting undefined behavior for null values.
++  template <typename T> struct NullGuard {
++    static const T& guard(const T& v) { return v; }
++  };
++  template <> struct NullGuard<char*> {
++    static const char* guard(const char* v) { return v ? v : "(null)"; }
++  };
++  template <> struct NullGuard<const char*> {
++    static const char* guard(const char* v) { return v ? v : "(null)"; }
++  };
++  template <> struct NullGuard<std::nullptr_t> {
++    static const char* guard(const std::nullptr_t&) { return "(null)"; }
++  };
++
++  template <typename T> QuicLogEmitter& operator<<(const T& v) {
++    stream_ << NullGuard<T>::guard(v);
++    return *this;
++  }
++
++  // Handle stream manipulators such as std::endl.
++  QuicLogEmitter& operator<<(std::ostream& (*m)(std::ostream& os)) {
++    stream_ << m;
++    return *this;
++  }
++  QuicLogEmitter& operator<<(std::ios_base& (*m)(std::ios_base& os)) {
++    stream_ << m;
++    return *this;
++  }
++
++  QuicLogEmitter& stream() { return *this; }
+ 
+ private:
+   const QuicLogLevel level_;
+@@ -166,14 +198,15 @@ class QuicLogEmitter {
+   std::ostringstream stream_;
+ };
+ 
+-class NullLogStream : public std::ostream {
++class NullLogStream {
+ public:
+-  NullLogStream() : std::ostream(nullptr) {}
+-
+   NullLogStream& stream() { return *this; }
+ };
+ 
+ template <typename T> inline NullLogStream& operator<<(NullLogStream& s, const T&) { return s; }
++// Handle stream manipulators such as std::endl.
++inline NullLogStream& operator<<(NullLogStream& s, std::ostream& (*)(std::ostream&)) { return s; }
++inline NullLogStream& operator<<(NullLogStream& s, std::ios_base& (*)(std::ios_base&)) { return s; }
+ 
+ inline spdlog::logger& GetLogger() {
+   return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::quic);
+diff --git a/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc b/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
+index 926ac95f75c..a6d74f12129 100644
+--- a/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
++++ b/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
+@@ -397,6 +397,8 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
+   EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "CHECK failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
+   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
+                      "CHECK failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
++  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
++                     "CHECK failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+ }
+ 
+ // Test the behaviors of the cross products of
+
+From 9df3c087df1a178e8183c6213e4f552387e2c00a Mon Sep 17 00:00:00 2001
+From: David Schinazi <dschinazi@google.com>
+Date: Wed, 24 Mar 2021 13:52:49 -0700
+Subject: [PATCH 2/3] Fix compilation in GCC
+
+This commit works around this bug in GCC:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
+
+Signed-off-by: David Schinazi <dschinazi@google.com>
+---
+ .../quiche/platform/quic_logging_impl.h       | 34 +++++++++----------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h b/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
+index 87ea331aa97..488e4e6468b 100644
+--- a/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
++++ b/source/extensions/quic_listeners/quiche/platform/quic_logging_impl.h
+@@ -140,6 +140,23 @@ static const QuicLogLevel DFATAL = ERROR;
+ static const QuicLogLevel DFATAL = FATAL;
+ #endif
+ 
++// NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
++// a nullptr_t, or a null char* or const char*, in which case it returns
++// "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
++// without hitting undefined behavior for null values.
++template <typename T> struct NullGuard {
++  static const T& guard(const T& v) { return v; }
++};
++template <> struct NullGuard<char*> {
++  static const char* guard(const char* v) { return v ? v : "(null)"; }
++};
++template <> struct NullGuard<const char*> {
++  static const char* guard(const char* v) { return v ? v : "(null)"; }
++};
++template <> struct NullGuard<std::nullptr_t> {
++  static const char* guard(const std::nullptr_t&) { return "(null)"; }
++};
++
+ class QuicLogEmitter {
+ public:
+   // |file_name| and |function_name| MUST be valid for the lifetime of the QuicLogEmitter. This is
+@@ -154,23 +171,6 @@ class QuicLogEmitter {
+     return *this;
+   }
+ 
+-  // NullGuard exists such that NullGuard<T>::guard(v) returns v, unless passed
+-  // a nullptr_t, or a null char* or const char*, in which case it returns
+-  // "(null)". This allows streaming NullGuard<T>::guard(v) to an output stream
+-  // without hitting undefined behavior for null values.
+-  template <typename T> struct NullGuard {
+-    static const T& guard(const T& v) { return v; }
+-  };
+-  template <> struct NullGuard<char*> {
+-    static const char* guard(const char* v) { return v ? v : "(null)"; }
+-  };
+-  template <> struct NullGuard<const char*> {
+-    static const char* guard(const char* v) { return v ? v : "(null)"; }
+-  };
+-  template <> struct NullGuard<std::nullptr_t> {
+-    static const char* guard(const std::nullptr_t&) { return "(null)"; }
+-  };
+-
+   template <typename T> QuicLogEmitter& operator<<(const T& v) {
+     stream_ << NullGuard<T>::guard(v);
+     return *this;
+
+From 87bfbc4cbc2f456265ee90a3bdcca3d8ba472050 Mon Sep 17 00:00:00 2001
+From: David Schinazi <dschinazi@google.com>
+Date: Thu, 25 Mar 2021 09:43:16 -0700
+Subject: [PATCH 3/3] add more testing
+
+Signed-off-by: David Schinazi <dschinazi@google.com>
+---
+ .../quic_listeners/quiche/platform/quic_platform_test.cc  | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc b/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
+index a6d74f12129..371794aff6a 100644
+--- a/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
++++ b/test/extensions/quic_listeners/quiche/platform/quic_platform_test.cc
+@@ -325,6 +325,14 @@ TEST_F(QuicPlatformTest, QuicLog) {
+   errno = SOCKET_ERROR_INVAL;
+   EXPECT_LOG_CONTAINS("info", "i=3:", QUIC_PLOG(INFO) << "i=" << (i = 3));
+   EXPECT_EQ(3, i);
++
++  char* null_string = nullptr;
++  EXPECT_LOG_CONTAINS("error", "null_string=(null)",
++                      QUIC_LOG(ERROR) << "null_string=" << null_string);
++  const char* const_null_string = nullptr;
++  EXPECT_LOG_CONTAINS("error", "const_null_string=(null)",
++                      QUIC_LOG(ERROR) << "const_null_string=" << const_null_string);
++  EXPECT_LOG_CONTAINS("error", "nullptr=(null)", QUIC_LOG(ERROR) << "nullptr=" << nullptr);
+ }
+ 
+ #ifdef NDEBUG
+

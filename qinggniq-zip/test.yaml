@@ -1,0 +1,77 @@
+static_resources:
+  listeners:
+  - name: main
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8989
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: web_service
+              rate_limits:
+                - actions:
+                  - generic_key:
+                      descriptor_value: "value1"
+                      descriptor_key: "key1"
+          http_filters:
+          - name: envoy.filters.http.ratelimit
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
+              domain: sm-verify-title
+              failure_mode_deny: true
+              rate_limit_service:
+                grpc_service:
+                  envoy_grpc:
+                    cluster_name: rls
+                  timeout: 10s
+                transport_api_version: V3
+          - name: envoy.filters.http.router
+            typed_config: {}
+
+  clusters:
+  - name: web_service
+    type: STRICT_DNS # static
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: web_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.113.24.65
+                port_value: 80
+  - name: rls
+    type: STRICT_DNS # static
+    lb_policy: ROUND_ROBIN
+    connect_timeout: { seconds: 1 }
+    http2_protocol_options: {}
+    load_assignment:
+      cluster_name: rls
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.112.174.34
+                port_value: 8081
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.112.146.250
+                port_value: 8081
