@@ -1837,15 +1837,16 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestHeaders) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
-  filter().setDecoderFilterCallbacks(decoder_callbacks);
-
   auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
-  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
-  EXPECT_CALL(decoder_callbacks,
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
@@ -1859,15 +1860,16 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestBody) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
-  filter().setDecoderFilterCallbacks(decoder_callbacks);
-
   auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
-  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
-  EXPECT_CALL(decoder_callbacks,
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
@@ -1880,15 +1882,16 @@ TEST_P(WasmHttpFilterTest, PanicOnRequestTrailers) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
-  filter().setDecoderFilterCallbacks(decoder_callbacks);
-
   auto headers = Http::TestResponseHeaderMapImpl{{":status", "503"}};
-  EXPECT_CALL(decoder_callbacks, encodeHeaders_(HeaderMapEqualRef(&headers), true));
-  EXPECT_CALL(decoder_callbacks,
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&headers), true));
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
@@ -1901,12 +1904,14 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseHeaders) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
-  filter().setEncoderFilterCallbacks(encoder_callbacks);
-  EXPECT_CALL(encoder_callbacks,
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
@@ -1920,12 +1925,14 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseBody) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
-  filter().setEncoderFilterCallbacks(encoder_callbacks);
-  EXPECT_CALL(encoder_callbacks,
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
@@ -1938,12 +1945,14 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
   }
   setupTest("panic");
   setupFilter();
-  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
-  filter().setEncoderFilterCallbacks(encoder_callbacks);
-  EXPECT_CALL(encoder_callbacks,
+
+  // In the case of VM failure, failStream is called for both request and response stream types,
+  // so we need to make sure that we don't send the local reply twice.
+  EXPECT_CALL(decoder_callbacks_,
               sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                              testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                              testing::Eq("wasm_fail_stream")));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   // Create in-VM context.
   filter().onCreate();
