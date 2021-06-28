@@ -410,6 +410,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/common/quic:quic_stat_names_lib",
         "//source/extensions/upstreams/http/generic:config",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -421,7 +422,6 @@ envoy_cc_library(
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
-        "//source/common/quic:quic_stat_names_lib",
     ]),
 )
 
