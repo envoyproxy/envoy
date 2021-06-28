@@ -19,7 +19,9 @@ namespace Server {
 
 namespace {
 
-// Return a fake address for use when either the source or destination is UDS.
+// Return a fake address for use when either the source or destination is unix domain socket.
+// This address will only match the fallback matcher of 0.0.0.0/0, which is the default
+// when no IP matcher is configured.
 Network::Address::InstanceConstSharedPtr fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          Network::Utility::parseInternetAddress("255.255.255.255"));
