@@ -838,7 +838,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2021-06-25",
+        release_date = "2021-06-28",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
