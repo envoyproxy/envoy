@@ -124,6 +124,8 @@ public:
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {
+    std::cerr << __FUNCTION__ << " here! this: " << this << " event: " << static_cast<int>(event) << " codec_client_:" << codec_client_.get() << "\n";
+    //ASSERT(false);
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }

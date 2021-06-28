@@ -81,10 +81,54 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
+  class ConnectionCallbacksWrapper : public ConnectionCallbacks {
+   public:
+    ConnectionCallbacksWrapper(HappyEyeballsConnectionImpl& parent,
+                               ClientConnection& connection)
+        : parent_(parent), connection_(connection) {}
+
+    void onEvent(ConnectionEvent event) override {
+      parent_.onEvent(event, this);
+    }
+
+    void onAboveWriteBufferHighWatermark() override {
+      parent_.onAboveWriteBufferHighWatermark(this);
+    }
+
+    void onBelowWriteBufferLowWatermark() override {
+      parent_.onBelowWriteBufferLowWatermark(this);
+    }
+
+    ClientConnection& connection() { return connection_; }
+
+   private:
+    HappyEyeballsConnectionImpl& parent_;
+    ClientConnection& connection_;
+  };
+
   std::unique_ptr<ClientConnection> createConnection();
 
+  void onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper);
+
+  void onAboveWriteBufferHighWatermark(ConnectionCallbacksWrapper* wrapper);
+
+  void onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper);
+
+  struct State {
+    bool detectEarlyCloseWhenReadDisabled_;
+    bool noDelay_;
+    Buffer::InstancePtr write_buffer_;
+    bool end_stream_;
+  };
+
   std::unique_ptr<ClientConnection> connection_;
+  std::vector<ConnectionCallbacks*> cbs_;
+  std::vector<ReadFilterSharedPtr> read_filters_;
+  State state_;
+  bool connect_finished_ = false;
+  std::unique_ptr<ConnectionCallbacksWrapper> callbacks_wrapper_;
   std::unique_ptr<ClientConnection> pending_connection_;
+
   Event::Dispatcher& dispatcher_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr source_address_;
