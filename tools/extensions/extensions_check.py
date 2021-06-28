@@ -49,7 +49,7 @@ EXTENSION_CATEGORIES = (
     "envoy.formatter", "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
     "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
     "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers", "envoy.private_key_providers", "envoy.quic.proof_source",
+    "envoy.matching.input_matchers", "envoy.tls.key_providers", "envoy.quic.proof_source",
     "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
     "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
     "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers",

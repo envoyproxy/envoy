@@ -298,7 +298,7 @@ EXTENSIONS = {
     # Private key providers
     #
 
-    "envoy.private_key_providers.cryptomb":                 "//source/extensions/private_key_providers/cryptomb:config",
+    "envoy.tls.key_providers.cryptomb":                 "//source/extensions/private_key_providers/cryptomb:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
