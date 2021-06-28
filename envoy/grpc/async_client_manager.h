@@ -30,7 +30,7 @@ private:
   friend class AsyncClientFactoryImpl;
 };
 
-enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled, NeverCache };
+enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled };
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
 

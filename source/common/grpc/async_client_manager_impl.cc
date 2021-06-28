@@ -145,14 +145,11 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check, CacheOption cache_option) {
 
-  if (cache_option == CacheOption::NeverCache ||
-      (cache_option == CacheOption::CacheWhenRuntimeEnabled &&
-       !Runtime::runtimeFeatureEnabled(
-           "envoy.reloadable_features.enable_grpc_async_client_cache"))) {
+  if (cache_option == CacheOption::CacheWhenRuntimeEnabled &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_grpc_async_client_cache")) {
     return factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();
   }
-  RawAsyncClientSharedPtr client;
-  client = raw_async_client_cache_->getCache(config);
+  RawAsyncClientSharedPtr client = raw_async_client_cache_->getCache(config);
   if (client != nullptr) {
     return client;
   }
@@ -163,8 +160,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) const {
-  uint64_t key = MessageUtil::hash(config);
-  auto it = cache_.find(key);
+  auto it = cache_.find(config);
   if (it == cache_.end()) {
     return nullptr;
   }
@@ -173,8 +169,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  uint64_t key = MessageUtil::hash(config);
-  cache_[key] = client;
+  cache_[config] = client;
 }
 
 } // namespace Grpc
