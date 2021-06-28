@@ -610,7 +610,7 @@ TEST_P(AdminInstanceTest, InvalidRegexIsBadRequest) {
   Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::BadRequest, getCallback("/config_dump?name_regex=[", header_map, response));
   std::string output = response.toString();
-  EXPECT_THAT(output, testing::HasSubstr("Error while parsing name_regex: "));
+  EXPECT_THAT(output, testing::HasSubstr("Error while parsing name_regex"));
 }
 
 ProtobufTypes::MessagePtr testDumpClustersConfig(const Matchers::StringMatcher&) {

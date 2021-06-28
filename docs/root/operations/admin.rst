@@ -201,8 +201,17 @@ modify different aspects of the server:
   Dump only the currently loaded configurations whose names match the specified regex. Can be used with
   both `resource` and `mask` query parameters.
 
-  For example, get all configs whose name contain a specified substring with
-  ``/config_dump?name_regex=.*substring.*``
+  For example, ``/config_dump?name_regex=.*substring.*`` would return all resource types
+  whose name field matches the given regex.
+
+  Per resource, the matched name field is:
+
+  - :ref:`envoy.config.listener.v3.Listener.name <envoy_v3_api_field_config.listener.v3.Listener.name>`
+  - :ref:`envoy.config.route.v3.RouteConfiguration.name <envoy_v3_api_field_config.route.v3.RouteConfiguration.name>`
+  - :ref:`envoy.config.route.v3.ScopedRouteConfiguration.name <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.name>`
+  - :ref:`envoy.config.cluster.v3.Cluster.name <envoy_v3_api_field_config.cluster.v3.Cluster.name>`
+  - :ref:`envoy.extensions.transport_sockets.tls.v3.Secret <envoy_v3_api_field_extensions.transport_sockets.tls.v3.Secret.name>`
+  - :ref:`envoy.config.endpoint.v3.ClusterLoadAssignment <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.cluster_name>`
 
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 

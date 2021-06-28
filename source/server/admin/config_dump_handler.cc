@@ -5,6 +5,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
+#include "source/common/common/statusor.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -133,7 +134,8 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
-Matchers::StringMatcherPtr buildNameMatcher(const Http::Utility::QueryParams& params) {
+absl::StatusOr<Matchers::StringMatcherPtr>
+buildNameMatcher(const Http::Utility::QueryParams& params) {
   const auto name_regex = Utility::queryParam(params, "name_regex");
   if (!name_regex.has_value()) {
     return std::make_unique<Matchers::UniversalStringMatcher>();
@@ -141,7 +143,13 @@ Matchers::StringMatcherPtr buildNameMatcher(const Http::Utility::QueryParams& pa
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
   matcher.set_regex(*name_regex);
+  TRY_ASSERT_MAIN_THREAD
   return Regex::Utility::parseRegex(matcher);
+  END_TRY
+  catch (EnvoyException& e) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Error while parsing name_regex from ", *name_regex, ": ", e.what()));
+  }
 }
 
 } // namespace
@@ -156,12 +164,9 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
-  Matchers::StringMatcherPtr name_matcher;
-  TRY_ASSERT_MAIN_THREAD
-  name_matcher = buildNameMatcher(query_params);
-  END_TRY
-  catch (std::exception& e) {
-    response.add(absl::StrCat("Error while parsing name_regex: ", e.what()));
+  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher = buildNameMatcher(query_params);
+  if (!name_matcher.ok()) {
+    response.add(name_matcher.status().ToString());
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
     return Http::Code::BadRequest;
   }
@@ -170,9 +175,9 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
 
   absl::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
-    err = addResourceToDump(dump, mask, resource.value(), *name_matcher, include_eds);
+    err = addResourceToDump(dump, mask, resource.value(), **name_matcher, include_eds);
   } else {
-    err = addAllConfigToDump(dump, mask, *name_matcher, include_eds);
+    err = addAllConfigToDump(dump, mask, **name_matcher, include_eds);
   }
   if (err.has_value()) {
     response_headers.addReference(Http::Headers::get().XContentTypeOptions,
