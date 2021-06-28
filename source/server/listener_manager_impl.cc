@@ -24,6 +24,8 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/synchronization/blocking_counter.h"
+
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
@@ -238,7 +240,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
     envoy::config::listener::v3::Listener::DrainType drain_type) {
-  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type, server_.dispatcher())};
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
@@ -254,7 +256,8 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })),
-      enable_dispatcher_stats_(enable_dispatcher_stats) {
+      enable_dispatcher_stats_(enable_dispatcher_stats),
+      quic_stat_names_(server_.stats().symbolTable()) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
@@ -820,6 +823,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
   workers_started_ = true;
   uint32_t i = 0;
 
+  absl::BlockingCounter workers_waiting_to_run(workers_.size());
+  Event::PostCb worker_started_running = [&workers_waiting_to_run]() {
+    workers_waiting_to_run.DecrementCount();
+  };
+
   // We can not use "Cleanup" to simplify this logic here, because it results in a issue if Envoy is
   // killed before workers are actually started. Specifically the AdminRequestGetStatsAndKill test
   // case in main_common_test fails with ASAN error if we use "Cleanup" here.
@@ -837,12 +845,16 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog, std::function<void()
                             }
                           });
     }
-    worker->start(guard_dog);
+    worker->start(guard_dog, worker_started_running);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_);
     }
     i++;
   }
+
+  // Wait for workers to start running.
+  workers_waiting_to_run.Wait();
+
   if (active_listeners_.empty()) {
     stats_.workers_started_.set(1);
     callback();

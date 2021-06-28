@@ -127,11 +127,6 @@ CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3::RegexMatc
   return std::make_unique<CompiledGoogleReMatcher>(matcher);
 }
 
-CompiledMatcherPtr Utility::parseStdRegexAsCompiledMatcher(const std::string& regex,
-                                                           std::regex::flag_type flags) {
-  return std::make_unique<CompiledStdMatcher>(parseStdRegex(regex, flags));
-}
-
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
   // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)
   // annotations may allow us to remove this in favor of direct validation of regular

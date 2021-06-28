@@ -51,8 +51,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
+    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -469,8 +469,8 @@ public:
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
-    ASSERT_TRUE(
-        TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_, timeout));
+    ASSERT_TRUE(TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_,
+                                                          server().dispatcher(), timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
@@ -499,8 +499,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ =
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+    drain_manager_ = new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

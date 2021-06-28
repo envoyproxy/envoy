@@ -8,6 +8,7 @@ load(
     "envoy_external_dep_path",
     "envoy_linkstatic",
 )
+load(":envoy_pch.bzl", "envoy_pch_copts")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -93,17 +94,17 @@ def envoy_cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_copts(repository) + copts,
+        copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             repository + "//envoy/common:base_includes",
             repository + "//source/common/common:fmt_lib",
+            repository + "//source/common/common:common_pch",
             envoy_external_dep_path("abseil_flat_hash_map"),
             envoy_external_dep_path("abseil_flat_hash_set"),
             envoy_external_dep_path("abseil_strings"),
-            envoy_external_dep_path("spdlog"),
             envoy_external_dep_path("fmtlib"),
         ],
         alwayslink = 1,

@@ -756,8 +756,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   auto find_histo_sample_count = [&](const std::string& name) -> uint64_t {
     for (auto& histogram : test_server_->histograms()) {
       if (histogram->name() == name) {
-        const auto& stats = histogram->cumulativeStatistics();
-        return stats.sampleCount();
+        return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
       }
     }
     return 0;

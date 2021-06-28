@@ -27,8 +27,9 @@ public:
                                Buffer::Instance& response, AdminStream&) const;
 
 private:
-  void addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                          const absl::optional<std::string>& mask, bool include_eds) const;
+  absl::optional<std::pair<Http::Code, std::string>>
+  addAllConfigToDump(envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+                     bool include_eds) const;
   /**
    * Add the config matching the passed resource to the passed config dump.
    * @return absl::nullopt on success, else the Http::Code and an error message that should be added
