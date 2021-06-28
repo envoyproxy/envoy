@@ -4,7 +4,7 @@ package envoy.service.metrics.v2;
 
 import "envoy/api/v2/core/base.proto";
 
-import "metrics.proto";
+import "io/prometheus/client/metrics.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";

@@ -137,10 +137,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
-  if (message->has_control_plane()) {
-    control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
-
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -149,16 +145,28 @@ void GrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
-  if (apiStateFor(type_url).watches_.empty()) {
+  ApiState& api_state = apiStateFor(type_url);
+
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
+
+  if (message->control_plane().identifier() != api_state.control_plane_identifier_) {
+    api_state.control_plane_identifier_ = message->control_plane().identifier();
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", type_url,
+              api_state.control_plane_identifier_);
+  }
+
+  if (api_state.watches_.empty()) {
     // update the nonce as we are processing this response.
-    apiStateFor(type_url).request_.set_response_nonce(message->nonce());
+    api_state.request_.set_response_nonce(message->nonce());
     if (message->resources().empty()) {
       // No watches and no resources. This can happen when envoy unregisters from a
       // resource that's removed from the server as well. For example, a deleted cluster
       // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
       // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
       // this update. no need to send a discovery request, as we don't watch for anything.
-      apiStateFor(type_url).request_.set_version_info(message->version_info());
+      api_state.request_.set_version_info(message->version_info());
     } else {
       // No watches and we have resources - this should not happen. send a NACK (by not
       // updating the version).
@@ -182,10 +190,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     std::vector<DecodedResourceImplPtr> resources;
     absl::btree_map<std::string, DecodedResourceRef> resource_ref_map;
     std::vector<DecodedResourceRef> all_resource_refs;
-    OpaqueResourceDecoder& resource_decoder =
-        apiStateFor(type_url).watches_.front()->resource_decoder_;
+    OpaqueResourceDecoder& resource_decoder = api_state.watches_.front()->resource_decoder_;
 
-    const auto scoped_ttl_update = apiStateFor(type_url).ttl_.scopedTtlUpdate();
+    const auto scoped_ttl_update = api_state.ttl_.scopedTtlUpdate();
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -200,9 +207,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
           DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
 
       if (decoded_resource->ttl()) {
-        apiStateFor(type_url).ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
+        api_state.ttl_.add(*decoded_resource->ttl(), decoded_resource->name());
       } else {
-        apiStateFor(type_url).ttl_.clear(decoded_resource->name());
+        api_state.ttl_.clear(decoded_resource->name());
       }
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
@@ -212,7 +219,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
     }
 
-    for (auto watch : apiStateFor(type_url).watches_) {
+    for (auto watch : api_state.watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
       // Listener) even if the message does not have resources so that update_empty stat
       // is properly incremented and state-of-the-world semantics are maintained.
@@ -236,21 +243,21 @@ void GrpcMuxImpl::onDiscoveryResponse(
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we
     // would do that tracking here.
-    apiStateFor(type_url).request_.set_version_info(message->version_info());
+    api_state.request_.set_version_info(message->version_info());
     Memory::Utils::tryShrinkHeap();
   }
   END_TRY
   catch (const EnvoyException& e) {
-    for (auto watch : apiStateFor(type_url).watches_) {
+    for (auto watch : api_state.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
-    ::google::rpc::Status* error_detail = apiStateFor(type_url).request_.mutable_error_detail();
+    ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
   }
-  apiStateFor(type_url).request_.set_response_nonce(message->nonce());
-  ASSERT(apiStateFor(type_url).paused());
+  api_state.request_.set_response_nonce(message->nonce());
+  ASSERT(api_state.paused());
   queueDiscoveryRequest(type_url);
 }
 

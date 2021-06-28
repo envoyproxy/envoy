@@ -63,10 +63,6 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
         health_check.mutable_http_health_check()->clear_codec_client_type();
       }
     }
-    // We may have both deprecated hosts() or load_assignment().
-    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
-      makePortHermetic(test_env, host);
-    }
     for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {

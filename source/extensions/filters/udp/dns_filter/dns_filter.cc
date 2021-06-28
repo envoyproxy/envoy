@@ -32,12 +32,12 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
   retry_count_ = dns_table.external_retry_count();
 
-  virtual_domains_.reserve(dns_table.virtual_domains().size());
   for (const auto& virtual_domain : dns_table.virtual_domains()) {
     AddressConstPtrVec addrs{};
 
     const absl::string_view domain_name = virtual_domain.name();
-    ENVOY_LOG(trace, "Loading configuration for domain: {}", domain_name);
+    const absl::string_view suffix = Utils::getDomainSuffix(domain_name);
+    ENVOY_LOG(trace, "Loading configuration for domain: {}. Suffix: {}", domain_name, suffix);
 
     if (virtual_domain.endpoint().has_address_list()) {
       const auto& address_list = virtual_domain.endpoint().address_list().address();
@@ -55,16 +55,28 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         addrs.push_back(std::move(ipaddr));
       }
 
-      // If the domain already exists with a different endpoint config, update the address_list
-      // with the data from the config
-      if (virtual_domains_.contains(domain_name)) {
-        auto& addr_vec = virtual_domains_[domain_name].address_list.value();
-        addr_vec.reserve(addr_vec.size() + addrs.size());
-        std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+      DnsEndpointConfig endpoint_config{};
+
+      // Check whether the trie contains an entry for this domain
+      auto virtual_domains = dns_lookup_trie_.find(suffix);
+      if (virtual_domains != nullptr) {
+        // The suffix already has a node in the trie
+
+        auto existing_endpoint_config = virtual_domains->find(domain_name);
+        if (existing_endpoint_config != virtual_domains->end()) {
+          // Update the existing endpoint config with the new addresses
+
+          auto& addr_vec = existing_endpoint_config->second.address_list.value();
+          addr_vec.reserve(addr_vec.size() + addrs.size());
+          std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+        } else {
+          // Add a new endpoint config for the new domain
+          endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+          virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
+        }
       } else {
-        DnsEndpointConfig endpoint_config{};
         endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-        virtual_domains_.emplace(std::string(domain_name), std::move(endpoint_config));
+        addEndpointToSuffix(suffix, domain_name, endpoint_config);
       }
     }
 
@@ -111,7 +123,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         DnsEndpointConfig endpoint_config{};
         endpoint_config.service_list =
             absl::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
-        virtual_domains_.emplace(full_service_name, std::move(endpoint_config));
+
+        auto virtual_domains = dns_lookup_trie_.find(suffix);
+        if (virtual_domains != nullptr) {
+          virtual_domains->emplace(full_service_name, std::move(endpoint_config));
+        }
       }
     }
 
@@ -120,20 +136,24 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     if (!cluster_name.empty()) {
       DnsEndpointConfig endpoint_config{};
       endpoint_config.cluster_name = absl::make_optional<std::string>(cluster_name);
-      virtual_domains_.emplace(domain_name, std::move(endpoint_config));
+
+      // See if there's a suffix already configured
+      auto virtual_domains = dns_lookup_trie_.find(suffix);
+      if (virtual_domains == nullptr) {
+        addEndpointToSuffix(suffix, domain_name, endpoint_config);
+      } else {
+        // A domain can be redirected to one cluster. If it appears multiple times, the first
+        // entry is the only one used
+        if (virtual_domains->find(domain_name) == virtual_domains->end()) {
+          virtual_domains->emplace(domain_name, std::move(endpoint_config));
+        }
+      }
     }
 
     std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
                                    ? std::chrono::seconds(virtual_domain.answer_ttl().seconds())
                                    : DEFAULT_RESOLVER_TTL;
     domain_ttl_.emplace(virtual_domain.name(), ttl);
-  }
-
-  // Add known domain suffixes
-  known_suffixes_.reserve(dns_table.known_suffixes().size());
-  for (const auto& suffix : dns_table.known_suffixes()) {
-    auto matcher_ptr = std::make_unique<Matchers::StringMatcherImpl>(suffix);
-    known_suffixes_.push_back(std::move(matcher_ptr));
   }
 
   forward_queries_ = config.has_client_config();
@@ -149,10 +169,23 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         }
       }
     }
+
+    // Set additional resolving options from configuration
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
   }
+}
+
+void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
+                                               const absl::string_view domain_name,
+                                               DnsEndpointConfig& endpoint_config) {
+
+  DnsVirtualDomainConfigSharedPtr virtual_domains = std::make_shared<DnsVirtualDomainConfig>();
+  virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
+
+  auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
+  ASSERT(success, "Unable to overwrite existing suffix in dns_filter trie");
 }
 
 bool DnsFilterEnvoyConfig::loadServerConfig(
@@ -282,7 +315,8 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
   for (const auto& query : context->queries_) {
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
-    if (isKnownDomain(query->name_) || !config_->forwardQueries()) {
+    const bool forward_queries = config_->forwardQueries();
+    if (isKnownDomain(query->name_) || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -294,10 +328,14 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
       }
     }
 
-    ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
-    resolver_->resolveExternalQuery(std::move(context), query.get());
+    // Forwarding queries is enabled if the configuration contains a client configuration
+    // for the dns_filter.
+    if (forward_queries) {
+      ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
+      resolver_->resolveExternalQuery(std::move(context), query.get());
 
-    return DnsLookupResponseCode::External;
+      return DnsLookupResponseCode::External;
+    }
   }
 
   if (context->answers_.empty()) {
@@ -331,24 +369,28 @@ std::chrono::seconds DnsFilter::getDomainTTL(const absl::string_view domain) {
 }
 
 bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
-  const auto& known_suffixes = config_->knownSuffixes();
-  // If we don't have a list of allowlisted domain suffixes, we will resolve the name with an
-  // external DNS server
+  const absl::string_view suffix = Utils::getDomainSuffix(domain_name);
+  auto config = config_->getDnsTrie().find(suffix);
 
-  // TODO(abaptiste): Use a trie to find a match instead of iterating through the list
-  for (auto& suffix : known_suffixes) {
-    if (suffix->match(domain_name)) {
-      config_->stats().known_domain_queries_.inc();
-      return true;
-    }
+  if (config != nullptr) {
+    config_->stats().known_domain_queries_.inc();
+    return true;
   }
+
   return false;
 }
 
 const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::string_view domain) {
-  const auto& domains = config_->domains();
-  const auto iter = domains.find(domain);
-  if (iter == domains.end()) {
+  const absl::string_view suffix = Utils::getDomainSuffix(domain);
+  const auto virtual_domains = config_->getDnsTrie().find(suffix);
+
+  if (virtual_domains == nullptr) {
+    ENVOY_LOG(debug, "No domain configuration exists for [{}]", domain);
+    return nullptr;
+  }
+
+  const auto iter = virtual_domains->find(domain);
+  if (iter == virtual_domains->end()) {
     ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
     return nullptr;
   }

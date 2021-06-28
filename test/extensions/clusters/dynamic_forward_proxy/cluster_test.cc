@@ -254,34 +254,8 @@ tls_context:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
 )EOF");
 
-  EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config, false), EnvoyException,
-      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
-}
-
-// Verify that using 'verify_subject_alt_name' causes a failure.
-TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-tls_context:
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-      verify_subject_alt_name: [api.lyft.com]
-)EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      createCluster(yaml_config, false), EnvoyException,
-      "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+  EXPECT_THROW_WITH_MESSAGE(createCluster(yaml_config, false), EnvoyException,
+                            "dynamic_forward_proxy cluster cannot configure 'sni'");
 }
 
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {
