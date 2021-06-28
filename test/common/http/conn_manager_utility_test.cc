@@ -333,11 +333,8 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
-  std::string scheme_string = "http";
-  OptRef<const std::string> scheme = scheme_string;
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
-  ON_CALL(config_, schemeToSet()).WillByDefault(Return(scheme));
   ON_CALL(config_, schemeHeaderTransformation())
       .WillByDefault(
           Return(ConnectionManagerConfig::HttpConnectionManagerProto::SET_SCHEME_IF_ABSENT));
@@ -353,7 +350,7 @@ TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
   EXPECT_EQ("http", headers.getForwardedProtoValue());
 
   // Scheme was present. Do not overwrite anything
-  scheme_string = "https";
+  config_.scheme_ = "https";
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("http", headers.getSchemeValue());
   EXPECT_EQ("http", headers.getForwardedProtoValue());

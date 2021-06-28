@@ -355,9 +355,9 @@ public:
   schemeHeaderTransformation() const PURE;
 
   /**
-   * @return const OptRef<const std::string> the scheme name to write into requests.
+   * @return const absl::optional<std::string> the scheme name to write into requests.
    */
-  virtual const OptRef<const std::string> schemeToSet() const PURE;
+  virtual const absl::optional<std::string>& schemeToSet() const PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.

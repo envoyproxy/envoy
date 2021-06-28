@@ -173,7 +173,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
-  const OptRef<const std::string> schemeToSet() const override { return scheme_; }
+  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   HttpConnectionManagerProto::SchemeHeaderTransformation
   schemeHeaderTransformation() const override {
     return scheme_transformation_;
@@ -238,7 +238,7 @@ public:
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
-  OptRef<const std::string> scheme_;
+  absl::optional<std::string> scheme_;
   HttpConnectionManagerProto::SchemeHeaderTransformation scheme_transformation_{
       HttpConnectionManagerProto::OVERWRITE_SCHEME};
   Stats::IsolatedStoreImpl fake_stats_;

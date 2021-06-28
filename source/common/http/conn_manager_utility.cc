@@ -169,10 +169,10 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     if (config.schemeHeaderTransformation() ==
             ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME ||
         (!request_headers.Scheme() && !request_headers.ForwardedProto())) {
-      request_headers.setScheme(config.schemeToSet().value().get());
+      request_headers.setScheme(config.schemeToSet().value());
       if (!request_headers.getForwardedProtoValue().empty() &&
           request_headers.getForwardedProtoValue() != request_headers.getSchemeValue()) {
-        request_headers.setForwardedProto(request_headers.getSchemeValue());
+        request_headers.setForwardedProto(config.schemeToSet().value());
       }
     }
   }

@@ -529,6 +529,7 @@ public:
     ON_CALL(*this, isRoutable()).WillByDefault(testing::Return(true));
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
+    ON_CALL(*this, schemeToSet()).WillByDefault(testing::ReturnRef(scheme_));
   }
 
   // Http::ConnectionManagerConfig
@@ -562,7 +563,7 @@ public:
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
-  MOCK_METHOD(const OptRef<const std::string>, schemeToSet, (), (const));
+  MOCK_METHOD(const absl::optional<std::string>&, schemeToSet, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::SchemeHeaderTransformation, schemeHeaderTransformation,
               (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
@@ -602,6 +603,7 @@ public:
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
+  absl::optional<std::string> scheme_;
 };
 
 class MockReceivedSettings : public ReceivedSettings {
