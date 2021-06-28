@@ -18,13 +18,10 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/quic_stat_names.h"
-#endif
 
 namespace Envoy {
 namespace Server {
@@ -100,7 +97,7 @@ public:
   ListenerFactoryContextBaseImpl(Envoy::Server::Instance& server,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  const envoy::config::listener::v3::Listener& config,
-                                 DrainManagerSharedPtr drain_manager);
+                                 DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
@@ -144,7 +141,7 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Server::DrainManagerSharedPtr drain_manager_;
+  Server::DrainManagerPtr drain_manager_;
 };
 
 class ListenerImpl;
@@ -158,7 +155,7 @@ public:
                                 ProtobufMessage::ValidationVisitor& validation_visitor,
                                 const envoy::config::listener::v3::Listener& config_message,
                                 const Network::ListenerConfig* listener_config,
-                                ListenerImpl& listener_impl, DrainManagerSharedPtr drain_manager)
+                                ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
             server, validation_visitor, config_message, drain_manager)),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
@@ -429,9 +426,7 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
-#ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames& quic_stat_names_;
-#endif
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

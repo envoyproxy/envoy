@@ -17,25 +17,26 @@ namespace Server {
 DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type,
                                    Event::Dispatcher& dispatcher)
-    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type), children_(dispatcher) {}
+    : server_(server), dispatcher_(dispatcher), drain_type_(drain_type),
+      children_(Common::ThreadSafeCallbackManager::create()) {}
 
-DrainManagerSharedPtr
+DrainManagerPtr
 DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
                                      envoy::config::listener::v3::Listener::DrainType drain_type) {
-  auto child = std::make_shared<DrainManagerImpl>(server_, drain_type, dispatcher);
+  auto child = std::make_unique<DrainManagerImpl>(server_, drain_type, dispatcher);
 
-  // Wire up the child so that when the parent starts draining, the child also sees the state-change
-  auto child_cb = children_.add(dispatcher, [child_ = std::weak_ptr<DrainManagerImpl>(child)] {
-    auto child = child_.lock();
-    if (child && !child->draining_) {
+  // Wire up the child so that when the parent starts draining, the child also sees the
+  // state-change
+  auto child_cb = children_->add(dispatcher, [child = child.get()] {
+    if (!child->draining_) {
       child->startDrainSequence([] {});
     }
   });
-  child->parent_callback_handle_ = child_cb;
+  child->parent_callback_handle_ = std::move(child_cb);
   return child;
 }
 
-DrainManagerSharedPtr DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher) {
+DrainManagerPtr DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher) {
   return createChildManager(dispatcher, drain_type_);
 }
 
@@ -98,17 +99,43 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(DrainCloseCb cb) c
   return cbs_.add(cb);
 }
 
+void DrainManagerImpl::addDrainCompleteCallback(std::function<void()> cb) {
+  ASSERT(draining_);
+
+  // If the drain-tick-timer is active, add the callback to the queue. If not defined
+  // then it must have already expired, invoke the callback immediately.
+  if (drain_tick_timer_) {
+    drain_complete_cbs_.push_back(cb);
+  } else {
+    cb();
+  }
+}
+
 void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
   ASSERT(drain_complete_cb);
-  ASSERT(!draining_);
+
+  // If we've already started draining (either through direct invocation or through
+  // parent-initiated draining), enqueue the drain_complete_cb and return
+  if (draining_) {
+    addDrainCompleteCallback(drain_complete_cb);
+    return;
+  }
+
   ASSERT(!drain_tick_timer_);
   draining_ = true;
 
   // Signal to child drain-managers to start their drain sequence
-  children_.runCallbacksWith([] { return std::tuple<>(); });
+  children_->runCallbacks();
 
   // Schedule callback to run at end of drain time
-  drain_tick_timer_ = dispatcher_.createTimer(drain_complete_cb);
+  drain_tick_timer_ = dispatcher_.createTimer([this]() {
+    for (auto& cb : drain_complete_cbs_) {
+      cb();
+    }
+    drain_complete_cbs_.clear();
+    drain_tick_timer_.reset();
+  });
+  addDrainCompleteCallback(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   drain_tick_timer_->enableTimer(drain_delay);
   drain_deadline_ = dispatcher_.timeSource().monotonicTime() + drain_delay;

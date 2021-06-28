@@ -20,18 +20,17 @@ public:
   ~MockDrainManager() override;
 
   // Network::DrainManager
-  MOCK_METHOD(DrainManagerSharedPtr, createChildManager,
+  MOCK_METHOD(DrainManagerPtr, createChildManager,
               (Event::Dispatcher&, envoy::config::listener::v3::Listener::DrainType), (override));
-  MOCK_METHOD(DrainManagerSharedPtr, createChildManager, (Event::Dispatcher&), (override));
-
-  MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
-
-  // Server::DrainManager
+  MOCK_METHOD(DrainManagerPtr, createChildManager, (Event::Dispatcher&), (override));
   MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startParentShutdownSequence, ());
   MOCK_METHOD(void, _startDrainSequence, (std::function<void()> completion));
   void startDrainSequence(std::function<void()> cb) override;
+
+  // Network::DrainDecision
+  MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 
   /**
    * Apply some setup/configuration to this drain manager and to all child drain-managers created
@@ -53,7 +52,10 @@ public:
   /**
    * All children created by calls to `createChildManager`
    */
-  std::vector<std::weak_ptr<DrainManager>> children_{};
+  std::vector<MockDrainManager*> children_{};
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  std::weak_ptr<bool> parent_alive_;
+  MockDrainManager* parent_ = nullptr;
 
   std::atomic<bool> draining_{false};
 };

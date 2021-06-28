@@ -13,7 +13,6 @@ namespace Server {
 
 class DrainManager;
 using DrainManagerPtr = std::unique_ptr<DrainManager>;
-using DrainManagerSharedPtr = std::shared_ptr<DrainManager>;
 
 /**
  * Handles connection draining. This concept is used globally during hot restart / server draining
@@ -26,23 +25,20 @@ public:
    * be used to enact local draining.
    *
    * Child managers can be used to construct "drain trees" where each node in the tree can drain
-   * independently of it's parent node, but the drain status cascades to child nodes. This
-   * relationship is managed through the callback methods in the DrainDecision interface. When
-   * constructed, the child is registered with the parent through this interface.
+   * independently of it's parent node, but the drain status cascades to child nodes.
    *
-   * The primary difference to a normal callback is that children managers do not respect the
-   * drain-time parameter of the parent. This is because the children may have their own drain
-   * strategies and may wish to define drain time and strategy separately. Observing this drain-time
-   * at each layer may also lead to unexpected/unwanted delays.
+   * A notable difference to drain callbacks is that child managers are notified immediately and
+   * without a delay timing. Additionally, notifications from parent to child is a thread-safe
+   * operation whereas callback registration and triggering is not.
    *
    * @param dispatcher Dispatcher for the current thread in which the new child drain-manager will
    * exist.
    * @param drain_type The drain-type for the manager. May be different from the parent manager.
    */
-  virtual DrainManagerSharedPtr
+  virtual DrainManagerPtr
   createChildManager(Event::Dispatcher& dispatcher,
                      envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
-  virtual DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) PURE;
+  virtual DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) PURE;
 
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).

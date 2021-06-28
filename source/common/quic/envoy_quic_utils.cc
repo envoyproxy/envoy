@@ -17,12 +17,12 @@ namespace Quic {
 Network::Address::InstanceConstSharedPtr
 quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   return quic_address.IsInitialized()
-             ? Network::Address::addressFromSockAddr(quic_address.generic_address(),
-                                                     quic_address.host().address_family() ==
-                                                             quic::IpAddressFamily::IP_V4
-                                                         ? sizeof(sockaddr_in)
-                                                         : sizeof(sockaddr_in6),
-                                                     false)
+             ? Network::Address::addressFromSockAddrOrDie(quic_address.generic_address(),
+                                                          quic_address.host().address_family() ==
+                                                                  quic::IpAddressFamily::IP_V4
+                                                              ? sizeof(sockaddr_in)
+                                                              : sizeof(sockaddr_in6),
+                                                          -1, false)
              : nullptr;
 }
 

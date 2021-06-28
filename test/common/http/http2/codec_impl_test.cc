@@ -1804,6 +1804,98 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   }
 }
 
+TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeError) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "true"}});
+
+  http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
+  http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
+      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
+      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        return request_decoder_;
+      }));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
+  absl::InlinedVector<nghttp2_settings_entry, 1> settings{
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}};
+  EXPECT_EQ(0, nghttp2_submit_settings(server_->session(), NGHTTP2_FLAG_NONE, settings.data(),
+                                       settings.size()));
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.stream_refused_errors").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
+  EXPECT_EQ(1, TestUtility::findGauge(server_stats_store_, "http2.streams_active")->value());
+}
+
+TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreError) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "false"}});
+
+  http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
+  http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
+      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
+      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        return request_decoder_;
+      }));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
+  absl::InlinedVector<nghttp2_settings_entry, 1> settings{
+      {NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}};
+  EXPECT_EQ(0, nghttp2_submit_settings(server_->session(), NGHTTP2_FLAG_NONE, settings.data(),
+                                       settings.size()));
+
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeHeaders(request_headers, true).IgnoreError(),
+                            ServerCodecError, "The user callback function failed");
+
+  EXPECT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  // Not verifying the http2.streams_active server/client gauges here as the
+  // EXPECT_THROW_WITH_MESSAGE above doesn't let us fully capture the behavior of the real system.
+  // In the real world, the status returned from dispatch would trigger a connection close which
+  // would result in the active stream gauges to go down to 0.
+}
+
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(                                                                              \
       ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),                   \

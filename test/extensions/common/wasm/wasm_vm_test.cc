@@ -100,7 +100,7 @@ public:
   MOCK_METHOD(uint32_t, random, (), (const));
 };
 
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 MockHostFunctions* g_host_functions;
 
 void pong(void*, Word value) { g_host_functions->pong(convertWordToUint32(value)); }

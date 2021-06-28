@@ -134,7 +134,6 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty

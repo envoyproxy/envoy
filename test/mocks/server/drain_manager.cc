@@ -19,22 +19,22 @@ MockDrainManager::MockDrainManager() {
   ON_CALL(*this, createChildManager(_, _))
       .WillByDefault(
           Invoke([this](Event::Dispatcher&,
-                        envoy::config::listener::v3::Listener_DrainType) -> DrainManagerSharedPtr {
+                        envoy::config::listener::v3::Listener_DrainType) -> DrainManagerPtr {
             auto* manager = new NiceMock<MockDrainManager>();
             child_setup_(*manager);
             manager->child_setup_ = child_setup_;
-            auto manager_ptr = std::shared_ptr<DrainManager>(manager);
-            children_.push_back(std::weak_ptr<DrainManager>(manager_ptr));
-            return manager_ptr;
+            manager->parent_alive_ = std::weak_ptr<bool>(this->still_alive_);
+            children_.push_back(manager);
+            return std::unique_ptr<DrainManager>(manager);
           }));
   ON_CALL(*this, createChildManager(_))
-      .WillByDefault(Invoke([this](Event::Dispatcher&) -> DrainManagerSharedPtr {
+      .WillByDefault(Invoke([this](Event::Dispatcher&) -> DrainManagerPtr {
         auto* manager = new NiceMock<MockDrainManager>();
         child_setup_(*manager);
         manager->child_setup_ = child_setup_;
-        auto manager_ptr = std::shared_ptr<DrainManager>(manager);
-        children_.push_back(std::weak_ptr<DrainManager>(manager_ptr));
-        return manager_ptr;
+        manager->parent_alive_ = std::weak_ptr<bool>(this->still_alive_);
+        children_.push_back(manager);
+        return std::unique_ptr<DrainManager>(manager);
       }));
 
   ON_CALL(*this, drainClose()).WillByDefault(Invoke([this]() { return draining_.load(); }));
@@ -45,11 +45,8 @@ void MockDrainManager::startDrainSequence(std::function<void()> cb) {
   drain_sequence_completion_ = cb;
 
   // Proxy calls to children
-  for (auto& child_weak_ptr : children_) {
-    auto child = child_weak_ptr.lock();
-    if (child) {
-      child->startDrainSequence([] {});
-    }
+  for (auto& child : children_) {
+    child->startDrainSequence([] {});
   }
 
   // flip internal drain state
@@ -59,7 +56,14 @@ void MockDrainManager::startDrainSequence(std::function<void()> cb) {
   _startDrainSequence(cb);
 }
 
-MockDrainManager::~MockDrainManager() = default;
+MockDrainManager::~MockDrainManager() {
+  if (!parent_alive_.expired() && parent_) {
+    auto child_it = std::find(parent_->children_.begin(), parent_->children_.end(), this);
+    if (child_it != parent_->children_.end()) {
+      parent_->children_.erase(child_it);
+    }
+  }
+};
 
 } // namespace Server
 } // namespace Envoy

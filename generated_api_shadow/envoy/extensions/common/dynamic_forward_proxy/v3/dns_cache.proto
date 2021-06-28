@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/resolver.proto";
 
 import "google/protobuf/duration.proto";
@@ -29,7 +30,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -108,4 +109,9 @@ message DnsCacheConfig {
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   config.core.v3.DnsResolutionConfig dns_resolution_config = 9;
+
+  // Hostnames that should be preresolved into the cache upon creation. This might provide a
+  // performance improvement, in the form of cache hits, for hostnames that are going to be
+  // resolved during steady state and are known at config load time.
+  repeated config.core.v3.SocketAddress preresolve_hostnames = 10;
 }

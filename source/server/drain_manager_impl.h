@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <vector>
 
 #include "envoy/common/callback.h"
 #include "envoy/common/time.h"
@@ -37,12 +38,14 @@ public:
   void startDrainSequence(std::function<void()> drain_complete_cb) override;
   bool draining() const override { return draining_; }
   void startParentShutdownSequence() override;
-  DrainManagerSharedPtr
+  DrainManagerPtr
   createChildManager(Event::Dispatcher& dispatcher,
                      envoy::config::listener::v3::Listener::DrainType drain_type) override;
-  DrainManagerSharedPtr createChildManager(Event::Dispatcher& dispatcher) override;
+  DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) override;
 
 private:
+  void addDrainCompleteCallback(std::function<void()> cb);
+
   Instance& server_;
   Event::Dispatcher& dispatcher_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
@@ -51,13 +54,14 @@ private:
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
+  std::vector<std::function<void()>> drain_complete_cbs_{};
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
-  Common::ThreadSafeCallbackManager<> children_;
+  std::shared_ptr<Common::ThreadSafeCallbackManager> children_;
 
   // Callback handle parent will invoke to initiate drain-sequence. Created and set
   // by the parent drain-manager.
-  Common::ThreadSafeCallbackHandlePtr parent_callback_handle_;
+  Common::CallbackHandlePtr parent_callback_handle_;
 
   Event::TimerPtr parent_shutdown_timer_;
 };

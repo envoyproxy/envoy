@@ -2,6 +2,8 @@
 
 #include <openssl/crypto.h>
 
+#include "envoy/common/optref.h"
+
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
@@ -71,7 +73,9 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes(), quic_stat_names_,
-      listener_config_.listenerScope(), crypto_server_stream_factory_);
+      listener_config_.listenerScope(), crypto_server_stream_factory_,
+      makeOptRefFromPtr(filter_chain == nullptr ? nullptr
+                                                : &filter_chain->transportSocketFactory()));
   if (filter_chain != nullptr) {
     const bool has_filter_initialized =
         listener_config_.filterChainFactory().createNetworkFilterChain(

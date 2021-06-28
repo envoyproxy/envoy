@@ -1,3 +1,4 @@
+#include <thread>
 #include <vector>
 
 #include "source/common/common/callback_impl.h"
@@ -57,81 +58,85 @@ TEST_F(CallbackManagerTest, DestroyManagerBeforeHandle) {
   handle.reset();
 }
 
-TEST_F(CallbackManagerTest, ThreadSafe__All) {
+class ThreadSafeCallbackManagerTest : public testing::Test {
+public:
+  MOCK_METHOD(void, called, (int arg));
+};
+
+// Test basic behaviors of the thread-safe callback-manager with respect to callback registration,
+// de-registration, and execution.
+TEST_F(ThreadSafeCallbackManagerTest, All) {
   InSequence s;
 
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackManager<int> manager{dispatcher};
+  auto manager = ThreadSafeCallbackManager::create();
 
-  auto handle1 = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg); });
-  auto handle2 = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg * 2); });
+  auto handle1 = manager->add(cb_dispatcher, [this]() -> void { called(5); });
+  auto handle2 = manager->add(cb_dispatcher, [this]() -> void { called(10); });
 
   EXPECT_CALL(*this, called(5));
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacksWith([] { return 5; });
+  manager->runCallbacks();
 
   handle1.reset();
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacksWith([] { return 5; });
+  manager->runCallbacks();
 
   EXPECT_CALL(*this, called(10));
   EXPECT_CALL(*this, called(20));
-  auto handle3 = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg * 4); });
-  manager.runCallbacksWith([] { return 5; });
+  auto handle3 = manager->add(cb_dispatcher, [this]() -> void { called(20); });
+  manager->runCallbacks();
   handle3.reset();
 
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacksWith([] { return 5; });
+  manager->runCallbacks();
 }
 
-TEST_F(CallbackManagerTest, ThreadSafe__DestroyManagerBeforeHandle) {
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
+// Validate that the handles returned from callback-registration can outlive the manager
+// and can be destructed without error.
+TEST_F(ThreadSafeCallbackManagerTest, DestroyManagerBeforeHandle) {
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackHandlePtr handle;
+  CallbackHandlePtr handle;
   {
-    ThreadSafeCallbackManager<int> manager{dispatcher};
-    handle = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg); });
+    auto manager = ThreadSafeCallbackManager::create();
+    handle = manager->add(cb_dispatcher, [this]() -> void { called(5); });
     EXPECT_CALL(*this, called(5));
-    manager.runCallbacksWith([] { return 5; });
+    manager->runCallbacks();
   }
   EXPECT_NE(nullptr, handle);
   // It should be safe to destruct the handle after the manager.
   handle.reset();
 }
 
-TEST_F(CallbackManagerTest, ThreadSafe__RemoveCallbackAsync) {
-  InSequence s;
+// Validate that a callback added and removed from a thread (and thus dispatcher) that
+// no longer exist is a safe operation.
+TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
+  auto manager = ThreadSafeCallbackManager::create();
 
-  std::vector<std::function<void()>> remove_cbs;
-  testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
-  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&remove_cbs](std::function<void()> cb) {
-    remove_cbs.push_back(cb);
-  }));
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  ThreadSafeCallbackManager<int> manager{dispatcher};
+  // Register a callback in a new thread and then remove it
+  auto t = std::thread([this, manager = manager.get()] {
+    testing::NiceMock<Event::MockDispatcher> cb_dispatcher;
+    ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](std::function<void()> cb) { cb(); }));
 
-  auto handle1 = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg); });
-  auto handle2 = manager.add(cb_dispatcher, [this](int arg) -> void { called(arg * 2); });
+    auto handle = manager->add(cb_dispatcher, [this]() { called(20); });
+    handle.reset();
+  });
 
-  // delete handle1, but delay removal from callback manager
-  handle1.reset();
+  // Add another callback on the main thread
+  auto handle = manager->add(cb_dispatcher, [this]() { called(10); });
+
+  // Validate that we can wait for the above thread to terminate (and de-register the
+  // callback), then run the remaining callbacks.
+  t.join();
   EXPECT_CALL(*this, called(10));
-  manager.runCallbacksWith([] { return 5; });
-
-  // remove all callbacks
-  handle2.reset();
-  for (auto& cb : remove_cbs) {
-    cb();
-  }
+  manager->runCallbacks();
 }
 
 } // namespace Common

@@ -27,8 +27,6 @@ public:
    * @brief Register a callback to be called proactively when a drain decision enters into a
    *        'close' state.
    *
-   * @param dispatcher Event dispatcher to use to schedule the callback. This should be the
-   * dispatcher associated with the thread in which the @b cb is registered.
    * @param cb Callback to be called once drain decision enters close state
    * @return handle to remove callback
    */

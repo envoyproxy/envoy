@@ -89,7 +89,7 @@ public:
 private:
   Configuration::DrainableFactoryContext& parent_context_;
   Init::Manager& init_manager_;
-  DrainManagerSharedPtr drain_manager_;
+  DrainManagerPtr drain_manager_;
   ThreadLocal::SlotPtr tls_;
 };
 
