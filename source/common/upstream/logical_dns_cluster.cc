@@ -56,6 +56,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
+      wait_for_dns_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_dns_on_init, true)),
       local_info_(factory_context.localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
@@ -89,7 +90,12 @@ LogicalDnsCluster::LogicalDnsCluster(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
 
-void LogicalDnsCluster::startPreInit() { startResolve(); }
+void LogicalDnsCluster::startPreInit() {
+  startResolve();
+  if (!wait_for_dns_on_init_) {
+    onPreInitComplete();
+  }
+}
 
 LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {

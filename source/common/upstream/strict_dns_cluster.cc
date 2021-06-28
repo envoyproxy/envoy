@@ -19,7 +19,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
+      respect_dns_ttl_(cluster.respect_dns_ttl()),
+      wait_for_dns_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_dns_on_init, true)) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
@@ -54,7 +55,7 @@ void StrictDnsClusterImpl::startPreInit() {
   }
   // If the config provides no endpoints, the cluster is initialized immediately as if all hosts are
   // resolved in failure.
-  if (resolve_targets_.empty()) {
+  if (resolve_targets_.empty() || !wait_for_dns_on_init_) {
     onPreInitComplete();
   }
 }
