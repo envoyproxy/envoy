@@ -182,7 +182,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     }
 
     // Proceed with resolution after establishing that the resolver has a live main_sd_ref_.
-    auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_, main_sd_ref_, dns_name);
+    auto pending_resolution =
+        std::make_unique<PendingResolution>(*this, callback, dispatcher_, main_sd_ref_, dns_name);
 
     DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
     if (error != kDNSServiceErr_NoError) {
