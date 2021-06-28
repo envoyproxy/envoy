@@ -5,6 +5,7 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "fuzzing_decoration")
 load(":envoy_binary.bzl", "envoy_cc_binary")
 load(":envoy_library.bzl", "tcmalloc_external_deps")
+load(":envoy_pch.bzl", "envoy_pch_copts")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -29,19 +30,26 @@ def _envoy_cc_test_infrastructure_library(
         include_prefix = None,
         copts = [],
         alwayslink = 1,
+        disable_pch = False,
         **kargs):
     # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
     deps += tcmalloc_external_deps(repository)
+    extra_deps = []
+    pch_copts = []
+    if disable_pch:
+        extra_deps = [envoy_external_dep_path("googletest")]
+    else:
+        extra_deps = [repository + "//test:test_pch"]
+        pch_copts = envoy_pch_copts(repository, "//test:test_pch")
+
     cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts + pch_copts,
         testonly = 1,
-        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
-            envoy_external_dep_path("googletest"),
-        ],
+        deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + extra_deps,
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = alwayslink,
@@ -159,11 +167,12 @@ def envoy_cc_test(
         name = name,
         srcs = srcs,
         data = data,
-        copts = envoy_copts(repository, test = True) + copts,
+        copts = envoy_copts(repository, test = True) + copts + envoy_pch_copts(repository, "//test:test_pch"),
         linkopts = _envoy_test_linkopts(),
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
+            repository + "//test:test_pch",
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
         ],
@@ -192,6 +201,7 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
+    disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
         srcs,
@@ -205,6 +215,7 @@ def envoy_cc_test_library(
         copts,
         visibility = ["//visibility:public"],
         alwayslink = alwayslink,
+        disable_pch = disable_pch,
         **kargs
     )
 
@@ -283,7 +294,7 @@ def envoy_py_test(
 
 # Envoy C++ mock targets should be specified with this function.
 def envoy_cc_mock(name, **kargs):
-    envoy_cc_test_library(name = name, **kargs)
+    envoy_cc_test_library(name = name, disable_pch = True, **kargs)
 
 # Envoy shell tests that need to be included in coverage run should be specified with this function.
 def envoy_sh_test(

@@ -67,9 +67,9 @@ gitdb==4.0.7 \
     # via
     #   -r tools/deprecate_version/requirements.txt
     #   gitpython
-gitpython==3.1.17 \
-    --hash=sha256:29fe82050709760081f588dd50ce83504feddbebdc4da6956d02351552b1c135 \
-    --hash=sha256:ee24bdc93dce357630764db659edaf6b8d664d4ff5447ccfeedd2dc5c253f41e
+gitpython==3.1.18 \
+    --hash=sha256:fce760879cd2aebd2991b3542876dc5c4a909b30c9d69dfc488e504a8db37ee8 \
+    --hash=sha256:b838a895977b45ab6f0cc926a9045c8d1c44e2b653c1fcc39fe91f42c6e8f05b
     # via -r tools/deprecate_version/requirements.txt
 idna==2.10 \
     --hash=sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6 \

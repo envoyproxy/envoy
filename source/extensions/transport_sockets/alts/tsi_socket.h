@@ -117,7 +117,6 @@ private:
   bool handshake_complete_{};
   bool end_stream_read_{};
   bool read_error_{};
-  bool write_buffer_contains_handshake_bytes_{};
   uint64_t prev_bytes_to_drain_{};
 };
 
@@ -131,7 +130,7 @@ public:
   bool implementsSecureTransport() const override;
   bool usesProxyProtocolOptions() const override { return false; }
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

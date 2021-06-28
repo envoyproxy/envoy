@@ -15,6 +15,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 #include "absl/types/optional.h"
 
@@ -42,14 +43,16 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt);
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt)
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -82,6 +85,8 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
+  const std::string buildMessage(const Stats::Metric& metric, uint64_t value,
+                                 const std::string& type) const;
   const std::string getName(const Stats::Metric& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
@@ -91,6 +96,7 @@ private:
   // Prefix for all flushed stats.
   const std::string prefix_;
   const uint64_t buffer_size_;
+  const Statsd::TagFormat tag_format_;
 };
 
 /**
