@@ -843,7 +843,9 @@ message RouteAction {
     // [#not-implemented-hide:]
     // Name of the cluster specifier plugin to use to determine the cluster for
     // requests on this route. The plugin name must be defined in the associated
-    // :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration.cluster_specifier_plugins`.
+    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
+    // in the
+    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
     string cluster_specifier_plugin = 37;
   }
 
