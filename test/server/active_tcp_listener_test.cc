@@ -86,7 +86,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
         return true;
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+      .WillOnce(Invoke([](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
 
@@ -95,7 +95,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
   absl::string_view server_name = "envoy.io";
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-  EXPECT_CALL(*accepted_socket, requestedServerName()).WillOnce(Return(server_name));
+  accepted_socket->address_provider_->setRequestedServerName(server_name);
 
   // fake the socket is open.
   NiceMock<Network::MockIoHandle> io_handle;
