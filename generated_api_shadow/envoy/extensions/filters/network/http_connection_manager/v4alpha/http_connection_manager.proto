@@ -82,7 +82,7 @@ message HttpConnectionManager {
     OVERWRITE_SCHEME = 0;
 
     // If no Scheme header is present (for HTTP/1.1 requests without a fully
-    // qualifiged URL) append Scheme
+    // qualified URL) append Scheme
     // :ref:`scheme
     // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>`.
     // If a Scheme header is present, pass it through.
