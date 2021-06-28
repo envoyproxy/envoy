@@ -45,9 +45,7 @@ public:
   const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return direct_remote_address_;
   }
-  absl::string_view requestedServerName() const override {
-    return server_name_;
-  }
+  absl::string_view requestedServerName() const override { return server_name_; }
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     server_name_ = std::string(requested_server_name);
   }
