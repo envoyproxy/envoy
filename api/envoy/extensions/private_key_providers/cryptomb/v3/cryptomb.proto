@@ -12,7 +12,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: CryptoMb private key provider]
 // [#extension: envoy.tls.key_providers.cryptomb]
 
-// An CryptoMbPrivateKeyMethodConfig message specifies how the CryptoMb private key
+// A CryptoMbPrivateKeyMethodConfig message specifies how the CryptoMb private key
 // provider is configured. The private key provider provides SIMD processing of
 // ECDSA sign operations and RSA sign and decrypt operations. It works by
 // gathering the operations into a worker-thread specific queue, and processing
