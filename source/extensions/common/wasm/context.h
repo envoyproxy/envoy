@@ -453,7 +453,7 @@ protected:
   Buffer buffer_;
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
-  bool end_of_stream_;
+  bool end_of_stream_ = false;
   bool local_reply_sent_ = false;
   ProtobufWkt::Struct temporary_metadata_;
 
