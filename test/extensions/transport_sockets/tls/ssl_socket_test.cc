@@ -787,8 +787,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 }
 
 void updateFilterChain(
-    envoy::config::listener::v3::FilterChain* filter_chain,
-    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context) {
+    const envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context,
+    envoy::config::listener::v3::FilterChain* filter_chain) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
@@ -801,7 +801,7 @@ struct OptionalServerConfig {
 void configureServerAndExpiredClientCertificate(
     envoy::config::listener::v3::Listener& listener,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client,
-    const OptionalServerConfig& server_config = {}) {
+    const OptionalServerConfig& server_config) {
 
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -828,7 +828,7 @@ void configureServerAndExpiredClientCertificate(
   if (server_config.cert_hash.has_value()) {
     server_validation_ctx->add_verify_certificate_hash(server_config.cert_hash.value());
   }
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
@@ -938,7 +938,7 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
           "{{ test_rundir "
           "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
 
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1546,7 +1546,7 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  configureServerAndExpiredClientCertificate(listener, client);
+  configureServerAndExpiredClientCertificate(listener, client, /*server_config=*/{});
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
@@ -1687,7 +1687,7 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_256_HASH);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1722,7 +1722,7 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_256_HASH);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1886,7 +1886,7 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_PASSWORD_PROTECTED_CERT_256_HASH);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1930,7 +1930,7 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -1964,7 +1964,7 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
           tls_context.mutable_common_tls_context()->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2000,7 +2000,7 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
@@ -2027,7 +2027,7 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
           tls_context.mutable_common_tls_context()->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2057,7 +2057,7 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2091,7 +2091,7 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
           tls_context.mutable_common_tls_context()->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2127,7 +2127,7 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2164,7 +2164,7 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2200,7 +2200,7 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2237,7 +2237,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2266,7 +2266,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -2297,7 +2297,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2332,7 +2332,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -2369,7 +2369,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
@@ -3862,7 +3862,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // so enable them to avoid false positives.
   client_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
   TestUtilOptionsV2 tls_v1_2_test_options =
@@ -3938,7 +3938,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3954,7 +3954,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_3_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3970,7 +3970,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
@@ -3980,7 +3980,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_1);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
@@ -3990,7 +3990,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_2_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
@@ -4000,7 +4000,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(error_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
@@ -4010,7 +4010,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_2_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
@@ -4024,7 +4024,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_0);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -4040,7 +4040,7 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
   server_params->set_tls_maximum_protocol_version(
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3);
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(tls_v1_3_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -4060,7 +4060,7 @@ TEST_P(SslSocketTest, ALPN) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
   envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* server_ctx =
       tls_context.mutable_common_tls_context();
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* client_ctx =
@@ -4078,7 +4078,7 @@ TEST_P(SslSocketTest, ALPN) {
 
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
   server_ctx->add_alpn_protocols("test");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(test_options);
   server_ctx->clear_alpn_protocols();
 
@@ -4091,7 +4091,7 @@ TEST_P(SslSocketTest, ALPN) {
   // Client connects with "test" ALPN to a server with "test" ALPN, "test" ALPN is negotiated.
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   test_options.setExpectedALPNProtocol("test");
   testUtilV2(test_options);
   test_options.setExpectedALPNProtocol("");
@@ -4103,7 +4103,7 @@ TEST_P(SslSocketTest, ALPN) {
   client.set_allow_renegotiation(true);
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   test_options.setExpectedALPNProtocol("test");
   testUtilV2(test_options);
   test_options.setExpectedALPNProtocol("");
@@ -4114,7 +4114,7 @@ TEST_P(SslSocketTest, ALPN) {
   // Client connects with "test" ALPN to a server with "test2" ALPN, no ALPN is negotiated.
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test2");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(test_options);
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
@@ -4136,7 +4136,7 @@ TEST_P(SslSocketTest, CipherSuites) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
@@ -4158,7 +4158,7 @@ TEST_P(SslSocketTest, CipherSuites) {
       tls_context.mutable_common_tls_context()->mutable_tls_params();
   server_params->add_cipher_suites(common_cipher_suite);
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   TestUtilOptionsV2 cipher_test_options(listener, client, true, GetParam());
   cipher_test_options.setExpectedCiphersuite(common_cipher_suite);
   std::string stats = "ssl.ciphers." + common_cipher_suite;
@@ -4170,7 +4170,7 @@ TEST_P(SslSocketTest, CipherSuites) {
   // Client connects with unsupported cipher suite, connection fails.
   client_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());
   error_test_options.setExpectedServerStats("ssl.connection_error");
   testUtilV2(error_test_options);
@@ -4179,11 +4179,11 @@ TEST_P(SslSocketTest, CipherSuites) {
 
   // Client connects to a server offering only deprecated cipher suites, connection fails.
   server_params->add_cipher_suites("ECDHE-RSA-AES128-SHA");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   error_test_options.setExpectedServerStats("ssl.connection_error");
   testUtilV2(error_test_options);
   server_params->clear_cipher_suites();
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
   client_params->add_cipher_suites(common_cipher_suite);
 #ifdef BORINGSSL_FIPS
@@ -4206,7 +4206,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
       tls_context.mutable_common_tls_context()->mutable_tls_params();
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
@@ -4226,7 +4226,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   server_params->add_ecdh_curves("X25519");
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   TestUtilOptionsV2 ecdh_curves_test_options(listener, client, true, GetParam());
   std::string stats = "ssl.curves.X25519";
   ecdh_curves_test_options.setExpectedServerStats(stats).setExpectedClientStats(stats);
@@ -4239,7 +4239,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client_params->add_ecdh_curves("X25519");
   server_params->add_ecdh_curves("P-256");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());
   error_test_options.setExpectedServerStats("ssl.connection_error");
   testUtilV2(error_test_options);
@@ -4251,7 +4251,7 @@ TEST_P(SslSocketTest, EcdhCurves) {
   // Verify that X25519 is not offered by default in FIPS builds.
   client_params->add_ecdh_curves("X25519");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 #ifdef BORINGSSL_FIPS
   testUtilV2(error_test_options);
 #else
@@ -4280,7 +4280,7 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"));
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   // Client RSA certificate.
@@ -4574,7 +4574,7 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
@@ -4593,7 +4593,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
@@ -4616,7 +4616,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
@@ -4646,12 +4646,12 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   envoy::extensions::transport_sockets::tls::v3::CommonTlsContext* server_ctx =
       tls_context.mutable_common_tls_context();
   server_ctx->add_alpn_protocols("test");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   testUtilV2(test_options);
   server_ctx->clear_alpn_protocols();
   // Override client side ALPN, "test" ALPN is used.
   server_ctx->add_alpn_protocols("test");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   auto transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
       "", std::vector<std::string>{}, std::vector<std::string>{"foo", "test", "bar"});
 
@@ -4685,7 +4685,7 @@ TEST_P(SslSocketTest, OverrideApplicationProtocols) {
   // Note that the server prefers "test" over "bar", but since the client only configures "bar",
   // the resulting ALPN will be "bar" even though "test" is included in the fallback.
   server_ctx->add_alpn_protocols("bar");
-  updateFilterChain(filter_chain, tls_context);
+  updateFilterChain(tls_context, filter_chain);
   client.mutable_common_tls_context()->add_alpn_protocols("bar");
   testUtilV2(test_options.setExpectedALPNProtocol("bar").setTransportSocketOptions(
       transport_socket_options));
