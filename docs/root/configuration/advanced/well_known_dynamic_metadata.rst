@@ -4,8 +4,8 @@ Well Known Dynamic Metadata
 ===========================
 
 Filters can emit dynamic metadata via the *setDynamicMetadata* routine in the
-:repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` interface on a
-:repo:`Connection <include/envoy/network/connection.h>`. This metadata emitted by a filter can be
+:repo:`StreamInfo <envoy/stream_info/stream_info.h>` interface on a
+:repo:`Connection <envoy/network/connection.h>`. This metadata emitted by a filter can be
 consumed by other filters and useful features can be built by stacking such filters. For example,
 a logging filter can consume dynamic metadata from an RBAC filter to log details about runtime
 shadow rule behavior. Another example is where an RBAC filter permits/restricts MySQL/MongoDB operations

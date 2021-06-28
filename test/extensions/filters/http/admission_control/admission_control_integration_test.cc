@@ -8,6 +8,9 @@
 namespace Envoy {
 namespace {
 
+// For how this value was chosen, see https://github.com/envoyproxy/envoy/issues/17067.
+constexpr double ALLOWED_ERROR = 0.10;
+
 const std::string ADMISSION_CONTROL_CONFIG =
     R"EOF(
 name: envoy.filters.http.admission_control
@@ -24,6 +27,10 @@ typed_config:
     default_value:
       value: 100.0
     runtime_key: "foo.sr_threshold"
+  max_rejection_probability:
+    default_value:
+      value: 100.0
+    runtime_key: "foo.mrp"
   enabled:
     default_value: true
     runtime_key: "foo.enabled"
@@ -117,9 +124,9 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
-  // throttling rate (default max_rejection_probability). Allowing an error of 10%.
-  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.10);
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
+  // throttling rate.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
@@ -157,9 +164,9 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~80%
-  // throttling rate (default max_rejection_probability). Allowing an error of 10%.
-  EXPECT_NEAR(throttle_count / request_count, 0.80, 0.10);
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
+  // throttling rate.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
