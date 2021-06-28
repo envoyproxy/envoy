@@ -154,6 +154,16 @@ public:
           // Get dynamically-allocated Context::RequestStatNames from the context.
           request_names_ = config_->context_.resolveDynamicServiceAndMethod(headers.Path());
           do_stat_tracking_ = request_names_.has_value();
+          if (do_stat_tracking_) {
+            const auto& tmp_service = absl::get<Stats::DynamicName>(request_names_->service_);
+            service_.assign(tmp_service.data(), tmp_service.size());
+
+            const auto& tmp_method = absl::get<Stats::DynamicName>(request_names_->method_);
+            method_.assign(tmp_method.data(), tmp_method.size());
+
+            request_names_ = Grpc::ContextImpl::RequestStatNames{Stats::DynamicName(service_),
+                                                                 Stats::DynamicName(method_)};
+          }
         } else {
           // This case handles both proto_config.stats_for_all_methods() == false,
           // and proto_config.has_individual_method_stats_allowlist(). This works
@@ -275,6 +285,8 @@ private:
   Grpc::FrameInspector response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_names_;
+  std::string service_;
+  std::string method_;
 }; // namespace
 
 } // namespace
