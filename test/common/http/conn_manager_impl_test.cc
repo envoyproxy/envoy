@@ -306,9 +306,9 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   decoder_ = &conn_manager_->newStream(response_encoder_);
 
   EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
-  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamSslConnection());
+  EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().downstreamSslConnection());
   EXPECT_EQ(1234U, decoder_->streamInfo().connectionID());
-  EXPECT_EQ(server_name, decoder_->streamInfo().requestedServerName());
+  EXPECT_EQ(server_name, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
 
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

@@ -112,11 +112,9 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
         upstream_filter_state_ = filter_state;
       }));
-  ON_CALL(*this, setRequestedServerName(_))
-      .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
-        requested_server_name_ = std::string(requested_server_name);
-      }));
-  ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, requestedServerName()).WillByDefault(Invoke([this]() -> absl::string_view {
+    return downstream_address_provider_->requestedServerName();
+  }));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));

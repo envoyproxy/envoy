@@ -74,6 +74,11 @@ public:
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
 
   /**
+   * @return SNI value for downstream host.
+   */
+  virtual absl::string_view requestedServerName() const PURE;
+
+  /**
    * Dumps the state of the SocketAddressProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
@@ -109,6 +114,11 @@ public:
    * Set the remote address of the socket.
    */
   virtual void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
+
+  /**
+   * @param SNI value requested.
+   */
+  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
 };
 
 using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;

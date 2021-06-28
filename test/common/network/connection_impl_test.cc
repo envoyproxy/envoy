@@ -1913,19 +1913,19 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   // Check socket dump
   const auto contents = ostream.contents();
   EXPECT_THAT(contents, HasSubstr("ListenSocketImpl"));
-  EXPECT_THAT(contents, HasSubstr("transport_protocol_: , server_name_: envoyproxy.io"));
+  EXPECT_THAT(contents, HasSubstr("transport_protocol_: "));
   EXPECT_THAT(contents, HasSubstr("SocketAddressSetterImpl"));
   if (GetParam() == Network::Address::IpVersion::v4) {
     EXPECT_THAT(
         contents,
         HasSubstr(
             "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
-            "1.2.3.4:56789"));
+            "1.2.3.4:56789, server_name_: envoyproxy.io"));
   } else {
     EXPECT_THAT(
         contents,
         HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
-                  "[::1:2:3:4]:56789"));
+                  "[::1:2:3:4]:56789, server_name_: envoyproxy.io"));
   }
 }
 

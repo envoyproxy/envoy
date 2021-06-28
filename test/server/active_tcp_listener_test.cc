@@ -62,34 +62,6 @@ public:
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
 };
 
-TEST_F(ActiveTcpListenerTest, PopulateSNIWhenNoFilterChainMatched) {
-  auto listener = std::make_unique<Network::MockListener>();
-  EXPECT_CALL(*listener, onDestroy());
-
-  NiceMock<Network::MockConnectionBalancer> balancer1;
-  Network::Address::InstanceConstSharedPtr normal_address(
-      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
-  EXPECT_CALL(*socket_factory_, localAddress()).WillRepeatedly(ReturnRef(normal_address));
-  EXPECT_CALL(listener_config_, connectionBalancer()).WillRepeatedly(ReturnRef(balancer1));
-  EXPECT_CALL(listener_config_, listenerScope).Times(testing::AnyNumber());
-  EXPECT_CALL(listener_config_, listenerFiltersTimeout());
-  EXPECT_CALL(listener_config_, continueOnListenerFiltersTimeout());
-  EXPECT_CALL(listener_config_, filterChainManager()).WillRepeatedly(ReturnRef(manager_));
-  EXPECT_CALL(listener_config_, openConnections()).WillRepeatedly(ReturnRef(resource_limit_));
-
-  auto active_listener1 =
-      std::make_unique<ActiveTcpListener>(conn_handler_, std::move(listener), listener_config_);
-
-  auto accepted_socket1 = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-  EXPECT_CALL(*accepted_socket1, requestedServerName()).WillRepeatedly(Return("envoy.io"));
-
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
-
-  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
-  EXPECT_CALL(*stream_info, setRequestedServerName("envoy.io"));
-  active_listener1->newConnection(std::move(accepted_socket1), std::move(stream_info));
-}
-
 TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   NiceMock<Network::MockConnectionBalancer> balancer;
   EXPECT_CALL(listener_config_, connectionBalancer()).WillRepeatedly(ReturnRef(balancer));
@@ -142,7 +114,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
   // trigger the onTimeout event manually, since the timer is fake.
   active_listener->sockets_.front()->onTimeout();
 
-  EXPECT_EQ(server_name, tcp_socket->stream_info_->requestedServerName());
+  EXPECT_EQ(server_name, tcp_socket->stream_info_->downstreamAddressProvider().requestedServerName());
 }
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
