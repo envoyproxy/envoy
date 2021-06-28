@@ -659,14 +659,16 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
   case WasmHeaderMapType::RequestHeaders:
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
-    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_) {
+    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_ &&
+        decoder_callbacks_) {
       request_trailers_ = &decoder_callbacks_->addDecodedTrailers();
     }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
-    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_) {
+    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_ &&
+        encoder_callbacks_) {
       response_trailers_ = &encoder_callbacks_->addEncodedTrailers();
     }
     return response_trailers_;
@@ -727,7 +729,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -802,7 +804,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -815,7 +817,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -829,7 +831,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -860,7 +862,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     }
     return nullptr;
   case WasmBufferType::HttpRequestBody:
-    if (buffering_request_body_) {
+    if (buffering_request_body_ && decoder_callbacks_) {
       // We need the mutable version, so capture it using a callback.
       // TODO: consider adding a mutableDecodingBuffer() interface.
       ::Envoy::Buffer::Instance* buffer_instance{};
@@ -870,7 +872,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     }
     return buffer_.set(request_body_buffer_);
   case WasmBufferType::HttpResponseBody:
-    if (buffering_response_body_) {
+    if (buffering_response_body_ && encoder_callbacks_) {
       // TODO: consider adding a mutableDecodingBuffer() interface.
       ::Envoy::Buffer::Instance* buffer_instance{};
       encoder_callbacks_->modifyEncodingBuffer(
