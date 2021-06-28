@@ -51,7 +51,7 @@ approve an extension PR, it will be merged by the maintainer on-call (or any oth
 without further review.
 
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-  * WASM
+  * Wasm
 
 # Envoy security team
 
