@@ -5,9 +5,8 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 namespace Envoy {
 namespace Quic {
@@ -46,7 +45,7 @@ public:
 
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr /*options*/) const override {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr /*options*/) const override {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   bool implementsSecureTransport() const override { return true; }
@@ -105,7 +104,7 @@ public:
   // is needed. In this case the QuicClientTransportSocketFactory falls over to
   // using the fallback factory.
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override {
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
     return fallback_factory_->createTransportSocket(options);
   }
 

@@ -13,16 +13,13 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/utility.h"
-
-#include "server/options_impl.h"
-
-#include "extensions/filters/http/buffer/buffer_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
+#include "source/server/options_impl.h"
 
 #if defined(__linux__)
 #include <sched.h>
-#include "server/options_impl_platform_linux.h"
+#include "source/server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -180,7 +177,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
-  options->setAllowUnkownFields(true);
+  options->setAllowUnknownFields(true);
   options->setRejectUnknownFieldsDynamic(true);
   options->setSocketPath("/foo/envoy_domain_socket");
   options->setSocketMode(0644);
@@ -643,13 +640,13 @@ TEST(FactoryByTypeTest, EarlierVersionConfigType) {
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   envoy::extensions::filters::http::buffer::v3::Buffer v3_config;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v3_config.GetDescriptor()->full_name());
   EXPECT_NE(factory, nullptr);
-  EXPECT_EQ(factory->name(), Extensions::HttpFilters::HttpFilterNames::get().Buffer);
+  EXPECT_EQ(factory->name(), "envoy.filters.http.buffer");
 
   ProtobufWkt::Any non_api_type;
   factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::

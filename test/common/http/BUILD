@@ -156,8 +156,8 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:conn_pool_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -436,6 +436,7 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",

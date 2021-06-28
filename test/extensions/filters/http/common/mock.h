@@ -2,9 +2,8 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/common/jwks_fetcher.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/mocks/upstream/mocks.h"
 

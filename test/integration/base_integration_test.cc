@@ -15,15 +15,14 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/thread.h"
-#include "common/config/api_version.h"
-#include "common/event/libevent.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/api_version.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/utility.h"
@@ -61,7 +60,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, create_(_, _, _))
+  ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
@@ -390,9 +389,9 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                port_names, validator_config, allow_lds_rejection);
 }
 
-void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
-                                                        std::string* response,
-                                                        bool disconnect_after_headers_complete) {
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
+    int port, const char* raw_http, std::string* response, bool disconnect_after_headers_complete,
+    Network::TransportSocketPtr transport_socket) {
   auto connection = createConnectionDriver(
       port, raw_http,
       [response, disconnect_after_headers_complete](Network::ClientConnection& client,
@@ -401,7 +400,8 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      });
+      },
+      std::move(transport_socket));
 
   connection->run();
 }

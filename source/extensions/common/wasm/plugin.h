@@ -5,8 +5,8 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/local_info/local_info.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -27,7 +27,7 @@ public:
   EnvironmentVariableMap& environmentVariables() { return envs_; }
 
 private:
-  const envoy::extensions::wasm::v3::PluginConfig& config_;
+  const envoy::extensions::wasm::v3::PluginConfig config_;
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_{};
   EnvironmentVariableMap envs_;
 };

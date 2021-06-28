@@ -1,9 +1,9 @@
-#include "common/init/manager_impl.h"
+#include "source/common/init/manager_impl.h"
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/init/watcher_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/init/watcher_impl.h"
 
 namespace Envoy {
 namespace Init {

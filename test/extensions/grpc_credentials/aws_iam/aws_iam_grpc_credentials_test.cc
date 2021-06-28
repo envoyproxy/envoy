@@ -1,11 +1,9 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/grpc/google_async_client_impl.h"
-
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"
@@ -122,7 +120,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_ConfigRegion) {
   service_name_ = "test_service";
   region_name_ = "test_region_static";
   region_location_ = RegionLocation::InConfig;
-  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -134,7 +132,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_EnvRegion) {
   service_name_ = "test_service";
   region_name_ = "test_region_env";
   region_location_ = RegionLocation::InEnvironment;
-  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -146,14 +144,14 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
   service_name_ = "test_service";
   region_name_ = "test_region_env";
   region_location_ = RegionLocation::NotProvided;
-  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
   EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
 }
 
 TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   call_credentials_ = CallCredentials::AccessToken;
-  credentials_factory_name_ = Extensions::GrpcCredentials::GrpcCredentialsNames::get().AwsIam;
+  credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

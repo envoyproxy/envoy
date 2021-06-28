@@ -1,7 +1,6 @@
-#include "common/http/utility.h"
-#include "common/network/io_socket_handle_impl.h"
-
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -33,7 +32,20 @@ public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(store_)),
         io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
-  ~TlsInspectorTest() override { io_handle_->close(); }
+  ~TlsInspectorTest() override {
+    filter_.reset();
+    EXPECT_CALL(dispatcher_,
+                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
+        .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
+    // This is used to test the FileEvent was reset by the listener filters.
+    // Otherwise the assertion inside `initializeFileEvent` will be trigger.
+    io_handle_->initializeFileEvent(
+        dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+    io_handle_->resetFileEvents();
+    io_handle_->close();
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);

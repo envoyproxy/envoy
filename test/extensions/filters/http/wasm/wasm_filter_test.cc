@@ -1,6 +1,5 @@
-#include "common/http/message_impl.h"
-
-#include "extensions/filters/http/wasm/wasm_filter.h"
+#include "source/common/http/message_impl.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/connection.h"
@@ -32,7 +31,7 @@ namespace Wasm {
 
 using Envoy::Extensions::Common::Wasm::CreateContextFn;
 using Envoy::Extensions::Common::Wasm::Plugin;
-using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
+using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
 using Envoy::Extensions::Common::Wasm::Wasm;
 using Envoy::Extensions::Common::Wasm::WasmHandleSharedPtr;
 using proxy_wasm::ContextBase;
@@ -41,9 +40,8 @@ using WasmFilterConfig = envoy::extensions::filters::http::wasm::v3::Wasm;
 
 class TestFilter : public Envoy::Extensions::Common::Wasm::Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id,
-             Envoy::Extensions::Common::Wasm::PluginSharedPtr plugin)
-      : Envoy::Extensions::Common::Wasm::Context(wasm, root_context_id, plugin) {}
+  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+      : Envoy::Extensions::Common::Wasm::Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 };
 
@@ -947,6 +945,9 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
       callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onSuccessRaw(std::move(response), span);
     }
   }
@@ -1369,8 +1370,10 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
@@ -1417,8 +1420,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "ok");
@@ -1465,8 +1470,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     auto response = std::make_unique<Buffer::OwnedImpl>(response_string);
     EXPECT_NE(callbacks, nullptr);
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "close");
@@ -1511,8 +1518,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     EXPECT_NE(callbacks, nullptr);
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>(
           Http::TestResponseHeaderMapImpl{{"test", "reset"}}));
     }
@@ -1557,8 +1566,10 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     EXPECT_NE(callbacks, nullptr);
     NiceMock<Tracing::MockSpan> span;
     if (callbacks) {
-      Http::TestRequestHeaderMapImpl create_initial_metadata{{"test", "create_initial_metadata"}};
-      callbacks->onCreateInitialMetadata(create_initial_metadata);
+      callbacks->onCreateInitialMetadata(request_headers);
+      const auto source = request_headers.get(Http::LowerCaseString{"source"});
+      EXPECT_EQ(source.size(), 1);
+      EXPECT_EQ(source[0]->value().getStringView(), id);
       callbacks->onReceiveInitialMetadata(std::make_unique<Http::TestResponseHeaderMapImpl>());
       callbacks->onReceiveMessageRaw(std::move(response));
       callbacks->onReceiveTrailingMetadata(std::make_unique<Http::TestResponseTrailerMapImpl>());
@@ -1603,7 +1614,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
   rootContext().onTick(0);
@@ -1648,7 +1659,7 @@ TEST_P(WasmHttpFilterTest, Property) {
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
-          HttpFilters::HttpFilterNames::get().Wasm,
+          "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));

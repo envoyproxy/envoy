@@ -4,10 +4,9 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/rocketmq_proxy/router/router.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/rocketmq_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,6 +41,7 @@ private:
     UpstreamRequest(RouterImpl& router);
 
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
 
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,

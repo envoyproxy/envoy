@@ -1,4 +1,4 @@
-#include "common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -119,9 +119,8 @@ OriginalDstCluster::OriginalDstCluster(
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
       host_map_(std::make_shared<HostMap>()) {
-  // TODO(dio): Remove hosts check once the hosts field is removed.
-  if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  if (config.has_load_assignment()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }

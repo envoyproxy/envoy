@@ -9,9 +9,8 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "common/stats/histogram_impl.h"
-
-#include "server/admin/handler_ctx.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
@@ -61,9 +60,14 @@ private:
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only,
-                                 const absl::optional<std::regex> regex = absl::nullopt,
+                                 bool used_only, const absl::optional<std::regex>& regex,
                                  bool pretty_print = false);
+
+  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                   const std::map<std::string, std::string>& text_readouts,
+                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
+                   bool used_only, const absl::optional<std::regex>& regex,
+                   Buffer::Instance& response);
 };
 
 } // namespace Server

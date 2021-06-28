@@ -9,11 +9,10 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/config/api_version.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
@@ -1181,7 +1180,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the mock buffer factory so the newly created SSL client will have a mock write
   // buffer. This allows us to track the bytes actually written to the socket.
 
-  EXPECT_CALL(*mock_buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .Times(AtLeast(1))
       .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                            std::function<void()> above_overflow) -> Buffer::Instance* {

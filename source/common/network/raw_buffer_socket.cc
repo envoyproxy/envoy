@@ -1,9 +1,9 @@
-#include "common/network/raw_buffer_socket.h"
+#include "source/common/network/raw_buffer_socket.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/http/headers.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Network {
@@ -87,7 +87,7 @@ absl::string_view RawBufferSocket::failureReason() const { return EMPTY_STRING; 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 
 TransportSocketPtr
-RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsSharedPtr) const {
+RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsConstSharedPtr) const {
   return std::make_unique<RawBufferSocket>();
 }
 

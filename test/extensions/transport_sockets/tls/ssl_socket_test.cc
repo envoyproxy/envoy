@@ -7,20 +7,19 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/empty_string.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/json/json_loader.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_impl.h"
-#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_impl.h"
+#include "source/extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/ca_cert_info.h"
@@ -568,13 +567,13 @@ public:
 
   const std::string& expectedALPNProtocol() const { return expected_alpn_protocol_; }
 
-  TestUtilOptionsV2&
-  setTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+  TestUtilOptionsV2& setTransportSocketOptions(
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
     transport_socket_options_ = transport_socket_options;
     return *this;
   }
 
-  Network::TransportSocketOptionsSharedPtr transportSocketOptions() const {
+  Network::TransportSocketOptionsConstSharedPtr transportSocketOptions() const {
     return transport_socket_options_;
   }
 
@@ -599,14 +598,13 @@ private:
   std::string expected_server_cert_digest_;
   std::string expected_requested_server_name_;
   std::string expected_alpn_protocol_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::string expected_transport_failure_reason_contains_;
 };
 
-const std::string testUtilV2(const TestUtilOptionsV2& options) {
+void testUtilV2(const TestUtilOptionsV2& options) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
-  std::string new_session = EMPTY_STRING;
 
   // SNI-based selection logic isn't happening in SslSocket anymore.
   ASSERT(options.listener().filter_chains().size() == 1);
@@ -721,14 +719,14 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
         EXPECT_FALSE(server_ssl_requested_server_name.has_value());
       }
 
-      SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
-      EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
-      uint8_t* session_data;
-      size_t session_len;
-      int rc = SSL_SESSION_to_bytes(client_ssl_session, &session_data, &session_len);
-      ASSERT(rc == 1);
-      new_session = std::string(reinterpret_cast<char*>(session_data), session_len);
-      OPENSSL_free(session_data);
+      const uint16_t tls_version = SSL_version(client_ssl_socket);
+      if (SSL3_VERSION <= tls_version && tls_version <= TLS1_2_VERSION) {
+        // Prior to TLS 1.3, one should be able to resume the session. With TLS
+        // 1.3, tickets come after the handshake and the SSL_SESSION on the
+        // client is a dummy object.
+        SSL_SESSION* client_ssl_session = SSL_get_session(client_ssl_socket);
+        EXPECT_TRUE(SSL_SESSION_is_resumable(client_ssl_session));
+      }
       server_connection->close(Network::ConnectionCloseType::NoFlush);
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       dispatcher->exit();
@@ -779,8 +777,6 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
   }
-
-  return new_session;
 }
 
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
@@ -4593,7 +4589,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
@@ -4615,7 +4611,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedRequestedServerName("example.com")
@@ -4883,7 +4879,7 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_(_, _, _))
+    EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(4)
         .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {

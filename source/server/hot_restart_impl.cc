@@ -1,4 +1,4 @@
-#include "server/hot_restart_impl.h"
+#include "source/server/hot_restart_impl.h"
 
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -13,10 +13,10 @@
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/api/os_sys_calls_impl_hot_restart.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl_hot_restart.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/string_view.h"
 

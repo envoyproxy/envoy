@@ -116,6 +116,7 @@ envoy_cc_test(
     srcs = ["drain_manager_impl_test.cc"],
     deps = [
         "//source/server:drain_manager_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -125,7 +126,7 @@ envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     deps = [
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/mocks/server:server_mocks",
     ],
@@ -173,7 +174,7 @@ envoy_cc_test(
     size = "small",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
-        "//include/envoy/common:time_interface",
+        "//envoy/common:time_interface",
         "//source/common/api:api_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
@@ -193,11 +194,10 @@ envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
     deps = [
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/buffer:config",
         "//source/server:options_lib",
         "//test/mocks/api:api_mocks",
@@ -217,7 +217,7 @@ envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",

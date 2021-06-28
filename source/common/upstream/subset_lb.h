@@ -10,10 +10,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "common/common/macros.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -158,7 +158,7 @@ private:
     Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
       return wrapped_->upstreamSocketOptions();
     }
-    Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
       return wrapped_->upstreamTransportSocketOptions();
     }
 

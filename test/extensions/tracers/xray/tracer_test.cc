@@ -3,12 +3,10 @@
 
 #include "envoy/common/time.h"
 
-#include "common/protobuf/utility.h"
-
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
-
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/tracing/mocks.h"

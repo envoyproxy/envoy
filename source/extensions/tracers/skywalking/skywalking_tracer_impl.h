@@ -5,9 +5,8 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
 
+#include "source/extensions/tracers/skywalking/tracer.h"
 #include "source/tracing_context_impl.h"
-
-#include "extensions/tracers/skywalking/tracer.h"
 
 #include "cpp2sky/exception.h"
 

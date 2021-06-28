@@ -49,7 +49,7 @@ void MockClusterManager::initializeThreadLocalClusters(
   // TODO(mattklein123): This should create a dedicated and new mock for each initialized cluster,
   // but this has larger test implications. I will fix this in a follow up.
   for (const auto& cluster_name : cluster_names) {
-    ON_CALL(*this, getThreadLocalCluster(cluster_name))
+    ON_CALL(*this, getThreadLocalCluster(absl::string_view(cluster_name)))
         .WillByDefault(Return(&thread_local_cluster_));
   }
 }

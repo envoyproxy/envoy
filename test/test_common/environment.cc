@@ -9,20 +9,20 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/filesystem/directory.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 
 #include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"

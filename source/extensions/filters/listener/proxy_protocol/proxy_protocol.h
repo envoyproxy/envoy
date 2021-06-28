@@ -6,9 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "proxy_protocol_header.h"
@@ -84,7 +83,11 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr& config) : config_(config) {}
-
+  ~Filter() override {
+    if (cb_) {
+      cb_->socket().ioHandle().resetFileEvents();
+    }
+  }
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 

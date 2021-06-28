@@ -14,14 +14,13 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/logger.h"
-#include "common/http/conn_manager_impl.h"
-#include "common/init/manager_impl.h"
-#include "common/network/socket_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -45,6 +44,10 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
+  }
 
 protected:
   ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
@@ -146,7 +149,7 @@ protected:
       bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
       // ScopeTrackedObject
-      void dumpState(std::ostream&, int) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 
       SyntheticReadCallbacks& parent_;
       Network::SocketAddressSetterSharedPtr address_provider_;

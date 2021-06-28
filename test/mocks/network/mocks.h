@@ -17,9 +17,9 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/filter_manager_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/connection.h"
@@ -162,6 +162,7 @@ public:
   ~MockDrainDecision() override;
 
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {
@@ -587,5 +588,17 @@ public:
   ~MockListenerFilterMatcher() override;
   MOCK_METHOD(bool, matches, (Network::ListenerFilterCallbacks & cb), (const));
 };
+
+class MockUdpPacketProcessor : public UdpPacketProcessor {
+public:
+  MOCK_METHOD(void, processPacket,
+              (Address::InstanceConstSharedPtr local_address,
+               Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
+               MonotonicTime receive_time));
+  MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
+  MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+};
+
 } // namespace Network
 } // namespace Envoy

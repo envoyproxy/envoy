@@ -60,10 +60,18 @@ def envoy_select_wasm_rust_tests(xs):
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_v8(xs):
     return select({
+        "@envoy//bazel:wasm_wamr": [],
         "@envoy//bazel:wasm_wasmtime": [],
         "@envoy//bazel:wasm_wavm": [],
         "@envoy//bazel:wasm_none": [],
         "//conditions:default": xs,
+    })
+
+# Selects the given values depending on the Wasm runtimes enabled in the current build.
+def envoy_select_wasm_wamr(xs):
+    return select({
+        "@envoy//bazel:wasm_wamr": xs,
+        "//conditions:default": [],
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.

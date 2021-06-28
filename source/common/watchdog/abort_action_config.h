@@ -3,7 +3,7 @@
 #include "envoy/server/guarddog_config.h"
 #include "envoy/watchdog/v3alpha/abort_action.pb.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Watchdog {

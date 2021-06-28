@@ -56,7 +56,7 @@ def reorder_headers(path):
 
     # Filter for includes that finds the #include of the header file associated with the source file
     # being processed. E.g. if 'path' is source/common/common/hex.cc, this filter matches
-    # "common/common/hex.h".
+    # "source/common/common/hex.h".
     def file_header_filter():
         return lambda f: f.endswith('.h"') and path.endswith(f[1:-3] + '.cc')
 

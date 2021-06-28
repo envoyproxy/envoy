@@ -6,7 +6,7 @@
 
 #include "envoy/common/mutex_tracer.h"
 
-#include "common/common/thread_annotations.h"
+#include "source/common/common/thread_annotations.h"
 
 namespace Envoy {
 

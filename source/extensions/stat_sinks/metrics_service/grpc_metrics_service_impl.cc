@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
+#include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include <chrono>
 
@@ -9,9 +9,9 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -59,19 +59,19 @@ MetricsPtr MetricsFlusher::flush(Stats::MetricSnapshot& snapshot) const {
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
   for (const auto& counter : snapshot.counters()) {
-    if (counter.counter_.get().used()) {
+    if (predicate_(counter.counter_.get())) {
       flushCounter(*metrics->Add(), counter, snapshot_time_ms);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
-    if (gauge.get().used()) {
+    if (predicate_(gauge)) {
       flushGauge(*metrics->Add(), gauge.get(), snapshot_time_ms);
     }
   }
 
   for (const auto& histogram : snapshot.histograms()) {
-    if (histogram.get().used()) {
+    if (predicate_(histogram.get())) {
       flushHistogram(*metrics->Add(), *metrics->Add(), histogram.get(), snapshot_time_ms);
     }
   }
