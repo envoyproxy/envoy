@@ -1003,8 +1003,8 @@ value:
 
 TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
   udpa::type::v1::TypedStruct actual;
-  MessageUtil::redact(actual);
   udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
