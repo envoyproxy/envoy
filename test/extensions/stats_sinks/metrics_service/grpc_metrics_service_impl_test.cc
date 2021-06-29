@@ -9,6 +9,8 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "io/prometheus/client/metrics.pb.h"
+
 using namespace std::chrono_literals;
 using testing::_;
 using testing::InSequence;
@@ -191,28 +193,35 @@ TEST_F(MetricsServiceSinkTest, ReportCountersAsDeltas) {
   counter_storage_.back()->setTags({{"a", "b"}});
 
   {
+    // This test won't emit any labels.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, true, false);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-      EXPECT_EQ(1, metrics->size());
-      EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
+      ASSERT_EQ(1, metrics->size());
+      EXPECT_EQ("test_counter", (*metrics)[0].name());
+
+      const auto& metric = (*metrics)[0].metric(0);
+      EXPECT_EQ(1, metric.counter().value());
+      EXPECT_EQ(0, metric.label().size());
     }));
     sink.flush(snapshot_);
   }
 
   {
+    // This test will emit labels.
     MetricsServiceSink<envoy::service::metrics::v3::StreamMetricsMessage,
                        envoy::service::metrics::v3::StreamMetricsResponse>
         sink(streamer_, true, true);
 
     EXPECT_CALL(*streamer_, send(_)).WillOnce(Invoke([](MetricsPtr&& metrics) {
-      EXPECT_EQ(1, metrics->size());
-      EXPECT_EQ(1, (*metrics)[0].metric(0).counter().value());
-
+      ASSERT_EQ(1, metrics->size());
       EXPECT_EQ("tag-counter-name", (*metrics)[0].name());
-      EXPECT_EQ(1, (*metrics)[0].metric(0).label().size());
+
+      const auto& metric = (*metrics)[0].metric(0);
+      EXPECT_EQ(1, metric.counter().value());
+      EXPECT_EQ(1, metric.label().size());
     }));
     sink.flush(snapshot_);
   }
