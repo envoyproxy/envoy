@@ -520,10 +520,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
     scheme_ = config.scheme_header_transformation().scheme_to_overwrite();
-    if (scheme_.value() != Http::Headers::get().SchemeValues.Https &&
-        scheme_.value() != Http::Headers::get().SchemeValues.Http) {
-      throw EnvoyException(fmt::format("Invalid scheme: {}", scheme_.value()));
-    }
   }
 
   if (!config.server_name().empty()) {

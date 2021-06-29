@@ -912,25 +912,6 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
                                      filter_config_provider_manager_);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, SchemeInvalid) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  scheme_header_transformation:
-    scheme_to_overwrite: foo
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                  date_provider_, route_config_provider_manager_,
-                                  scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                  filter_config_provider_manager_),
-      EnvoyException, "Invalid scheme: foo");
-}
-
 // Validated that by default we don't normalize paths
 // unless set build flag path_normalization_by_default=true
 TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {

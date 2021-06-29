@@ -486,7 +486,6 @@ message SchemeHeaderTransformation {
 
   oneof transformation {
     // Overwrite any Scheme header with the contents of this string.
-    // Valid values are "http" and "https"
-    string scheme_to_overwrite = 1 [(validate.rules).string = {min_len: 1}];
+    string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
   }
 }
