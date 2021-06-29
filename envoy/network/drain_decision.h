@@ -13,6 +13,11 @@ namespace Network {
 
 class DrainDecision {
 public:
+
+  /**
+   * @brief Callback used when reacting to drain events. Function takes time parameter
+   *        to signal when draining should begin.
+   */
   using DrainCloseCb = std::function<void(std::chrono::milliseconds)>;
 
   virtual ~DrainDecision() = default;

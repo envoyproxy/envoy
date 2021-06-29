@@ -52,6 +52,9 @@ private:
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
+
+  // Collection of callbacks that may be enqueued through direct invocations to
+  // startDrainSequence, or through parents initiating draining on their children.
   std::vector<std::function<void()>> drain_complete_cbs_{};
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
