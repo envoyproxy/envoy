@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -20,7 +21,16 @@ namespace Http {
  */
 class HeaderUtility {
 public:
-  enum class HeaderMatchType { Value, Regex, Range, Present, Prefix, Suffix, Contains };
+  enum class HeaderMatchType {
+    Value,
+    Regex,
+    Range,
+    Present,
+    Prefix,
+    Suffix,
+    Contains,
+    StringMatch
+  };
 
   /**
    * Get all header values as a single string. Multiple headers are concatenated with ','.
@@ -63,13 +73,11 @@ public:
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;
     std::string value_;
-    // The contains_match_lowercase_ is populated only for contains match when ignore_case is true.
-    LowerCaseString contains_match_lowercase_;
     Regex::CompiledMatcherPtr regex_;
     envoy::type::v3::Int64Range range_;
+    Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
     bool present_;
-    bool ignore_case_;
 
     // HeaderMatcher
     bool matchesHeaders(const HeaderMap& headers) const override {

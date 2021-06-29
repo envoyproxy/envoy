@@ -2,6 +2,7 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -35,8 +36,7 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
 HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
-    : name_(config.name()), contains_match_lowercase_(""), invert_match_(config.invert_match()),
-      ignore_case_(config.ignore_case()) {
+    : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
@@ -66,9 +66,10 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
     header_match_type_ = HeaderMatchType::Contains;
     value_ = config.contains_match();
-    if (ignore_case_) {
-      contains_match_lowercase_ = LowerCaseString(value_);
-    }
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    header_match_type_ = HeaderMatchType::StringMatch;
+    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -146,9 +147,7 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   bool match;
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() ||
-            (header_data.ignore_case_ ? absl::EqualsIgnoreCase(value, header_data.value_)
-                                      : value == header_data.value_);
+    match = header_data.value_.empty() || value == header_data.value_;
     break;
   case HeaderMatchType::Regex:
     match = header_data.regex_->match(value);
@@ -164,18 +163,16 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     match = header_data.present_;
     break;
   case HeaderMatchType::Prefix:
-    match = header_data.ignore_case_ ? absl::StartsWithIgnoreCase(value, header_data.value_)
-                                     : absl::StartsWith(value, header_data.value_);
+    match = absl::StartsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = header_data.ignore_case_ ? absl::EndsWithIgnoreCase(value, header_data.value_)
-                                     : absl::EndsWith(value, header_data.value_);
+    match = absl::EndsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Contains:
-    match = header_data.ignore_case_
-                ? absl::StrContains(absl::AsciiStrToLower(value),
-                                    header_data.contains_match_lowercase_.get())
-                : absl::StrContains(value, header_data.value_);
+    match = absl::StrContains(value, header_data.value_);
+    break;
+  case HeaderMatchType::StringMatch:
+    match = header_data.string_match_->match(value);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

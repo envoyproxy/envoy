@@ -1813,9 +1813,10 @@ message HeaderMatcher {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.route.v3.HeaderMatcher";
 
-  reserved 2, 3, 5;
+  reserved 2, 3, 5, 4, 11, 9, 10, 12;
 
-  reserved "regex_match";
+  reserved "regex_match", "exact_match", "safe_regex_match", "prefix_match", "suffix_match",
+      "contains_match";
 
   // Specifies the name of the header in the request.
   string name = 1
@@ -1823,14 +1824,6 @@ message HeaderMatcher {
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
-    // If specified, header match will be performed based on the value of the header.
-    string exact_match = 4;
-
-    // If specified, this regex string is a regular expression rule which implies the entire request
-    // header value must match the regex. The rule will not match if only a subsequence of the
-    // request header value matches the regex.
-    type.matcher.v4alpha.RegexMatcher safe_regex_match = 11;
-
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
     // The entire request header value must represent an integer in base 10 notation: consisting of
@@ -1848,30 +1841,8 @@ message HeaderMatcher {
     // request. If specified as false, header match will be performed based on whether the header is absent.
     bool present_match = 7;
 
-    // If specified, header match will be performed based on the prefix of the header value.
-    // Note: empty prefix is not allowed, please use present_match instead.
-    //
-    // Examples:
-    //
-    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string = {min_len: 1}];
-
-    // If specified, header match will be performed based on the suffix of the header value.
-    // Note: empty suffix is not allowed, please use present_match instead.
-    //
-    // Examples:
-    //
-    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string = {min_len: 1}];
-
-    // If specified, header match will be performed based on whether the header value contains
-    // the given value or not.
-    // Note: empty contains match is not allowed, please use present_match instead.
-    //
-    // Examples:
-    //
-    // * The value *abcd* matches the value *xyzabcdpqr*, but not for *xyzbcdpqr*.
-    string contains_match = 12 [(validate.rules).string = {min_len: 1}];
+    // If specified, header match will be performed based on the string match of the header value.
+    type.matcher.v4alpha.StringMatcher string_match = 13;
   }
 
   // If specified, the match result will be inverted before checking. Defaults to false.
@@ -1881,10 +1852,6 @@ message HeaderMatcher {
   // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
   // * The range [-10,0) will match the value -1, so it will not match when inverted.
   bool invert_match = 8;
-
-  // If true, indicates the exact_match/prefix_match/suffix_match/contains_match should be case
-  // insensitive. This has no effect for the safe_regex_match.
-  bool ignore_case = 13;
 }
 
 // Query parameter matching treats the query string of a request's :path header
