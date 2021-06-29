@@ -300,8 +300,8 @@ void testUtil(const TestUtilOptions& options) {
   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
       test_private_key_method_factory(test_factory);
 
-  Extensions::PrivateKeyProviders::CryptoMb::FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(
-      true);
+  Extensions::PrivateKeyMethodProvider::CryptoMb::FakeCryptoMbPrivateKeyMethodFactory
+      cryptomb_factory(true);
   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
       cryptomb_private_key_method_factory(cryptomb_factory);
 

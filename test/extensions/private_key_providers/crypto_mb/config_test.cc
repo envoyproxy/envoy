@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PrivateKeyProviders {
+namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
 inline envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider
@@ -29,8 +29,8 @@ parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
   return private_key_provider;
 }
 
-PrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider*
-createWithConfig(std::string yaml, bool supported_instruction_set = true) {
+CryptoMbPrivateKeyMethodProvider* createWithConfig(std::string yaml,
+                                                   bool supported_instruction_set = true) {
   FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(supported_instruction_set);
   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
       cryptomb_private_key_method_factory(cryptomb_factory);
@@ -53,7 +53,7 @@ createWithConfig(std::string yaml, bool supported_instruction_set = true) {
       .WillOnce(testing::ReturnRef(private_key_method_manager))
       .WillRepeatedly(testing::ReturnRef(private_key_method_manager));
 
-  return dynamic_cast<PrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider*>(
+  return dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(
       server_factory_context.sslContextManager()
           .privateKeyMethodManager()
           .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
@@ -177,6 +177,6 @@ TEST(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
                             "Multi-buffer CPU instructions not available.");
 }
 } // namespace CryptoMb
-} // namespace PrivateKeyProviders
+} // namespace PrivateKeyMethodProvider
 } // namespace Extensions
 } // namespace Envoy

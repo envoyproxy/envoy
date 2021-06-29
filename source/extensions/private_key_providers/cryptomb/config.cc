@@ -17,6 +17,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
+namespace CryptoMb {
 
 Ssl::PrivateKeyMethodProviderSharedPtr
 CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
@@ -45,6 +46,7 @@ CryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
 
 REGISTER_FACTORY(CryptoMbPrivateKeyMethodFactory, Ssl::PrivateKeyMethodProviderInstanceFactory);
 
+} // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions
 } // namespace Envoy

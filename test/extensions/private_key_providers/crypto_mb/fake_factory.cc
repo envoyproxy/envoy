@@ -19,19 +19,27 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace PrivateKeyProviders {
+namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
 FakeIppCryptoImpl::FakeIppCryptoImpl(bool supported_instruction_set)
     : supported_instruction_set_(supported_instruction_set) {}
 
-int FakeIppCryptoImpl::mbx_is_crypto_mb_applicable(int64u) {
+FakeIppCryptoImpl::~FakeIppCryptoImpl() {
+  BN_free(n_);
+  BN_free(e_);
+  BN_free(d_);
+}
+
+int FakeIppCryptoImpl::mbxIsCryptoMbApplicable(int64u) {
   return supported_instruction_set_ ? 1 : 0;
 }
 
-mbx_status FakeIppCryptoImpl::mbx_nistp256_ecdsa_sign_ssl_mb8(
-    int8u* pa_sign_r[8], int8u* pa_sign_s[8], const int8u* const pa_msg[8],
-    const BIGNUM* const pa_eph_skey[8], const BIGNUM* const pa_reg_skey[8], int8u* pBuffer) {
+mbx_status FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(int8u* pa_sign_r[8], int8u* pa_sign_s[8],
+                                                         const int8u* const pa_msg[8],
+                                                         const BIGNUM* const pa_eph_skey[8],
+                                                         const BIGNUM* const pa_reg_skey[8],
+                                                         int8u* p_buffer) {
 
   mbx_status status = 0;
 
@@ -39,7 +47,7 @@ mbx_status FakeIppCryptoImpl::mbx_nistp256_ecdsa_sign_ssl_mb8(
     EC_KEY* key;
     ECDSA_SIG* sig;
 
-    if (pa_eph_skey[i] == NULL) {
+    if (pa_eph_skey[i] == nullptr) {
       break;
     }
 
@@ -59,12 +67,12 @@ mbx_status FakeIppCryptoImpl::mbx_nistp256_ecdsa_sign_ssl_mb8(
   }
 
   UNREFERENCED_PARAMETER(pa_eph_skey);
-  UNREFERENCED_PARAMETER(pBuffer);
+  UNREFERENCED_PARAMETER(p_buffer);
 
   return status;
 }
 
-mbx_status FakeIppCryptoImpl::mbx_rsa_private_crt_ssl_mb8(
+mbx_status FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
     const int8u* const from_pa[8], int8u* const to_pa[8], const BIGNUM* const p_pa[8],
     const BIGNUM* const q_pa[8], const BIGNUM* const dp_pa[8], const BIGNUM* const dq_pa[8],
     const BIGNUM* const iq_pa[8], int expected_rsa_bitsize) {
@@ -76,7 +84,7 @@ mbx_status FakeIppCryptoImpl::mbx_rsa_private_crt_ssl_mb8(
     size_t out_len = 0;
     int ret;
 
-    if (from_pa[i] == NULL) {
+    if (from_pa[i] == nullptr) {
       break;
     }
 
@@ -105,11 +113,10 @@ mbx_status FakeIppCryptoImpl::mbx_rsa_private_crt_ssl_mb8(
   return status;
 }
 
-mbx_status FakeIppCryptoImpl::mbx_rsa_public_ssl_mb8(const int8u* const from_pa[8],
-                                                     int8u* const to_pa[8],
-                                                     const BIGNUM* const e_pa[8],
-                                                     const BIGNUM* const n_pa[8],
-                                                     int expected_rsa_bitsize) {
+mbx_status FakeIppCryptoImpl::mbxRsaPublicSslMb8(const int8u* const from_pa[8],
+                                                 int8u* const to_pa[8], const BIGNUM* const e_pa[8],
+                                                 const BIGNUM* const n_pa[8],
+                                                 int expected_rsa_bitsize) {
   mbx_status status = 0;
 
   for (int i = 0; i < 8; i++) {
@@ -117,7 +124,7 @@ mbx_status FakeIppCryptoImpl::mbx_rsa_public_ssl_mb8(const int8u* const from_pa[
     size_t out_len = 0;
     int ret;
 
-    if (e_pa[i] == NULL) {
+    if (e_pa[i] == nullptr) {
       break;
     }
 
@@ -171,17 +178,16 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
     const BIGNUM *e, *n, *d;
     RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
     RSA_get0_key(rsa, &n, &e, &d);
-    fakeIpp->set_rsa_key(n, e, d);
+    fakeIpp->setRsaKey(n, e, d);
   }
 
-  PrivateKeyMethodProvider::IppCryptoSharedPtr ipp =
-      std::dynamic_pointer_cast<PrivateKeyMethodProvider::IppCrypto>(fakeIpp);
+  IppCryptoSharedPtr ipp = std::dynamic_pointer_cast<IppCrypto>(fakeIpp);
 
-  return std::make_shared<PrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider>(
-      conf, private_key_provider_context, ipp);
+  return std::make_shared<CryptoMbPrivateKeyMethodProvider>(conf, private_key_provider_context,
+                                                            ipp);
 }
 
 } // namespace CryptoMb
-} // namespace PrivateKeyProviders
+} // namespace PrivateKeyMethodProvider
 } // namespace Extensions
 } // namespace Envoy

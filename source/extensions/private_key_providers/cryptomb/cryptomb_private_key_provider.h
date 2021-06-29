@@ -13,9 +13,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
+namespace CryptoMb {
 
-enum class RequestStatus { retry, success, error };
-enum class KeyType { rsa, ec };
+enum class RequestStatus { Retry, Success, Error };
+enum class KeyType { Rsa, Ec };
 
 // CryptoMbContext holds the actual data to be signed or encrypted. It also has a
 // reference to the worker thread dispatcher for communicating that it has
@@ -184,6 +185,7 @@ private:
   ThreadLocal::TypedSlotPtr<ThreadLocalData> tls_;
 };
 
+} // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions
 } // namespace Envoy
