@@ -707,8 +707,6 @@ TEST(EgressConfigImplTest, EgressConfigImplTest) {
   EXPECT_EQ(nullptr, config_impl.customTags());
   EXPECT_EQ(false, config_impl.verbose());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config_impl.maxPathTagLength());
-  EXPECT_EQ(Tracing::TraceRequestIdSampleDecisionPolicy::Default,
-            config_impl.traceRequestIdSampleDecisionPolicy());
 }
 
 TEST(HttpNullTracerTest, BasicFunctionality) {

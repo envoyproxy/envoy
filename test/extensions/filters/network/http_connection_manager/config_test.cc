@@ -417,23 +417,6 @@ http_filters:
   EXPECT_THAT(config.tracer(), Eq(http_tracer_));
 }
 
-TEST_F(HttpConnectionManagerConfigTest, TracingConfigWithTraceRequestIdSampleDecisionPolicy) {
-  const std::string yaml_string = R"EOF(
-stat_prefix: router
-route_config:
-  name: local_route
-tracing:
-  trace_request_id_sample_decision_policy: ByPass
-  )EOF";
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  const Tracing::TraceRequestIdSampleDecisionPolicy policy =
-      config.tracingConfig()->trace_request_id_sample_decision_policy_;
-  EXPECT_EQ(policy, Tracing::TraceRequestIdSampleDecisionPolicy::ByPass);
-}
-
 TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
@@ -1738,7 +1721,9 @@ public:
     return Tracing::Reason::Sampling;
   }
   void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
-
+  Http::RequestIDMutationPolicy requestIdMutationPolicy() const override {
+    return Http::RequestIDMutationPolicy::Default;
+  }
   std::string testField() { return config_.test_field(); }
 
 private:
@@ -1853,6 +1838,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_TRUE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->requestIdMutationPolicy(),
+            Http::RequestIDMutationPolicy::Default);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
@@ -1864,6 +1851,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
       pack_trace_reason: false
+      mutation_policy: SKIP
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1876,6 +1864,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->requestIdMutationPolicy(), Http::RequestIDMutationPolicy::Skip);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {

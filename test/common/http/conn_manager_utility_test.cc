@@ -63,6 +63,8 @@ public:
             [this](Http::RequestHeaderMap& request_headers, Tracing::Reason trace_status) {
               real_->setTraceReason(request_headers, trace_status);
             });
+    ON_CALL(*this, requestIdMutationPolicy())
+        .WillByDefault(Return(Http::RequestIDMutationPolicy::Default));
   }
 
   MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool));
@@ -70,6 +72,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, toInteger, (const Http::RequestHeaderMap&), (const));
   MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
   MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
+  MOCK_METHOD(Http::RequestIDMutationPolicy, requestIdMutationPolicy, (), (const));
 
 private:
   RequestIDExtensionSharedPtr real_;
@@ -98,14 +101,8 @@ public:
     envoy::type::v3::FractionalPercent percent2;
     percent2.set_numerator(10000);
     percent2.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    tracing_config_ = {Tracing::OperationName::Ingress,
-                       {},
-                       percent1,
-                       percent2,
-                       percent1,
-                       false,
-                       256,
-                       Tracing::TraceRequestIdSampleDecisionPolicy::Default};
+    tracing_config_ = {
+        Tracing::OperationName::Ingress, {}, percent1, percent2, percent1, false, 256};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
     ON_CALL(config_, localReply()).WillByDefault(ReturnRef(*local_reply_));
 
@@ -1236,9 +1233,8 @@ TEST_F(ConnectionManagerUtilityTest, SamplingWithoutRouteOverride) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, CheckSamplingDecisionWithBypassSamplingWithRequestId) {
-  tracing_config_.trace_request_id_sample_decision_policy_ =
-      Tracing::TraceRequestIdSampleDecisionPolicy::ByPass;
-
+  EXPECT_CALL(*request_id_extension_, requestIdMutationPolicy())
+      .WillOnce(Return(Http::RequestIDMutationPolicy::Skip));
   Http::TestRequestHeaderMapImpl request_headers{
       {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
   const auto ret = callMutateRequestHeaders(request_headers, Protocol::Http2);

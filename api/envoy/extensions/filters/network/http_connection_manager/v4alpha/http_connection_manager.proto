@@ -126,7 +126,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 10]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing";
@@ -137,21 +137,6 @@ message HttpConnectionManager {
 
       // The HTTP listener is used for egress/outgoing requests.
       EGRESS = 1;
-    }
-
-    // This option is used to change the behavior of the sampling strategy decided
-    // based on the :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`.
-    enum TraceRequestIdSampleDecisionPolicy {
-      // Default value. if specified as DEFAULT, the sampling strategy will be based
-      // on the value of :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`.
-      DEFAULT = 0;
-
-      // Bypasses the :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` to
-      // determine the sampling strategy and leaves all decisions to the tracing provider.
-      // If this value is set, the generated :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`
-      // will not be rewritten. Also, it will no longer be affected by runtime flags
-      // for tracing decisions.
-      BYPASS = 1;
     }
 
     reserved 1, 2;
@@ -206,10 +191,6 @@ message HttpConnectionManager {
     //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
     //   on OpenCensus side.
     config.trace.v4alpha.Tracing.Http provider = 9;
-
-    // How to determine the sampling strategy by
-    // :ref:`x-request-id<config_http_conn_man_headers_x-request-id>`.
-    TraceRequestIdSampleDecisionPolicy trace_request_id_sample_decision_policy = 10;
   }
 
   message InternalAddressConfig {

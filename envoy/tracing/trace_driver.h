@@ -18,8 +18,6 @@ constexpr uint32_t DefaultMaxPathTagLength = 256;
 
 enum class OperationName { Ingress, Egress };
 
-enum class TraceRequestIdSampleDecisionPolicy { Default, ByPass };
-
 /**
  * The context for the custom tag to obtain the tag value.
  */
@@ -79,11 +77,6 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
-
-  /**
-   * @return sampling decision policy based on x-request-id.
-   */
-  virtual TraceRequestIdSampleDecisionPolicy traceRequestIdSampleDecisionPolicy() const PURE;
 };
 
 /**

@@ -29,6 +29,8 @@ public:
 
 using RequestIdStreamInfoProviderSharedPtr = std::shared_ptr<RequestIdStreamInfoProvider>;
 
+enum class RequestIDMutationPolicy { Default, Skip };
+
 /**
  * Abstract request id utilities for getting/setting the request IDs and tracing status of requests
  */
@@ -63,6 +65,11 @@ public:
    * @param status the trace reason that should be set for this request.
    */
   virtual void setTraceReason(Http::RequestHeaderMap& request_headers, Tracing::Reason reason) PURE;
+
+  /**
+   * @return request id mutation policy.
+   */
+  virtual RequestIDMutationPolicy requestIdMutationPolicy() const PURE;
 };
 
 using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;
