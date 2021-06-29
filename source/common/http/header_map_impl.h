@@ -322,7 +322,10 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderMap::NonConstGetResult getExisting(const LowerCaseString& key);
+
+  HeaderMap::NonConstGetResult getExisting(absl::string_view key);
+  size_t removeExisting(absl::string_view key);
+
   size_t removeInline(HeaderEntryImpl** entry);
   void updateSize(uint64_t from_size, uint64_t to_size);
   void addSize(uint64_t size);
@@ -479,6 +482,12 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_INLINE_HEADER_STRING_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_INLINE_HEADER_NUMERIC_FUNCS)
+
+  // Tracing::TraceContext
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override;
+  void setTraceContext(absl::string_view key, absl::string_view val) override;
+  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override;
+  void setTraceContextReference(absl::string_view key, absl::string_view val) override;
 
 protected:
   // NOTE: Because inline_headers_ is a variable size member, it must be the last member in the
