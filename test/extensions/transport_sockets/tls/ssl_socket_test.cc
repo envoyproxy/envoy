@@ -793,16 +793,15 @@ void updateFilterChain(
 }
 
 struct OptionalServerConfig {
-  absl::optional<std::string> cert_hash = {};
-  absl::optional<std::string> trusted_ca = {};
-  absl::optional<bool> allow_expired_cert = {};
+  absl::optional<std::string> cert_hash{};
+  absl::optional<std::string> trusted_ca{};
+  absl::optional<bool> allow_expired_cert{};
 };
 
 void configureServerAndExpiredClientCertificate(
     envoy::config::listener::v3::Listener& listener,
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client,
     const OptionalServerConfig& server_config) {
-
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1559,7 +1558,7 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  OptionalServerConfig server_config = {};
+  OptionalServerConfig server_config;
   server_config.allow_expired_cert = false;
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
@@ -1573,7 +1572,7 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  OptionalServerConfig server_config = {};
+  OptionalServerConfig server_config;
   server_config.allow_expired_cert = true;
   configureServerAndExpiredClientCertificate(listener, client, server_config);
 
@@ -1587,7 +1586,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  OptionalServerConfig server_config = {};
+  OptionalServerConfig server_config;
   server_config.allow_expired_cert = true;
   server_config.cert_hash = "0000000000000000000000000000000000000000000000000000000000000000";
   configureServerAndExpiredClientCertificate(listener, client, server_config);
@@ -1603,7 +1602,7 @@ TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  OptionalServerConfig server_config = {};
+  OptionalServerConfig server_config;
   server_config.allow_expired_cert = true;
   // Fake CA is not used to sign the client's certificate.
   server_config.trusted_ca = "{{ test_rundir "
