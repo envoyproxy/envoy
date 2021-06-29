@@ -290,7 +290,7 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
     dns_failure_refresh_rate:
       base_interval: 7s
       max_interval: 10s
-    wait_for_dns_on_init: false
+    wait_for_warm_on_init: false
     load_assignment:
       endpoints:
       - lb_endpoints:

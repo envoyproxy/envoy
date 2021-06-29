@@ -876,12 +876,12 @@ message Cluster {
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   core.v3.DnsResolutionConfig dns_resolution_config = 53;
 
-  // Optional configuration for having server init block on async DNS resolution. Only applicable for
+  // Optional configuration for having server init block on cluster warmup. Currently, only applicable for
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
-  // If true, server startup blocks on async DNS resolution. If false, server will complete
-  // initialization whether or not DNS resolution has completed. Defaults to true.
-  google.protobuf.BoolValue wait_for_dns_on_init = 54;
+  // If true, server startup blocks on cluster warmup. If false, server will complete
+  // initialization whether or not warmup has completed. Defaults to true.
+  google.protobuf.BoolValue wait_for_warm_on_init = 54;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via

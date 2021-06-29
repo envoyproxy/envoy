@@ -575,7 +575,7 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   dns_lookup_family: V4_ONLY
-  wait_for_dns_on_init: false
+  wait_for_warm_on_init: false
   load_assignment:
         endpoints:
           - lb_endpoints:

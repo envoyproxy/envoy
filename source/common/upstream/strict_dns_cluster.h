@@ -62,7 +62,7 @@ private:
   BackOffStrategyPtr failure_backoff_strategy_;
   const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
-  const bool wait_for_dns_on_init_;
+  const bool wait_for_warm_on_init_;
   uint32_t overprovisioning_factor_;
 };
 
