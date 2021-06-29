@@ -332,32 +332,18 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
-TEST_F(ConnectionManagerUtilityTest, SchemeAppendOrOverwrite) {
+TEST_F(ConnectionManagerUtilityTest, SchemeOverwrite) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
-  ON_CALL(config_, schemeHeaderTransformation())
-      .WillByDefault(
-          Return(ConnectionManagerConfig::HttpConnectionManagerProto::SET_SCHEME_IF_ABSENT));
   connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   TestRequestHeaderMapImpl headers{};
   Network::Address::Ipv4Instance local_address("10.3.2.1");
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
 
-  // Scheme was absent. Append HTTP.
-  callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.getSchemeValue());
-  EXPECT_EQ("http", headers.getForwardedProtoValue());
-
   // Scheme was present. Do not overwrite anything
-  config_.scheme_ = "https";
-  callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.getSchemeValue());
-  EXPECT_EQ("http", headers.getForwardedProtoValue());
-
   // Scheme and X-Forwarded-Proto will be overwritten.
-  ON_CALL(config_, schemeHeaderTransformation())
-      .WillByDefault(Return(ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME));
+  config_.scheme_ = "https";
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("https", headers.getSchemeValue());
   EXPECT_EQ("https", headers.getForwardedProtoValue());

@@ -166,15 +166,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
                                                                 : Headers::get().SchemeValues.Http);
   }
   if (config.schemeToSet().has_value()) {
-    if (config.schemeHeaderTransformation() ==
-            ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME ||
-        (!request_headers.Scheme() && !request_headers.ForwardedProto())) {
-      request_headers.setScheme(config.schemeToSet().value());
-      if (!request_headers.getForwardedProtoValue().empty() &&
-          request_headers.getForwardedProtoValue() != request_headers.getSchemeValue()) {
-        request_headers.setForwardedProto(config.schemeToSet().value());
-      }
-    }
+    request_headers.setScheme(config.schemeToSet().value());
+    request_headers.setForwardedProto(config.schemeToSet().value());
   }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.

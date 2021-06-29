@@ -174,10 +174,6 @@ public:
     return server_transformation_;
   }
   const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
-  HttpConnectionManagerProto::SchemeHeaderTransformation
-  schemeHeaderTransformation() const override {
-    return scheme_transformation_;
-  }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -239,8 +235,6 @@ public:
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
   absl::optional<std::string> scheme_;
-  HttpConnectionManagerProto::SchemeHeaderTransformation scheme_transformation_{
-      HttpConnectionManagerProto::OVERWRITE_SCHEME};
   Stats::IsolatedStoreImpl fake_stats_;
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;

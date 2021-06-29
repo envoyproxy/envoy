@@ -349,12 +349,6 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
-   * @return SchemeHeaderTransformation the transformation to apply to request headers.
-   */
-  virtual HttpConnectionManagerProto::SchemeHeaderTransformation
-  schemeHeaderTransformation() const PURE;
-
-  /**
    * @return const absl::optional<std::string> the scheme name to write into requests.
    */
   virtual const absl::optional<std::string>& schemeToSet() const PURE;

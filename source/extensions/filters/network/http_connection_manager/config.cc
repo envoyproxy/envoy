@@ -518,13 +518,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   server_transformation_ = config.server_header_transformation();
 
-  scheme_transformation_ = config.scheme_header_transformation();
-
-  if (!config.scheme().empty()) {
-    scheme_ = config.scheme();
-    if (config.scheme() != Http::Headers::get().SchemeValues.Https &&
-        config.scheme() != Http::Headers::get().SchemeValues.Http) {
-      throw EnvoyException(fmt::format("Invalid scheme: {}", config.scheme()));
+  if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
+    scheme_ = config.scheme_header_transformation().scheme_to_overwrite();
+    if (scheme_.value() != Http::Headers::get().SchemeValues.Https &&
+        scheme_.value() != Http::Headers::get().SchemeValues.Http) {
+      throw EnvoyException(fmt::format("Invalid scheme: {}", scheme_.value()));
     }
   }
 

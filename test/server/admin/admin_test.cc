@@ -52,7 +52,6 @@ TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(nullptr, admin_.tracer());
   EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
   EXPECT_EQ(false, admin_.schemeToSet().has_value());
-  EXPECT_EQ(0, admin_.schemeHeaderTransformation());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {

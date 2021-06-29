@@ -9,6 +9,22 @@ is being received) as well as during encoding (when the response is being sent).
 .. contents::
   :local:
 
+.. _config_http_conn_man_headers_scheme:
+
+:scheme
+-------
+
+Envoy will always set the *:scheme* header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/1 and HTTP/2, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1
+
+For HTTP/2, and HTTP/3, incoming :scheme headers are trusted and propogated through upstream.
+For HTTP/1, the :scheme header will be set
+1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request.
+2) From the value of the :ref:`config_http_conn_man_headers_x-forwarded-proto` header after sanitization.
+
+This default behavior can be overridden via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option.
+
 .. _config_http_conn_man_headers_user-agent:
 
 user-agent
@@ -340,6 +356,14 @@ x-forwarded-proto
 It is a common case where a service wants to know what the originating protocol (HTTP or HTTPS) was
 of the connection terminated by front/edge Envoy. *x-forwarded-proto* contains this information. It
 will be set to either *http* or *https*.
+
+Downstream *x-forwarded-proto* headers will only be trusted if *xff_num_trusted_hops* is non-zero.
+If *xff_num_trusted_hops* is zero, downstream *x-forwarded-proto* headers will be set to http
+or https based on if the downstream connection is TLS or not.
+
+If the scheme is changed via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option, *x-forwarded-proto* will be updated as well.
 
 .. _config_http_conn_man_headers_x-request-id:
 

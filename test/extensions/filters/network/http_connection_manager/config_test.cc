@@ -895,8 +895,8 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
 TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  scheme_header_transformation: OVERWRITE_SCHEME
-  scheme: http
+  scheme_header_transformation:
+    scheme_to_overwrite: http
   route_config:
     name: local_route
   http_filters:
@@ -910,37 +910,13 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE_SCHEME,
-            config.schemeHeaderTransformation());
-}
-
-TEST_F(HttpConnectionManagerConfigTest, SchemeAppendIfAbsent) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  scheme_header_transformation: SET_SCHEME_IF_ABSENT
-  scheme: http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-  )EOF";
-
-  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
-      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
-                             &Runtime::MockSnapshot::featureEnabledDefault));
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                     filter_config_provider_manager_);
-  EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::SET_SCHEME_IF_ABSENT,
-            config.schemeHeaderTransformation());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SchemeInvalid) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  scheme_header_transformation: SET_SCHEME_IF_ABSENT
-  scheme: foo
+  scheme_header_transformation:
+    scheme_to_overwrite: foo
   route_config:
     name: local_route
   http_filters:

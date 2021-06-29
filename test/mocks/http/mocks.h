@@ -564,8 +564,6 @@ public:
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, schemeToSet, (), (const));
-  MOCK_METHOD(HttpConnectionManagerProto::SchemeHeaderTransformation, schemeHeaderTransformation,
-              (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
   MOCK_METHOD(bool, useRemoteAddress, (), (const));
