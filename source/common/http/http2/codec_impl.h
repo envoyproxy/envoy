@@ -199,6 +199,10 @@ protected:
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata(uint8_t flags);
+    // Returns true if the stream should defer the local reset stream until after the next call to
+    // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
+    // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
+    virtual bool useDeferredReset() const PURE;
     virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
@@ -323,6 +327,8 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
+    // Do not use deferred reset on upstream connections.
+    bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
@@ -373,6 +379,10 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
+    // Enable deferred reset on downstream connections so outbound HTTP internal error replies are
+    // written out before force resetting the stream, assuming there is enough H2 connection flow
+    // control window is available.
+    bool useDeferredReset() const override { return true; }
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
@@ -529,9 +539,13 @@ private:
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
 
+  // Streams that are pending deferred reset. Using an ordered map provides determinism in the rare
+  // case where there are multiple streams waiting for deferred reset. The stream id is also used to
+  // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
+  // after the stream has been removed from the active list.
+  std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
-  bool pending_deferred_reset_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   Event::TimerPtr keepalive_send_timer_;

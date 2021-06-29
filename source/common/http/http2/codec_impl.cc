@@ -512,8 +512,9 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // If we submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
   // We want these frames to go out so we defer the reset until we send all of the frames that
   // end the local stream.
-  if (local_end_stream_ && !local_end_stream_sent_) {
-    parent_.pending_deferred_reset_ = true;
+  if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_) {
+    ASSERT(parent_.getStream(stream_id_) != nullptr);
+    parent_.pending_deferred_reset_streams_.emplace(stream_id_, this);
     deferred_reset_ = reason;
     ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
   } else {
@@ -574,8 +575,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       protocol_constraints_(stats, http2_options),
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
-      dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false),
-      random_(random_generator) {
+      dispatching_(false), raised_goaway_(false), random_(random_generator) {
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
@@ -682,7 +682,9 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
 }
 
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
-  return static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
+  StreamImpl* stream =
+      static_cast<StreamImpl*>(nghttp2_session_get_stream_user_data(session_, stream_id));
+  return stream;
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
@@ -997,6 +999,8 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
     }
 
     stream->destroy();
+    // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
+    pending_deferred_reset_streams_.erase(stream->stream_id_);
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
     // nghttp2 does not appear to track this internally, and any stream deleted
@@ -1104,12 +1108,15 @@ Status ConnectionImpl::sendPendingFrames() {
   //       to short circuit requests. In the best effort case, we complete the stream before
   //       resetting. In other cases, we just do the reset now which will blow away pending data
   //       frames and release any memory associated with the stream.
-  if (pending_deferred_reset_) {
-    pending_deferred_reset_ = false;
-    for (auto& stream : active_streams_) {
-      if (stream->deferred_reset_) {
-        stream->resetStreamWorker(stream->deferred_reset_.value());
-      }
+  if (!pending_deferred_reset_streams_.empty()) {
+    while (!pending_deferred_reset_streams_.empty()) {
+      auto it = pending_deferred_reset_streams_.begin();
+      auto* stream = it->second;
+      // Sanity check: the stream's id matches the map key.
+      ASSERT(it->first == stream->stream_id_);
+      pending_deferred_reset_streams_.erase(it);
+      ASSERT(stream->deferred_reset_);
+      stream->resetStreamWorker(stream->deferred_reset_.value());
     }
     RETURN_IF_ERROR(sendPendingFrames());
   }

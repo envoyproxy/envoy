@@ -528,12 +528,18 @@ private:
 using FakeRawConnectionPtr = std::unique_ptr<FakeRawConnection>;
 
 struct FakeUpstreamConfig {
-  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {}
+  FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {
+    http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_);
+    // Legacy options which are always set.
+    http2_options_.set_allow_connect(true);
+    http2_options_.set_allow_metadata(true);
+  }
 
   Event::TestTimeSystem& time_system_;
   FakeHttpConnection::Type upstream_protocol_{FakeHttpConnection::Type::HTTP1};
   bool enable_half_close_{};
   bool udp_fake_upstream_{};
+  envoy::config::core::v3::Http2ProtocolOptions http2_options_;
 };
 
 /**
@@ -634,6 +640,8 @@ public:
   testing::AssertionResult
   rawWriteConnection(uint32_t index, const std::string& data, bool end_stream = false,
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  const envoy::config::core::v3::Http2ProtocolOptions& http2Options() { return http2_options_; }
 
 protected:
   Stats::IsolatedStoreImpl stats_store_;
@@ -737,6 +745,7 @@ private:
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
 
+  const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;

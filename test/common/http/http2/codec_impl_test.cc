@@ -949,7 +949,7 @@ TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
 
 class Http2CodecImplDeferredResetTest : public Http2CodecImplTest {};
 
-TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
+TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetForClientStreams) {
   initialize();
 
   InSequence s;
@@ -957,67 +957,145 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   MockStreamCallbacks client_stream_callbacks;
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
 
-  // Do a request, but pause server dispatch so we don't send window updates. This will result in a
-  // deferred reset, followed by a pending frames flush which will cause the stream to actually
-  // be reset immediately since we are outside of dispatch context.
+  // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
+  // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
+  // call to resetStream goes down the regular reset path for client streams; the pending outbound
+  // header and data for the reset stream are discarded immediately.
+  EXPECT_CALL(request_decoder_, decodeData(_, _)).Times(0);
   ON_CALL(client_connection_, write(_, _))
       .WillByDefault(
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
-  EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  request_encoder_->encodeData(body, true);
-  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
-  request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   // Dispatch server. We expect to see some data.
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() -> void {
-    // Start a response inside the headers callback. This should not result in the client
-    // seeing any headers as the stream should already be reset on the other side, even though
-    // we don't know about it yet.
     TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     response_encoder_->encodeHeaders(response_headers, false);
   }));
-  EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    request_encoder_->encodeData(body, true);
+    EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+    request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
 
   setupDefaultConnectionMocks();
+  EXPECT_NE(0, server_wrapper_.buffer_.length());
   auto status = server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
   EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, server_wrapper_.buffer_.length());
 }
 
-TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
+TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBeforeReset) {
   initialize();
 
   InSequence s;
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
+    // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
+    // delayed sendPendingFrames processing allows us to verify that resetStream calls go down the
+    // deferred reset path if there are pending data frames with local end_stream set.
+    ON_CALL(server_connection_, write(_, _))
+        .WillByDefault(Invoke(
+            [&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(32 * 1024, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+    EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(*flush_timer, disableTimer());
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-
-  // In this case we do the same thing as DeferredResetClient but on the server side.
-  ON_CALL(server_connection_, write(_, _))
-      .WillByDefault(
-          Invoke([&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, false);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
-  EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-  auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
-  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
-  response_encoder_->encodeData(body, true);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-  EXPECT_CALL(*flush_timer, disableTimer());
-  response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   MockStreamCallbacks client_stream_callbacks;
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
+  EXPECT_CALL(response_decoder_, decodeData(_, true));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  setupDefaultConnectionMocks();
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+  initialize();
+
+  InSequence s;
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
+    // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
+    // delayed sendPendingFrames processing allows us to verify that resetStream calls go down the
+    // deferred reset path if there are pending data frames with local end_stream set.
+    ON_CALL(server_connection_, write(_, _))
+        .WillByDefault(Invoke(
+            [&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+    EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(*flush_timer, disableTimer());
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  setupDefaultConnectionMocks();
+  auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalEndStream) {
+  initialize();
+
+  InSequence s;
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    // Encode headers, encode data and send reset stream from the call stack of decodeHeaders in
+    // order to delay sendPendingFrames processing in those calls until the end of dispatch. The
+    // call to resetStream goes down the regular reset path since local end_stream is not set; the
+    // pending outbound header and data for the reset stream are discarded immediately.
+    ON_CALL(server_connection_, write(_, _))
+        .WillByDefault(Invoke(
+            [&](Buffer::Instance& data, bool) -> void { client_wrapper_.buffer_.add(data); }));
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    response_encoder_->encodeData(body, false);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(response_decoder_, decodeData(_, _)).Times(0);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
   auto status = client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
