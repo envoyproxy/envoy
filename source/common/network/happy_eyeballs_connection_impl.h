@@ -114,11 +114,14 @@ private:
 
   void onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper);
 
+  void onWriteBufferHighWatermark();
+  void onWriteBufferLowWatermark();
+
   struct State {
-    bool detectEarlyCloseWhenReadDisabled_;
-    bool noDelay_;
+    bool detectEarlyCloseWhenReadDisabled_ = false;
+    bool noDelay_ = false;
     Buffer::InstancePtr write_buffer_;
-    bool end_stream_;
+    bool end_stream_ = false;
   };
 
   std::unique_ptr<ClientConnection> connection_;

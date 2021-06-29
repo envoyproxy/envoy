@@ -17,6 +17,10 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       transport_socket_options_(transport_socket_options),
       options_(options) {
   connection_ = createConnection();
+  state_.write_buffer_ = dispatcher_.getWatermarkFactory().create(
+          [this]() -> void { this->onWriteBufferLowWatermark(); },
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
 }
 
 HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() = default;
@@ -83,7 +87,9 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
   connection_->detectEarlyCloseWhenReadDisabled(value);
 }
 bool HappyEyeballsConnectionImpl::readEnabled() const {
-  ASSERT(connect_finished_);
+  if (!connect_finished_) {
+    return true;
+  }
   return connection_->readEnabled();
 }
 const SocketAddressProvider& HappyEyeballsConnectionImpl::addressProvider() const {
@@ -103,7 +109,10 @@ Ssl::ConnectionInfoConstSharedPtr HappyEyeballsConnectionImpl::ssl() const {
   return connection_->ssl();
 }
 Connection::State HappyEyeballsConnectionImpl::state() const {
-  ASSERT(connect_finished_);
+  //ASSERT(
+  if (!connect_finished_) {
+    ASSERT(connection_->state() == Connection::State::Open);
+  }
   return connection_->state();
 }
 bool HappyEyeballsConnectionImpl::connecting() const {
@@ -118,8 +127,8 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
     std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     return;
   }
+
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
-  //state_.write_buffer_ = std::make_unique<Buffer::Instance>();
   state_.write_buffer_->move(data);
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   state_.end_stream_ = end_stream;
@@ -135,7 +144,10 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
   return connection_->bufferLimit();
 }
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
-  ASSERT(connect_finished_);
+  if (!connect_finished_) {
+    return false;
+  }
+
   return connection_->aboveHighWatermark();
 }
 const ConnectionSocket::OptionsSharedPtr& HappyEyeballsConnectionImpl::socketOptions() const {
@@ -188,7 +200,8 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
   ASSERT(false);
 }
 void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
-  ASSERT(connect_finished_);
+  // TODO(XXX)
+  //ASSERT(connect_finished_);
   connection_->close(type);
 }
 Event::Dispatcher& HappyEyeballsConnectionImpl::dispatcher() {
@@ -246,11 +259,10 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
       connection_->addReadFilter(filter);
     }
   }
-  /*
-  if (state_.write_buffer_ || state_.end_stream_) {
+
+  if (state_.write_buffer_->length() > 0 || state_.end_stream_) {
     connection_->write(*state_.write_buffer_, state_.end_stream_);
   }
-  */
 
   std::vector<ConnectionCallbacks*> cbs;
   cbs.swap(cbs_);
@@ -272,6 +284,13 @@ void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(ConnectionCall
 void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper) {
   ASSERT(connect_finished_);
   ASSERT(wrapper == callbacks_wrapper_.get());
+}
+
+void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
+  ASSERT(false);
+}
+void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
+  ASSERT(false);
 }
 
 } // namespace Network
