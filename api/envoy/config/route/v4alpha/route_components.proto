@@ -571,7 +571,7 @@ message CorsPolicy {
   core.v4alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.route.v3.RouteAction";
 
@@ -845,6 +845,14 @@ message RouteAction {
     // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`
     // for additional documentation.
     WeightedCluster weighted_clusters = 3;
+
+    // [#not-implemented-hide:]
+    // Name of the cluster specifier plugin to use to determine the cluster for
+    // requests on this route. The plugin name must be defined in the associated
+    // :ref:`envoy_v3_api_field_config.route.v3.RouteConfiguration.cluster_specifier_plugins`
+    // in the
+    // :ref:`envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name` field.
+    string cluster_specifier_plugin = 37;
   }
 
   // The HTTP status code to use when configured cluster is not found.
