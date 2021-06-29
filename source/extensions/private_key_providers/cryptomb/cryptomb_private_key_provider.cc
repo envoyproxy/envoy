@@ -420,22 +420,22 @@ void CryptoMbQueue::processEcdsaRequests() {
   ENVOY_LOG(debug, "Multibuffer ECDSA process {} requests", request_queue_.size());
 
   // Signature components. Size of r and s is the key size in bytes: 256/8=32
-  int8u sign_r[MULTIBUFF_BATCH][32];
-  int8u sign_s[MULTIBUFF_BATCH][32];
-  int8u* pa_sign_r[MULTIBUFF_BATCH] = {sign_r[0], sign_r[1], sign_r[2], sign_r[3],
-                                       sign_r[4], sign_r[5], sign_r[6], sign_r[7]};
-  int8u* pa_sign_s[MULTIBUFF_BATCH] = {sign_s[0], sign_s[1], sign_s[2], sign_s[3],
-                                       sign_s[4], sign_s[5], sign_s[6], sign_s[7]};
+  uint8_t sign_r[MULTIBUFF_BATCH][32];
+  uint8_t sign_s[MULTIBUFF_BATCH][32];
+  uint8_t* pa_sign_r[MULTIBUFF_BATCH] = {sign_r[0], sign_r[1], sign_r[2], sign_r[3],
+                                         sign_r[4], sign_r[5], sign_r[6], sign_r[7]};
+  uint8_t* pa_sign_s[MULTIBUFF_BATCH] = {sign_s[0], sign_s[1], sign_s[2], sign_s[3],
+                                         sign_s[4], sign_s[5], sign_s[6], sign_s[7]};
 
-  unsigned int ecdsa_sts = ipp_->mbxNistp256EcdsaSignSslMb8(pa_sign_r, pa_sign_s, ecdsa_priv_from,
-                                                            pa_eph_skey, pa_reg_skey, nullptr);
+  uint32_t ecdsa_sts = ipp_->mbxNistp256EcdsaSignSslMb8(pa_sign_r, pa_sign_s, ecdsa_priv_from,
+                                                        pa_eph_skey, pa_reg_skey, nullptr);
 
   enum RequestStatus status[MULTIBUFF_BATCH] = {RequestStatus::Retry};
   for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
     CryptoMbEcdsaContextSharedPtr mb_ctx =
         std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
     enum RequestStatus ctx_status;
-    if (MBX_GET_STS(ecdsa_sts, req_num) == MBX_STATUS_OK) {
+    if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
       ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] success", req_num);
       status[req_num] = RequestStatus::Success;
 
@@ -467,8 +467,7 @@ void CryptoMbQueue::processEcdsaRequests() {
         ECDSA_SIG_free(sig);
       }
     } else {
-      ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] failure: {}", req_num,
-                MBX_GET_STS(ecdsa_sts, req_num));
+      ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] failure", req_num);
       status[req_num] = RequestStatus::Error;
     }
 
@@ -508,7 +507,7 @@ void CryptoMbQueue::processRsaRequests() {
 
   ENVOY_LOG(debug, "Multibuffer RSA process {} requests", request_queue_.size());
 
-  unsigned int rsa_sts =
+  uint32_t rsa_sts =
       ipp_->mbxRsaPrivateCrtSslMb8(rsa_priv_from, rsa_priv_to, rsa_priv_p, rsa_priv_q,
                                    rsa_priv_dmp1, rsa_priv_dmq1, rsa_priv_iqmp, key_size_);
 
@@ -517,7 +516,7 @@ void CryptoMbQueue::processRsaRequests() {
   for (unsigned req_num = 0; req_num < request_queue_.size(); req_num++) {
     CryptoMbRsaContextSharedPtr mb_ctx =
         std::static_pointer_cast<CryptoMbRsaContext>(request_queue_[req_num]);
-    if (MBX_GET_STS(rsa_sts, req_num) == MBX_STATUS_OK) {
+    if (ipp_->mbxGetSts(rsa_sts, req_num)) {
       ENVOY_LOG(debug, "Multibuffer RSA request {} success", req_num);
       status[req_num] = RequestStatus::Success;
     } else {
@@ -539,7 +538,7 @@ void CryptoMbQueue::processRsaRequests() {
     CryptoMbRsaContextSharedPtr mb_ctx =
         std::static_pointer_cast<CryptoMbRsaContext>(request_queue_[req_num]);
     enum RequestStatus ctx_status;
-    if (MBX_GET_STS(rsa_sts, req_num) == MBX_STATUS_OK) {
+    if (ipp_->mbxGetSts(rsa_sts, req_num)) {
       if (CRYPTO_memcmp(mb_ctx->in_buf_.get(), rsa_priv_to[req_num], mb_ctx->out_len_) != 0) {
         ENVOY_LOG(debug, "Multibuffer RSA request {} Lenstra check failure", req_num);
         status[req_num] = RequestStatus::Error;

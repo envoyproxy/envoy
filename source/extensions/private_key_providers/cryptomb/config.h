@@ -7,6 +7,12 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/private_key_providers/cryptomb/cryptomb_private_key_provider.h"
 
+#ifdef IPP_CRYPTO_DISABLED
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto_disabled_impl.h"
+#else
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto_impl.h"
+#endif
+
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {

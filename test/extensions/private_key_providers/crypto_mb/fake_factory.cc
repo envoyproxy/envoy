@@ -12,7 +12,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/private_key_providers/cryptomb/config.h"
-#include "source/extensions/private_key_providers/cryptomb/ipp.h"
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto.h"
 
 #include "openssl/rsa.h"
 #include "openssl/ssl.h"
@@ -31,17 +31,31 @@ FakeIppCryptoImpl::~FakeIppCryptoImpl() {
   BN_free(d_);
 }
 
-int FakeIppCryptoImpl::mbxIsCryptoMbApplicable(int64u) {
+int FakeIppCryptoImpl::mbxIsCryptoMbApplicable(uint64_t) {
   return supported_instruction_set_ ? 1 : 0;
 }
 
-mbx_status FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(int8u* pa_sign_r[8], int8u* pa_sign_s[8],
-                                                         const int8u* const pa_msg[8],
-                                                         const BIGNUM* const pa_eph_skey[8],
-                                                         const BIGNUM* const pa_reg_skey[8],
-                                                         int8u* p_buffer) {
+uint32_t FakeIppCryptoImpl::mbxSetSts(uint32_t status, unsigned req_num, bool success) {
+  if (success) {
+    // clear bit req_num
+    return status &= ~(1UL << req_num);
+  }
+  // set bit req_num
+  return status |= (1UL << req_num);
+}
 
-  mbx_status status = 0;
+bool FakeIppCryptoImpl::mbxGetSts(uint32_t status, unsigned req_num) {
+  // return true if bit req_num if not set
+  return !((status >> req_num) & 1UL);
+}
+
+uint32_t FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], uint8_t* pa_sign_s[8],
+                                                       const uint8_t* const pa_msg[8],
+                                                       const BIGNUM* const pa_eph_skey[8],
+                                                       const BIGNUM* const pa_reg_skey[8],
+                                                       uint8_t* p_buffer) {
+
+  uint32_t status = 0xff;
 
   for (int i = 0; i < 8; i++) {
     EC_KEY* key;
@@ -63,7 +77,7 @@ mbx_status FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(int8u* pa_sign_r[8], in
     ECDSA_SIG_free(sig);
     EC_KEY_free(key);
 
-    MBX_SET_STS(status, i, MBX_STATUS_OK);
+    status = mbxSetSts(status, i, true);
   }
 
   UNREFERENCED_PARAMETER(pa_eph_skey);
@@ -72,12 +86,12 @@ mbx_status FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(int8u* pa_sign_r[8], in
   return status;
 }
 
-mbx_status FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
-    const int8u* const from_pa[8], int8u* const to_pa[8], const BIGNUM* const p_pa[8],
+uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
+    const uint8_t* const from_pa[8], uint8_t* const to_pa[8], const BIGNUM* const p_pa[8],
     const BIGNUM* const q_pa[8], const BIGNUM* const dp_pa[8], const BIGNUM* const dq_pa[8],
     const BIGNUM* const iq_pa[8], int expected_rsa_bitsize) {
 
-  mbx_status status = 0;
+  uint32_t status = 0xff;
 
   for (int i = 0; i < 8; i++) {
     RSA* rsa;
@@ -105,7 +119,7 @@ mbx_status FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
 
     RSA_free(rsa);
 
-    MBX_SET_STS(status, i, ret ? MBX_STATUS_OK : MBX_STATUS_NULL_PARAM_ERR);
+    status = mbxSetSts(status, i, ret);
   }
 
   UNREFERENCED_PARAMETER(expected_rsa_bitsize);
@@ -113,11 +127,11 @@ mbx_status FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
   return status;
 }
 
-mbx_status FakeIppCryptoImpl::mbxRsaPublicSslMb8(const int8u* const from_pa[8],
-                                                 int8u* const to_pa[8], const BIGNUM* const e_pa[8],
-                                                 const BIGNUM* const n_pa[8],
-                                                 int expected_rsa_bitsize) {
-  mbx_status status = 0;
+uint32_t FakeIppCryptoImpl::mbxRsaPublicSslMb8(const uint8_t* const from_pa[8],
+                                               uint8_t* const to_pa[8], const BIGNUM* const e_pa[8],
+                                               const BIGNUM* const n_pa[8],
+                                               int expected_rsa_bitsize) {
+  uint32_t status = 0xff;
 
   for (int i = 0; i < 8; i++) {
     RSA* rsa;
@@ -137,7 +151,7 @@ mbx_status FakeIppCryptoImpl::mbxRsaPublicSslMb8(const int8u* const from_pa[8],
 
     RSA_free(rsa);
 
-    MBX_SET_STS(status, i, ret ? MBX_STATUS_OK : MBX_STATUS_NULL_PARAM_ERR);
+    status = mbxSetSts(status, i, ret);
   }
 
   UNREFERENCED_PARAMETER(expected_rsa_bitsize);

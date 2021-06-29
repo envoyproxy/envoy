@@ -8,7 +8,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/private_key_providers/cryptomb/ipp.h"
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto.h"
 
 namespace Envoy {
 namespace Extensions {

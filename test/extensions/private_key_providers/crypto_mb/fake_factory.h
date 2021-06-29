@@ -5,7 +5,7 @@
 #include "envoy/ssl/private_key/private_key_config.h"
 
 #include "source/extensions/private_key_providers/cryptomb/cryptomb_private_key_provider.h"
-#include "source/extensions/private_key_providers/cryptomb/ipp.h"
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,20 +17,20 @@ public:
   FakeIppCryptoImpl(bool supported_instruction_set);
   ~FakeIppCryptoImpl() override;
 
-  int mbxIsCryptoMbApplicable(int64u features) override;
-  mbx_status mbxNistp256EcdsaSignSslMb8(int8u* pa_sign_r[8], int8u* pa_sign_s[8],
-                                        const int8u* const pa_msg[8],
-                                        const BIGNUM* const pa_eph_skey[8],
-                                        const BIGNUM* const pa_reg_skey[8],
-                                        int8u* p_buffer) override;
-  mbx_status mbxRsaPrivateCrtSslMb8(const int8u* const from_pa[8], int8u* const to_pa[8],
-                                    const BIGNUM* const p_pa[8], const BIGNUM* const q_pa[8],
-                                    const BIGNUM* const dp_pa[8], const BIGNUM* const dq_pa[8],
-                                    const BIGNUM* const iq_pa[8],
-                                    int expected_rsa_bitsize) override;
-  mbx_status mbxRsaPublicSslMb8(const int8u* const from_pa[8], int8u* const to_pa[8],
-                                const BIGNUM* const e_pa[8], const BIGNUM* const n_pa[8],
-                                int expected_rsa_bitsize) override;
+  int mbxIsCryptoMbApplicable(uint64_t features) override;
+  uint32_t mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], uint8_t* pa_sign_s[8],
+                                      const uint8_t* const pa_msg[8],
+                                      const BIGNUM* const pa_eph_skey[8],
+                                      const BIGNUM* const pa_reg_skey[8],
+                                      uint8_t* p_buffer) override;
+  uint32_t mbxRsaPrivateCrtSslMb8(const uint8_t* const from_pa[8], uint8_t* const to_pa[8],
+                                  const BIGNUM* const p_pa[8], const BIGNUM* const q_pa[8],
+                                  const BIGNUM* const dp_pa[8], const BIGNUM* const dq_pa[8],
+                                  const BIGNUM* const iq_pa[8], int expected_rsa_bitsize) override;
+  uint32_t mbxRsaPublicSslMb8(const uint8_t* const from_pa[8], uint8_t* const to_pa[8],
+                              const BIGNUM* const e_pa[8], const BIGNUM* const n_pa[8],
+                              int expected_rsa_bitsize) override;
+  bool mbxGetSts(uint32_t status, unsigned req_num) override;
 
   void setRsaKey(const BIGNUM* n, const BIGNUM* e, const BIGNUM* d) {
     n_ = BN_dup(n);
@@ -39,6 +39,8 @@ public:
   };
 
 private:
+  uint32_t mbxSetSts(uint32_t status, unsigned req_num, bool success);
+
   bool supported_instruction_set_;
   BIGNUM* n_{};
   BIGNUM* e_{};

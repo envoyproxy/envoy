@@ -10,7 +10,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/private_key_providers/cryptomb/ipp.h"
+#include "source/extensions/private_key_providers/cryptomb/ipp_crypto.h"
 
 #include "openssl/ssl.h"
 

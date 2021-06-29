@@ -10,18 +10,40 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "ipp_crypto_wrapper_lib",
+    hdrs = [
+        "ipp_crypto.h",
+        "ipp_crypto_disabled_impl.h",
+        "ipp_crypto_impl.h",
+    ],
+    defines = select({
+        "//bazel:linux_x86_64": [],
+        "//conditions:default": [
+            "IPP_CRYPTO_DISABLED=1",
+        ],
+    }),
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    deps = select({
+        "//bazel:linux_x86_64": [
+            "//bazel/foreign_cc:ipp-crypto",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_library(
     name = "cryptomb_private_key_provider_lib",
     srcs = [
         "cryptomb_private_key_provider.cc",
     ],
     hdrs = [
         "cryptomb_private_key_provider.h",
-        "ipp.h",
     ],
     external_deps = ["ssl"],
     repository = "@envoy",
     deps = [
-        "//bazel/foreign_cc:ipp-crypto",
+        ":ipp_crypto_wrapper_lib",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/registry",
