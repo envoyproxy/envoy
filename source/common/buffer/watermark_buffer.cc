@@ -202,9 +202,7 @@ int BufferMemoryAccountImpl::balanceToClassIndex() {
   }
 
   const int class_idx = absl::bit_width(shifted_balance) - 1;
-  // TODO(kbaichoo): get rid of magic numbers (size_class_account_sets_.size() -
-  // 1)
-  return std::min<int>(class_idx, 7);
+  return std::min<int>(class_idx, NUM_MEMORY_CLASSES_ - 1);
 }
 
 void BufferMemoryAccountImpl::credit(uint64_t amount) {

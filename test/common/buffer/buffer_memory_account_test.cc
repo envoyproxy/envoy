@@ -14,7 +14,8 @@ namespace {
 
 using testing::_;
 
-using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>, 8>;
+using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>,
+                                              BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_>;
 
 constexpr uint64_t kMinimumBalanceToTrack = 1024 * 1024;
 constexpr uint64_t kThresholdForFinalBucket = 128 * 1024 * 1024;
@@ -388,8 +389,7 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceIncreases)
     EXPECT_EQ(memory_classes_to_account[0].size(), 1);
   });
 
-  // TODO(kbaichoo): avoid magic numbers (size of set - 1)
-  for (int i = 0; i < 8 - 1; ++i) {
+  for (size_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1; ++i) {
     // Double the balance to enter the higher buckets.
     account->charge(account->balance());
     factory_.inspectMemoryClasses([i](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -407,13 +407,11 @@ TEST_F(BufferMemoryAccountTest, FactoryTracksAccountCorrectlyAsBalanceDecreases)
   account->charge(kThresholdForFinalBucket);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
-    EXPECT_EQ(memory_classes_to_account[7].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1].size(),
+              1);
   });
 
-  // TODO(kbaichoo): UN magic number this.
-  const int second_largest_index = 6;
-
-  for (int i = second_largest_index; i > 0; --i) {
+  for (int i = BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 2; i > 0; --i) {
     // Halve the balance to enter the lower buckets.
     account->credit(account->balance() / 2);
     factory_.inspectMemoryClasses([i](MemoryClassesToAccountsSet& memory_classes_to_account) {
@@ -431,14 +429,16 @@ TEST_F(BufferMemoryAccountTest, SizeSaturatesInLargestBucket) {
   account->charge(kThresholdForFinalBucket);
 
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
-    EXPECT_EQ(memory_classes_to_account[7].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1].size(),
+              1);
   });
 
   account->charge(account->balance());
 
   // Remains in final bucket.
   factory_.inspectMemoryClasses([](MemoryClassesToAccountsSet& memory_classes_to_account) {
-    EXPECT_EQ(memory_classes_to_account[7].size(), 1);
+    EXPECT_EQ(memory_classes_to_account[BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_ - 1].size(),
+              1);
   });
 
   account->credit(account->balance());

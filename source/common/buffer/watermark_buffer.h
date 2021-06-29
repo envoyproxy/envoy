@@ -74,33 +74,7 @@ private:
 
 using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 
-class WatermarkBufferFactory : public WatermarkFactory {
-public:
-  // Buffer::WatermarkFactory
-  ~WatermarkBufferFactory() override;
-  InstancePtr createBuffer(std::function<void()> below_low_watermark,
-                           std::function<void()> above_high_watermark,
-                           std::function<void()> above_overflow_watermark) override {
-    return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
-                                             above_overflow_watermark);
-  }
-
-  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
-
-  // Called by BufferMemoryAccountImpls created by the factory on account class
-  // updated.
-  void updateAccountClass(const BufferMemoryAccountSharedPtr& account, int current_class,
-                          int new_class);
-
-  // Unregister a buffer memory account.
-  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class);
-
-protected:
-  // Enable subclasses to inspect the mapping.
-  using MemoryClassesToAccountsSet =
-      std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>, 8>;
-  MemoryClassesToAccountsSet size_class_account_sets_;
-};
+class WatermarkBufferFactory;
 
 /**
  * A BufferMemoryAccountImpl tracks allocated bytes across associated buffers and
@@ -137,6 +111,9 @@ public:
     }
   }
 
+  // The number of memory classes the Account expects to exists.
+  static constexpr uint32_t NUM_MEMORY_CLASSES_ = 8;
+
 private:
   BufferMemoryAccountImpl(WatermarkBufferFactory* factory, Http::StreamResetHandler* reset_handler)
       : factory_(factory), reset_handler_(reset_handler) {}
@@ -144,6 +121,7 @@ private:
   // Returns the class index based off of the buffer_memory_allocated_
   // This can differs with current_bucket_idx_ if buffer_memory_allocated_ was
   // just modified.
+  // Returned class index range is [-1, NUM_MEMORY_CLASSES_).
   int balanceToClassIndex();
 
   uint64_t buffer_memory_allocated_ = 0;
@@ -160,6 +138,34 @@ private:
   // instantiate an instance of this class. This should is cleared when
   // unregistering from the factory.
   BufferMemoryAccountSharedPtr shared_this_ = nullptr;
+};
+
+class WatermarkBufferFactory : public WatermarkFactory {
+public:
+  // Buffer::WatermarkFactory
+  ~WatermarkBufferFactory() override;
+  InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                           std::function<void()> above_high_watermark,
+                           std::function<void()> above_overflow_watermark) override {
+    return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
+                                             above_overflow_watermark);
+  }
+
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
+
+  // Called by BufferMemoryAccountImpls created by the factory on account class
+  // updated.
+  void updateAccountClass(const BufferMemoryAccountSharedPtr& account, int current_class,
+                          int new_class);
+
+  // Unregister a buffer memory account.
+  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class);
+
+protected:
+  // Enable subclasses to inspect the mapping.
+  using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>,
+                                                BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_>;
+  MemoryClassesToAccountsSet size_class_account_sets_;
 };
 
 } // namespace Buffer
