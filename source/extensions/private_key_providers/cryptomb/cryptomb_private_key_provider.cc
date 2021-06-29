@@ -670,9 +670,11 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     BN_init(&e_check);
     BN_add_word(&e_check, 65537);
     if (e == nullptr || BN_ucmp(e, &e_check) != 0) {
+      BN_free(&e_check);
       throw EnvoyException("Only RSA keys with \"e\" parameter value 65537 are allowed, because "
                            "we can validate the signatures using multi-buffer instructions.");
     }
+    BN_free(&e_check);
   } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
     ENVOY_LOG(debug, "CryptoMb key type: ECDSA");
     key_type = KeyType::Ec;
