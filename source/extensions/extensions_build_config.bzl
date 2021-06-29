@@ -295,6 +295,7 @@ EXTENSIONS = {
     #
 
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+    "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
