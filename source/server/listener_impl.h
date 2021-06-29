@@ -157,7 +157,7 @@ public:
                                 const Network::ListenerConfig* listener_config,
                                 ListenerImpl& listener_impl, DrainManagerPtr drain_manager)
       : listener_factory_context_base_(std::make_shared<ListenerFactoryContextBaseImpl>(
-            server, validation_visitor, config_message, drain_manager)),
+            server, validation_visitor, config_message, std::move(drain_manager))),
         listener_config_(listener_config), listener_impl_(listener_impl) {}
   PerListenerFactoryContextImpl(
       std::shared_ptr<ListenerFactoryContextBaseImpl> listener_factory_context_base,

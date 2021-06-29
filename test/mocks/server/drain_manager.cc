@@ -24,6 +24,7 @@ MockDrainManager::MockDrainManager() {
             child_setup_(*manager);
             manager->child_setup_ = child_setup_;
             manager->parent_alive_ = std::weak_ptr<bool>(this->still_alive_);
+            manager->parent_ = this;
             children_.push_back(manager);
             return std::unique_ptr<DrainManager>(manager);
           }));
@@ -33,6 +34,7 @@ MockDrainManager::MockDrainManager() {
         child_setup_(*manager);
         manager->child_setup_ = child_setup_;
         manager->parent_alive_ = std::weak_ptr<bool>(this->still_alive_);
+        manager->parent_ = this;
         children_.push_back(manager);
         return std::unique_ptr<DrainManager>(manager);
       }));

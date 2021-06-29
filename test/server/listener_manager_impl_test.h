@@ -128,7 +128,7 @@ protected:
     EXPECT_CALL(server_.drain_manager_, createChildManager(_, drain_type))
         .WillOnce(Invoke(
             [raw_listener](Event::Dispatcher&, envoy::config::listener::v3::Listener::DrainType) {
-              return std::shared_ptr<NiceMock<MockDrainManager>>(raw_listener->drain_manager_);
+              return std::unique_ptr<NiceMock<MockDrainManager>>(raw_listener->drain_manager_);
             }));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
