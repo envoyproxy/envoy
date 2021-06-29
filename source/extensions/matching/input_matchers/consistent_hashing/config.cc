@@ -7,11 +7,11 @@ namespace InputMatchers {
 namespace ConsistentHashing {
 
 Envoy::Matcher::InputMatcherFactoryCb ConsistentHashingConfig::createInputMatcherFactoryCb(
-    const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
+    const Protobuf::Message& config, Server::Configuration::FactoryContext& factory_context) {
   const auto& consistent_hashing_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::matching::input_matchers::
                                            consistent_hashing::v3::ConsistentHashing&>(
-          config, validation_visitor);
+          config, factory_context.messageValidationVisitor());
 
   if (consistent_hashing_config.threshold() > consistent_hashing_config.modulo()) {
     throw EnvoyException(fmt::format("threshold cannot be greater than modulo: {} > {}",
