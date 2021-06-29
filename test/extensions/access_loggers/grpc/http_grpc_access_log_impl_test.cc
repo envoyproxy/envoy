@@ -389,7 +389,7 @@ response: {}
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2CC0));
     stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -449,7 +449,7 @@ response: {}
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -499,7 +499,7 @@ response: {}
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -549,7 +549,7 @@ response: {}
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -599,7 +599,7 @@ response: {}
     ON_CALL(*connection_info, tlsVersion()).WillByDefault(ReturnRef(tlsVersion));
     ON_CALL(*connection_info, ciphersuiteId()).WillByDefault(Return(0x2F));
     stream_info.setDownstreamSslConnection(connection_info);
-    stream_info.requested_server_name_ = "sni";
+    stream_info.downstream_address_provider_->setRequestedServerName("sni");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},

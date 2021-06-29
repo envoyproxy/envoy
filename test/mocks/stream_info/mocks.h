@@ -80,7 +80,6 @@ public:
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
-  MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
