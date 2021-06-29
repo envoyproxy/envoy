@@ -529,8 +529,6 @@ public:
     ON_CALL(*this, isRoutable()).WillByDefault(testing::Return(true));
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
-    // This is the Envoy default.
-    ON_CALL(*this, clearHopByHopResponseHeaders()).WillByDefault(Return(true));
   }
 
   // Http::ConnectionManagerConfig
@@ -564,7 +562,6 @@ public:
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
-  MOCK_METHOD(bool, clearHopByHopResponseHeaders, (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
   MOCK_METHOD(bool, useRemoteAddress, (), (const));

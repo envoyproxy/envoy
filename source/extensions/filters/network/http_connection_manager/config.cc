@@ -518,8 +518,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   server_transformation_ = config.server_header_transformation();
 
-  clear_hop_by_hop_response_headers_ = !config.preserve_hop_by_hop_response_headers();
-
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();
   } else {

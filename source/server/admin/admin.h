@@ -150,7 +150,6 @@ public:
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
   }
-  bool clearHopByHopResponseHeaders() const override { return true; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return true; }

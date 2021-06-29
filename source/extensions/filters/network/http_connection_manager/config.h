@@ -147,7 +147,6 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
-  bool clearHopByHopResponseHeaders() const override { return clear_hop_by_hop_response_headers_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -245,7 +244,6 @@ private:
   const Http::Http1Settings http1_settings_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
-  bool clear_hop_by_hop_response_headers_{true};
   std::string server_name_;
   Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;

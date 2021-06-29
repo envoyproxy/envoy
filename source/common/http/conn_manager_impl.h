@@ -114,6 +114,7 @@ public:
 
 private:
   struct ActiveStream;
+  class MobileConnectionManagerImpl;
 
   class RdsRouteConfigUpdateRequester {
   public:
@@ -452,6 +453,24 @@ private:
   TimeSource& time_source_;
   bool remote_close_{};
   bool enable_internal_redirects_with_body_{};
+  // Hop by hop headers should always be cleared for Enovy-as-a-proxy but will
+  // not be for Envoy-mobile.
+  bool clear_hop_by_hop_response_headers_{true};
+};
+
+// An HCM class for Envoy mobile.
+// Currently the only behavioral difference is that hop by hop response headers
+// are not cleared for Envoy Mobile as they are for Envoy as a proxy.
+class MobileConnectionManagerImpl : public ConnectionManagerImpl {
+  MobileConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
+                        Random::RandomGenerator& random_generator, Http::Context& http_context,
+                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+                        Upstream::ClusterManager& cluster_manager,
+                        Server::OverloadManager& overload_manager, TimeSource& time_system)
+      : ConnectionManagerImpl(config, drain_close, random_generator, http_context,
+                              runtime, local_info, cluster_manager, overload_manager, time_system) {
+        clear_hop_by_hop_response_headers_ = false;
+  }
 };
 
 } // namespace Http

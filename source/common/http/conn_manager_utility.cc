@@ -418,8 +418,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
 void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                                      const RequestHeaderMap* request_headers,
                                                      ConnectionManagerConfig& config,
-                                                     const std::string& via) {
-  bool clear_hop_by_hop = config.clearHopByHopResponseHeaders();
+                                                     const std::string& via,
+                                                     bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.

@@ -349,10 +349,6 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
-   * @return bool if the hop by hop headers should be cleared on Envoy responses.
-   */
-  virtual bool clearHopByHopResponseHeaders() const PURE;
-  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;

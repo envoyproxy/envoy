@@ -34,7 +34,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 49]
+// [#next-free-field: 48]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
@@ -373,11 +373,6 @@ message HttpConnectionManager {
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
       [(validate.rules).enum = {defined_only: true}];
-
-  // By default, Envoy removes hop by hop headers. For envoy-mobile
-  // they should be passed up to the caller. This should not be used by server
-  // side Envoy as it expects hop by hop headers to be cleared.
-  bool preserve_hop_by_hop_response_headers = 48;
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.

@@ -140,7 +140,7 @@ http_filters:
 
 // When deprecating v2, remove the old style "operation_name: egress" config
 // but retain the rest of the test.
-TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscDeprecatedConfig)) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(MiscConfig)) {
   TestDeprecatedV2Api _deprecated_v2_api;
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -829,11 +829,10 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
+TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   server_header_transformation: OVERWRITE
-  preserve_hop_by_hop_response_headers: true
   route_config:
     name: local_route
   http_filters:
@@ -849,7 +848,6 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
                                      filter_config_provider_manager_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE,
             config.serverHeaderTransformation());
-  EXPECT_FALSE(config.clearHopByHopResponseHeaders());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ServerAppendIfAbsent) {
@@ -1411,7 +1409,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1441,7 +1438,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1481,7 +1477,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 1024
   custom_settings_parameters: { identifier: 3, value: 2048 }
@@ -1510,7 +1505,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1544,7 +1538,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 8, value: 0 }
@@ -1568,7 +1561,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   allow_connect: true
   )EOF";
@@ -1592,7 +1584,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters: { identifier: 2, value: 1 }
   )EOF";
@@ -1617,7 +1608,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1650,7 +1640,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 10, value: 0 }

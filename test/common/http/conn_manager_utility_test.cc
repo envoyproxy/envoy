@@ -397,8 +397,6 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedHopsWithoutRemoteAddress) {
 
 // Verify we preserve hop by hop headers if configured to do so.
 TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
-  ON_CALL(config_, clearHopByHopResponseHeaders()).WillByDefault(Return(false));
-
   TestRequestHeaderMapImpl request_headers;
   TestResponseHeaderMapImpl response_headers{{"connection", "foo"},
                                              {"transfer-encoding", "foo"},
@@ -406,7 +404,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
                                              {"keep-alive", "ads"},
                                              {"proxy-connection", "dsa"}};
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                  via_);
+                                                  via_, false);
   EXPECT_TRUE(response_headers.has(Headers::get().Connection));
   EXPECT_TRUE(response_headers.has(Headers::get().TransferEncoding));
   EXPECT_TRUE(response_headers.has(Headers::get().Upgrade));
