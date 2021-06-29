@@ -47,6 +47,10 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
+  }
 
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;

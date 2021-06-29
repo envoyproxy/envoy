@@ -56,6 +56,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     conn_data_ = std::move(conn);
     conn_data_->addUpstreamCallbacks(callbacks_);
     host_ = host;
+    ssl_ = conn_data_->connection().streamInfo().downstreamSslConnection();
     pool_ready_.ready();
   }
 
@@ -72,6 +73,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
   Upstream::HostDescriptionConstSharedPtr host_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_;
 };
 
 class TestActiveTcpClient : public ActiveTcpClient {
@@ -321,7 +323,7 @@ public:
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
-    EXPECT_CALL(*connection_, streamInfo()).Times(2);
+    EXPECT_CALL(*connection_, streamInfo()).Times(3);
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
 
@@ -338,6 +340,7 @@ public:
     EXPECT_CALL(*connection_, ssl()).WillOnce(Return(ssl_));
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
     EXPECT_EQ(connection_->streamInfo().downstreamSslConnection(), ssl_);
+    EXPECT_EQ(callbacks_->ssl_, ssl_);
   }
 
   bool test_new_connection_pool_;

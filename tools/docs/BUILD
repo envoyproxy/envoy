@@ -75,3 +75,9 @@ envoy_py_binary(
         requirement("urllib3"),
     ],
 )
+
+envoy_py_binary(
+    name = "tools.docs.rst_check",
+    data = ["//docs:root/version_history/current.rst"],
+    deps = ["//tools/base:checker"],
+)
