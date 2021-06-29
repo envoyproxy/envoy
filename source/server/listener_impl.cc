@@ -6,7 +6,6 @@
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
-#include "envoy/server/drain_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -410,7 +409,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
         config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
-    // non-QUIC integration tests to fail, which I haven't investigated yet.  Additionally, from
+    // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
     // looking at the GSO code there are substantial copying inefficiency so I don't think it's
     // wise to enable to globally for now. I will circle back and fix both of the above with
     // a non-QUICHE GSO implementation.

@@ -5,8 +5,6 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"

@@ -4,12 +4,10 @@
 #include <functional>
 #include <vector>
 
-#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/network/drain_decision.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 

@@ -5,7 +5,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
