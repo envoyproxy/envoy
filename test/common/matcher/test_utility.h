@@ -30,7 +30,7 @@ public:
 
   CommonProtocolInputFactoryCb
   createCommonProtocolInputFactoryCb(const Protobuf::Message&,
-                                     ProtobufMessage::ValidationVisitor&) override {
+                                     Server::Configuration::FactoryContext&) override {
     return [&]() { return std::make_unique<CommonProtocolTestInput>(value_); };
   }
 
@@ -60,7 +60,8 @@ public:
       : factory_name_(std::string(factory_name)), value_(std::string(data)), injection_(*this) {}
 
   DataInputFactoryCb<TestData>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&,
+                           Server::Configuration::FactoryContext&) override {
     return [&]() {
       return std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, value_});
@@ -107,10 +108,10 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 };
 
 // Factory for StringAction.
-class StringActionFactory : public ActionFactory<absl::string_view> {
+class StringActionFactory : public ActionFactory {
 public:
-  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, absl::string_view&,
-                                        ProtobufMessage::ValidationVisitor&) override {
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, const std::string&,
+                                        Server::Configuration::FactoryContext&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
     return [string]() { return std::make_unique<StringAction>(string.value()); };
   }
@@ -134,8 +135,9 @@ class NeverMatchFactory : public InputMatcherFactory {
 public:
   NeverMatchFactory() : inject_factory_(*this) {}
 
-  InputMatcherFactoryCb createInputMatcherFactoryCb(const Protobuf::Message&,
-                                                    ProtobufMessage::ValidationVisitor&) override {
+  InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message&,
+                              Server::Configuration::FactoryContext&) override {
     return []() { return std::make_unique<NeverMatch>(); };
   }
 

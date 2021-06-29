@@ -22,16 +22,12 @@ namespace Envoy {
 namespace Matcher {
 class MatcherTest : public ::testing::Test {
 public:
-  MatcherTest()
-      : inject_action_(action_factory_),
-        factory_(context_, ProtobufMessage::getStrictValidationVisitor(), validation_visitor_) {}
+  MatcherTest() : inject_action_(action_factory_) {}
 
   StringActionFactory action_factory_;
-  Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action_;
+  Registry::InjectFactory<ActionFactory> inject_action_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   MockMatchTreeValidationVisitor<TestData> validation_visitor_;
-
-  absl::string_view context_ = "";
-  MatchTreeFactory<TestData, absl::string_view> factory_;
 };
 
 TEST_F(MatcherTest, TestMatcher) {
@@ -68,13 +64,15 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(2);
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -106,9 +104,10 @@ matcher_list:
   MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
 
   TestUtility::validate(matcher);
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
 
   auto common_input_factory = TestCommonProtocolInputFactory("generic", "foo");
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -142,12 +141,14 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
   NeverMatchFactory match_factory;
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -197,13 +198,15 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(3);
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -254,13 +257,15 @@ matcher_tree:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(3);
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -294,12 +299,14 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
   NeverMatchFactory match_factory;
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
@@ -343,13 +350,15 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
+  MatchTreeFactory<TestData> factory("", factory_context_, validation_visitor_);
+
   auto outer_factory = TestDataInputFactory("outer_input", "value");
   auto inner_factory = TestDataInputFactory("inner_input", "foo");
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(2);
-  auto match_tree = factory_.create(matcher);
+  auto match_tree = factory.create(matcher);
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);

@@ -76,12 +76,11 @@ public:
 using ActionPtr = std::unique_ptr<Action>;
 using ActionFactoryCb = std::function<ActionPtr()>;
 
-template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
+class ActionFactory : public Config::TypedFactory {
 public:
   virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        ActionFactoryContext& action_factory_context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
+                        Server::Configuration::FactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -156,7 +155,7 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                              Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
@@ -227,7 +226,7 @@ public:
    */
   virtual DataInputFactoryCb<DataType>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                           Server::Configuration::FactoryContext& factory_context) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist
@@ -263,7 +262,7 @@ public:
    */
   virtual CommonProtocolInputFactoryCb
   createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+                                     Server::Configuration::FactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.common_inputs"; }
 };
