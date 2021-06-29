@@ -17,7 +17,6 @@ public:
 };
 
 using CallbackHandlePtr = std::unique_ptr<CallbackHandle>;
-using ThreadSafeCallbackHandlePtr = std::shared_ptr<CallbackHandle>;
 
 } // namespace Common
 } // namespace Envoy

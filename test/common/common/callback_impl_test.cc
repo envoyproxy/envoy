@@ -13,7 +13,7 @@ using testing::InSequence;
 namespace Envoy {
 namespace Common {
 
-class CallbackManagerTest : public testing::TestWithParam<bool> {
+class CallbackManagerTest : public testing::Test {
 public:
   MOCK_METHOD(void, called, (int arg));
 };
