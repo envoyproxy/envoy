@@ -6,7 +6,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.3" # Raise when QUIC coverage goes up
 "source/common/api:75.3"
 "source/common/api/posix:73.9"
-"source/common/common:96.3"
+"source/common/common:96.2"
 "source/common/common/posix:94.1"
 "source/common/crypto:0.0"
 "source/common/event:94.2" # Emulated edge events guards don't report LCOV
