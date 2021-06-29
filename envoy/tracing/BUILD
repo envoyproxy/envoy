@@ -40,3 +40,8 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "trace_context_interface",
+    hdrs = ["trace_context.h"],
+)
