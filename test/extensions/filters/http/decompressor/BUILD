@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "decompressor_filter_test",
     srcs = ["decompressor_filter_test.cc"],
-    extension_name = "envoy.filters.http.decompressor",
+    extension_names = ["envoy.filters.http.decompressor"],
     deps = [
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
     srcs = [
         "decompressor_filter_integration_test.cc",
     ],
-    extension_name = "envoy.filters.http.decompressor",
+    extension_names = ["envoy.filters.http.decompressor"],
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",

@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "evaluator_test",
     srcs = ["evaluator_test.cc"],
-    extension_name = "envoy.filters.http.rbac",
+    extension_names = ["envoy.filters.http.rbac"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//test/test_common:utility_lib",
