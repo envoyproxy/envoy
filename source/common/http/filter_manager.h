@@ -68,12 +68,11 @@ private:
 
 using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
 
-class SkipActionFactory : public Matcher::ActionFactory<Matching::HttpFilterActionContext> {
+class SkipActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 Matching::HttpFilterActionContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&, const std::string&,
+                                                 Server::Configuration::FactoryContext&) override {
     return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
