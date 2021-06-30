@@ -27,6 +27,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger_delegates.h"
+#include "source/common/common/perf_tracing.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
@@ -397,6 +398,10 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
+
+#ifdef ENVOY_PERFETTO
+  std::unique_ptr<perfetto::TracingSession> tracing_session_{};
+#endif
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

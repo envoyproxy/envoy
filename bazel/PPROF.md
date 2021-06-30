@@ -327,3 +327,20 @@ private:
   PERF_OWNER(perf_operation_);
 };
 ```
+
+# Performance analysis with Perfetto
+
+Similar results can be obtained with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/tracing.h) which can be enabled with
+
+```
+bazel --define=perf_tracing=enabled ...
+```
+
+[Pefetto](https://perfetto.dev/) is a production-grade open-source stack for
+performance instrumentation and trace analysis. It offers services and libraries
+for recording system-level and app-level traces, a library for analyzing traces
+using SQL and a web-based UI to visualize and explore multi-GB traces.
+
+Currently when the Perfetto support is enabled the tracing data in binary Protobuf
+format is dumped into `envoy.pftrace` upon process termination. The file
+can be analyzed online at https://ui.perfetto.dev/ or with a custom tool.

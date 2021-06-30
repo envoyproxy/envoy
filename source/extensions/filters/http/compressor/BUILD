@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "//envoy/compression/compressor:compressor_factory_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/common:perf_tracing_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",

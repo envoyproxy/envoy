@@ -7,6 +7,10 @@
 #include <memory>
 #include <string>
 
+#ifdef ENVOY_PERFETTO
+#include <fstream>
+#endif
+
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
@@ -147,6 +151,23 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+
+#ifdef ENVOY_PERFETTO
+  if (tracing_session_ != nullptr) {
+    // StopTracing
+    // Make sure the last event is closed for this example.
+    perfetto::TrackEvent::Flush();
+
+    // Stop tracing and read the trace data.
+    tracing_session_->StopBlocking();
+    std::vector<char> trace_data(tracing_session_->ReadTraceBlocking());
+
+    std::ofstream output;
+    output.open("envoy.pftrace", std::ios::out | std::ios::binary);
+    output.write(&trace_data[0], trace_data.size());
+    output.close();
+  }
+#endif
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
@@ -386,6 +407,24 @@ void InstanceImpl::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
+
+#ifdef ENVOY_PERFETTO
+  perfetto::TracingInitArgs args;
+  // Include in-process events only.
+  args.backends = perfetto::kInProcessBackend;
+  perfetto::Tracing::Initialize(args);
+  perfetto::TrackEvent::Register();
+  perfetto::TraceConfig cfg;
+  // TODO(rojkov): make the tracer configurable with either `Perfetto`'s native
+  // message or a custom one embedded into Bootstrap.
+  cfg.add_buffers()->set_size_kb(1024);
+  auto* ds_cfg = cfg.add_data_sources()->mutable_config();
+  ds_cfg->set_name("track_event");
+
+  tracing_session_ = perfetto::Tracing::NewTrace();
+  tracing_session_->Setup(cfg);
+  tracing_session_->StartBlocking();
+#endif
 
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.

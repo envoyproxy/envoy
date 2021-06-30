@@ -113,6 +113,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-03",
         cpe = "N/A",
     ),
+    com_github_google_perfetto = dict(
+        project_name = "Perfetto",
+        project_desc = "Perfetto Tracing SDK",
+        project_url = "https://perfetto.dev/",
+        version = "17.0",
+        sha256 = "4adedc50bc02e1265172f8e3b954b7deb8be75237c345aaf6308db96e29f71ee",
+        strip_prefix = "perfetto-{version}/sdk",
+        urls = ["https://github.com/google/perfetto/archive/refs/tags/v{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-07-02",
+        cpe = "N/A",
+    ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",
