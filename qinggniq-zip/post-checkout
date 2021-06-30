@@ -1,6 +1,0 @@
-#!/bin/bash
-
-export PATH=/usr/lib/llvm-11/bin:/data/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/node/bin:/usr/local/go/bin:/snap/bin:/home/wangcong01/istio-1.8.1/bin:/home/wangcong01/istio-1.8.1/bin:/home/wangcong01/go/bin CC=clang CXX=clang++ TEST_TMPDIR=/data/.cache BUILD_DIR=/data/.cache
-
-./tools/vscode/refresh_compdb.sh 
-
