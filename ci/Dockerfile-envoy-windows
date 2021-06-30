@@ -3,11 +3,12 @@ ARG BUILD_TAG=ltsc2019
 
 FROM $BUILD_OS:$BUILD_TAG
 
+USER ContainerAdministrator
 RUN net user /add "EnvoyUser"
 RUN net localgroup "Network Configuration Operators" "EnvoyUser" /add
 
 RUN mkdir "C:\\Program\ Files\\envoy"
-RUN setx path "%path%;c:\Program Files\envoy"
+RUN setx /M path "%path%;c:\Program Files\envoy"
 ADD ["windows/amd64/envoy.exe", "C:/Program Files/envoy/"]
 
 RUN mkdir "C:\\ProgramData\\envoy"

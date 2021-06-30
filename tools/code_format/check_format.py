@@ -1220,9 +1220,10 @@ if __name__ == "__main__":
     # Calculate the list of owned directories once per run.
     error_messages = []
     owned_directories = owned_directories(error_messages)
-
     if os.path.isfile(args.target_path):
-        error_messages += format_checker.check_format("./" + args.target_path)
+        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
+                SUFFIXES):
+            error_messages += format_checker.check_format("./" + args.target_path)
     else:
         results = []
 

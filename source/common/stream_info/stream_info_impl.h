@@ -233,12 +233,6 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_filter_state_ = filter_state;
   }
 
-  void setRequestedServerName(absl::string_view requested_server_name) override {
-    requested_server_name_ = std::string(requested_server_name);
-  }
-
-  const std::string& requestedServerName() const override { return requested_server_name_; }
-
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
   }
