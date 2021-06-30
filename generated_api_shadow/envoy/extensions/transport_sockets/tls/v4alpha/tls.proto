@@ -204,7 +204,7 @@ message CommonTlsContext {
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
-  reserved 5, 10, 12;
+  reserved 5;
 
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
@@ -252,19 +252,30 @@ message CommonTlsContext {
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
+
+    // Certificate provider for fetching validation context.
+    // [#not-implemented-hide:]
+    CertificateProvider hidden_envoy_deprecated_validation_context_certificate_provider = 10
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+    // Certificate provider instance for fetching validation context.
+    // [#not-implemented-hide:]
+    CertificateProviderInstance
+        hidden_envoy_deprecated_validation_context_certificate_provider_instance = 12
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
   // Certificate provider for fetching CA certs. This will populate the
   // :ref:`CertificateValidationContext.trusted_ca field
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   // [#not-implemented-hide:]
-  CertificateProvider validation_context_certificate_provider = 14;
+  CertificateProvider ca_certificate_provider = 14;
 
   // Certificate provider instance for fetching CA certs. This will populate the
   // :ref:`CertificateValidationContext.trusted_ca field
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   // [#not-implemented-hide:]
-  CertificateProviderInstance validation_context_certificate_provider_instance = 15;
+  CertificateProviderInstance ca_certificate_provider_instance = 15;
 
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the

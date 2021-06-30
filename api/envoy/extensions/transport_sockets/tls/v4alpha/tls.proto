@@ -197,6 +197,9 @@ message CommonTlsContext {
 
   reserved 5, 10, 12;
 
+  reserved "validation_context_certificate_provider",
+      "validation_context_certificate_provider_instance";
+
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
@@ -249,13 +252,13 @@ message CommonTlsContext {
   // :ref:`CertificateValidationContext.trusted_ca field
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   // [#not-implemented-hide:]
-  CertificateProvider validation_context_certificate_provider = 14;
+  CertificateProvider ca_certificate_provider = 14;
 
   // Certificate provider instance for fetching CA certs. This will populate the
   // :ref:`CertificateValidationContext.trusted_ca field
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   // [#not-implemented-hide:]
-  CertificateProviderInstance validation_context_certificate_provider_instance = 15;
+  CertificateProviderInstance ca_certificate_provider_instance = 15;
 
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the
