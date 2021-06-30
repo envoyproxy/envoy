@@ -49,6 +49,7 @@ The following sandboxes are available:
     cache
     cors
     csrf
+    default-config
     double-proxy
     dynamic-configuration-filesystem
     dynamic-configuration-control-plane
