@@ -6,8 +6,9 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" ]]; then
+if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
+          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
+          "$1" == "verify_build_examples" ]]; then
     build_setup_args="-nofetch"
 fi
 
