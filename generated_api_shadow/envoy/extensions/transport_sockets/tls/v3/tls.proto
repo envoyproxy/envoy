@@ -9,7 +9,7 @@ import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -125,7 +125,7 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 14]
+// [#next-free-field: 16]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -179,29 +179,23 @@ message CommonTlsContext {
 
     // Config for fetching validation context via SDS API. Note SDS API allows certificates to be
     // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
-    // Only one of validation_context_sds_secret_config, validation_context_certificate_provider,
-    // or validation_context_certificate_provider_instance may be used.
-    SdsSecretConfig validation_context_sds_secret_config = 2 [
-      (validate.rules).message = {required: true},
-      (udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"
-    ];
+    SdsSecretConfig validation_context_sds_secret_config = 2
+        [(validate.rules).message = {required: true}];
 
-    // Certificate provider for fetching validation context.
-    // Only one of validation_context_sds_secret_config, validation_context_certificate_provider,
-    // or validation_context_certificate_provider_instance may be used.
+    // Certificate provider for fetching CA certs. This will populate the
+    // *default_validation_context.trusted_ca* field.
     // [#not-implemented-hide:]
     CertificateProvider validation_context_certificate_provider = 3
-        [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-    // Certificate provider instance for fetching validation context.
-    // Only one of validation_context_sds_secret_config, validation_context_certificate_provider,
-    // or validation_context_certificate_provider_instance may be used.
+    // Certificate provider instance for fetching CA certs. This will populate the
+    // *default_validation_context.trusted_ca* field.
     // [#not-implemented-hide:]
     CertificateProviderInstance validation_context_certificate_provider_instance = 4
-        [(udpa.annotations.field_migrate).oneof_promotion = "dynamic_validation_context"];
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }
 
-  reserved 5;
+  reserved 5, 10, 12;
 
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
@@ -249,15 +243,19 @@ message CommonTlsContext {
     // CertificateValidationContext, and concatenates repeated fields to default
     // CertificateValidationContext, and logical OR is applied to boolean fields.
     CombinedCertificateValidationContext combined_validation_context = 8;
-
-    // Certificate provider for fetching validation context.
-    // [#not-implemented-hide:]
-    CertificateProvider validation_context_certificate_provider = 10;
-
-    // Certificate provider instance for fetching validation context.
-    // [#not-implemented-hide:]
-    CertificateProviderInstance validation_context_certificate_provider_instance = 12;
   }
+
+  // Certificate provider for fetching CA certs. This will populate the
+  // :ref:`CertificateValidationContext.trusted_ca field
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
+  // [#not-implemented-hide:]
+  CertificateProvider validation_context_certificate_provider = 14;
+
+  // Certificate provider instance for fetching CA certs. This will populate the
+  // :ref:`CertificateValidationContext.trusted_ca field
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
+  // [#not-implemented-hide:]
+  CertificateProviderInstance validation_context_certificate_provider_instance = 15;
 
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the
