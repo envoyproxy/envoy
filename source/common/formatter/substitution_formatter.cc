@@ -820,8 +820,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          if (!stream_info.requestedServerName().empty()) {
-            result = stream_info.requestedServerName();
+          if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
+            result = std::string(stream_info.downstreamAddressProvider().requestedServerName());
           }
           return result;
         });
