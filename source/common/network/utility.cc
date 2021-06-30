@@ -46,8 +46,7 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   } else if (urlIsUdpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
-    return Address::InstanceConstSharedPtr{
-        new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
+    return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
   } else {
     throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
   }
