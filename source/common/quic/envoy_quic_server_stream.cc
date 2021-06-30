@@ -263,6 +263,7 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
   bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  ASSERT(write_side_closed());
   if (read_side_closed() && !end_stream_encoded) {
     // If both directions are closed but end stream hasn't be encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
@@ -278,6 +279,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   // This closes read side in both Google Quic and IETF Quic, but doesn't close write side in IETF
   // Quic.
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
+  ASSERT(read_side_closed());
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
     // If both directions are closed but upstream hasn't received or sent end stream, run reset
     // stream callback.
