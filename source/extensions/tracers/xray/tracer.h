@@ -103,14 +103,6 @@ public:
   }
 
   /**
-   * Gets the AWS metadata
-   * field of the Span.
-   */
-  const absl::flat_hash_map<std::string, ProtobufWkt::Value>& awsMetadata() {
-    return aws_metadata_;
-  }
-
-  /**
    * Sets the recording start time of the traced operation/request.
    */
   void setStartTime(Envoy::SystemTime start_time) { start_time_ = start_time; }
