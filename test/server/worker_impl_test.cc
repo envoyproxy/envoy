@@ -11,6 +11,7 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -24,6 +25,8 @@ using testing::Throw;
 namespace Envoy {
 namespace Server {
 namespace {
+
+Event::PostCb emptyCallback = []() {};
 
 class WorkerImplTest : public testing::Test {
 public:
@@ -76,7 +79,7 @@ TEST_F(WorkerImplTest, BasicFlow) {
   });
 
   NiceMock<Stats::MockStore> store;
-  worker_.start(guard_dog_);
+  worker_.start(guard_dog_, emptyCallback);
   worker_.initializeStats(store);
   ci.waitReady();
 
@@ -155,7 +158,16 @@ TEST_F(WorkerImplTest, ListenerException) {
       .WillOnce(Throw(Network::CreateListenerException("failed")));
   worker_.addListener(absl::nullopt, listener, [](bool success) -> void { EXPECT_FALSE(success); });
 
-  worker_.start(guard_dog_);
+  worker_.start(guard_dog_, emptyCallback);
+  worker_.stop();
+}
+
+TEST_F(WorkerImplTest, WorkerInvokesProvidedCallback) {
+  absl::Notification callback_ran;
+  auto cb = [&callback_ran]() { callback_ran.Notify(); };
+  worker_.start(guard_dog_, cb);
+
+  callback_ran.WaitForNotification();
   worker_.stop();
 }
 

@@ -533,6 +533,11 @@ protected:
   // dumpState helper method.
   virtual void dumpStreams(std::ostream& os, int indent_level) const;
 
+  // Send a keepalive ping, and set the idle timer for ping timeout.
+  void sendKeepalive();
+
+  const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
+
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
@@ -554,7 +559,6 @@ private:
   virtual ProtocolConstraints::ReleasorProc
   trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) PURE;
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
-  void sendKeepalive();
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
@@ -566,6 +570,7 @@ private:
   bool pending_deferred_reset_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
+  MonotonicTime last_received_data_time_{};
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
   std::chrono::milliseconds keepalive_interval_;
@@ -604,6 +609,7 @@ private:
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
+  std::chrono::milliseconds idle_session_requires_ping_interval_;
   // Latched value of "envoy.reloadable_features.upstream_http2_flood_checks" runtime feature.
   bool enable_upstream_http2_flood_checks_;
 };

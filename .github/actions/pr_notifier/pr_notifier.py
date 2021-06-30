@@ -13,6 +13,7 @@ from slack_sdk.errors import SlackApiError
 
 MAINTAINERS = {
     'alyssawilk': 'U78RP48V9',
+    'dio': 'U79S2DFV1',
     'mattklein123': 'U5CALEVSL',
     'lizan': 'U79E51EQ6',
     'snowp': 'U93KTPQP6',
@@ -28,6 +29,13 @@ MAINTAINERS = {
     'asraa': 'UKZKCFRTP',
 }
 
+# Only notify API reviewers who aren't maintainers.
+# Maintainers are already notified of pending PRs.
+API_REVIEWERS = {
+    'markdroth': 'UMN8K55A6',
+    'adisuissa': 'UT17EMMTP',
+}
+
 
 def get_slo_hours():
     # on Monday, allow for 24h + 48h
@@ -39,7 +47,15 @@ def get_slo_hours():
 # Return true if the PR has a waiting tag, false otherwise.
 def is_waiting(labels):
     for label in labels:
-        if label.name == 'waiting':
+        if label.name == 'waiting' or label.name == 'waiting:any':
+            return True
+    return False
+
+
+# Return true if the PR has an API tag, false otherwise.
+def is_api(labels):
+    for label in labels:
+        if label.name == 'api':
             return True
     return False
 
@@ -54,19 +70,38 @@ def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
             pr_url, pr_title, delta_days, delta_hours)
 
 
-# Adds reminder lines to the appropriate maintainer to review the assigned PRs
-def add_reminders(assignees, maintainers_and_prs, message):
-    has_maintainer_assignee = False
+# Adds reminder lines to the appropriate assignee to review the assigned PRs
+# Returns true if one of the assignees is in the known_assignee_map, false otherwise.
+def add_reminders(assignees, assignees_and_prs, message, known_assignee_map):
+    has_known_assignee = False
     for assignee_info in assignees:
         assignee = assignee_info.login
-        if assignee not in MAINTAINERS:
+        if assignee not in known_assignee_map:
             continue
-        has_maintainer_assignee = True
-        if assignee not in maintainers_and_prs.keys():
-            maintainers_and_prs[
+        has_known_assignee = True
+        if assignee not in assignees_and_prs.keys():
+            assignees_and_prs[
                 assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
-        maintainers_and_prs[assignee] = maintainers_and_prs[assignee] + message
-    return has_maintainer_assignee
+        assignees_and_prs[assignee] = assignees_and_prs[assignee] + message
+    return has_known_assignee
+
+
+# Returns true if the PR needs an LGTM from an API shephard.
+def needs_api_review(labels, repo, pr_info):
+    # API reviews should always have the label, so don't bother doing an RPC if
+    # it's not tagged (this helps avoid github rate limiting)
+    if not (is_api(labels)):
+        return False
+    # repokitten tags each commit as pending unless there has been an API LGTM
+    # since the latest API changes. If this PR is tagged pendding it needs an
+    # API review, otherwise it's set.
+    headers, data = repo._requester.requestJsonAndCheck(
+        "GET",
+        ("https://api.github.com/repos/envoyproxy/envoy/statuses/" + pr_info.head.sha),
+    )
+    if (data and data[0]["state"] == 'pending'):
+        return True
+    return False
 
 
 def track_prs():
@@ -79,13 +114,19 @@ def track_prs():
     maintainers_and_prs = {}
     # A placeholder for unassigned PRs, to be sent to #maintainers eventually
     maintainers_and_prs['unassigned'] = ""
+    # A dict of shephard : outstanding_pr_string to be sent to slack
+    api_review_and_prs = {}
     # Out-SLO PRs to be sent to #envoy-maintainer-oncall
     stalled_prs = ""
 
     # Snag all PRs, including drafts
     for pr_info in repo.get_pulls("open", "updated", "desc"):
+        labels = pr_info.labels
+        assignees = pr_info.assignees
         # If the PR is waiting, continue.
-        if is_waiting(pr_info.labels):
+        if is_waiting(labels):
+            continue
+        if pr_info.draft:
             continue
 
         # Update the time based on the time zone delta from github's
@@ -98,37 +139,40 @@ def track_prs():
         # SLO, nudge in bold if not.
         message = pr_message(delta, pr_info.html_url, pr_info.title, delta_days, delta_hours)
 
+        if (needs_api_review(labels, repo, pr_info)):
+            add_reminders(pr_info.assignees, api_review_and_prs, message, API_REVIEWERS)
+
         # If the PR has been out-SLO for over a day, inform on-call
         if delta > datetime.timedelta(hours=get_slo_hours() + 36):
             stalled_prs = stalled_prs + message
 
         # Add a reminder to each maintainer-assigner on the PR.
-        has_maintainer_assignee = add_reminders(pr_info.assignees, maintainers_and_prs, message)
+        has_maintainer_assignee = add_reminders(
+            pr_info.assignees, maintainers_and_prs, message, MAINTAINERS)
 
         # If there was no maintainer, track it as unassigned.
         if not has_maintainer_assignee:
-            # don't bother assigning maintainer WIPs.
-            if pr_info.draft and pr_info.user.login in maintainers_and_prs.keys():
-                continue
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
-    # Return the dict of {maintainers : PR notifications}, and stalled PRs
-    return maintainers_and_prs, stalled_prs
+    # Return the dict of {maintainers : PR notifications},
+    # the dict of {api-shephards-who-are-not-maintainers: PR notifications},
+    # and stalled PRs
+    return maintainers_and_prs, api_review_and_prs, stalled_prs
 
 
-def post_to_maintainers(client, maintainers_and_messages):
-    # Post updates to individual maintainers
-    for key in maintainers_and_messages:
-        message = maintainers_and_messages[key]
+def post_to_assignee(client, assignees_and_messages, assignees_map):
+    # Post updates to individual assignees
+    for key in assignees_and_messages:
+        message = assignees_and_messages[key]
 
-        # Only send messages if we have the maintainer UID
-        if key not in MAINTAINERS:
+        # Only send messages if we have the slack UID
+        if key not in assignees_map:
             continue
-        uid = MAINTAINERS[key]
+        uid = assignees_map[key]
 
         # Ship messages off to slack.
         try:
-            print(maintainers_and_messages[key])
+            print(assignees_and_messages[key])
             response = client.conversations_open(users=uid, text="hello")
             channel_id = response["channel"]["id"]
             response = client.chat_postMessage(channel=channel_id, text=message)
@@ -151,6 +195,8 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
 
 
 if __name__ == '__main__':
+    maintainers_and_messages, shephards_and_messages, stalled_prs = track_prs()
+
     SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
     if not SLACK_BOT_TOKEN:
         print(
@@ -158,8 +204,7 @@ if __name__ == '__main__':
         )
         sys.exit(1)
 
-    maintainers_and_messages, stalled_prs = track_prs()
-
     client = WebClient(token=SLACK_BOT_TOKEN)
-    post_to_maintainers(client, maintainers_and_messages)
     post_to_oncall(client, maintainers_and_messages['unassigned'], stalled_prs)
+    post_to_assignee(client, shephards_and_messages, API_REVIEWERS)
+    post_to_assignee(client, maintainers_and_messages, MAINTAINERS)

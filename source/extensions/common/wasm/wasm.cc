@@ -474,7 +474,9 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
                           "Plugin configured to fail closed failed to load");
     }
-    return nullptr;
+    // To handle the case when failed to create VMs and fail-open/close properly,
+    // we still create PluginHandle with null WasmBase.
+    return std::make_shared<PluginHandle>(nullptr, plugin);
   }
   return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
       std::static_pointer_cast<WasmHandle>(base_wasm), plugin,

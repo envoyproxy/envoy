@@ -53,7 +53,7 @@ public:
 
   // The following values are returned by the decoder, when filter
   // passes bytes of data via onData method:
-  enum Result {
+  enum class Result {
     ReadyForNext, // Decoder processed previous message and is ready for the next message.
     NeedMoreData, // Decoder needs more data to reconstruct the message.
     Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
@@ -84,12 +84,21 @@ public:
 
   std::string getMessage() { return message_; }
 
-  void setStartup(bool startup) { startup_ = startup; }
   void initialize();
 
   bool encrypted() const { return encrypted_; }
 
+  enum class State { InitState, InSyncState, OutOfSyncState, EncryptedState };
+  State state() const { return state_; }
+  void state(State state) { state_ = state; }
+
 protected:
+  State state_{State::InitState};
+
+  Result onDataInit(Buffer::Instance& data, bool frontend);
+  Result onDataInSync(Buffer::Instance& data, bool frontend);
+  Result onDataIgnore(Buffer::Instance& data, bool frontend);
+
   // MsgAction defines the Decoder's method which will be invoked
   // when a specific message has been decoded.
   using MsgAction = std::function<void(DecoderImpl*)>;
@@ -110,7 +119,7 @@ protected:
   // Frontend and Backend messages.
   using MsgGroup = struct {
     // String describing direction (Frontend or Backend).
-    std::string direction_;
+    absl::string_view direction_;
     // Hash map indexed by messages' 1st byte points to handlers used for processing messages.
     absl::flat_hash_map<char, MessageProcessor> messages_;
     // Handler used for processing messages not found in hash map.
@@ -131,7 +140,8 @@ protected:
     MsgAction unknown_;
   };
 
-  Result parseHeader(Buffer::Instance& data);
+  void processMessageBody(Buffer::Instance& data, absl::string_view direction, uint32_t length,
+                          MessageProcessor& msg, const std::unique_ptr<Message>& parser);
   void decode(Buffer::Instance& data);
   void decodeAuthentication();
   void decodeBackendStatements();
@@ -149,18 +159,17 @@ protected:
 
   // Helper method generating currently processed message in
   // displayable format.
-  const std::string genDebugMessage(const MessageProcessor& msg, Buffer::Instance& data,
+  const std::string genDebugMessage(const std::unique_ptr<Message>& parser, Buffer::Instance& data,
                                     uint32_t message_len);
 
   DecoderCallbacks* callbacks_{};
   PostgresSession session_{};
 
   // The following fields store result of message parsing.
-  char command_{};
+  char command_{'-'};
   std::string message_;
   uint32_t message_len_{};
 
-  bool startup_{true};    // startup stage does not have 1st byte command
   bool encrypted_{false}; // tells if exchange is encrypted
 
   // Dispatchers for Backend (BE) and Frontend (FE) messages.
@@ -178,6 +187,11 @@ protected:
 
   MsgParserDict BE_errors_;
   MsgParserDict BE_notices_;
+
+  // MAX_STARTUP_PACKET_LENGTH is defined in Postgres source code
+  // as maximum size of initial packet.
+  // https://github.com/postgres/postgres/search?q=MAX_STARTUP_PACKET_LENGTH&type=code
+  static constexpr uint64_t MAX_STARTUP_PACKET_LENGTH = 10000;
 };
 
 } // namespace PostgresProxy

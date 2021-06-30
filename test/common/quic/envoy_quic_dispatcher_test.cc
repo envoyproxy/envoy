@@ -10,7 +10,6 @@
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/common/platform/api/quiche_text_utils.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -33,6 +32,7 @@
 #include "test/common/quic/test_utils.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/server/configuration_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -67,6 +67,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         quic_version_(version_manager_.GetSupportedVersions()[0]),
@@ -83,7 +84,8 @@ public:
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_),
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_, quic_stat_names_,
+            crypto_stream_factory_),
         connection_id_(quic::test::TestConnectionId(1)) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
@@ -204,12 +206,15 @@ public:
             EXPECT_EQ("h3-T051", socket.requestedApplicationProtocols()[0]);
             break;
           case QuicVersionType::Iquic:
-            EXPECT_EQ("h3-29", socket.requestedApplicationProtocols()[0]);
+            EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
             break;
           }
           EXPECT_EQ("test.example.org", socket.requestedServerName());
           return &proof_source_->filterChain();
         }));
+    Network::MockTransportSocketFactory transport_socket_factory;
+    EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
+        .WillOnce(ReturnRef(transport_socket_factory));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
@@ -255,6 +260,7 @@ protected:
   Server::PerHandlerListenerStats per_worker_stats_;
   QuicStatNames quic_stat_names_;
   Server::ConnectionHandlerImpl connection_handler_;
+  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
   const quic::QuicConnectionId connection_id_;
 };
@@ -287,6 +293,9 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
   EXPECT_CALL(filter_chain_manager, findFilterChain(_))
       .WillOnce(Return(&proof_source_->filterChain()));
+  Network::MockTransportSocketFactory transport_socket_factory;
+  EXPECT_CALL(proof_source_->filterChain(), transportSocketFactory())
+      .WillOnce(ReturnRef(transport_socket_factory));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());

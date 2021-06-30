@@ -221,7 +221,6 @@ DecodeStatus BufferHelper::peekHdr(Buffer::Instance& buffer, uint32_t& len, uint
 }
 
 AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_name) {
-
   if (auth_plugin_name.empty()) {
     /*
      * https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase.html

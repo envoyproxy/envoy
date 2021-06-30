@@ -33,10 +33,11 @@ public:
   }
 
   void verifySendData(const std::string& content, const msghdr* message) {
-    EXPECT_EQ(peer_address_.ToString(), Network::Address::addressFromSockAddr(
-                                            *reinterpret_cast<sockaddr_storage*>(message->msg_name),
-                                            message->msg_namelen, /*v6only=*/false)
-                                            ->asString());
+    EXPECT_EQ(peer_address_.ToString(),
+              (*Network::Address::addressFromSockAddr(
+                   *reinterpret_cast<sockaddr_storage*>(message->msg_name), message->msg_namelen,
+                   /*v6only=*/false))
+                  ->asString());
     cmsghdr* const cmsg = CMSG_FIRSTHDR(message);
     auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     EXPECT_EQ(0, memcmp(self_address_.GetIPv6().s6_addr, pktinfo->ipi6_addr.s6_addr,

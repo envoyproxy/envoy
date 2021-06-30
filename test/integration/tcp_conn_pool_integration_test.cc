@@ -47,7 +47,7 @@ private:
     Request(TestFilter& parent, Buffer::Instance& data) : parent_(parent) { data_.move(data); }
 
     // Tcp::ConnectionPool::Callbacks
-    void onPoolFailure(ConnectionPool::PoolFailureReason,
+    void onPoolFailure(ConnectionPool::PoolFailureReason, absl::string_view,
                        Upstream::HostDescriptionConstSharedPtr) override {
       ASSERT(false);
     }

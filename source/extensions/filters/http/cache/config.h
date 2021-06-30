@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +13,7 @@ namespace Cache {
 class CacheFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::cache::v3alpha::CacheConfig> {
 public:
-  CacheFilterFactory() : FactoryBase(HttpFilterNames::get().Cache) {}
+  CacheFilterFactory() : FactoryBase("envoy.filters.http.cache") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
