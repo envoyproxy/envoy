@@ -984,8 +984,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_,
-        connection_manager_.clear_hop_by_hop_response_headers_);
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_);
 
     // IP detection failed, reject the request.
     if (mutate_result.reject_request.has_value()) {
@@ -1337,7 +1336,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers_.get(),
-                                                  connection_manager_.config_, EMPTY_STRING);
+                                                  connection_manager_.config_, EMPTY_STRING,
+                                                  connection_manager_.clear_hop_by_hop_response_headers_);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(response_headers);
@@ -1367,7 +1367,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   }
   ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
                                                   connection_manager_.config_,
-                                                  connection_manager_.config_.via());
+                                                  connection_manager_.config_.via(),
+                                                  connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&

@@ -985,3 +985,11 @@ message RequestIDExtension {
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
 }
+
+message EnvoyMobileHttpConnectionManager {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.network.http_connection_manager.v3."
+      "EnvoyMobileHttpConnectionManager";
+
+  HttpConnectionManager config = 1;
+}

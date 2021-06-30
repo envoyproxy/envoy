@@ -1002,5 +1002,5 @@ message RequestIDExtension {
 }
 
 message EnvoyMobileHttpConnectionManager {
-  HttpConnectionManager config;
+  HttpConnectionManager config = 1;
 }

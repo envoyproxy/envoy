@@ -403,8 +403,8 @@ TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
                                              {"upgrade", "eep"},
                                              {"keep-alive", "ads"},
                                              {"proxy-connection", "dsa"}};
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_,
-                                                  via_, false);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, via_,
+                                                  false);
   EXPECT_TRUE(response_headers.has(Headers::get().Connection));
   EXPECT_TRUE(response_headers.has(Headers::get().TransferEncoding));
   EXPECT_TRUE(response_headers.has(Headers::get().Upgrade));

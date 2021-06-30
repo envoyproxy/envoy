@@ -222,6 +222,35 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+Network::FilterFactoryCb
+MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& mobile_config,
+    Server::Configuration::FactoryContext& context) {
+  const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+      proto_config = mobile_config.config();
+
+  Utility::Singletons singletons = Utility::createSingletons(context);
+
+  auto filter_config = Utility::createConfig(
+      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      *singletons.filter_config_provider_manager_);
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
+  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
+    auto hcm = new Http::ConnectionManagerImpl(
+        *filter_config, context.drainDecision(), context.api().randomGenerator(),
+        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
+        context.overloadManager(), context.dispatcher().timeSource());
+    hcm->setClearHopByHopResponseHeaders(false);
+    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{hcm});
+  };
+}
+
 /**
  * Static registration for the HTTP connection manager filter.
  */
