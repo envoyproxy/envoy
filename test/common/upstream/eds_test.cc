@@ -147,7 +147,7 @@ public:
 
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
-  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -500,29 +500,31 @@ TEST_F(EdsTest, EndpointMetadataWithTransportSocket) {
   auto* endpoints = cluster_load_assignment.add_endpoints();
   auto* endpoint = endpoints->add_lb_endpoints();
 
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
-  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  auto* socket_address = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(hosts.size(), 1);
+  ASSERT_EQ(hosts.size(), 1);
+  auto* upstream_host = hosts[0].get();
 
   // Verify that default transport socket is raw (does not implement secure transport).
-  ASSERT_FALSE((hosts[0].get())->transportSocketFactory().implementsSecureTransport());
+  EXPECT_FALSE(upstream_host->transportSocketFactory().implementsSecureTransport());
 
   // Create metadata with transport socket match pointing to secure mode.
   auto metadata = new envoy::config::core::v3::Metadata();
   MetadataConstSharedPtr metadata_sharedptr(metadata);
-  Envoy::Config::Metadata::mutableMetadataValue(
-      *metadata, Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, "secure")
+  Config::Metadata::mutableMetadataValue(
+      *metadata, Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, "secure")
       .set_string_value("enabled");
 
   // Update metadata.
-  dynamic_cast<HostImpl*>(hosts[0].get())->metadata(metadata_sharedptr);
+  upstream_host->metadata(metadata_sharedptr);
 
   // Transport socket factory should point to tls, which implements secure transport.
-  ASSERT_TRUE((hosts[0].get())->transportSocketFactory().implementsSecureTransport());
+  EXPECT_TRUE(upstream_host->transportSocketFactory().implementsSecureTransport());
 }
 
 // Validate that onConfigUpdate() updates endpoint health status.
