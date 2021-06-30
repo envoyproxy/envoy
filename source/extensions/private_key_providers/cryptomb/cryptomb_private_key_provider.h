@@ -95,15 +95,15 @@ public:
   static constexpr uint32_t MULTIBUFF_BATCH = 8;
 
   CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                IppCryptoSharedPtr ipp);
-  void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx, Event::Dispatcher& dispatcher);
+                IppCryptoSharedPtr ipp, Event::Dispatcher& d);
+  void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx);
 
 private:
   void processRequests();
   void processRsaRequests();
   void processEcdsaRequests();
-  void startTimer(Event::Dispatcher& dispatcher);
-  void disableTimer();
+  void startTimer();
+  void stopTimer();
 
   // Polling delay.
   std::chrono::microseconds us_{};
@@ -173,8 +173,8 @@ private:
   // Thread local data containing a single queue per worker thread.
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
     ThreadLocalData(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                    IppCryptoSharedPtr ipp)
-        : queue_(poll_delay, type, keysize, ipp){};
+                    IppCryptoSharedPtr ipp, Event::Dispatcher& d)
+        : queue_(poll_delay, type, keysize, ipp, d){};
     CryptoMbQueue queue_;
   };
 

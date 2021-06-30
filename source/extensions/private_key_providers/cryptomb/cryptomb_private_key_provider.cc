@@ -355,33 +355,28 @@ ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_
 } // namespace
 
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                             IppCryptoSharedPtr ipp)
+                             IppCryptoSharedPtr ipp, Event::Dispatcher& d)
     : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp) {
+      key_size_(keysize), ipp_(ipp),
+      timer_(d.createTimer([this]() -> void { processRequests(); })) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
 
-void CryptoMbQueue::startTimer(Event::Dispatcher& dispatcher) {
-  if (timer_ == nullptr) {
-    timer_ = dispatcher.createTimer([this]() -> void { processRequests(); });
-  }
-  timer_->enableHRTimer(us_);
-}
+void CryptoMbQueue::startTimer() { timer_->enableHRTimer(us_); }
 
-void CryptoMbQueue::disableTimer() { timer_->disableTimer(); }
+void CryptoMbQueue::stopTimer() { timer_->disableTimer(); }
 
-void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx,
-                                               Event::Dispatcher& dispatcher) {
+void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) {
   // Add the request to the processing queue.
   ASSERT(request_queue_.size() < MULTIBUFF_BATCH);
   request_queue_.push_back(mb_ctx);
 
   if (request_queue_.size() == 1) {
     // First request in the queue, start the queue timer.
-    startTimer(dispatcher);
+    startTimer();
   } else if (request_queue_.size() == MULTIBUFF_BATCH) {
     // There are eight requests in the queue and we can process them.
-    disableTimer();
+    stopTimer();
 
     ENVOY_LOG(debug, "processing directly 8 requests");
     processRequests();
@@ -579,7 +574,7 @@ void CryptoMbPrivateKeyMethodProvider::registerPrivateKeyMethod(
 
 void CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
   mb_ctx_ = mb_ctx;
-  queue_.addAndProcessEightRequests(mb_ctx_, dispatcher_);
+  queue_.addAndProcessEightRequests(mb_ctx_);
 }
 
 bool CryptoMbPrivateKeyMethodProvider::checkFips() {
@@ -702,7 +697,7 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   // Create a single queue for every worker thread to avoid locking.
   tls_->set([poll_delay, key_type, key_size, ipp](Event::Dispatcher& d) {
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
-    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp);
+    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d);
   });
 }
 
