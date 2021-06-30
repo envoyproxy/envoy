@@ -94,7 +94,7 @@ public:
    * Charge a simple response stat to an upstream.
    */
   virtual void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                       Code response_code) const PURE;
+                                       Code response_code, bool exclude_http_code_stats) const PURE;
 
   /**
    * Charge a response stat to both agg counters (*xx) as well as code specific counters. This

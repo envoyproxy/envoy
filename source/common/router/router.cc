@@ -1273,7 +1273,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         Http::CodeStats& code_stats = httpContext().codeStats();
         code_stats.chargeBasicResponseStat(cluster_->statsScope(),
                                            config_.stats_.stat_names_.retry_,
-                                           static_cast<Http::Code>(response_code));
+                                           static_cast<Http::Code>(response_code), false);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
