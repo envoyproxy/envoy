@@ -71,20 +71,22 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_STREQ(expected_user_agent,
-                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_STREQ(
+        expected_user_agent,
+        s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
     ASSERT_FALSE(s.fault());    /*server error*/
     ASSERT_FALSE(s.error());    /*client error*/
     ASSERT_FALSE(s.throttle()); /*request throttled*/
     ASSERT_DOUBLE_EQ(expected_status_code,
-                     s.http().response().fields().at("status").number_value());
+                     s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
     ASSERT_DOUBLE_EQ(expected_content_length,
                      s.http().response().fields().at("content_length").number_value());
     ASSERT_STREQ(expected_client_ip,
                  s.http().request().fields().at("client_ip").string_value().c_str());
     ASSERT_EQ(expected_x_forwarded_for,
               s.http().request().fields().at("x_forwarded_for").bool_value());
-    ASSERT_STREQ(expected_upstream_address, s.annotations().at("upstream_address").c_str());
+    ASSERT_STREQ(expected_upstream_address,
+                 s.annotations().at(Tracing::Tags::get().UpstreamAddress).c_str());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -93,13 +95,13 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("user_agent", expected_user_agent);
-  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
-  span->setTag("response_size", absl::StrFormat("%d", expected_content_length));
-  span->setTag("peer.address", expected_client_ip);
-  span->setTag("upstream_address", expected_upstream_address);
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag(Tracing::Tags::get().UserAgent, expected_user_agent);
+  span->setTag(Tracing::Tags::get().HttpStatusCode, absl::StrFormat("%d", expected_status_code));
+  span->setTag(Tracing::Tags::get().ResponseSize, absl::StrFormat("%d", expected_content_length));
+  span->setTag(Tracing::Tags::get().PeerAddress, expected_client_ip);
+  span->setTag(Tracing::Tags::get().UpstreamAddress, expected_upstream_address);
   span->finishSpan();
 }
 
@@ -127,12 +129,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_STREQ(expected_user_agent,
-                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_STREQ(
+        expected_user_agent,
+        s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
     ASSERT_TRUE(s.fault());  /*server error*/
     ASSERT_FALSE(s.error()); /*client error*/
     ASSERT_DOUBLE_EQ(expected_status_code,
-                     s.http().response().fields().at("status").number_value());
+                     s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -141,11 +144,11 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("user_agent", expected_user_agent);
-  span->setTag("error", expected_error);
-  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag(Tracing::Tags::get().UserAgent, expected_user_agent);
+  span->setTag(Tracing::Tags::get().Error, expected_error);
+  span->setTag(Tracing::Tags::get().HttpStatusCode, absl::StrFormat("%d", expected_status_code));
   span->finishSpan();
 }
 
@@ -172,13 +175,14 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_STREQ(expected_user_agent,
-                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_STREQ(
+        expected_user_agent,
+        s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
     ASSERT_FALSE(s.fault());    /*server error*/
     ASSERT_TRUE(s.error());     /*client error*/
     ASSERT_FALSE(s.throttle()); /*request throttled*/
     ASSERT_DOUBLE_EQ(expected_status_code,
-                     s.http().response().fields().at("status").number_value());
+                     s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -187,10 +191,10 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("user_agent", expected_user_agent);
-  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag(Tracing::Tags::get().UserAgent, expected_user_agent);
+  span->setTag(Tracing::Tags::get().HttpStatusCode, absl::StrFormat("%d", expected_status_code));
   span->finishSpan();
 }
 
@@ -217,13 +221,14 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_STREQ(expected_user_agent,
-                 s.http().request().fields().at("user_agent").string_value().c_str());
+    ASSERT_STREQ(
+        expected_user_agent,
+        s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
     ASSERT_FALSE(s.fault());   /*server error*/
     ASSERT_TRUE(s.error());    /*client error*/
     ASSERT_TRUE(s.throttle()); /*request throttled*/
     ASSERT_DOUBLE_EQ(expected_status_code,
-                     s.http().response().fields().at("status").number_value());
+                     s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -232,10 +237,10 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("user_agent", expected_user_agent);
-  span->setTag("http.status_code", absl::StrFormat("%d", expected_status_code));
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag(Tracing::Tags::get().UserAgent, expected_user_agent);
+  span->setTag(Tracing::Tags::get().HttpStatusCode, absl::StrFormat("%d", expected_status_code));
   span->finishSpan();
 }
 
@@ -261,8 +266,8 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyNameOrValue) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_FALSE(s.http().request().fields().contains("user_agent"));
-    ASSERT_FALSE(s.http().request().fields().contains("status"));
+    ASSERT_FALSE(s.http().request().fields().contains(Tracing::Tags::get().UserAgent));
+    ASSERT_FALSE(s.http().request().fields().contains(Tracing::Tags::get().Status));
   };
 
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
@@ -271,10 +276,10 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyNameOrValue) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("", expected_user_agent); // Send empty string for name
-  span->setTag("http.status_code", "");  // Send empty string for value
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag("", expected_user_agent);                 // Send empty string for name
+  span->setTag(Tracing::Tags::get().HttpStatusCode, ""); // Send empty string for value
   span->finishSpan();
 }
 
@@ -302,9 +307,10 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
     ASSERT_STREQ(expected_http_method,
                  s.http().request().fields().at("method").string_value().c_str());
     ASSERT_STREQ(expected_http_url, s.http().request().fields().at("url").string_value().c_str());
-    ASSERT_STREQ(expected_user_agent,
-                 s.http().request().fields().at("user_agent").string_value().c_str());
-    ASSERT_FALSE(s.http().request().fields().contains("status"));
+    ASSERT_STREQ(
+        expected_user_agent,
+        s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
+    ASSERT_FALSE(s.http().request().fields().contains(Tracing::Tags::get().Status));
     ASSERT_FALSE(s.http().request().fields().contains("content_length"));
   };
 
@@ -314,11 +320,11 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
                 std::move(broker_), server_.timeSource(), server_.api().randomGenerator()};
   auto span = tracer.startSpan(expected_operation_name, server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
-  span->setTag("http.method", expected_http_method);
-  span->setTag("http.url", expected_http_url);
-  span->setTag("user_agent", expected_user_agent);
-  span->setTag("http.status_code", expected_status_code);
-  span->setTag("response_size", expected_content_length);
+  span->setTag(Tracing::Tags::get().HttpMethod, expected_http_method);
+  span->setTag(Tracing::Tags::get().HttpUrl, expected_http_url);
+  span->setTag(Tracing::Tags::get().UserAgent, expected_user_agent);
+  span->setTag(Tracing::Tags::get().HttpStatusCode, expected_status_code);
+  span->setTag(Tracing::Tags::get().ResponseSize, expected_content_length);
   span->finishSpan();
 }
 
@@ -532,7 +538,7 @@ TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
 
-  span->setTag("http.status_code", "202");
+  span->setTag(Tracing::Tags::get().HttpStatusCode, "202");
   span->finishSpan();
 
   Network::UdpRecvData datagram;
