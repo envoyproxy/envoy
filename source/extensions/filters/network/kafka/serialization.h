@@ -224,6 +224,72 @@ private:
   bool ready_ = false;
 };
 
+class VarInt32Deserializer : public Deserializer<int32_t> {
+public:
+  VarInt32Deserializer() = default;
+
+  uint32_t feed(absl::string_view& data) override { return varuint32_deserializer_.feed(data); }
+
+  bool ready() const override { return varuint32_deserializer_.ready(); }
+
+  int32_t get() const override {
+    const uint32_t res = varuint32_deserializer_.get();
+    return (res >> 1) ^ -(res & 1);
+  }
+
+private:
+  VarUInt32Deserializer varuint32_deserializer_;
+};
+
+class VarInt64Deserializer : public Deserializer<int64_t> {
+public:
+  VarInt64Deserializer() = default;
+
+  uint32_t feed(absl::string_view& data) override {
+    uint32_t processed = 0;
+    while (!ready_ && !data.empty()) {
+
+      // Read next byte from input.
+      uint8_t el;
+      safeMemcpy(&el, data.data());
+      data = {data.data() + 1, data.size() - 1};
+      processed++;
+
+      // Put the 7 bits where they should have been.
+      // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 63 and some bits
+      // at positions 2-7 are set (we would have left shift of signed value that does not fit in
+      // data type).
+      bytes_ |= ((static_cast<uint64_t>(el) & 0x7f) << offset_);
+      if ((el & 0x80) == 0) {
+        // If this was the last byte to process (what is marked by unset highest bit), we are done.
+        ready_ = true;
+        break;
+      } else {
+        // Otherwise, we need to read next byte.
+        offset_ += 7;
+        // Valid input can have at most 5 bytes.
+        if (offset_ >= 10 * 7) {
+          ExceptionUtil::throwEnvoyException(
+              "VarInt64 is too long (10th byte has highest bit set)");
+        }
+      }
+    }
+    return processed;
+  }
+
+  bool ready() const override { return ready_; }
+
+  int64_t get() const override {
+    // Do the final conversion, this is a zig-zag encoded signed value.
+    return (bytes_ >> 1) ^ -(bytes_ & 1);
+  }
+
+private:
+  uint64_t bytes_ = 0;
+  uint32_t offset_ = 0;
+  bool ready_ = false;
+};
+
 /**
  * Deserializer of string value.
  * First reads length (INT16) and then allocates the buffer of given length.
@@ -373,10 +439,10 @@ private:
 
 /**
  * Deserializer of compact bytes value.
- * First reads length (UNSIGNED_VARINT) and then allocates the buffer of given length.
+ * First reads length (UNSIGNED_VARINT32) and then allocates the buffer of given length.
  *
  * From Kafka documentation:
- * First the length N+1 is given as an UNSIGNED_VARINT. Then N bytes follow.
+ * First the length N+1 is given as an UNSIGNED_VARINT32. Then N bytes follow.
  */
 class CompactBytesDeserializer : public Deserializer<Bytes> {
 public:

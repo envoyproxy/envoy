@@ -20,7 +20,7 @@ void assertStringViewIncrement(absl::string_view incremented, absl::string_view 
                                size_t difference);
 
 // Helper function converting buffer to raw bytes.
-const char* getRawData(const Buffer::OwnedImpl& buffer);
+const char* getRawData(const Buffer::Instance& buffer);
 
 // Exactly what is says on the tin:
 // 1. serialize expected using Encoder,
@@ -105,20 +105,15 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   ASSERT_EQ(more_data.size(), garbage_size);
 }
 
-// Same thing as 'serializeThenDeserializeAndCheckEqualityInOneGo', just uses compact encoding.
 template <typename BT, typename AT>
-void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
+void deserializeCompactAndCheckEqualityInOneGo(Buffer::Instance& buffer, const AT expected) {
   // given
   BT testee{};
 
-  Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
-  const uint32_t expected_written_size = encoder.computeCompactSize(expected);
-  const uint32_t written = encoder.encodeCompact(expected, buffer);
-  ASSERT_EQ(written, expected_written_size);
+  const uint32_t written = buffer.length();
   // Insert garbage after serialized payload.
   const uint32_t garbage_size = encoder.encode(Bytes(10000), buffer);
-
   const char* raw_buffer_ptr =
       reinterpret_cast<const char*>(buffer.linearize(written + garbage_size));
   // Tell parser that there is more data, it should never consume more than written.
@@ -140,6 +135,17 @@ void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   // then - 2 (nothing changes)
   ASSERT_EQ(consumed2, 0);
   assertStringViewIncrement(data, orig_data, consumed);
+}
+
+// Same thing as 'serializeThenDeserializeAndCheckEqualityInOneGo', just uses compact encoding.
+template <typename BT, typename AT>
+void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
+  Buffer::OwnedImpl buffer;
+  EncodingContext encoder{-1};
+  const uint32_t expected_written_size = encoder.computeCompactSize(expected);
+  const uint32_t written = encoder.encodeCompact(expected, buffer);
+  ASSERT_EQ(written, expected_written_size);
+  deserializeCompactAndCheckEqualityInOneGo<BT>(buffer, expected);
 }
 
 // Same thing as 'serializeThenDeserializeAndCheckEqualityWithChunks', just uses compact encoding.
