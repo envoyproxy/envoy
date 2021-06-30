@@ -48,6 +48,7 @@ public:
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
       proto_config_.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+      proto_config_.set_bootstrap_metadata_labels_key("labels");
       if (disable_with_metadata) {
         // Disable the ext_authz filter with metadata matcher that never matches.
         auto* metadata = proto_config_.mutable_filter_enabled_metadata();
@@ -60,10 +61,21 @@ public:
       proto_config_.set_transport_api_version(apiVersion());
 
       // Add labels and verify they are passed.
-      Protobuf::Map<std::string, std::string> labels;
+      std::map<std::string, std::string> labels;
       labels["label_1"] = "value_1";
       labels["label_2"] = "value_2";
-      (*proto_config_.mutable_destination_labels()) = labels;
+
+      ProtobufWkt::Struct metadata;
+      ProtobufWkt::Value val;
+      ProtobufWkt::Struct* labels_obj = val.mutable_struct_value();
+      for (const auto& pair : labels) {
+        ProtobufWkt::Value val;
+        val.set_string_value(pair.second);
+        (*labels_obj->mutable_fields())[pair.first] = val;
+      }
+      (*metadata.mutable_fields())["labels"] = val;
+
+      *bootstrap.mutable_node()->mutable_metadata() = metadata;
 
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");

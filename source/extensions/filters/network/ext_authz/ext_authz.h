@@ -51,15 +51,23 @@ class Config {
 
 public:
   Config(const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& config,
-         Stats::Scope& scope)
+         Stats::Scope& scope, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
-        destination_labels_(config.destination_labels()),
         include_peer_certificate_(config.include_peer_certificate()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? absl::optional<Matchers::MetadataMatcher>(config.filter_enabled_metadata())
-                : absl::nullopt) {}
+                : absl::nullopt) {
+    auto labels_key_it =
+        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+      for (auto labels_it = labels_key_it->second.struct_value().fields().begin();
+           labels_it != labels_key_it->second.struct_value().fields().end(); labels_it++) {
+        destination_labels_[labels_it->first] = labels_it->second.string_value();
+      }
+    }
+  }
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -90,7 +98,7 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
                public Filters::Common::ExtAuthz::RequestCallbacks {
-  using LabelsMap = Protobuf::Map<std::string, std::string>;
+  using LabelsMap = std::map<std::string, std::string>;
 
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)

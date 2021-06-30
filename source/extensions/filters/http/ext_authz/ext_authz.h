@@ -55,7 +55,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                Stats::Scope& scope, Runtime::Loader& runtime, Http::Context& http_context,
-               const std::string& stats_prefix)
+               const std::string& stats_prefix, envoy::config::bootstrap::v3::Bootstrap& bootstrap)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
         clear_route_cache_(config.clear_route_cache()),
@@ -63,7 +63,6 @@ public:
         pack_as_bytes_(config.with_request_body().pack_as_bytes()),
         status_on_error_(toErrorCode(config.status_on_error().code())), scope_(scope),
         runtime_(runtime), http_context_(http_context),
-        destination_labels_(config.destination_labels()),
         filter_enabled_(config.has_filter_enabled()
                             ? absl::optional<Runtime::FractionalPercent>(
                                   Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -85,7 +84,16 @@ public:
         ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
         ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
         ext_authz_failure_mode_allowed_(
-            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {}
+            pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+    auto labels_key_it =
+        bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
+    if (labels_key_it != bootstrap.node().metadata().fields().end()) {
+      for (auto labels_it = labels_key_it->second.struct_value().fields().begin();
+           labels_it != labels_key_it->second.struct_value().fields().end(); labels_it++) {
+        destination_labels_[labels_it->first] = labels_it->second.string_value();
+      }
+    }
+  }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
 

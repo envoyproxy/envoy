@@ -58,6 +58,7 @@ message ExtAuthz {
   type.matcher.v4alpha.MetadataMatcher filter_enabled_metadata = 6;
 
   // Optional labels that will be passed to :ref:`labels<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.labels>` in
-  // :ref:`destination<envoy_v3_api_field_service.auth.v3.AttributeContext.destination>` if provided.
-  map<string, string> destination_labels = 7;
+  // :ref:`destination<envoy_v3_api_field_service.auth.v3.AttributeContext.destination>`.
+  // The labels will be read from :ref:`metadata<envoy_v3_api_field_core.v3.Node.metadata>` with the specified key.
+  string bootstrap_metadata_labels_key = 7;
 }
