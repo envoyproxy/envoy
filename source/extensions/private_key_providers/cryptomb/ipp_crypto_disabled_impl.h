@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/macros.h"
 #include "source/extensions/private_key_providers/cryptomb/ipp_crypto.h"
 
 namespace Envoy {

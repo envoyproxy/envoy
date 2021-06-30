@@ -27,6 +27,7 @@ envoy_cc_library(
     deps = select({
         "//bazel:linux_x86_64": [
             "//bazel/foreign_cc:ipp-crypto",
+            "//source/common/common:macros",
         ],
         "//conditions:default": [],
     }),

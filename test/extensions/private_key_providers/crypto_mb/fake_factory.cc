@@ -38,10 +38,10 @@ int FakeIppCryptoImpl::mbxIsCryptoMbApplicable(uint64_t) {
 uint32_t FakeIppCryptoImpl::mbxSetSts(uint32_t status, unsigned req_num, bool success) {
   if (success) {
     // clear bit req_num
-    return status &= ~(1UL << req_num);
+    return status & ~(1UL << req_num);
   }
   // set bit req_num
-  return status |= (1UL << req_num);
+  return status | (1UL << req_num);
 }
 
 bool FakeIppCryptoImpl::mbxGetSts(uint32_t status, unsigned req_num) {
