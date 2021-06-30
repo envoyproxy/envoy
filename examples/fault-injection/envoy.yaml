@@ -41,7 +41,6 @@ static_resources:
                   numerator: 0
                   denominator: HUNDRED
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
     type: STRICT_DNS

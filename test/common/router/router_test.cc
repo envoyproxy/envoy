@@ -5863,7 +5863,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                            Upstream::LoadBalancerContext* context) {
-        Network::TransportSocketOptionsSharedPtr transport_socket_options =
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
         EXPECT_FALSE(transport_socket_options->applicationProtocolListOverride().empty());

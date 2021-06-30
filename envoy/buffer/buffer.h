@@ -494,9 +494,9 @@ public:
    *   high watermark.
    * @return a newly created InstancePtr.
    */
-  virtual InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark,
-                             std::function<void()> above_overflow_watermark) PURE;
+  virtual InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                                   std::function<void()> above_high_watermark,
+                                   std::function<void()> above_overflow_watermark) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

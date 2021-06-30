@@ -12,6 +12,21 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+
+// Validates that `field_mask` is valid for `message` and applies `TrimMessage`.
+// Necessary because TrimMessage crashes if `field_mask` is invalid.
+// Returns `true` on success.
+bool checkFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
+                                  Protobuf::Message& message) {
+  for (const auto& path : field_mask.paths()) {
+    if (!ProtobufUtil::FieldMaskUtil::GetFieldDescriptors(message.GetDescriptor(), path, nullptr)) {
+      return false;
+    }
+  }
+  ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &message);
+  return true;
+}
+
 // Apply a field mask to a resource message. A simple field mask might look
 // like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
 // resource. Unfortunately, since the "cluster" field is Any and the in-built
@@ -31,7 +46,10 @@ namespace {
 // this to allow arbitrary indexing through Any fields. This is pretty
 // complicated, we would need to build a FieldMask tree similar to how the C++
 // Protobuf library does this internally.
-void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
+/**
+ * @return true on success, false if `field_mask` is invalid.
+ */
+bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   // Figure out which paths cover Any fields. For each field, gather the paths to
@@ -87,13 +105,15 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
       inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
       MessageUtil::unpackTo(any_message, *inner_message);
       // Trim message.
-      ProtobufUtil::FieldMaskUtil::TrimMessage(inner_field_mask, inner_message.get());
+      if (!checkFieldMaskAndTrimMessage(inner_field_mask, *inner_message)) {
+        return false;
+      }
       // Pack it back into the Any resource.
       any_message.PackFrom(*inner_message);
       reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
     }
   }
-  ProtobufUtil::FieldMaskUtil::TrimMessage(outer_field_mask, &message);
+  return checkFieldMaskAndTrimMessage(outer_field_mask, message);
 }
 
 // Helper method to get the resource parameter.
@@ -126,14 +146,18 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
 
   envoy::admin::v3::ConfigDump dump;
 
+  absl::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
-    auto err = addResourceToDump(dump, mask, resource.value(), include_eds);
-    if (err.has_value()) {
-      response.add(err.value().second);
-      return err.value().first;
-    }
+    err = addResourceToDump(dump, mask, resource.value(), include_eds);
   } else {
-    addAllConfigToDump(dump, mask, include_eds);
+    err = addAllConfigToDump(dump, mask, include_eds);
+  }
+  if (err.has_value()) {
+    response_headers.addReference(Http::Headers::get().XContentTypeOptions,
+                                  Http::Headers::get().XContentTypeOptionValues.Nosniff);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+    response.add(err.value().second);
+    return err.value().first;
   }
   MessageUtil::redact(dump);
 
@@ -176,7 +200,11 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       if (mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
-        trimResourceMessage(field_mask, msg);
+        if (!trimResourceMessage(field_mask, msg)) {
+          return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+              Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
+                                                   " could not be successfully used."))};
+        }
       }
       auto* config = dump.add_configs();
       config->PackFrom(msg);
@@ -191,9 +219,10 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                           const absl::optional<std::string>& mask,
-                                           bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>>
+ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
+                                      const absl::optional<std::string>& mask,
+                                      bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
@@ -213,12 +242,17 @@ void ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields.
-      ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+      if (!checkFieldMaskAndTrimMessage(field_mask, *message)) {
+        return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+            Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
+                                                 " could not be successfully used."))};
+      }
     }
 
     auto* config = dump.add_configs();
     config->PackFrom(*message);
   }
+  return absl::nullopt;
 }
 
 ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {

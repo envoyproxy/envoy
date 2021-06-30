@@ -25,10 +25,6 @@ steps:
     path: $(Build.StagingDirectory)/repository_cache
   continueOnError: true
 
-- bash: .azure-pipelines/cleanup.sh
-  displayName: "Removing tools from agent"
-  condition: ${{ parameters.managedAgent }}
-
 - bash: |
     echo "disk space at beginning of build:"
     df -h
