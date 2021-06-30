@@ -66,15 +66,13 @@ template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<
 
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
- * @param DataType the type used as a source for DataInputs
- * @param ActionFactoryContext the context provided to Action factories
  */
-template <class DataType, class ActionFactoryContext> class MatchTreeFactory {
+template <class DataType> class MatchTreeFactory {
 public:
-  MatchTreeFactory(ActionFactoryContext& context,
-                   ProtobufMessage::ValidationVisitor& proto_validation_visitor,
+  MatchTreeFactory(const std::string& stats_prefix,
+                   Server::Configuration::FactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : action_factory_context_(context), proto_validation_visitor_(proto_validation_visitor),
+      : stats_prefix_(stats_prefix), factory_context_(factory_context),
         validation_visitor_(validation_visitor) {}
 
   MatchTreeFactoryCb<DataType> create(const envoy::config::common::matcher::v3::Matcher& config) {
@@ -202,13 +200,12 @@ private:
         return OnMatch<DataType>{{}, matcher_factory()};
       };
     } else if (on_match.has_action()) {
-      auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
-          on_match.action());
+      auto& factory = Config::Utility::getAndCheckFactory<ActionFactory>(on_match.action());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          on_match.action().typed_config(), proto_validation_visitor_, factory);
+          on_match.action().typed_config(), factory_context_.messageValidationVisitor(), factory);
 
-      auto action_factory = factory.createActionFactoryCb(*message, action_factory_context_,
-                                                          proto_validation_visitor_);
+      auto action_factory =
+          factory.createActionFactoryCb(*message, stats_prefix_, factory_context_);
       return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
     }
 
@@ -237,8 +234,8 @@ private:
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
 
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          config.typed_config(), proto_validation_visitor_, *factory);
-      auto data_input = factory->createDataInputFactoryCb(*message, proto_validation_visitor_);
+          config.typed_config(), factory_context_.messageValidationVisitor(), *factory);
+      auto data_input = factory->createDataInputFactoryCb(*message, factory_context_);
       return data_input;
     }
 
@@ -247,9 +244,9 @@ private:
     auto& common_input_factory =
         Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), proto_validation_visitor_, common_input_factory);
-    auto common_input = common_input_factory.createCommonProtocolInputFactoryCb(
-        *message, proto_validation_visitor_);
+        config.typed_config(), factory_context_.messageValidationVisitor(), common_input_factory);
+    auto common_input =
+        common_input_factory.createCommonProtocolInputFactoryCb(*message, factory_context_);
     return
         [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
   }
@@ -268,8 +265,9 @@ private:
       auto& factory =
           Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          predicate.custom_match().typed_config(), proto_validation_visitor_, factory);
-      return factory.createInputMatcherFactoryCb(*message, proto_validation_visitor_);
+          predicate.custom_match().typed_config(), factory_context_.messageValidationVisitor(),
+          factory);
+      return factory.createInputMatcherFactoryCb(*message, factory_context_);
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -277,8 +275,7 @@ private:
   }
 
   const std::string stats_prefix_;
-  ActionFactoryContext& action_factory_context_;
-  ProtobufMessage::ValidationVisitor& proto_validation_visitor_;
+  Server::Configuration::FactoryContext& factory_context_;
   MatchTreeValidationVisitor<DataType>& validation_visitor_;
 };
 } // namespace Matcher

@@ -13,13 +13,11 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 
-#include "matching/data_impl.h"
-
 namespace Envoy {
 namespace Http {
 
 namespace {
-REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<Matching::HttpFilterActionContext>);
+REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 

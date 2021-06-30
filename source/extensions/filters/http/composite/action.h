@@ -2,7 +2,6 @@
 
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.validate.h"
 
-#include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
 namespace Envoy {
@@ -22,25 +21,23 @@ private:
   Http::FilterFactoryCb cb_;
 };
 
-class ExecuteFilterActionFactory
-    : public Matcher::ActionFactory<Http::Matching::HttpFilterActionContext> {
+class ExecuteFilterActionFactory : public Matcher::ActionFactory {
 public:
   std::string name() const override { return "composite-action"; }
   Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        Http::Matching::HttpFilterActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  createActionFactoryCb(const Protobuf::Message& config, const std::string& stat_prefix,
+                        Server::Configuration::FactoryContext& factory_context) override {
     const auto& composite_action = MessageUtil::downcastAndValidate<
         const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
-        config, validation_visitor);
+        config, factory_context.messageValidationVisitor());
 
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             composite_action.typed_config());
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        composite_action.typed_config().typed_config(), validation_visitor, factory);
-    auto callback = factory.createFilterFactoryFromProto(*message, context.stat_prefix_,
-                                                         context.factory_context_);
+        composite_action.typed_config().typed_config(), factory_context.messageValidationVisitor(),
+        factory);
+    auto callback = factory.createFilterFactoryFromProto(*message, stat_prefix, factory_context);
     return [cb = std::move(callback)]() -> Matcher::ActionPtr {
       return std::make_unique<ExecuteFilterAction>(cb);
     };
