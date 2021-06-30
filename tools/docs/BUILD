@@ -23,6 +23,7 @@ py_binary(
     ],
     deps = [
         "//tools/dependency:exports",
+        "//tools/dependency:ossf_scorecard",
         "//tools/dependency:utils",
     ],
 )

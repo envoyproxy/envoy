@@ -10,6 +10,7 @@ import tarfile
 import urllib.parse
 
 from tools.dependency import utils as dep_utils
+from tools.dependency import ossf_scorecard
 
 
 # Render a CSV table given a list of table headers, widths and list of rows
@@ -69,7 +70,7 @@ def get_version_url(metadata):
 
 
 def csv_row(dep):
-    return [dep.name, dep.version, dep.release_date, dep.cpe]
+    return [dep.name, dep.version, dep.release_date, dep.cpe, dep.scorecard]
 
 
 def main():
@@ -78,11 +79,16 @@ def main():
     security_rst_root = os.path.join(generated_rst_dir, "intro/arch_overview/security")
 
     pathlib.Path(security_rst_root).mkdir(parents=True, exist_ok=True)
+    repo_locations = dep_utils.repository_locations()
 
-    Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date'])
+    # Some categories are not scored
+    scorecard_results = "https://storage.cloud.google.com/ossf-scorecards/latest.json"
+    scorecards = ossf_scorecard.score(scorecard_results, None, repo_locations)
+
+    Dep = namedtuple('Dep', ['name', 'sort_name', 'version', 'cpe', 'release_date', 'scorecard'])
     use_categories = defaultdict(lambda: defaultdict(list))
     # Bin rendered dependencies into per-use category lists.
-    for k, v in dep_utils.repository_locations().items():
+    for k, v in repo_locations.items():
         cpe = v.get('cpe', '')
         if cpe == 'N/A':
             cpe = ''
@@ -93,7 +99,14 @@ def main():
         name = rst_link(project_name, project_url)
         version = rst_link(render_version(v['version']), get_version_url(v))
         release_date = v['release_date']
-        dep = Dep(name, project_name.lower(), version, cpe, release_date)
+
+        scorecard = "n/a"
+        if scorecard_results:
+            result = scorecards.get(project_name, None)
+            if result != None:
+                scorecard = ossf_scorecard.format_scorecard(result)
+
+        dep = Dep(name, project_name.lower(), version, cpe, release_date, scorecard)
         for category in v['use_category']:
             for ext in v.get('extensions', ['core']):
                 use_categories[category][ext].append(dep)
@@ -105,7 +118,8 @@ def main():
             if ext_name != 'core':
                 content += render_title(ext_name)
             output_path = pathlib.Path(security_rst_root, f'external_dep_{category}.rst')
-            content += csv_table(['Name', 'Version', 'Release date', 'CPE'], [2, 1, 1, 2],
+            content += csv_table(['Name', 'Version', 'Release date', 'CPE', 'Scorecard'],
+                                 [2, 1, 1, 2, 2],
                                  [csv_row(dep) for dep in sorted(deps, key=lambda d: d.sort_name)])
         output_path.write_text(content)
 

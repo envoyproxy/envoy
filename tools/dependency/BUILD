@@ -23,6 +23,15 @@ py_library(
     deps = [":exports"],
 )
 
+py_library(
+    name = "ossf_scorecard",
+    srcs = ["ossf_scorecard.py"],
+    deps = [
+        ":exports",
+        requirement("google-cloud-storage"),
+    ],
+)
+
 py_binary(
     name = "cve_scan",
     srcs = [
