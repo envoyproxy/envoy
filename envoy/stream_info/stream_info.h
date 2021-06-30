@@ -530,16 +530,6 @@ public:
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 
   /**
-   * @param SNI value requested.
-   */
-  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
-
-  /**
-   * @return SNI value for downstream host.
-   */
-  virtual const std::string& requestedServerName() const PURE;
-
-  /**
    * @param failure_reason the upstream transport failure reason.
    */
   virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
