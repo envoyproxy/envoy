@@ -411,17 +411,15 @@ elif [[ "$CI_TARGET" == "fix_format" ]]; then
 
   echo "fix_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
   exit 0
 elif [[ "$CI_TARGET" == "check_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
 
-  echo "check_format_test..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
   echo "check_format..."
   "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check --test
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
   exit 0
 elif [[ "$CI_TARGET" == "docs" ]]; then
   echo "generating docs..."
@@ -432,12 +430,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
 
   echo "verifying dependencies..."
   # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
   "${ENVOY_SRCDIR}"/tools/dependency/validate.py
-
-  # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
-  # presubmits, but cve_scan only runs async.
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
 
   # Validate repository metadata.
   echo "check repositories..."
@@ -454,8 +447,30 @@ elif [[ "$CI_TARGET" == "cve_scan" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
   exit 0
 elif [[ "$CI_TARGET" == "tooling" ]]; then
+  setup_clang_toolchain
+
+  # TODO(phlax): move this to a bazel rule
+
   echo "Run pytest tooling tests..."
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
+
+  echo "Run protoxform test"
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
+
+  echo "Run merge active shadow test"
+  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
+
+  echo "check_format_test..."
+  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+
+  echo "dependency validate_test..."
+  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
+
+  # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
+  # presubmits, but cve_scan only runs async.
+  echo "cve_scan_test..."
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+
   exit 0
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" "wasm-cc|win32-front-proxy"
