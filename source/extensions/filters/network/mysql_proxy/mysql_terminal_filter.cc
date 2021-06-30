@@ -50,7 +50,7 @@ void MySQLTerminalFilter::initializeReadFilterCallbacks(Network::ReadFilterCallb
 void MySQLTerminalFilter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    ENVOY_LOG(debug, "downstream connection closed");
+    ENVOY_LOG(debug, "mysql proxy: downstream connection closed");
     if (canceler_) {
       canceler_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
       canceler_ = nullptr;
@@ -63,7 +63,7 @@ void MySQLTerminalFilter::onEvent(Network::ConnectionEvent event) {
 void MySQLTerminalFilter::UpstreamEventHandler::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    ENVOY_LOG(debug, "upstream connection closed");
+    ENVOY_LOG(debug, "mysql proxy: upstream connection closed");
     parent.closeLocal();
     parent.upstream_conn_data_ = nullptr;
     parent.canceler_ = nullptr;
@@ -79,6 +79,7 @@ void MySQLTerminalFilter::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionData
 }
 
 void MySQLTerminalFilter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+                                        absl::string_view transport_failure_reason,
                                         Upstream::HostDescriptionConstSharedPtr host) {
   config_->stats_.login_failures_.inc();
 
@@ -88,22 +89,34 @@ void MySQLTerminalFilter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason r
   }
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: too many connections, {}", host_info);
+    ENVOY_LOG(info,
+              "mysql proxy upstream connection pool: too many connections, {}. Transport failure "
+              "reason: {}.",
+              host_info, transport_failure_reason);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool:onocal connection failure, {}",
-              host_info);
+    ENVOY_LOG(info,
+              "mysql proxy upstream connection pool: local connection failure, {}. Transport "
+              "failure reason: {}",
+              host_info, transport_failure_reason);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: remote connection failure, {}",
-              host_info);
+    ENVOY_LOG(info,
+              "mysql proxy upstream connection pool: remote connection failure, {}. Transport "
+              "failure reason: {}",
+              host_info, transport_failure_reason);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: connection failure due to time out, {}",
-              host_info);
+    ENVOY_LOG(info,
+              "mysql proxy upstream connection pool: connection failure due to time out, {}. "
+              "Transport failure reason: {}",
+              host_info, transport_failure_reason);
     break;
   default:
-    ENVOY_LOG(info, "mysql proxy upstream connection pool: unknown error, {}", host_info);
+    ENVOY_LOG(
+        info,
+        "mysql proxy upstream connection pool: unknown error, {}. Transport failure reason: {}",
+        host_info, transport_failure_reason);
     break;
   }
   canceler_ = nullptr;
@@ -128,13 +141,13 @@ MySQLTerminalFilter::UpstreamEventHandler::UpstreamEventHandler(MySQLTerminalFil
 
 void MySQLTerminalFilter::DownstreamEventHandler::onProtocolError() {
   parent.onProtocolError();
-  ENVOY_LOG(info, "communication failure due to protocol error");
+  ENVOY_LOG(info, "mysql proxy: communication failure due to protocol error");
   parent.closeLocal();
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onProtocolError() {
   parent.onProtocolError();
-  ENVOY_LOG(info, "communication failure due to protocol error");
+  ENVOY_LOG(info, "mysql proxy: communication failure due to protocol error");
   parent.closeRemote();
 }
 
@@ -146,26 +159,26 @@ Network::FilterStatus MySQLTerminalFilter::onData(Buffer::Instance& buffer, bool
 void MySQLTerminalFilter::sendLocal(const MySQLCodec& message) {
   Buffer::OwnedImpl buffer;
   message.encodePacket(buffer);
-  ENVOY_LOG(debug, "send data to client, len {}", buffer.length());
+  ENVOY_LOG(debug, "mysql proxy: send data to client, len {}", buffer.length());
   read_callbacks_->connection().write(buffer, false);
 }
 
 void MySQLTerminalFilter::sendRemote(const MySQLCodec& message) {
   Buffer::OwnedImpl buffer;
   message.encodePacket(buffer);
-  ENVOY_LOG(debug, "send data to server, len {}", buffer.length());
+  ENVOY_LOG(debug, "mysql proxy: send data to server, len {}", buffer.length());
   upstream_conn_data_->connection().write(buffer, false);
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onUpstreamData(Buffer::Instance& data, bool) {
-  ENVOY_LOG(debug, "upstream data recevied, len {}", data.length());
+  ENVOY_LOG(debug, "mysql proxy: upstream data recevied, len {}", data.length());
   buffer.move(data);
   decoder->onData(buffer);
 }
 
 Network::FilterStatus MySQLTerminalFilter::DownstreamEventHandler::onData(Buffer::Instance& data,
                                                                           bool) {
-  ENVOY_LOG(debug, "downstream data recevied, len {}", data.length());
+  ENVOY_LOG(debug, "mysql proxy: downstream data recevied, len {}", data.length());
   buffer.move(data);
   // wait upstream connection ready
   if (parent.upstream_event_handler_ != nullptr && !parent.upstream_event_handler_->ready) {
@@ -212,7 +225,9 @@ void MySQLTerminalFilter::onFailure(ErrMessage& err, uint8_t seq) {
 
 void MySQLTerminalFilter::DownstreamEventHandler::onBothAuthSucc() {
   ASSERT(pending_response.has_value());
-  ENVOY_LOG(debug, "downstream/upstream auth ok, notify client to command phase");
+  ENVOY_LOG(
+      debug,
+      "mysql proxy: downstream/upstream authentication success, notify client to command phase");
   parent.stepLocalSession(MYSQL_REQUEST_PKT_NUM, MySQLSession::State::Req);
   parent.sendLocal(pending_response.value());
   pending_response.reset();
@@ -224,18 +239,18 @@ MySQLTerminalFilter::DownstreamEventHandler::checkAuth(const std::string& name,
                                                        const std::vector<uint8_t>& expect_sig) {
 
   if (parent.downstream_username_ != name) {
-    ENVOY_LOG(info, "filter: no such username {}", name);
+    ENVOY_LOG(info, "mysql proxy: no such user {}", name);
     return MessageHelper::authError(
         name, parent.read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
         true);
   }
   if (sig.size() != expect_sig.size()) {
-    ENVOY_LOG(info, "filter: password length error of client login, expected {}, got {}",
+    ENVOY_LOG(info, "mysql proxy: password length error of client login, expected {}, got {}",
               expect_sig.size(), sig.size());
     return MessageHelper::passwordLengthError(sig.size());
   }
   if (expect_sig != sig) {
-    ENVOY_LOG(info, "filter: password is not correct");
+    ENVOY_LOG(info, "mysql proxy: password is not correct");
     return MessageHelper::authError(
         name, parent.read_callbacks_->connection().addressProvider().remoteAddress()->asString(),
         true);
@@ -259,19 +274,20 @@ void MySQLTerminalFilter::DownstreamEventHandler::onNewMessage(MySQLSession::Sta
 
 void MySQLTerminalFilter::DownstreamEventHandler::onServerGreeting(ServerGreeting&) {
   ENVOY_LOG(error,
-            "mysql filter: downstream impossible callback onMoreClientLoginResponse is called");
+            "mysql proxy: downstream decoder callback onMoreClientLoginResponse is not supported");
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onClientLogin(ClientLogin& login) {
   parent.onClientLogin(login);
 
   if (login.isSSLRequest()) {
-    ENVOY_LOG(info, "communication failure due to proxy not support ssl upgrade");
-    auto err = MessageHelper::defaultError("envoy mysql proxy is now not support ssl");
+    ENVOY_LOG(info, "mysql proxy: communication failure due to lack of support for ssl upgrade");
+    auto err = MessageHelper::defaultError("mysql proxy does not support ssl upgrade");
     parent.onFailure(err, login.getSeq() + 1);
     return;
   }
-  ENVOY_LOG(debug, "user {} try to login into database {}", login.getUsername(), login.getDb());
+  ENVOY_LOG(debug, "mysql proxy: user {} try to login into database {}", login.getUsername(),
+            login.getDb());
 
   auto auth_method = AuthHelper::authMethod(login.getClientCap(), login.getAuthPluginName());
   absl::optional<ErrMessage> err;
@@ -287,7 +303,8 @@ void MySQLTerminalFilter::DownstreamEventHandler::onClientLogin(ClientLogin& log
                     NativePassword::signature(parent.downstream_password_, seed));
     break;
   default:
-    ENVOY_LOG(info, "auth plugin {} is not support", login.getAuthPluginName());
+    ENVOY_LOG(info, "mysql proxy: mysql proxy does not support auth plugin {}",
+              login.getAuthPluginName());
     auto auth_switch = MessageHelper::encodeAuthSwitch(seed);
     auth_switch.setSeq(login.getClientCap() + 1);
     parent.sendLocal(auth_switch);
@@ -302,7 +319,8 @@ void MySQLTerminalFilter::DownstreamEventHandler::onClientLogin(ClientLogin& log
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onClientLoginResponse(ClientLoginResponse&) {
-  ENVOY_LOG(error, "mysql filter: onMoreClientLoginResponse impossible callback is called");
+  ENVOY_LOG(error,
+            "mysql proxy: downstream decoder callback onMoreClientLoginResponse is not supported.");
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onClientSwitchResponse(
@@ -323,25 +341,26 @@ void MySQLTerminalFilter::DownstreamEventHandler::tryConnectUpstream(uint8_t seq
     route = parent.router_->defaultPool();
   }
   if (route == nullptr) {
-    ENVOY_LOG(info, "closed due to there is no suitable cluster in route");
+    ENVOY_LOG(info, "mysql proxy: close downstream due to no route found for database {}.",
+              parent.connect_db_);
     auto err = MessageHelper::dbError(parent.connect_db_);
     parent.onFailure(err, seq);
     return;
   }
   auto cluster = route->upstream();
   if (cluster == nullptr) {
-    ENVOY_LOG(info, "closed due to there is no cluster");
-    auto err = MessageHelper::defaultError(
-        fmt::format("cluster {} is not exists in envoy", route->name()));
+    ENVOY_LOG(info, "mysql proxy: close downstream due to cluster {} not found.", route->name());
+    auto err = MessageHelper::defaultError(fmt::format("cluster {} is not found.", route->name()));
     parent.onFailure(err, seq);
     return;
   }
   auto pool = cluster->tcpConnPool(Upstream::ResourcePriority::Default, nullptr);
 
   if (!pool.has_value()) {
-    ENVOY_LOG(info, "closed due to there is no host in cluster {}", cluster->info()->name());
+    ENVOY_LOG(info, "mysql proxy: close downstream due to no host found in cluster {}.",
+              route->name());
     auto err =
-        MessageHelper::defaultError(fmt::format("there is no host in cluster {}", route->name()));
+        MessageHelper::defaultError(fmt::format("no host found in cluster {}.", route->name()));
     parent.onFailure(err, seq);
     return;
   }
@@ -349,14 +368,15 @@ void MySQLTerminalFilter::DownstreamEventHandler::tryConnectUpstream(uint8_t seq
   parent.canceler_ = pool->newConnection(parent);
   auto ok = MessageHelper::encodeOk();
   ok.setSeq(seq);
-  // wait upstream connection ready
+  // do not send ok to client immediately, wait upstream authentication success
   pending_response = ok;
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onMoreClientLoginResponse(
     ClientLoginResponse& login_resp) {
   // envoy now not return AuthMoreData to client, this callback will never called.
-  ENVOY_LOG(error, "mysql filter: onMoreClientLoginResponse impossible callback is called");
+  ENVOY_LOG(error,
+            "mysql proxy: downstream decoder callback onMoreClientLoginResponse is not supported.");
   parent.onMoreClientLoginResponse(login_resp);
 }
 
@@ -375,21 +395,23 @@ void MySQLTerminalFilter::DownstreamEventHandler::onCommand(Command& command) {
 }
 
 void MySQLTerminalFilter::DownstreamEventHandler::onCommandResponse(CommandResponse&) {
-  ENVOY_LOG(error, "mysql filter: downstream onCommandResponse impossible callback is called");
+  ENVOY_LOG(error, "mysql proxy: downstream decoder callback onCommandResponse is not supported.");
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onNewMessage(MySQLSession::State state) {
   parent.onNewMessage(state);
   // close connection when received message on state NotHandled.
   if (state == MySQLSession::State::NotHandled || state == MySQLSession::State::Error) {
-    ENVOY_LOG(info, "connection closed due to unexpected state occurs on communication");
+    ENVOY_LOG(
+        info,
+        "mysql proxy: connection closed due to unexpected state encountered during communication.");
     parent.closeRemote();
   }
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onServerGreeting(ServerGreeting& greet) {
   parent.onServerGreeting(greet);
-  ENVOY_LOG(debug, "server {} send challenge", greet.getVersion());
+  ENVOY_LOG(debug, "mysql proxy: server {} send challenge.", greet.getVersion());
   auto auth_method = AuthHelper::authMethod(greet.getServerCap(), greet.getAuthPluginName());
   if (auth_method != AuthMethod::OldPassword && auth_method != AuthMethod::NativePassword) {
     // If server's auth method is not supported, use mysql_native_password as response, wait for
@@ -406,16 +428,13 @@ void MySQLTerminalFilter::UpstreamEventHandler::onServerGreeting(ServerGreeting&
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onClientLogin(ClientLogin&) {
-  ENVOY_LOG(error, "mysql filter: upstream onClientLogin impossible callback is called");
+  ENVOY_LOG(error, "mysql proxy: upstream decoder callback onClientLogin is not supported.");
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onAuthSucc() {
   parent.downstream_event_handler_->onBothAuthSucc();
   ready = true;
   parent.stepRemoteSession(MYSQL_RESPONSE_PKT_NUM, MySQLSession::State::ReqResp);
-  if (parent.downstream_event_handler_->buffer.length()) {
-    parent.downstream_event_handler_->decoder->onData(parent.downstream_event_handler_->buffer);
-  }
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
@@ -429,10 +448,15 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
     auto& auth_switch = dynamic_cast<AuthSwitchMessage&>(login_resp);
     if (!auth_switch.isOldAuthSwitch() &&
         auth_switch.getAuthPluginName() != "mysql_native_password") {
-      ENVOY_LOG(info, "auth plugin {} is not supported", auth_switch.getAuthPluginName());
-      err = MessageHelper::defaultError(
-          "mysql proxy is failed to auth to upstream due to auth plugin is not support (now "
-          "support mysql_native_password, mysql_old_password)");
+      ENVOY_LOG(info,
+                "mysql proxy: mysql proxy failed authenticate upstream server due to unsupported "
+                "plugin {}. Only "
+                "mysql_native_password and mysql_old_password are supported.",
+                auth_switch.getAuthPluginName());
+      err = MessageHelper::defaultError(fmt::format(
+          "mysql proxy failed authenticate upstream server due to unsupported plugin {}. Only "
+          "mysql_native_password and mysql_old_password are supported.",
+          auth_switch.getAuthPluginName()));
       break;
     }
     auto auth_method =
@@ -451,18 +475,22 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
     onAuthSucc();
     break;
   case MYSQL_RESP_ERR:
-    ENVOY_LOG(info, "mysql proxy failed of auth, info {}",
+    ENVOY_LOG(info, "mysql proxy: mysql proxy failed authenticate upstream server. Error: {}",
               dynamic_cast<ErrMessage&>(login_resp).getErrorMessage());
     err = MessageHelper::defaultError(
-        fmt::format("mysql proxy is failed to auth upstream database server due to {}",
+        fmt::format("mysql proxy failed authenticate upstream server. Error: {}",
                     dynamic_cast<ErrMessage&>(login_resp).getErrorMessage()));
     break;
   case MYSQL_RESP_MORE:
   default:
-    ENVOY_LOG(info, "unhandled message resp code {}", login_resp.getRespCode());
-    err = MessageHelper::defaultError(fmt::format("mysql proxy is failed to auth upstream database "
-                                                  "server due to unhandled message resp code {}",
-                                                  login_resp.getRespCode()));
+    ENVOY_LOG(
+        info,
+        "mysql proxy: mysql proxy failed authenticate upstream server due to unhandled message "
+        "resp code {}",
+        login_resp.getRespCode());
+    err = MessageHelper::defaultError(fmt::format(
+        "mysql proxy failed authenticate upstream server due to unhandled message resp code {}",
+        login_resp.getRespCode()));
     break;
   }
   if (err.has_value()) {
@@ -472,7 +500,8 @@ void MySQLTerminalFilter::UpstreamEventHandler::onClientLoginResponse(
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onClientSwitchResponse(ClientSwitchResponse&) {
-  ENVOY_LOG(error, "mysql filter: upstream onClientSwitchResponse impossible callback is called");
+  ENVOY_LOG(error,
+            "mysql proxy: upstream decoder callback onClientSwitchResponse is not supported.");
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onMoreClientLoginResponse(
@@ -487,18 +516,21 @@ void MySQLTerminalFilter::UpstreamEventHandler::onMoreClientLoginResponse(
     onAuthSucc();
     break;
   case MYSQL_RESP_ERR:
-    ENVOY_LOG(info, "mysql proxy failed of auth, info {} ",
+    ENVOY_LOG(info, "mysql proxy: mysql proxy failed authenticate upstream server. Error: {}",
               dynamic_cast<ErrMessage&>(resp).getErrorMessage());
     err = MessageHelper::defaultError(
-        fmt::format("mysql proxy is failed to auth upstream database server due to {}",
+        fmt::format("mysql proxy failed authenticate upstream server. Error: {}",
                     dynamic_cast<ErrMessage&>(resp).getErrorMessage()));
     break;
   case MYSQL_RESP_AUTH_SWITCH:
   default:
-    ENVOY_LOG(info, "unhandled message resp code {}", resp.getRespCode());
-    err = MessageHelper::defaultError(fmt::format("mysql proxy is failed to auth upstream database "
-                                                  "server due to unhandled message resp code {}",
-                                                  resp.getRespCode()));
+    ENVOY_LOG(info,
+              "mysql proxy: mysql proxy failed authenticate upstream server due to unhandled "
+              "message resp code {}",
+              resp.getRespCode());
+    err = MessageHelper::defaultError(fmt::format(
+        "mysql proxy failed authenticate upstream server due to unhandled message resp code {}",
+        resp.getRespCode()));
     break;
   }
   if (err.has_value()) {
@@ -507,7 +539,7 @@ void MySQLTerminalFilter::UpstreamEventHandler::onMoreClientLoginResponse(
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onCommand(Command&) {
-  ENVOY_LOG(error, "mysql filter: upstream onCommand impossible callback is called");
+  ENVOY_LOG(error, "mysql proxy: upstream decoder callback onCommand is not supported.");
 }
 
 void MySQLTerminalFilter::UpstreamEventHandler::onCommandResponse(CommandResponse& resp) {

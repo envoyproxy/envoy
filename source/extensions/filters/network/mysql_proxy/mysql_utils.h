@@ -113,6 +113,7 @@ struct NativePassword {
 class AuthHelper {
 public:
   static AuthMethod authMethod(uint32_t cap, const std::string& auth_plugin_name);
+  static std::string authPluginName(AuthMethod method);
 };
 
 } // namespace MySQLProxy

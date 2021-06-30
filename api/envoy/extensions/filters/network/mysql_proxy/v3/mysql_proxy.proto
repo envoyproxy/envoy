@@ -79,8 +79,8 @@ message MySQLProxy {
   // * ``jdbc:mysql://host1:9001/`` will send command to catch_all_cluster.
   //
   // .. note::
-  //   If `database_routes` is set, MySQL proxy will manage the upstream connections, it becomes terminal filter, should be put at last in filter chain.
-  //   If `database_routes` is not set, MySQL proxy works as a transport proxy, and must not be put at last in filter chain.
+  //   If `database_routes` is set, MySQL proxy will manage the upstream connections, it becomes terminal filter, should be put as last in filter chain.
+  //   If `database_routes` is not set, MySQL proxy works as a transport proxy, and must not be put as last in filter chain.
   DatabaseRoutes database_routes = 3;
 
   // [#not-implemented-hide:] Downstream client username/password. Authenticate MySQL client connections locally by forcing downstream clients connect with this username/password. If the username/password is not match, then ER_ACCESS_DENIED_ERROR will return;

@@ -251,6 +251,24 @@ AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_n
   return AuthMethod::Unknown;
 }
 
+std::string AuthHelper::authPluginName(AuthMethod method) {
+  switch (method) {
+  case AuthMethod::OldPassword:
+    return "mysql_old_password";
+  case AuthMethod::NativePassword:
+    return "mysql_native_password";
+  case AuthMethod::Sha256Password:
+    return "sha256_password";
+  case AuthMethod::CacheSha2Password:
+    return "caching_sha2_password";
+  case AuthMethod::ClearPassword:
+    return "mysql_clear_password";
+  case AuthMethod::Unknown:
+  default:
+    return "unknown auth plugin";
+  }
+}
+
 // https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L186
 std::vector<uint8_t> OldPassword::signature(const std::string& password,
                                             const std::vector<uint8_t>& seed) {

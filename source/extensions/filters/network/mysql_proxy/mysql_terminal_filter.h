@@ -40,6 +40,7 @@ public:
   void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                    Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
   // ConnectionCallback
