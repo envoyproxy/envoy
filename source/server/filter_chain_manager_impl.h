@@ -244,8 +244,16 @@ private:
   using DirectSourceIPsMap = absl::flat_hash_map<std::string, SourceTypesArraySharedPtr>;
   using DirectSourceIPsTrie = Network::LcTrie::LcTrie<SourceTypesArraySharedPtr>;
   using DirectSourceIPsTriePtr = std::unique_ptr<DirectSourceIPsTrie>;
-  using ApplicationProtocolsMap =
-      absl::flat_hash_map<std::string, std::pair<DirectSourceIPsMap, DirectSourceIPsTriePtr>>;
+
+  // This would nominally be a `std::pair`, but that version crashes the Windows clang_cl compiler
+  // for unknown reasons. This variation, which is equivalent, does not crash the compiler.
+  // The `std::pair` version was confirmed to crash both clang 11 and clang 12.
+  struct DirectSourceIPsPair {
+    DirectSourceIPsMap first;
+    DirectSourceIPsTriePtr second;
+  };
+
+  using ApplicationProtocolsMap = absl::flat_hash_map<std::string, DirectSourceIPsPair>;
   using TransportProtocolsMap = absl::flat_hash_map<std::string, ApplicationProtocolsMap>;
   // Both exact server names and wildcard domains are part of the same map, in which wildcard
   // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
