@@ -2688,6 +2688,9 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
 }
 
 TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
   autonomous_upstream_ = true;
   autonomous_allow_incomplete_streams_ = true;
   initialize();
@@ -2717,6 +2720,7 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   response->waitForHeaders();
   // Reset stream while the quic server stream might have FIN buffered in its send buffer.
   codec_client_->sendReset(encoder);
+  codec_client_->close();
 }
 
 } // namespace Envoy

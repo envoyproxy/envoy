@@ -440,8 +440,8 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   quic::QuicStream* stream2 = envoy_quic_session_.GetOrCreateStream(stream1->id() + 4u);
   quic::QuicRstStreamFrame rst2(/*control_frame_id=*/1u, stream2->id(), quic::QUIC_REFUSED_STREAM,
                                 /*bytes_written=*/0u);
-  quic::QuicStopSendingFrame stop_sending(/*control_frame_id=*/1u, stream2->id(),
-                                          quic::QUIC_REFUSED_STREAM);
+  quic::QuicStopSendingFrame stop_sending2(/*control_frame_id=*/1u, stream2->id(),
+                                           quic::QUIC_REFUSED_STREAM);
   // Receiving both STOP_SENDING and RESET_STREAM should close the stream.
   EXPECT_CALL(stream_callbacks,
               onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
@@ -451,9 +451,30 @@ TEST_P(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
         EXPECT_EQ(quic::QUIC_REFUSED_STREAM, frame.rst_stream_frame->error_code);
         return false;
       }));
-  envoy_quic_session_.OnStopSendingFrame(stop_sending);
+  envoy_quic_session_.OnStopSendingFrame(stop_sending2);
   envoy_quic_session_.OnRstStream(rst2);
   EXPECT_EQ(1U, TestUtility::findCounter(
+                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
+                    ->value());
+
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
+      .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
+                                                             bool) -> Http::RequestDecoder& {
+        encoder.getStream().addCallbacks(stream_callbacks);
+        return request_decoder;
+      }));
+  quic::QuicStream* stream3 = envoy_quic_session_.GetOrCreateStream(stream1->id() + 8u);
+  quic::QuicRstStreamFrame rst3(/*control_frame_id=*/1u, stream3->id(), quic::QUIC_REFUSED_STREAM,
+                                /*bytes_written=*/0u);
+  quic::QuicStopSendingFrame stop_sending3(/*control_frame_id=*/1u, stream3->id(),
+                                           quic::QUIC_REFUSED_STREAM);
+  // Receiving both STOP_SENDING and RESET_STREAM should close the stream.
+  EXPECT_CALL(stream_callbacks,
+              onResetStream(Http::StreamResetReason::RemoteRefusedStreamReset, _));
+  envoy_quic_session_.OnRstStream(rst3);
+  envoy_quic_session_.OnStopSendingFrame(stop_sending3);
+  EXPECT_EQ(2U, TestUtility::findCounter(
                     static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
