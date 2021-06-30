@@ -29,7 +29,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
       .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 
-  ON_CALL(buffer_factory_, create_(_, _, _))
+  ON_CALL(buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);

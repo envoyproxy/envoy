@@ -175,6 +175,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
+    external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()

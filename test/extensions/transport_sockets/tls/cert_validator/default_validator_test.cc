@@ -116,6 +116,36 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
+  std::vector<Matchers::StringMatcherImpl> san_matchers;
+  san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  // Verify the certificate with correct SAN regex matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Validated);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 0);
+
+  matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
+  std::vector<Matchers::StringMatcherImpl> invalid_san_matchers;
+  invalid_san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  // Verify the certificate with incorrect SAN exact matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
+                                                 invalid_san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Failed);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 1);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
