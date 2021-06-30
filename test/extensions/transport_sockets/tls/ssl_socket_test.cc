@@ -838,6 +838,16 @@ void configureServerAndExpiredClientCertificate(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/expired_san_uri_key.pem"));
 }
 
+TestUtilOptionsV2 createProtocolTestOptions(
+    const envoy::config::listener::v3::Listener& listener,
+    const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx,
+    Network::Address::IpVersion version, std::string protocol) {
+  std::string stats = "ssl.versions." + protocol;
+  TestUtilOptionsV2 options(listener, client_ctx, true, version);
+  options.setExpectedServerStats(stats).setExpectedClientStats(stats);
+  return options.setExpectedProtocolVersion(protocol);
+}
+
 } // namespace
 
 class SslSocketTest : public SslCertsTest,
@@ -3828,16 +3838,6 @@ TEST_P(SslSocketTest, SslError) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.connection_error").value());
-}
-
-static TestUtilOptionsV2 createProtocolTestOptions(
-    const envoy::config::listener::v3::Listener& listener,
-    const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx,
-    Network::Address::IpVersion version, std::string protocol) {
-  std::string stats = "ssl.versions." + protocol;
-  TestUtilOptionsV2 options(listener, client_ctx, true, version);
-  options.setExpectedServerStats(stats).setExpectedClientStats(stats);
-  return options.setExpectedProtocolVersion(protocol);
 }
 
 TEST_P(SslSocketTest, ProtocolVersions) {
