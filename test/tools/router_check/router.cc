@@ -48,6 +48,9 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
     return "contains_match";
     break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    return "string_match";
+    break;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
