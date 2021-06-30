@@ -20,7 +20,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
-      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)) {
+      wait_for_warm_on_init_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
