@@ -519,7 +519,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   server_transformation_ = config.server_header_transformation();
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
-    scheme_ = config.scheme_header_transformation().scheme_to_overwrite();
+    scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
   }
 
   if (!config.server_name().empty()) {

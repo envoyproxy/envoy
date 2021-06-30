@@ -14,11 +14,11 @@ is being received) as well as during encoding (when the response is being sent).
 :scheme
 -------
 
-Envoy will always set the *:scheme* header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/1 and HTTP/2, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1
+Envoy will always set the *:scheme* header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/2 and HTTP/3, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1.
 
 For HTTP/2, and HTTP/3, incoming *:scheme* headers are trusted and propogated through upstream.
 For HTTP/1, the *:scheme* header will be set
-1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privledge escalation attack for edge Envoys [1]_ which doesn't have a comparable vector for HTTP/2 and above [2]_
+1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privledge escalation attack for edge Envoys [1]_ which doesn't have a comparable vector for HTTP/2 and above [2]_.
 2) From the value of the :ref:`config_http_conn_man_headers_x-forwarded-proto` header after sanitization (to valid *x-forwarded-proto* from trusted downstreams, otherwise based on downstream encryption level).
 
 This default behavior can be overridden via the :ref:`scheme_header_transformation

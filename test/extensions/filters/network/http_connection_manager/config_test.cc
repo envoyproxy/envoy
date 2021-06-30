@@ -910,6 +910,7 @@ TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
+  EXPECT_EQ(config.schemeToSet(), "http");
 }
 
 // Validated that by default we don't normalize paths
