@@ -16,7 +16,6 @@ envoy_cc_library(
         "@envoy//envoy/event:deferred_deletable",
         "@envoy//envoy/event:dispatcher_interface",
         "@envoy//source/common/common:lock_guard_lib",
-        "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:thread_synchronizer_lib",
     ],
 )
