@@ -116,7 +116,7 @@ envoy_cc_library(
         "active_tcp_listener.h",
     ],
     deps = [
-        ":active_stream_socket",
+        ":active_tcp_socket",
         "//envoy/common:time_interface",
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
@@ -159,10 +159,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "active_stream_socket",
-    srcs = ["active_stream_socket.cc"],
+    name = "active_tcp_socket",
+    srcs = ["active_tcp_socket.cc"],
     hdrs = [
-        "active_stream_socket.h",
+        "active_tcp_socket.h",
     ],
     deps = [
         ":active_listener_base",

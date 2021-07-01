@@ -39,7 +39,23 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 ActiveTcpListener::~ActiveTcpListener() {
   config_->connectionBalancer().unregisterHandler(*this);
 
-  cleanupConnections();
+  is_deleting_ = true;
+
+  // Purge sockets that have not progressed to connections. This should only happen when
+  // a listener filter stops iteration and never resumes.
+  while (!sockets_.empty()) {
+    auto removed = sockets_.front()->removeFromList(sockets_);
+    dispatcher().deferredDelete(std::move(removed));
+  }
+
+  for (auto& chain_and_connections : connections_by_context_) {
+    ASSERT(chain_and_connections.second != nullptr);
+    auto& connections = chain_and_connections.second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+  }
+  dispatcher().clearDeferredDeleteList();
 
   // By the time a listener is destroyed, in the common case, there should be no connections.
   // However, this is not always true if there is an in flight rebalanced connection that is
@@ -135,49 +151,13 @@ void ActiveTcpListener::resumeListening() {
   }
 }
 
-void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
-                                      std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
-
-  // Find matching filter chain.
-  const auto filter_chain = config_->filterChainManager().findFilterChain(*socket);
-  if (filter_chain == nullptr) {
-    RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
-    ENVOY_LOG(debug, "closing connection from {}: no matching filter chain found",
-              socket->addressProvider().remoteAddress()->asString());
-    stats_.no_filter_chain_match_.inc();
-    stream_info->setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    stream_info->setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().FilterChainNotFound);
-    emitLogs(*config_, *stream_info);
-    socket->close();
-    return;
-  }
-
-  stream_info->setFilterChainName(filter_chain->name());
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
-  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
-  auto server_conn_ptr = dispatcher().createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info);
-  if (const auto timeout = filter_chain->transportSocketConnectTimeout();
-      timeout != std::chrono::milliseconds::zero()) {
-    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
-  }
-
-  ActiveTcpConnectionPtr active_connection(
+void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_chain,
+                                            Network::ServerConnectionPtr server_conn_ptr,
+                                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  auto& active_connections = getOrCreateActiveConnections(filter_chain);
+  ActiveConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               dispatcher().timeSource(), std::move(stream_info)));
-  active_connection->connection_->setBufferLimits(config_->perConnectionBufferLimitBytes());
-
-  RELEASE_ASSERT(active_connection->connection_->addressProvider().remoteAddress() != nullptr, "");
-
-  const bool empty_filter_chain = !config_->filterChainFactory().createNetworkFilterChain(
-      *active_connection->connection_, filter_chain->networkFilterFactories());
-  if (empty_filter_chain) {
-    ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *active_connection->connection_,
-                   active_connection->connection_->addressProvider().remoteAddress()->asString());
-    active_connection->connection_->close(Network::ConnectionCloseType::NoFlush);
-  }
-
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,
@@ -189,7 +169,7 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
 
 ActiveConnections&
 ActiveTcpListener::getOrCreateActiveConnections(const Network::FilterChain& filter_chain) {
-  ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
+  ActiveConnectionCollectionPtr& connections = connections_by_context_[&filter_chain];
   if (connections == nullptr) {
     connections = std::make_unique<ActiveConnections>(*this, filter_chain);
   }
@@ -263,7 +243,6 @@ ActiveTcpConnection::~ActiveTcpConnection() {
   listener.parent_.decNumConnections();
 }
 
-// Network::ConnectionCallbacks
 void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(trace, "[C{}] connection on event {}", connection_->id(), static_cast<int>(event));
   // Any event leads to destruction of the connection.

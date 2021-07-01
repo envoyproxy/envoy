@@ -1,4 +1,4 @@
-#include "source/server/active_stream_socket.h"
+#include "source/server/active_tcp_socket.h"
 
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
