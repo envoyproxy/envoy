@@ -847,6 +847,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote error with CONNECT request";
   case Http::StreamResetReason::ProtocolError:
     return "protocol error";
+  case Http::StreamResetReason::OverloadManager:
+    return "overload manager reset";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

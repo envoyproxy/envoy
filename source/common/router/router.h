@@ -388,7 +388,7 @@ public:
                                           : callbacks_->getUpstreamSocketOptions();
   }
 
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return transport_socket_options_;
   }
 
@@ -549,7 +549,7 @@ private:
   uint32_t attempt_count_{1};
   uint32_t pending_retries_{0};
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
 };
 

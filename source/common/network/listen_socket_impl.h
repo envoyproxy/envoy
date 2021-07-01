@@ -152,9 +152,11 @@ public:
 
   void setRequestedServerName(absl::string_view server_name) override {
     // Always keep the server_name_ as lower case.
-    server_name_ = absl::AsciiStrToLower(server_name);
+    addressProvider().setRequestedServerName(absl::AsciiStrToLower(server_name));
   }
-  absl::string_view requestedServerName() const override { return server_name_; }
+  absl::string_view requestedServerName() const override {
+    return addressProvider().requestedServerName();
+  }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
@@ -162,15 +164,13 @@ public:
 
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_)
-       << DUMP_MEMBER(server_name_) << "\n";
+    os << spaces << "ListenSocketImpl " << this << DUMP_MEMBER(transport_protocol_) << "\n";
     DUMP_DETAILS(address_provider_);
   }
 
 protected:
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
-  std::string server_name_;
 };
 
 // ConnectionSocket used with server connections.

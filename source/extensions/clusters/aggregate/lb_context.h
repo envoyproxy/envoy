@@ -62,7 +62,7 @@ public:
   Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
     return context_->upstreamSocketOptions();
   }
-  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return context_->upstreamTransportSocketOptions();
   }
 

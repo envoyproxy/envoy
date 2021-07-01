@@ -69,11 +69,11 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this, *socket_),
-      write_buffer_(dispatcher.getWatermarkFactory().create(
+      write_buffer_(dispatcher.getWatermarkFactory().createBuffer(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      read_buffer_(dispatcher.getWatermarkFactory().create(
+      read_buffer_(dispatcher.getWatermarkFactory().createBuffer(
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
