@@ -91,7 +91,8 @@ public:
   struct ResponseTimingInfo;
 
   /**
-   * Charge a simple response stat to an upstream.
+   * Charge a simple response stat to an upstream. exclude_http_code_stats will skip charging
+   * HTTP group/individual status code stats if set to True.
    */
   virtual void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                        Code response_code, bool exclude_http_code_stats) const PURE;
