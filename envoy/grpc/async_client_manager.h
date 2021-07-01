@@ -50,7 +50,7 @@ public:
    * @param scope stats scope.
    * @param skip_cluster_check if set to true skips checks for cluster presence and being statically
    * configured.
-   * @param cache_option always use cache, never use cache, or use cache when runtime is enabled.
+   * @param cache_option always use cache or use cache when runtime is enabled.
    * @return RawAsyncClientPtr a grpc async client.
    * @throws EnvoyException when grpc_service validation fails.
    */
