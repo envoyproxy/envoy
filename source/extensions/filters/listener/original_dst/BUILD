@@ -53,6 +53,5 @@ envoy_cc_extension(
         ":original_dst_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "@envoy_api//envoy/extensions/filters/listener/original_dst/v3:pkg_cc_proto",
     ],
 )
