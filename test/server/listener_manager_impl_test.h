@@ -175,7 +175,8 @@ protected:
   findFilterChain(uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
                   const std::vector<std::string>& application_protocols,
-                  const std::string& source_address, uint16_t source_port) {
+                  const std::string& source_address, uint16_t source_port,
+                  std::string direct_source_address = "") {
     if (absl::StartsWith(destination_address, "/")) {
       local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
     } else {
@@ -196,6 +197,18 @@ protected:
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     socket_->address_provider_->setRemoteAddress(remote_address_);
+
+    if (direct_source_address.empty()) {
+      direct_source_address = source_address;
+    }
+    if (absl::StartsWith(direct_source_address, "/")) {
+      direct_remote_address_ =
+          std::make_shared<Network::Address::PipeInstance>(direct_source_address);
+    } else {
+      direct_remote_address_ =
+          Network::Utility::parseInternetAddress(direct_source_address, source_port);
+    }
+    socket_->address_provider_->setDirectRemoteAddressForTest(direct_remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -294,6 +307,7 @@ protected:
   Api::ApiPtr api_;
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
+  Network::Address::InstanceConstSharedPtr direct_remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};
