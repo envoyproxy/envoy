@@ -199,12 +199,11 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     if (withhold_grpc_frames_) {
       if (response_size_header_) {
         if (upstream_response_bytes_ != response_message_length_) {
-          std::cout << "actual: " << upstream_response_bytes_ << " expected: " << response_message_length_ << std::endl;
           encoder_callbacks_->sendLocalReply(
-              Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length", nullptr,
-              Grpc::Status::WellKnownGrpcStatus::Internal,
+              Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length",
+              nullptr, Grpc::Status::WellKnownGrpcStatus::Internal,
               RcDetails::get().GrpcBridgeFailedWrongContentLength);
-              return Http::FilterDataStatus::StopIterationNoBuffer;
+          return Http::FilterDataStatus::StopIterationNoBuffer;
         }
       } else {
         buffer.prepend(buffer_);

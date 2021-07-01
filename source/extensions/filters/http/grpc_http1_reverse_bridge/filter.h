@@ -24,10 +24,9 @@ public:
          std::string response_size_header)
       : upstream_content_type_(std::move(upstream_content_type)),
         withhold_grpc_frames_(withhold_grpc_frames),
-        response_size_header_(
-            !response_size_header.empty()
-                ? absl::make_optional(Http::LowerCaseString(response_size_header))
-                : absl::nullopt) {}
+        response_size_header_(!response_size_header.empty()
+                                  ? absl::make_optional(Http::LowerCaseString(response_size_header))
+                                  : absl::nullopt) {}
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

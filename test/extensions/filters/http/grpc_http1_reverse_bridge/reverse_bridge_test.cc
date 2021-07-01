@@ -984,11 +984,11 @@ TEST_F(ReverseBridgeTest, WithholdGrpcStreamResponseWrongContentLength) {
 
     Envoy::Buffer::OwnedImpl buffer;
     buffer.add("ghj", 4);
-      EXPECT_CALL(
-      encoder_callbacks_,
-      sendLocalReply(
-          Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length", _,
-          absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
+    EXPECT_CALL(
+        encoder_callbacks_,
+        sendLocalReply(
+            Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length", _,
+            absl::make_optional(static_cast<Grpc::Status::GrpcStatus>(Grpc::Status::Internal)), _));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(buffer, true));
     EXPECT_EQ(4, buffer.length());
     EXPECT_THAT(trailers, HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));

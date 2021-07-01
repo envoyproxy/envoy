@@ -77,11 +77,9 @@ Removed Config or Runtime
 
 New Features
 ------------
-* crash support: restore crash context when continuing to processing requests or responses as a result of an asynchronous callback that invokes a filter directly. This is unlike the call stacks that go through the various network layers, to eventually reach the filter. For  a concrete example see: ``Envoy::Extensions::HttpFilters::Cache::CacheFilter::getHeaders`` which posts a callback on the dispatcher that will invoke the filter directly.
 * grpc reverse bridge: added a new :ref:`option envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header` to support streaming response bodies when withholding gRPC frames from the upstream.
 * http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
-  value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
-
+  value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter.
 * access_log: added the new response flag for :ref:`overload manager termination <envoy_v3_api_field_data.accesslog.v3.ResponseFlags.overload_manager>`. The response flag will be set when the http stream is terminated by overload manager.
 * admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.rps_threshold>` option that when average RPS of the sampling window is below this threshold, the filter will not throttle requests. Added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` option to set an upper limit on the probability of rejection.
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
