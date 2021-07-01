@@ -60,11 +60,13 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
           Data::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
     }
 
-    uint32_t attempt_count;
-    if (headers.EnvoyAttemptCount() &&
-        absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count)) {
-      error_attempt_count_ = attempt_count;
+    uint32_t attempt_count = 1;
+    if (headers.EnvoyAttemptCount()) {
+      RELEASE_ASSERT(
+          absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count),
+          "parse error reading attempt count");
     }
+    error_attempt_count_ = attempt_count;
 
     if (end_stream) {
       onError();
