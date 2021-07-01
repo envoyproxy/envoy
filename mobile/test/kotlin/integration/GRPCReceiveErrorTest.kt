@@ -15,7 +15,8 @@ import io.envoyproxy.envoymobile.engine.JniLibrary
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
 private const val hcmType =
@@ -61,11 +62,13 @@ class GRPCReceiveErrorTest {
     JniLibrary.loadTestLibrary()
   }
 
-  private val filterExpectation = CountDownLatch(1)
-  private val runExpectation = CountDownLatch(1)
+  private val callbackReceivedError = CountDownLatch(1)
+  private val filterReceivedError = CountDownLatch(1)
+  private val filterNotCancelled = CountDownLatch(1)
 
   class ErrorValidationFilter(
-    private val latch: CountDownLatch
+    private val receivedError: CountDownLatch,
+    private val notCancelled: CountDownLatch
   ) : ResponseFilter {
     override fun onResponseHeaders(headers: ResponseHeaders, endStream: Boolean): FilterHeadersStatus<ResponseHeaders> {
       return FilterHeadersStatus.Continue(headers)
@@ -79,10 +82,12 @@ class GRPCReceiveErrorTest {
       return FilterTrailersStatus.Continue(trailers)
     }
 
-    override fun onError(error: EnvoyError) {}
+    override fun onError(error: EnvoyError) {
+      receivedError.countDown()
+    }
 
     override fun onCancel() {
-      latch.countDown()
+      notCancelled.countDown()
     }
   }
 
@@ -97,7 +102,7 @@ class GRPCReceiveErrorTest {
     val engine = EngineBuilder(Custom(config))
       .addPlatformFilter(
         name = filterName,
-        factory = { ErrorValidationFilter(filterExpectation) }
+        factory = { ErrorValidationFilter(filterReceivedError, filterNotCancelled) }
       )
       .setOnEngineRunning {}
       .build()
@@ -107,16 +112,28 @@ class GRPCReceiveErrorTest {
       .setOnResponseHeaders { headers, endStream -> }
       .setOnResponseMessage { }
       .setOnError {
-        runExpectation.countDown()
+        callbackReceivedError.countDown()
       }
+      .setOnCancel { fail("Unexpected call to onCancel response callback") }
       .start()
       .sendHeaders(requestHeader, false)
       .sendMessage(ByteBuffer.wrap(ByteArray(5)))
 
     engine.terminate()
-    filterExpectation.await(10, TimeUnit.SECONDS)
-    runExpectation.await(10, TimeUnit.SECONDS)
-    Assertions.assertThat(filterExpectation.count).isEqualTo(0)
-    Assertions.assertThat(runExpectation.count).isEqualTo(0)
+    filterReceivedError.await(10, TimeUnit.SECONDS)
+    filterNotCancelled.await(1, TimeUnit.SECONDS)
+    callbackReceivedError.await(10, TimeUnit.SECONDS)
+
+    assertThat(filterReceivedError.count)
+      .withFailMessage("Missing call to onError filter callback")
+      .isEqualTo(0)
+
+    assertThat(filterNotCancelled.count)
+      .withFailMessage("Unexpected call to onCancel filter callback")
+      .isEqualTo(1)
+
+    assertThat(callbackReceivedError.count)
+      .withFailMessage("Missing call to onError response callback")
+      .isEqualTo(0)
   }
 }
