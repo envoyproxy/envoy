@@ -18,9 +18,29 @@
 #include "test/test_common/printers.h"
 
 namespace {
-const std::string
-toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase specifier) {
-  switch (specifier) {
+
+const std::string toString(envoy::type::matcher::v3::StringMatcher::MatchPatternCase pattern) {
+  switch (pattern) {
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
+    return "exact";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix:
+    return "prefix";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
+    return "suffix";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
+    return "safe_regex";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    return "deprecated_regex";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kContains:
+    return "contains";
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::MATCH_PATTERN_NOT_SET:
+    return "match_pattern_not_set";
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+const std::string toString(const envoy::config::route::v3::HeaderMatcher& header) {
+  switch (header.header_match_specifier_case()) {
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     return "exact_match";
     break;
@@ -49,7 +69,7 @@ toString(envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase speci
     return "contains_match";
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
-    return "string_match";
+    return "string_match." + ::toString(header.string_match().match_pattern_case());
     break;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -466,12 +486,16 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
 
   // Test failed. Decide on what to log.
   std::string actual, expected;
-  std::string match_test_type{test_type + "." + ::toString(header.header_match_specifier_case())};
+  std::string match_test_type{test_type + "." + ::toString(header)};
   switch (header.header_match_specifier_case()) {
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    if (header.string_match().match_pattern_case() !=
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
+      goto default_case;
+    }
     actual =
         header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
-    expected = header.name() + ": " + header.exact_match();
+    expected = header.name() + ": " + header.string_match().exact();
     reportFailure(actual, expected, match_test_type, !header.invert_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
@@ -481,6 +505,7 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
     expected = "has(" + header.name() + "):" + (header.invert_match() ? "false" : "true");
     reportFailure(actual, expected, match_test_type);
     break;
+  default_case:
   default:
     actual =
         header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
