@@ -2,7 +2,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/dump_state_utils.h"
-#include "source/common/common/lock_guard.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -12,7 +11,6 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/thread/lock_guard.h"
 
 namespace Envoy {
 namespace Http {
