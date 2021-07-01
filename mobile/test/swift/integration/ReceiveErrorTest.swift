@@ -45,7 +45,8 @@ static_resources:
 """
 
     struct ErrorValidationFilter: ResponseFilter {
-      let expectation: XCTestExpectation
+      let receivedError: XCTestExpectation
+      let notCancelled: XCTestExpectation
 
       func onResponseHeaders(_ headers: ResponseHeaders, endStream: Bool)
         -> FilterHeadersStatus<ResponseHeaders>
@@ -64,20 +65,30 @@ static_resources:
 
       func onError(_ error: EnvoyError) {
         XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
-        self.expectation.fulfill()
+        self.receivedError.fulfill()
       }
 
-      func onCancel() {}
+      func onCancel() {
+        XCTFail("Unexpected call to onCancel filter callback")
+        self.notCancelled.fulfill()
+      }
     }
 
-    let runExpectation = self.expectation(description: "Run called with expected error")
-    let filterExpectation = self.expectation(description: "Filter called with expected error")
+    let callbackReceivedError = self.expectation(description: "Run called with expected error")
+    let filterReceivedError = self.expectation(description: "Filter called with expected error")
+    let filterNotCancelled =
+      self.expectation(description: "Filter called with unexpected cancellation")
+    filterNotCancelled.isInverted = true
+    let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
     let client = EngineBuilder(yaml: config)
       .addLogLevel(.trace)
       .addPlatformFilter(
         name: filterName,
-        factory: { ErrorValidationFilter(expectation: filterExpectation) }
+        factory: {
+          ErrorValidationFilter(receivedError: filterReceivedError,
+                                notCancelled: filterNotCancelled)
+        }
       )
       .build()
       .streamClient()
@@ -99,11 +110,14 @@ static_resources:
       // an error.
       .setOnError { error in
          XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
-         runExpectation.fulfill()
+         callbackReceivedError.fulfill()
+      }
+      .setOnCancel {
+        XCTFail("Unexpected call to onCancel response callback")
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 1), .completed)
   }
 }
