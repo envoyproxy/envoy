@@ -642,15 +642,53 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   });
 
   // `extensions` is a repeated field, and cannot be indexed through in a FieldMask.
-  EXPECT_EQ(Http::Code::BadRequest,
+  EXPECT_EQ(Http::Code::OK,
             getCallback("/config_dump?mask=bootstrap.node.extensions.name", header_map, response));
-  EXPECT_EQ("FieldMask paths: \"bootstrap.node.extensions.name\"\n could not be "
-            "successfully used.",
+  EXPECT_EQ(R"EOF({}
+)EOF",
             response.toString());
-  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
-            Http::Headers::get().ContentTypeValues.Text);
-  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
-            Http::Headers::get().XContentTypeOptionValues.Nosniff);
+}
+
+TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  auto bootstrap = admin_.getConfigTracker().add("bootstrap", [] {
+    auto msg = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    auto* bootstrap = msg->mutable_bootstrap();
+    bootstrap->mutable_node()->add_extensions()->set_name("ext1");
+    bootstrap->mutable_node()->add_extensions()->set_name("ext2");
+    return msg;
+  });
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+    auto* static_cluster = msg->add_static_clusters();
+    envoy::config::cluster::v3::Cluster inner_cluster;
+    inner_cluster.set_name("cluster1");
+    static_cluster->mutable_cluster()->PackFrom(inner_cluster);
+    return msg;
+  });
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?mask=bootstrap", header_map, response));
+  EXPECT_EQ(R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+   "bootstrap": {
+    "node": {
+     "extensions": [
+      {
+       "name": "ext1"
+      },
+      {
+       "name": "ext2"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
+)EOF",
+            response.toString());
 }
 
 } // namespace Server
