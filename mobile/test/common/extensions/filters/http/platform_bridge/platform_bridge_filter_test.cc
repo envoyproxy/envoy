@@ -93,6 +93,8 @@ public:
     unsigned int on_resume_request_calls;
     unsigned int set_response_callbacks_calls;
     unsigned int on_resume_response_calls;
+    unsigned int on_cancel_calls;
+    unsigned int on_error_calls;
     unsigned int release_filter_calls;
   } filter_invocations;
 
@@ -638,6 +640,63 @@ platform_filter_name: StopAndBufferOnRequestData
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(third_chunk, false));
   // Manual update not required, because once iteration is stopped, data is added directly.
   EXPECT_EQ(invocations.on_request_data_calls, 3);
+}
+
+TEST_F(PlatformBridgeFilterTest, BasicError) {
+  envoy_http_filter platform_filter{};
+  filter_invocations invocations{};
+  platform_filter.static_context = &invocations;
+  platform_filter.init_filter = [](const void* context) -> const void* {
+    envoy_http_filter* c_filter = static_cast<envoy_http_filter*>(const_cast<void*>(context));
+    filter_invocations* invocations =
+        static_cast<filter_invocations*>(const_cast<void*>(c_filter->static_context));
+    invocations->init_filter_calls++;
+    return invocations;
+  };
+  platform_filter.on_response_headers = [](envoy_headers c_headers, bool,
+                                           const void* context) -> envoy_filter_headers_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->on_response_headers_calls++;
+    ADD_FAILURE() << "on_headers should not get called for an error response.";
+    release_envoy_headers(c_headers);
+    return {kEnvoyFilterHeadersStatusStopIteration, envoy_noheaders};
+  };
+  platform_filter.on_response_data = [](envoy_data c_data, bool,
+                                        const void* context) -> envoy_filter_data_status {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->on_response_data_calls++;
+    ADD_FAILURE() << "on_data should not get called for an error response.";
+    c_data.release(c_data.context);
+    return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
+  };
+  platform_filter.on_error = [](envoy_error c_error, const void* context) -> void {
+    filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
+    invocations->on_error_calls++;
+    EXPECT_EQ(c_error.error_code, ENVOY_UNDEFINED_ERROR);
+    EXPECT_EQ(Data::Utility::copyToString(c_error.message), "busted");
+    EXPECT_EQ(c_error.attempt_count, 1);
+    c_error.message.release(c_error.message.context);
+  };
+
+  setUpFilter(R"EOF(
+platform_filter_name: BasicError
+)EOF",
+              &platform_filter);
+  EXPECT_EQ(invocations.init_filter_calls, 1);
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"x-internal-error-code", "0"},
+      {"x-internal-error-message", "busted"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+
+  Buffer::OwnedImpl response_data = Buffer::OwnedImpl("busted");
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, true));
+
+  EXPECT_EQ(invocations.on_response_headers_calls, 0);
+  EXPECT_EQ(invocations.on_response_data_calls, 0);
+  EXPECT_EQ(invocations.on_error_calls, 1);
 }
 
 TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {

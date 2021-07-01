@@ -404,11 +404,11 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
           Data::Utility::copyToBridgeData(error_message_header[0]->value().getStringView());
     }
 
-    int32_t attempt_count;
+    int32_t attempt_count = 1;
     if (headers.EnvoyAttemptCount()) {
-      bool parsed_attempts =
-          absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count);
-      RELEASE_ASSERT(parsed_attempts, "parse error reading attempt count");
+      RELEASE_ASSERT(
+          absl::SimpleAtoi(headers.EnvoyAttemptCount()->value().getStringView(), &attempt_count),
+          "parse error reading attempt count");
     }
 
     if (platform_filter_.on_error) {
