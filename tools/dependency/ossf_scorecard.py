@@ -26,13 +26,12 @@ from google.cloud import storage
 from urllib.parse import urlparse
 import re
 import csv
-import tempfile
 import json
 import os
 import subprocess as sp
 import sys
 
-import tools.dependency.exports
+from tools.dependency import exports
 from tools.dependency import utils
 
 Incompatible = 'Not Scorecard compatible'
