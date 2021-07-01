@@ -44,11 +44,11 @@ void Span::finishSpan() {
   parent_tracer_.sendSegment(tracing_context_);
 }
 
-void Span::injectContext(Http::RequestHeaderMap& request_headers) {
-  auto sw8_header =
-      tracing_context_->createSW8HeaderValue(std::string(request_headers.getHostValue()));
+void Span::injectContext(Tracing::TraceContext& trace_context) {
+  const auto host = trace_context.getTraceContext(Http::Headers::get().HostLegacy).value_or("");
+  auto sw8_header = tracing_context_->createSW8HeaderValue({host.data(), host.size()});
   if (sw8_header.has_value()) {
-    request_headers.setReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
+    trace_context.setTraceContextReferenceKey(skywalkingPropagationHeaderKey(), sw8_header.value());
   }
 }
 

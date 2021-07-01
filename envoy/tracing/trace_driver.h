@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/tracing/trace_context.h"
 #include "envoy/tracing/trace_reason.h"
 
 namespace Envoy {
@@ -22,7 +23,7 @@ enum class OperationName { Ingress, Egress };
  * The context for the custom tag to obtain the tag value.
  */
 struct CustomTagContext {
-  const Http::RequestHeaderMap* request_headers;
+  const TraceContext* trace_context;
   const StreamInfo::StreamInfo& stream_info;
 };
 
@@ -117,7 +118,7 @@ public:
    * (implementation-specific) trace.
    * @param request_headers the headers to which propagation context will be added
    */
-  virtual void injectContext(Http::RequestHeaderMap& request_headers) PURE;
+  virtual void injectContext(TraceContext& trace_conext) PURE;
 
   /**
    * Create and start a child Span, with this Span as its parent in the trace.
@@ -171,7 +172,7 @@ public:
   /**
    * Start driver specific span.
    */
-  virtual SpanPtr startSpan(const Config& config, Http::RequestHeaderMap& request_headers,
+  virtual SpanPtr startSpan(const Config& config, TraceContext& trace_conext,
                             const std::string& operation_name, SystemTime start_time,
                             const Tracing::Decision tracing_decision) PURE;
 };

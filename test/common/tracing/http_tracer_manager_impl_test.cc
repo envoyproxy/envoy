@@ -22,7 +22,7 @@ namespace {
 
 class SampleDriver : public Driver {
 public:
-  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const std::string&, SystemTime,
+  SpanPtr startSpan(const Config&, Tracing::TraceContext&, const std::string&, SystemTime,
                     const Tracing::Decision) override {
     return nullptr;
   }
