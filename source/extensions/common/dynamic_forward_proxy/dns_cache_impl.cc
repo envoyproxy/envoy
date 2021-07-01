@@ -58,7 +58,8 @@ DnsCacheImpl::DnsCacheImpl(
 DnsCacheImpl::~DnsCacheImpl() {
   for (const auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      primary_host.second->active_query_->cancel();
+      primary_host.second->active_query_->cancel(
+          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
     }
   }
 
@@ -210,6 +211,9 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
 }
 
 DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& host) {
+  // Functions modify primary_hosts_ are only called in the main thread so we
+  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   const auto primary_host_it = primary_hosts_.find(host);
   ASSERT(primary_host_it != primary_hosts_.end());
@@ -222,7 +226,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   auto& primary_host = getPrimaryHost(host);
   ENVOY_LOG(debug, "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
-  primary_host.active_query_->cancel();
+  primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
 }
 
@@ -233,10 +237,7 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
   // use-after-free issues
   PrimaryHostInfoPtr host_to_erase;
 
-  // Functions like this one that modify primary_hosts_ are only called in the main thread so we
-  // know it is safe to use the PrimaryHostInfo pointers outside of the lock.
   auto& primary_host = getPrimaryHost(host);
-
   const std::chrono::steady_clock::duration now_duration =
       main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
   auto last_used_time = primary_host.host_info_->lastUsedTime();

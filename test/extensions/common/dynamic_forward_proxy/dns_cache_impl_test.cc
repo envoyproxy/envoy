@@ -481,7 +481,7 @@ TEST_F(DnsCacheImplTest, ResolveTimeout) {
   checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
-  EXPECT_CALL(resolver_->active_query_, cancel());
+  EXPECT_CALL(resolver_->active_query_, cancel(Network::ActiveDnsQuery::CancelReason::Timeout));
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
   EXPECT_CALL(callbacks, onLoadDnsCacheComplete(DnsHostInfoAddressIsNull()));
@@ -783,7 +783,8 @@ TEST_F(DnsCacheImplTest, CancelActiveQueriesOnDestroy) {
   EXPECT_NE(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
 
-  EXPECT_CALL(resolver_->active_query_, cancel());
+  EXPECT_CALL(resolver_->active_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
   dns_cache_.reset();
 }
 

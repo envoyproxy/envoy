@@ -97,7 +97,7 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
-    active_query_->cancel();
+    active_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
 }
 

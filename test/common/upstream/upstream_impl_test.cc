@@ -457,8 +457,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver2.expectResolve(*dns_resolver_);
   resolver2.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that host removal works correctly when hosts are being health checked
@@ -854,9 +856,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
@@ -993,9 +998,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails

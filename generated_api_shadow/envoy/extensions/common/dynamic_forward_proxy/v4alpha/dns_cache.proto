@@ -122,5 +122,5 @@ message DnsCacheConfig {
   // used by the underlying DNS implementation (e.g., c-areas and Apple DNS) which are opaque.
   // Setting this timeout will ensure that queries succeed or fail within the specified time frame
   // and are then retried using the standard refresh rates. Defaults to 5s if not set.
-  google.protobuf.Duration dns_query_timeout = 11;
+  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
 }
