@@ -77,9 +77,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-* grpc reverse bridge: added a new :ref:`option envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header` to support streaming response bodies when withholding gRPC frames from the upstream.
-* http: a new field `is_optional` is added to `extensions.filters.network.http_connection_manager.v3.HttpFilter`. When
-  value is `true`, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter.
+
 * access_log: added the new response flag for :ref:`overload manager termination <envoy_v3_api_field_data.accesslog.v3.ResponseFlags.overload_manager>`. The response flag will be set when the http stream is terminated by overload manager.
 * admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.rps_threshold>` option that when average RPS of the sampling window is below this threshold, the filter will not throttle requests. Added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` option to set an upper limit on the probability of rejection.
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
@@ -95,6 +93,7 @@ New Features
 * dns resolver: added ``DnsResolutionConfig`` to combine :ref:`dns_resolver_options <envoy_v3_api_field_config.core.v3.DnsResolutionConfig.dns_resolver_options>` and :ref:`resolvers <envoy_v3_api_field_config.core.v3.DnsResolutionConfig.resolvers>` in a single protobuf message. The field ``resolvers`` can be specified with a list of DNS resolver addresses. If specified, DNS client library will perform resolution via the underlying DNS resolvers. Otherwise, the default system resolvers (e.g., /etc/resolv.conf) will be used.
 * dns_filter: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting the configuration option ``use_tcp_for_dns_lookups`` to true we can make dns filter's external resolvers to answer queries using TCP only, by setting the configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query which replaces the pre-existing alpha api field ``upstream_resolvers``.
 * dynamic_forward_proxy: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` option to the DNS cache config in order to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query instead of the system default resolvers.
+* grpc reverse bridge: added a new :ref:`option envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header` to support streaming response bodies when withholding gRPC frames from the upstream.
 * http: a new field ``is_optional`` is added to ``extensions.filters.network.http_connection_manager.v3.HttpFilter``. When
   value is ``true``, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
   in the typed per filter config. For more information, please reference
