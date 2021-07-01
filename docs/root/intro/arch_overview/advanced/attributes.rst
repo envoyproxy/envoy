@@ -42,7 +42,7 @@ Request attributes
 The following request attributes are generally available upon initial request
 processing, which makes them suitable for RBAC policies.
 
-`request.*` attributes are only available in http filters.
+``request.*`` attributes are only available in http filters.
 
 .. csv-table::
    :header: Attribute, Type, Description
@@ -78,7 +78,7 @@ Response attributes
 
 Response attributes are only available after the request completes.
 
-`response.*` attributes are only available in http filters.
+``response.*`` attributes are only available in http filters.
 
 .. csv-table::
    :header: Attribute, Type, Description
