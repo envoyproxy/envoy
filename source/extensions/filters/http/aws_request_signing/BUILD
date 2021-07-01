@@ -34,7 +34,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:signer_impl_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_request_signing/v3:pkg_cc_proto",
     ],

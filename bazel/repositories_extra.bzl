@@ -70,18 +70,6 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
-        name = "headersplit_pip3",
-        requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "Clang",
-        # project_url = "https://clang.llvm.org/",
-        # version = "10.0.1",
-        # release_date = "2020-07-21"
-        # use_category = ["devtools"],
-        # cpe = "cpe:2.3:a:llvm:clang:*",
-    )
-    pip_install(
         name = "protodoc_pip3",
         requirements = "@envoy//tools/protodoc:requirements.txt",
         extra_pip_args = ["--require-hashes"],

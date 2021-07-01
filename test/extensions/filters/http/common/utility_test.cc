@@ -1,5 +1,4 @@
 #include "source/extensions/filters/http/common/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"
@@ -21,8 +20,8 @@ namespace {
 TEST(FilterNameUtilTest, TestIgnoreCanonicalName) {
   NiceMock<Runtime::MockLoader> runtime;
 
-  EXPECT_EQ(HttpFilterNames::get().Buffer,
-            FilterNameUtil::canonicalFilterName(HttpFilterNames::get().Buffer, &runtime));
+  EXPECT_EQ("envoy.filters.http.buffer",
+            FilterNameUtil::canonicalFilterName("envoy.filters.http.buffer", &runtime));
   EXPECT_EQ("canonical.name", FilterNameUtil::canonicalFilterName("canonical.name", &runtime));
 }
 
@@ -35,9 +34,9 @@ TEST(FilterNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedName)) {
       deprecatedFeatureEnabled("envoy.deprecated_features.allow_deprecated_extension_names", _))
       .WillRepeatedly(Return(true));
 
-  EXPECT_EQ(HttpFilterNames::get().Buffer,
+  EXPECT_EQ("envoy.filters.http.buffer",
             FilterNameUtil::canonicalFilterName("envoy.buffer", &runtime));
-  EXPECT_EQ(HttpFilterNames::get().Squash,
+  EXPECT_EQ("envoy.filters.http.squash",
             FilterNameUtil::canonicalFilterName("envoy.squash", &runtime));
 }
 

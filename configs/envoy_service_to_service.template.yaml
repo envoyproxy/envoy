@@ -46,7 +46,6 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
-          typed_config: {}
         access_log:
         - name: envoy.access_loggers.file
           filter:
@@ -164,10 +163,7 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
-            typed_config: {}
           - name: envoy.filters.http.router
-            typed_config: {}
-
   - address:
       socket_address:
         protocol: TCP
@@ -228,9 +224,7 @@ static_resources:
                     envoy_grpc:
                        cluster_name: ratelimit
           - name: envoy.filters.http.grpc_http1_bridge
-            typed_config: {}
           - name: envoy.filters.http.router
-            typed_config: {}
   {% if external_virtual_hosts|length > 0 or mongos_servers|length > 0 %}{% endif -%}
   {% for mapping in external_virtual_hosts -%}
   - name: "{{ mapping['address']}}"
@@ -269,10 +263,8 @@ static_resources:
           http_filters:
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
           - name: envoy.filters.http.dynamo
-            typed_config: {}
           {% endif -%}
           - name: envoy.filters.http.router
-            typed_config: {}
           access_log:
           - name: envoy.access_loggers.file
             filter:
