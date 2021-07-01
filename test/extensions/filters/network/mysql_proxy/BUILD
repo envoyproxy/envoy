@@ -23,6 +23,17 @@ envoy_extension_cc_test_library(
 )
 
 envoy_extension_cc_test(
+    name = "mysql_auth_plugin_tests",
+    srcs = [
+        "mysql_auth_plugin_test.cc",
+    ],
+    extension_name = "envoy.filters.network.mysql_proxy",
+    deps = [
+        ":mysql_test_utils_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "mysql_codec_tests",
     srcs = [
         "mysql_codec_test.cc",

@@ -51,6 +51,71 @@ public:
   static DecodeStatus peekHdr(Buffer::Instance& buffer, uint32_t& len, uint8_t& seq);
 };
 
+/**
+ * MySQL auth method.
+ */
+enum class AuthMethod : uint8_t {
+  Unknown,
+  OldPassword,
+  NativePassword,
+  Sha256Password,
+  CacheSha2Password,
+  ClearPassword
+};
+
+// Helper function collection of old_password
+struct OldPassword {
+public:
+  static std::vector<uint8_t> generateSeed();
+  static std::vector<uint8_t> signature(const std::string& password,
+                                        const std::vector<uint8_t>& seed);
+  static std::vector<uint32_t> hash(const std::string& text) {
+    return hash(text.data(), text.size());
+  }
+  static std::vector<uint32_t> hash(const std::vector<uint8_t>& text) {
+    return hash(reinterpret_cast<const char*>(text.data()), text.size());
+  }
+  /*
+   * Generate binary hash from raw text string
+   * Used for Pre-4.1 password handling
+   */
+  static std::vector<uint32_t> hash(const char* text, int size);
+  static constexpr int SEED_LENGTH = 8;
+
+private:
+  struct RandStruct {
+    RandStruct(uint32_t seed1, uint32_t seed2);
+    double myRnd();
+    uint32_t seed1_, seed2_, max_value_;
+    double max_value_dbl_;
+  };
+};
+
+// Helper function collection of native_password
+struct NativePassword {
+  static std::vector<uint8_t> generateSeed();
+  static std::vector<uint8_t> signature(const std::string& password,
+                                        const std::vector<uint8_t>& seed);
+
+  static std::vector<uint8_t> hash(const std::string& text) {
+    return hash(text.data(), text.size());
+  }
+  static std::vector<uint8_t> hash(const std::vector<uint8_t>& text) {
+    return hash(reinterpret_cast<const char*>(text.data()), text.size());
+  }
+  static std::vector<uint8_t> hash(const char* data, int len);
+  static constexpr int SEED_LENGTH = 20;
+};
+
+/**
+ * Auth helpers for auth MySQL client and server.
+ */
+class AuthHelper {
+public:
+  static AuthMethod authMethod(uint32_t cap, const std::string& auth_plugin_name);
+  static std::string authPluginName(AuthMethod method);
+};
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions

@@ -45,6 +45,8 @@ public:
   std::string encodeAuthSwitchResp();
 
   std::string encodeMessage(uint32_t packet_len, uint8_t it = 0, uint8_t seq_force = 0);
+
+  static std::string encodeUint32Hex(const uint32_t* data, size_t len);
 };
 } // namespace MySQLProxy
 } // namespace NetworkFilters

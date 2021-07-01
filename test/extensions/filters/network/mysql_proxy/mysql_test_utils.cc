@@ -134,6 +134,27 @@ int MySQLTestUtils::sizeOfLengthEncodeInteger(uint64_t val) {
   }
 }
 
+std::string MySQLTestUtils::encodeUint32Hex(const uint32_t* data, size_t len) {
+  static const char* const digits = "0123456789abcdef";
+
+  std::string ret;
+  ret.reserve(len * sizeof(uint32_t) * 2);
+
+  for (size_t i = 0; i < len; i++) {
+    uint32_t d = data[i];
+    ret.push_back(digits[(d >> (8 * 3 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 3)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 2 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 2)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 1 + 4)) & 0xf]);
+    ret.push_back(digits[(d >> (8 * 1)) & 0xf]);
+    ret.push_back(digits[(d >> 4) & 0xf]);
+    ret.push_back(digits[d & 0xf]);
+  }
+
+  return ret;
+}
+
 } // namespace MySQLProxy
 } // namespace NetworkFilters
 } // namespace Extensions
