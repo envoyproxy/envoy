@@ -95,6 +95,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/local_info:local_info_mocks",
