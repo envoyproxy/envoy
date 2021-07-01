@@ -122,6 +122,18 @@ std::string MySQLTestUtils::encodeMessage(uint32_t packet_len, uint8_t it, uint8
   return buffer.toString();
 }
 
+int MySQLTestUtils::bytesOfConnAtrributeLength(
+    const std::vector<std::pair<std::string, std::string>> conn_attrs) {
+  int64_t allLen = 0;
+  for (const auto& kv : conn_attrs) {
+    allLen += sizeOfLengthEncodeInteger(kv.first.length());
+    allLen += kv.first.length();
+    allLen += sizeOfLengthEncodeInteger(kv.second.length());
+    allLen += kv.second.length();
+  }
+  return sizeOfLengthEncodeInteger(allLen);
+}
+
 int MySQLTestUtils::sizeOfLengthEncodeInteger(uint64_t val) {
   if (val < 251) {
     return sizeof(uint8_t);
