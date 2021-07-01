@@ -39,13 +39,13 @@ void grpcAltsSetRpcProtocolVersions(grpc_gcp_rpc_protocol_versions* rpc_versions
 // returns false and fills out err with an error message.
 bool doValidate(const tsi_peer& peer, const absl::node_hash_set<std::string>& peers,
                 TsiInfo& tsi_info, std::string& err) {
-  tsi_info.name_ = TSI_ALTS_SERVICE_ACCOUNT_PEER_PROPERTY;
   for (size_t i = 0; i < peer.property_count; ++i) {
     const std::string name = std::string(peer.properties[i].name);
     const std::string value =
         std::string(peer.properties[i].value.data, peer.properties[i].value.length);
     if (name.compare(TSI_ALTS_SERVICE_ACCOUNT_PEER_PROPERTY) == 0 &&
         peers.find(value) != peers.end()) {
+      tsi_info.name_ = value;
       return true;
     }
   }
