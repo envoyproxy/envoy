@@ -220,7 +220,7 @@ message CommonTlsContext {
   // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
   // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
-  // not legal to put a repeated field in a oneof. In the next majory version, we should rework
+  // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
   repeated TlsCertificate tls_certificates = 2;
 
@@ -233,7 +233,7 @@ message CommonTlsContext {
   // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
   // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
-  // not legal to put a repeated field in a oneof. In the next majory version, we should rework
+  // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
       [(validate.rules).repeated = {max_items: 2}];
