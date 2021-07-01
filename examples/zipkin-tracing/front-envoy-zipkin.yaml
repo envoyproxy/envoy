@@ -43,7 +43,6 @@ static_resources:
                   value: "%REQ(x-request-id)%"
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: service1
     type: STRICT_DNS

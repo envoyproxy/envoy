@@ -56,6 +56,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     conn_data_ = std::move(conn);
     conn_data_->addUpstreamCallbacks(callbacks_);
     host_ = host;
+    ssl_ = conn_data_->connection().streamInfo().downstreamSslConnection();
     pool_ready_.ready();
   }
 
@@ -72,6 +73,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
   ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
   Upstream::HostDescriptionConstSharedPtr host_;
+  Ssl::ConnectionInfoConstSharedPtr ssl_;
 };
 
 class TestActiveTcpClient : public ActiveTcpClient {
@@ -99,7 +101,7 @@ public:
   ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                Network::ConnectionSocket::OptionsSharedPtr options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                bool test_new_connection_pool);
 
   void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
@@ -155,14 +157,14 @@ public:
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
 protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
   public:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         Network::ConnectionSocket::OptionsSharedPtr options,
-                        Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                         ConnPoolBase& parent)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                        transport_socket_options, state_),
@@ -187,10 +189,11 @@ protected:
 
   class OriginalConnPoolImplForTest : public OriginalConnPoolImpl {
   public:
-    OriginalConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
-                                Network::ConnectionSocket::OptionsSharedPtr options,
-                                Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                                ConnPoolBase& parent)
+    OriginalConnPoolImplForTest(
+        Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
+        Network::ConnectionSocket::OptionsSharedPtr options,
+        Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+        ConnPoolBase& parent)
         : OriginalConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                                transport_socket_options),
           parent_(parent) {}
@@ -229,7 +232,7 @@ protected:
 ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                            NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb,
                            Network::ConnectionSocket::OptionsSharedPtr options,
-                           Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            bool test_new_connection_pool)
     : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb),
       test_new_connection_pool_(test_new_connection_pool), options_(options),
@@ -285,7 +288,7 @@ public:
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   Upstream::HostSharedPtr host_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<ConnPoolBase> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
@@ -320,7 +323,7 @@ public:
     EXPECT_CALL(*connection_, connect());
     EXPECT_CALL(*connection_, setConnectionStats(_));
     EXPECT_CALL(*connection_, noDelay(true));
-    EXPECT_CALL(*connection_, streamInfo()).Times(2);
+    EXPECT_CALL(*connection_, streamInfo()).Times(3);
     EXPECT_CALL(*connection_, id()).Times(AnyNumber());
     EXPECT_CALL(*connection_, readDisable(_)).Times(AnyNumber());
 
@@ -337,6 +340,7 @@ public:
     EXPECT_CALL(*connection_, ssl()).WillOnce(Return(ssl_));
     connection_->raiseEvent(Network::ConnectionEvent::Connected);
     EXPECT_EQ(connection_->streamInfo().downstreamSslConnection(), ssl_);
+    EXPECT_EQ(callbacks_->ssl_, ssl_);
   }
 
   bool test_new_connection_pool_;
