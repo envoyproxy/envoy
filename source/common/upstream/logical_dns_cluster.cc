@@ -56,7 +56,6 @@ LogicalDnsCluster::LogicalDnsCluster(
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
-      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       local_info_(factory_context.localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
