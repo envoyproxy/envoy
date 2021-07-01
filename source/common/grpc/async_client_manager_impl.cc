@@ -144,7 +144,6 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
 RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
     const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
     bool skip_cluster_check, CacheOption cache_option) {
-
   if (cache_option == CacheOption::CacheWhenRuntimeEnabled &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_grpc_async_client_cache")) {
     return factoryForGrpcService(config, scope, skip_cluster_check)->createUncachedRawAsyncClient();

@@ -30,6 +30,8 @@ private:
   friend class AsyncClientFactoryImpl;
 };
 
+// TO(chaoqin-li1123): Remove this enum class when we verify that sharing async client is safe and the
+// "envoy.reloadable_features.enable_grpc_async_client_cache" runtime has been removed.
 enum class CacheOption { AlwaysCache, CacheWhenRuntimeEnabled };
 
 using AsyncClientFactoryPtr = std::unique_ptr<AsyncClientFactory>;
