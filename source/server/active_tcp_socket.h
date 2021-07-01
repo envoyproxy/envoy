@@ -173,9 +173,6 @@ public:
     newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
   }
 
-  virtual void newActiveConnection(const Network::FilterChain& filter_chain,
-                                   Network::ServerConnectionPtr server_conn_ptr,
-                                   std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
 
   /**
    * Schedule to remove and destroy the active connections owned by the filter chain.
@@ -210,12 +207,25 @@ public:
     }
   }
 
+  // Below members are open to access by ActiveTcpSocket.
   Network::ConnectionHandler& parent_;
-  Event::Dispatcher& dispatcher_;
-  Network::ListenerPtr listener_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
+
+protected:
+  /**
+   * Create the active connection from server connection. This active listener owns the created active connection.
+   * 
+   * @param filter_chain The network filter chain linking to the connection.
+   * @param server_conn_ptr The server connection.
+   * @param stream_info The stream info of the active connection.
+   */
+  virtual void newActiveConnection(const Network::FilterChain& filter_chain,
+                                   Network::ServerConnectionPtr server_conn_ptr,
+                                   std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+  Event::Dispatcher& dispatcher_;
+  Network::ListenerPtr listener_;
   bool is_deleting_{false};
 };
 
