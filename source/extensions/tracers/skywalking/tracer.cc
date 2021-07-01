@@ -49,7 +49,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
 
   // TODO(wbpcode): Due to https://github.com/SkyAPM/cpp2sky/issues/83 in cpp2sky, it is necessary
   // to ensure that there is '\0' at the end of the string_view parameter to ensure that the
-  // corresponding sw8 header is generated correctly. For this reason, we cannot directly use host
+  // corresponding trace header is generated correctly. For this reason, we cannot directly use host
   // as argument. We need create a copy of std::string based on host and std::string will
   // automatically add '\0' to the end of the string content.
   auto sw8_header = tracing_context_->createSW8HeaderValue(std::string(host));
