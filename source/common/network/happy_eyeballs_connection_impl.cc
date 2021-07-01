@@ -17,10 +17,6 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       transport_socket_options_(transport_socket_options),
       options_(options) {
   connection_ = createConnection();
-  state_.write_buffer_ = dispatcher_.getWatermarkFactory().create(
-          [this]() -> void { this->onWriteBufferLowWatermark(); },
-          [this]() -> void { this->onWriteBufferHighWatermark(); },
-          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
 }
 
 HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() = default;
@@ -88,6 +84,7 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
 }
 bool HappyEyeballsConnectionImpl::readEnabled() const {
   if (!connect_finished_) {
+    ASSERT_EQ(connection_->readEnabled(), true);
     return true;
   }
   return connection_->readEnabled();
@@ -129,6 +126,10 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   }
 
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
+  state_.write_buffer_ = dispatcher_.getWatermarkFactory().create(
+          [this]() -> void { this->onWriteBufferLowWatermark(); },
+          [this]() -> void { this->onWriteBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
   state_.write_buffer_->move(data);
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   state_.end_stream_ = end_stream;
@@ -144,10 +145,11 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
   return connection_->bufferLimit();
 }
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
+  /*
   if (!connect_finished_) {
     return false;
   }
-
+  */
   return connection_->aboveHighWatermark();
 }
 const ConnectionSocket::OptionsSharedPtr& HappyEyeballsConnectionImpl::socketOptions() const {
@@ -260,7 +262,8 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
     }
   }
 
-  if (state_.write_buffer_->length() > 0 || state_.end_stream_) {
+  if ((state_.write_buffer_ && state_.write_buffer_->length() > 0) || state_.end_stream_) {
+    ASSERT(false);
     connection_->write(*state_.write_buffer_, state_.end_stream_);
   }
 
