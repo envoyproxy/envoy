@@ -32,7 +32,6 @@ static_resources:
                 timeout: 0.250s
               transport_api_version: V3
           - name: envoy.filters.http.router
-            typed_config: {}
 
   clusters:
   - name: upstream-service

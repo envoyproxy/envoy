@@ -655,9 +655,9 @@ void Filter::onUpstreamConnection() {
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
-  getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
+                 read_callbacks_->connection(),
+                 getStreamInfo().downstreamAddressProvider().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into

@@ -334,7 +334,7 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   // Validate that there are no active listeners and workers are started.
@@ -441,7 +441,6 @@ filter_chains:
 - filters:
   - foo: type
     name: name
-    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
@@ -477,7 +476,6 @@ address:
 filter_chains:
 - filters:
   - name: non_terminal
-    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
@@ -500,7 +498,6 @@ filter_chains:
       stat_prefix: tcp
       cluster: cluster
   - name: unknown_but_will_not_be_processed
-    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(
@@ -518,7 +515,6 @@ address:
 filter_chains:
 - filters:
   - name: invalid
-    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
@@ -568,7 +564,6 @@ bind_to_port: false
 filter_chains:
 - filters:
   - name: stats_test
-    typed_config: {}
   )EOF";
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)));
@@ -716,7 +711,7 @@ dynamic_listeners:
 )EOF");
 
   EXPECT_CALL(*worker_, addListener(_, _, _));
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   worker_->callAddCompletion(true);
 
@@ -946,7 +941,6 @@ address:
 filter_chains:
 - filters:
   - name: fake
-    typed_config: {}
   )EOF";
 
   EXPECT_FALSE(
@@ -1040,7 +1034,7 @@ dynamic_listeners:
 static_listeners:
 )EOF");
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
@@ -1117,7 +1111,7 @@ filter_chains: {}
       }))
       .RetiresOnSaturation();
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
@@ -1259,7 +1253,7 @@ dynamic_listeners:
 
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _));
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
@@ -1435,7 +1429,6 @@ address:
 filter_chains:
 - filters:
   - name: fake
-    typed_config: {}
   )EOF";
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);
@@ -1464,7 +1457,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add and initialize foo listener.
@@ -1525,7 +1518,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener directly into active.
@@ -1585,7 +1578,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener directly into active.
@@ -1638,7 +1631,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1675,7 +1668,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqualToFalse)) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1713,7 +1706,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, ReusePortEqualToTrue) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -1768,7 +1761,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   const std::string listener_foo_yaml = R"EOF(
@@ -1821,7 +1814,7 @@ TEST_F(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Make sure the config dump is empty by default.
@@ -1857,7 +1850,7 @@ dynamic_listeners:
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   const std::string listener_foo_yaml = R"EOF(
@@ -1907,7 +1900,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Remove an unknown listener.
@@ -1989,7 +1982,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener in inbound direction.
@@ -2094,7 +2087,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopAllListeners) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2142,7 +2135,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StopWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2199,7 +2192,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into active.
@@ -2236,7 +2229,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, StaticListenerAddFailure) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into active.
@@ -2307,7 +2300,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -2364,7 +2357,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, EarlyShutdown) {
   // If stopWorkers is called before the workers are started, it should be a no-op: they should be
   // neither started nor stopped.
-  EXPECT_CALL(*worker_, start(_)).Times(0);
+  EXPECT_CALL(*worker_, start(_, _)).Times(0);
   EXPECT_CALL(*worker_, stop()).Times(0);
   manager_->stopWorkers();
 }
@@ -2375,7 +2368,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         destination_port: 8080
@@ -2421,7 +2413,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
@@ -2467,7 +2458,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         server_names: "server1.example.com"
@@ -2514,7 +2504,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
@@ -2556,7 +2545,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         application_protocols: "http/1.1"
@@ -2603,7 +2591,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -2662,7 +2649,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -2722,7 +2708,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         source_prefix_ranges:
@@ -2762,7 +2747,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         source_ports:
@@ -2809,7 +2793,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         source_type: SAME_IP_OR_LOOPBACK
@@ -2897,7 +2880,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -2983,7 +2965,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3069,7 +3050,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3168,7 +3148,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3213,7 +3192,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3261,7 +3239,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty
@@ -3324,7 +3301,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -3368,7 +3344,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -3408,7 +3383,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         prefix_ranges: { address_prefix: a.b.c.d, prefix_len: 32 }
@@ -3425,7 +3399,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         server_names: "*w.example.com"
@@ -3444,7 +3417,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - name : foo
       filter_chain_match:
@@ -3468,7 +3440,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - name: foo
       filter_chain_match:
@@ -3491,7 +3462,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithOverlappi
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         server_names: "example.com"
@@ -3569,7 +3539,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         transport_protocol: "tls"
@@ -3894,7 +3863,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
                 route: { cluster: service_foo }
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   Configuration::ListenerFactoryContext* listener_factory_context = nullptr;
@@ -3927,7 +3895,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoTrafficDi
     filter_chains: {}
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3948,7 +3915,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterWin32NoFeatureSu
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
@@ -3967,7 +3933,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "envoy.filters.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(server_.api_.random_, uuid());
@@ -4049,7 +4014,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4105,7 +4069,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
     traffic_direction: OUTBOUND
     listener_filters:
     - name: "test.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4156,7 +4119,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
     traffic_direction: INBOUND
     listener_filters:
     - name: "test.listener.original_dst"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -4238,7 +4200,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     filter_chains: {}
     listener_filters:
     - name: "test.listener.original_dstipv6"
-      typed_config: {}
   )EOF",
                                                        Network::Address::IpVersion::v6);
 
@@ -4595,7 +4556,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 
 // Validate that dispatcher stats prefix is set correctly when enabled.
 TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(*worker_, initializeStats(_));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 }
@@ -4725,7 +4686,7 @@ api_listener:
 TEST_F(ListenerManagerImplTest, StopInplaceWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4787,7 +4748,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4856,7 +4817,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -4919,7 +4880,7 @@ filter_chains:
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdatingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -5001,7 +4962,7 @@ filter_chains:
 TEST_F(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   // Add foo listener into warming.
@@ -5151,7 +5112,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5177,7 +5138,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfImplicitTlsInspectorChanges) {
   auto tls_inspector_injection_enabled_guard = enableTlsInspectorInjectionForThisTest();
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5203,7 +5164,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        DEPRECATED_FEATURE_TEST(TraditionalUpdateIfImplicitProxyProtocolChanges)) {
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5223,7 +5184,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 }
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZeroFilterChain) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5247,7 +5208,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
 
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
   auto listener_proto = createDefaultListener();
@@ -5314,7 +5275,7 @@ TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
 TEST_F(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(callback_, Call());
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 }

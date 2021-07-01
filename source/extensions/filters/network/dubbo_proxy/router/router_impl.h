@@ -19,7 +19,7 @@ namespace Router {
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
-               public DubboFilters::DecoderFilter,
+               public DubboFilters::CodecFilter,
                Logger::Loggable<Logger::Id::dubbo> {
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
@@ -30,6 +30,10 @@ public:
   void setDecoderFilterCallbacks(DubboFilters::DecoderFilterCallbacks& callbacks) override;
 
   FilterStatus onMessageDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
+
+  // DubboFilter::EncoderFilter
+  void setEncoderFilterCallbacks(DubboFilters::EncoderFilterCallbacks& callbacks) override;
+  FilterStatus onMessageEncoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) override;
 
   // Upstream::LoadBalancerContextBase
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
@@ -57,6 +61,7 @@ private:
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -88,6 +93,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
 
   DubboFilters::DecoderFilterCallbacks* callbacks_{};
+  DubboFilters::EncoderFilterCallbacks* encoder_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;

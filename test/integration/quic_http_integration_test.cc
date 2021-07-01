@@ -74,6 +74,7 @@ public:
           }
           bool use_http3 = GetParam().second == QuicVersionType::Iquic;
           SetQuicReloadableFlag(quic_disable_version_draft_29, !use_http3);
+          SetQuicReloadableFlag(quic_enable_version_rfcv1, use_http3);
           return quic::CurrentSupportedVersions();
         }()),
         conn_helper_(*dispatcher_), alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
@@ -109,7 +110,8 @@ public:
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
-        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
+        persistent_info.crypto_stream_factory_);
     return session;
   }
 
@@ -273,6 +275,13 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
+  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
+  } else if (GetParam().second == QuicVersionType::GquicTls) {
+    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  } else {
+    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -382,6 +391,15 @@ TEST_P(QuicHttpIntegrationTest, Reset101SwitchProtocolResponse) {
   ASSERT_TRUE(response->waitForReset());
   codec_client_->close();
   EXPECT_FALSE(response->complete());
+
+  // Verify stream error counters are correctly incremented.
+  std::string counter_scope = GetParam().first == Network::Address::IpVersion::v4
+                                  ? "listener.127.0.0.1_0.http3.downstream.rx."
+                                  : "listener.[__1]_0.http3.downstream.rx.";
+  std::string error_code = GetParam().second == QuicVersionType::Iquic
+                               ? "quic_reset_stream_error_code_QUIC_STREAM_GENERAL_PROTOCOL_ERROR"
+                               : "quic_reset_stream_error_code_QUIC_BAD_APPLICATION_PAYLOAD";
+  test_server_->waitForCounterEq(absl::StrCat(counter_scope, error_code), 1U);
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {

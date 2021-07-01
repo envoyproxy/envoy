@@ -3,7 +3,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/listener/original_dst/config.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +24,7 @@ public:
     return std::make_unique<envoy::extensions::filters::listener::original_dst::v3::OriginalDst>();
   }
 
-  std::string name() const override { return ListenerFilterNames::get().OriginalDst; }
+  std::string name() const override { return "envoy.filters.listener.original_dst"; }
 };
 
 } // namespace OriginalDst

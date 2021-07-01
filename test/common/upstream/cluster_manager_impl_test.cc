@@ -3422,6 +3422,27 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   EXPECT_TRUE(opt_cp.has_value());
 }
 
+TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(pool_mock));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
+  ASSERT_TRUE(opt_cp.has_value());
+
+  EXPECT_CALL(*pool_mock, hasActiveConnections()).WillOnce(Return(true));
+  opt_cp.value().hasActiveConnections();
+
+  ConnectionPool::Instance::DrainedCb drained_cb = []() {};
+  EXPECT_CALL(*pool_mock, addDrainedCallback(_));
+  opt_cp.value().addDrainedCallback(drained_cb);
+}
+
 class TestUpstreamNetworkFilter : public Network::WriteFilter {
 public:
   Network::FilterStatus onWrite(Buffer::Instance&, bool) override {

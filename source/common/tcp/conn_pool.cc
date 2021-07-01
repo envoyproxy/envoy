@@ -64,15 +64,14 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   // This is also necessary for prefetch to be used with such protocols.
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
+    connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
   }
   Envoy::ConnectionPool::ActiveClient::onEvent(event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected
     // connections.
-    if (event == Network::ConnectionEvent::Connected) {
-      connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
-    } else {
+    if (event != Network::ConnectionEvent::Connected) {
       if (tcp_connection_data_) {
         Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
       }

@@ -421,6 +421,13 @@ absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
   return path_str;
 }
 
+std::string Utility::stripQueryString(const HeaderString& path) {
+  absl::string_view path_str = path.getStringView();
+  size_t query_offset = path_str.find('?');
+  return std::string(path_str.data(),
+                     query_offset != path_str.npos ? query_offset : path_str.size());
+}
+
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
   return parseCookie(headers, key, Http::Headers::get().Cookie.get());
 }
@@ -840,6 +847,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote error with CONNECT request";
   case Http::StreamResetReason::ProtocolError:
     return "protocol error";
+  case Http::StreamResetReason::OverloadManager:
+    return "overload manager reset";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

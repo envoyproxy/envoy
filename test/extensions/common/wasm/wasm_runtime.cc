@@ -13,16 +13,16 @@ std::vector<std::string> runtimes() {
 
 std::vector<std::string> sandboxRuntimes() {
   std::vector<std::string> runtimes;
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
   runtimes.push_back("v8");
 #endif
-#if defined(ENVOY_WASM_WAVM)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAVM)
   runtimes.push_back("wavm");
 #endif
-#if defined(ENVOY_WASM_WAMR)
+#if defined(PROXY_WASM_HAS_RUNTIME_WAMR)
   runtimes.push_back("wamr");
 #endif
-#if defined(ENVOY_WASM_WASMTIME)
+#if defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
   runtimes.push_back("wasmtime");
 #endif
   return runtimes;

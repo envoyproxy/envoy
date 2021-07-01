@@ -6,7 +6,7 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
@@ -69,6 +69,7 @@ struct DnsEndpointConfig {
 };
 
 using DnsVirtualDomainConfig = absl::flat_hash_map<std::string, DnsEndpointConfig>;
+using DnsVirtualDomainConfigSharedPtr = std::shared_ptr<DnsVirtualDomainConfig>;
 
 /**
  * DnsFilter configuration class abstracting access to data necessary for the filter's operation
@@ -80,8 +81,6 @@ public:
       const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config);
 
   DnsFilterStats& stats() const { return stats_; }
-  const DnsVirtualDomainConfig& domains() const { return virtual_domains_; }
-  const std::vector<Matchers::StringMatcherPtr>& knownSuffixes() const { return known_suffixes_; }
   const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
     return domain_ttl_;
   }
@@ -95,6 +94,9 @@ public:
   const envoy::config::core::v3::DnsResolverOptions& dnsResolverOptions() const {
     return dns_resolver_options_;
   }
+  const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
+    return dns_lookup_trie_;
+  }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
@@ -107,14 +109,17 @@ private:
                             DnsFilterConfig::ServerContextConfig& config,
                         envoy::data::dns::v3::DnsTable& table);
 
+  void addEndpointToSuffix(const absl::string_view suffix, const absl::string_view domain_name,
+                           DnsEndpointConfig& endpoint_config);
+
   Stats::Scope& root_scope_;
   Upstream::ClusterManager& cluster_manager_;
   Network::DnsResolverSharedPtr resolver_;
   Api::Api& api_;
 
   mutable DnsFilterStats stats_;
-  DnsVirtualDomainConfig virtual_domains_;
-  std::vector<Matchers::StringMatcherPtr> known_suffixes_;
+
+  TrieLookupTable<DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   uint64_t retry_count_;

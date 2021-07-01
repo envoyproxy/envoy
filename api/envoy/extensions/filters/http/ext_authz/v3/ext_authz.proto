@@ -215,18 +215,21 @@ message AuthorizationRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.AuthorizationRequest";
 
-  // Authorization request will include the client request headers that have a correspondent match
-  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. Note that in addition to the
-  // user's supplied matchers:
+  // Authorization request includes the client request headers that have a correspondent match
+  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`.
   //
-  // 1. *Host*, *Method*, *Path* and *Content-Length* are automatically included to the list.
+  // .. note::
   //
-  // 2. *Content-Length* will be set to 0 and the request to the authorization service will not have
-  // a message body. However, the authorization request can include the buffered client request body
-  // (controlled by :ref:`with_request_body
-  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` setting),
-  // consequently the value of *Content-Length* of the authorization request reflects the size of
-  // its payload size.
+  //   In addition to the the user's supplied matchers, ``Host``, ``Method``, ``Path``,
+  //   ``Content-Length``, and ``Authorization`` are **automatically included** to the list.
+  //
+  // .. note::
+  //
+  //   By default, ``Content-Length`` header is set to ``0`` and the request to the authorization
+  //   service has no message body. However, the authorization request *may* include the buffered
+  //   client request body (controlled by :ref:`with_request_body
+  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
+  //   setting) hence the value of its ``Content-Length`` reflects the size of its payload size.
   //
   type.matcher.v3.ListStringMatcher allowed_headers = 1;
 
