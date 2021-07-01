@@ -19,7 +19,9 @@ namespace Server {
 
 namespace {
 
-// Return a fake address for use when either the source or destination is UDS.
+// Return a fake address for use when either the source or destination is unix domain socket.
+// This address will only match the fallback matcher of 0.0.0.0/0, which is the default
+// when no IP matcher is configured.
 Network::Address::InstanceConstSharedPtr fakeAddress() {
   CONSTRUCT_ON_FIRST_USE(Network::Address::InstanceConstSharedPtr,
                          Network::Utility::parseInternetAddress("255.255.255.255"));
@@ -174,20 +176,23 @@ void FilterChainManagerImpl::addFilterChains(
     }
     filter_chains.insert({filter_chain_match, filter_chain->name()});
 
-    // Validate IP addresses.
-    std::vector<std::string> destination_ips;
-    destination_ips.reserve(filter_chain_match.prefix_ranges().size());
-    for (const auto& destination_ip : filter_chain_match.prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(destination_ip);
-      destination_ips.push_back(cidr_range.asString());
-    }
+    auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {
+      std::vector<std::string> ips;
+      ips.reserve(prefix_ranges.size());
+      for (const auto& ip : prefix_ranges) {
+        const auto& cidr_range = Network::Address::CidrRange::create(ip);
+        ips.push_back(cidr_range.asString());
+      }
+      return ips;
+    };
 
-    std::vector<std::string> source_ips;
-    source_ips.reserve(filter_chain_match.source_prefix_ranges().size());
-    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
-      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
-      source_ips.push_back(cidr_range.asString());
-    }
+    // Validate IP addresses.
+    std::vector<std::string> destination_ips =
+        createAddressVector(filter_chain_match.prefix_ranges());
+    std::vector<std::string> source_ips =
+        createAddressVector(filter_chain_match.source_prefix_ranges());
+    std::vector<std::string> direct_source_ips =
+        createAddressVector(filter_chain_match.direct_source_prefix_ranges());
 
     std::vector<std::string> server_names;
     // Reject partial wildcards, we don't match on them.
@@ -215,8 +220,9 @@ void FilterChainManagerImpl::addFilterChains(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         server_names, filter_chain_match.transport_protocol(),
-        filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-        filter_chain_match.source_ports(), filter_chain_impl);
+        filter_chain_match.application_protocols(), direct_source_ips,
+        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
+        filter_chain_impl);
 
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
@@ -265,6 +271,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
+    const std::vector<std::string>& direct_source_ips,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
@@ -275,26 +282,28 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
   }
   addFilterChainForDestinationIPs(destination_ports_map[destination_port].first, destination_ips,
                                   server_names, transport_protocol, application_protocols,
-                                  source_type, source_ips, source_ports, filter_chain);
+                                  direct_source_ips, source_type, source_ips, source_ports,
+                                  filter_chain);
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
+    const std::vector<std::string>& direct_source_ips,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ips.empty()) {
     addFilterChainForServerNames(destination_ips_map[EMPTY_STRING], server_names,
-                                 transport_protocol, application_protocols, source_type, source_ips,
-                                 source_ports, filter_chain);
+                                 transport_protocol, application_protocols, direct_source_ips,
+                                 source_type, source_ips, source_ports, filter_chain);
   } else {
     for (const auto& destination_ip : destination_ips) {
       addFilterChainForServerNames(destination_ips_map[destination_ip], server_names,
-                                   transport_protocol, application_protocols, source_type,
-                                   source_ips, source_ports, filter_chain);
+                                   transport_protocol, application_protocols, direct_source_ips,
+                                   source_type, source_ips, source_ports, filter_chain);
     }
   }
 }
@@ -303,6 +312,7 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
     ServerNamesMapSharedPtr& server_names_map_ptr, const absl::Span<const std::string> server_names,
     const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
+    const std::vector<std::string>& direct_source_ips,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
@@ -314,19 +324,19 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
 
   if (server_names.empty()) {
     addFilterChainForApplicationProtocols(server_names_map[EMPTY_STRING][transport_protocol],
-                                          application_protocols, source_type, source_ips,
-                                          source_ports, filter_chain);
+                                          application_protocols, direct_source_ips, source_type,
+                                          source_ips, source_ports, filter_chain);
   } else {
     for (const auto& server_name : server_names) {
       if (isWildcardServerName(server_name)) {
         // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
         addFilterChainForApplicationProtocols(
             server_names_map[server_name.substr(1)][transport_protocol], application_protocols,
-            source_type, source_ips, source_ports, filter_chain);
+            direct_source_ips, source_type, source_ips, source_ports, filter_chain);
       } else {
         addFilterChainForApplicationProtocols(server_names_map[server_name][transport_protocol],
-                                              application_protocols, source_type, source_ips,
-                                              source_ports, filter_chain);
+                                              application_protocols, direct_source_ips, source_type,
+                                              source_ips, source_ports, filter_chain);
       }
     }
   }
@@ -335,27 +345,52 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
 void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
     const absl::Span<const std::string* const> application_protocols,
+    const std::vector<std::string>& direct_source_ips,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (application_protocols.empty()) {
-    addFilterChainForSourceTypes(application_protocols_map[EMPTY_STRING], source_type, source_ips,
-                                 source_ports, filter_chain);
+    addFilterChainForDirectSourceIPs(application_protocols_map[EMPTY_STRING].first,
+                                     direct_source_ips, source_type, source_ips, source_ports,
+                                     filter_chain);
   } else {
     for (const auto& application_protocol_ptr : application_protocols) {
-      addFilterChainForSourceTypes(application_protocols_map[*application_protocol_ptr],
-                                   source_type, source_ips, source_ports, filter_chain);
+      addFilterChainForDirectSourceIPs(application_protocols_map[*application_protocol_ptr].first,
+                                       direct_source_ips, source_type, source_ips, source_ports,
+                                       filter_chain);
+    }
+  }
+}
+
+void FilterChainManagerImpl::addFilterChainForDirectSourceIPs(
+    DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+    const std::vector<std::string>& source_ips,
+    const absl::Span<const Protobuf::uint32> source_ports,
+    const Network::FilterChainSharedPtr& filter_chain) {
+  if (direct_source_ips.empty()) {
+    addFilterChainForSourceTypes(direct_source_ips_map[EMPTY_STRING], source_type, source_ips,
+                                 source_ports, filter_chain);
+  } else {
+    for (const auto& direct_source_ip : direct_source_ips) {
+      addFilterChainForSourceTypes(direct_source_ips_map[direct_source_ip], source_type, source_ips,
+                                   source_ports, filter_chain);
     }
   }
 }
 
 void FilterChainManagerImpl::addFilterChainForSourceTypes(
-    SourceTypesArray& source_types_array,
+    SourceTypesArraySharedPtr& source_types_array_ptr,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
+  if (source_types_array_ptr == nullptr) {
+    source_types_array_ptr = std::make_shared<SourceTypesArray>();
+  }
+
+  SourceTypesArray& source_types_array = *source_types_array_ptr;
   if (source_ips.empty()) {
     addFilterChainForSourceIPs(source_types_array[source_type].first, EMPTY_STRING, source_ports,
                                filter_chain);
@@ -527,14 +562,31 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
   for (const auto& application_protocol : socket.requestedApplicationProtocols()) {
     const auto application_protocol_match = application_protocols_map.find(application_protocol);
     if (application_protocol_match != application_protocols_map.end()) {
-      return findFilterChainForSourceTypes(application_protocol_match->second, socket);
+      return findFilterChainForDirectSourceIP(*application_protocol_match->second.second, socket);
     }
   }
 
   // Match on a filter chain without application protocol requirements.
   const auto any_protocol_match = application_protocols_map.find(EMPTY_STRING);
   if (any_protocol_match != application_protocols_map.end()) {
-    return findFilterChainForSourceTypes(any_protocol_match->second, socket);
+    return findFilterChainForDirectSourceIP(*any_protocol_match->second.second, socket);
+  }
+
+  return nullptr;
+}
+
+const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSourceIP(
+    const DirectSourceIPsTrie& direct_source_ips_trie,
+    const Network::ConnectionSocket& socket) const {
+  auto address = socket.addressProvider().directRemoteAddress();
+  if (address->type() != Network::Address::Type::Ip) {
+    address = fakeAddress();
+  }
+
+  const auto& data = direct_source_ips_trie.getData(address);
+  if (!data.empty()) {
+    ASSERT(data.size() == 1);
+    return findFilterChainForSourceTypes(*data.back(), socket);
   }
 
   return nullptr;
@@ -627,20 +679,34 @@ void FilterChainManagerImpl::convertIPsToTries() {
         UNREFERENCED_PARAMETER(server_name);
         for (auto& [transport_protocol, application_protocols_map] : transport_protocols_map) {
           UNREFERENCED_PARAMETER(transport_protocol);
-          for (auto& [application_protocol, source_arrays] : application_protocols_map) {
+          for (auto& [application_protocol, direct_source_ips_pair] : application_protocols_map) {
             UNREFERENCED_PARAMETER(application_protocol);
-            for (auto& [source_ips_map, source_ips_trie] : source_arrays) {
-              std::vector<
-                  std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
-                  source_ips_list;
-              source_ips_list.reserve(source_ips_map.size());
+            auto& [direct_source_ips_map, direct_source_ips_trie] = direct_source_ips_pair;
 
-              for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
-                source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
+            std::vector<
+                std::pair<SourceTypesArraySharedPtr, std::vector<Network::Address::CidrRange>>>
+                direct_source_ips_list;
+            direct_source_ips_list.reserve(direct_source_ips_map.size());
+
+            for (auto& [direct_source_ip, source_arrays_ptr] : direct_source_ips_map) {
+              direct_source_ips_list.push_back(
+                  makeCidrListEntry(direct_source_ip, source_arrays_ptr));
+
+              for (auto& [source_ips_map, source_ips_trie] : *source_arrays_ptr) {
+                std::vector<
+                    std::pair<SourcePortsMapSharedPtr, std::vector<Network::Address::CidrRange>>>
+                    source_ips_list;
+                source_ips_list.reserve(source_ips_map.size());
+
+                for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
+                  source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
+                }
+
+                source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
               }
-
-              source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
             }
+            direct_source_ips_trie =
+                std::make_unique<DirectSourceIPsTrie>(direct_source_ips_list, true);
           }
         }
       }

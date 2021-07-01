@@ -84,15 +84,13 @@ public:
     Extensions::Common::Wasm::createWasm(
         plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
         remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
-    if (wasm_) {
-      plugin_handle_ = getOrCreateThreadLocalPlugin(
-          wasm_, plugin_, dispatcher_,
-          [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
-            root_context_ = static_cast<Context*>(create_root(wasm, plugin));
-            return root_context_;
-          });
-      wasm_ = plugin_handle_->wasmHandleForTest();
-    }
+    plugin_handle_ = getOrCreateThreadLocalPlugin(
+        wasm_, plugin_, dispatcher_,
+        [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
+          root_context_ = static_cast<Context*>(create_root(wasm, plugin));
+          return root_context_;
+        });
+    wasm_ = plugin_handle_->wasmHandle();
   }
 
   WasmHandleSharedPtr& wasm() { return wasm_; }
@@ -143,7 +141,8 @@ public:
   template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
     int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
+    context_ =
+        std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_handle_);
     context_->setDecoderFilterCallbacks(decoder_callbacks_);
     context_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -160,7 +159,8 @@ public:
   template <typename TestFilter> void setupFilterBase() {
     auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
     int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ = std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_);
+    context_ =
+        std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_handle_);
     context_->initializeReadFilterCallbacks(read_filter_callbacks_);
     context_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }

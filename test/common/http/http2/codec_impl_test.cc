@@ -1076,14 +1076,14 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     Stats::TestUtil::MemoryTest memory_test;
     server_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
-
-    // Check contents for active stream, trailers to encode and header map.
+    // Check contents for active stream, local_end_stream_, trailers to encode and header map.
     EXPECT_THAT(
         ostream.contents(),
         HasSubstr(
             "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
             "  stream: \n"
             "    ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(), HasSubstr("local_end_stream_: 1"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
                           "    absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
@@ -1103,13 +1103,14 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     client_->dumpState(ostream, 1);
     EXPECT_EQ(memory_test.consumedBytes(), 0);
 
-    // Check contents for active stream, trailers to encode and header map.
+    // Check contents for active stream, local_end_stream_, trailers to encode and header map.
     EXPECT_THAT(
         ostream.contents(),
         HasSubstr(
             "Number of active streams: 1, current_stream_id_: null Dumping 1 Active Streams:\n"
             "  stream: \n"
             "    ConnectionImpl::StreamImpl"));
+    EXPECT_THAT(ostream.contents(), HasSubstr("local_end_stream_: 0"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
                           "    absl::get<ResponseHeaderMapPtr>(headers_or_trailers_): \n"
