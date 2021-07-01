@@ -41,6 +41,7 @@ private:
     UpstreamRequest(RouterImpl& router);
 
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
 
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,

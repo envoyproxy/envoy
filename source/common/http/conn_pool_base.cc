@@ -10,8 +10,8 @@
 namespace Envoy {
 namespace Http {
 
-Network::TransportSocketOptionsSharedPtr
-wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+Network::TransportSocketOptionsConstSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
@@ -44,7 +44,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
 HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
@@ -154,6 +154,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
     break;
   case StreamResetReason::LocalReset:
   case StreamResetReason::ProtocolError:
+  case StreamResetReason::OverloadManager:
     parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
     break;
   case StreamResetReason::RemoteReset:

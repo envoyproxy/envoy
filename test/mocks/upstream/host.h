@@ -130,16 +130,17 @@ public:
   MockHost();
   ~MockHost() override;
 
-  CreateConnectionData createConnection(Event::Dispatcher& dispatcher,
-                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                        Network::TransportSocketOptionsSharedPtr) const override {
+  CreateConnectionData
+  createConnection(Event::Dispatcher& dispatcher,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   Network::TransportSocketOptionsConstSharedPtr) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, options);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
   CreateConnectionData
   createHealthCheckConnection(Event::Dispatcher& dispatcher,
-                              Network::TransportSocketOptionsSharedPtr,
+                              Network::TransportSocketOptionsConstSharedPtr,
                               const envoy::config::core::v3::Metadata*) const override {
     MockCreateConnectionData data = createConnection_(dispatcher, nullptr);
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};

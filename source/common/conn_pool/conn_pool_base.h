@@ -140,7 +140,7 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
@@ -224,7 +224,7 @@ public:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
-  const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
@@ -305,7 +305,7 @@ protected:
 
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
   std::list<Instance::IdleCb> idle_callbacks_;
 

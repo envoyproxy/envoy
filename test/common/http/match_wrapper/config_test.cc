@@ -164,7 +164,7 @@ matcher:
 )EOF");
 
   MatchWrapperConfig match_wrapper_config;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       match_wrapper_config.createFilterFactoryFromProto(config, "", factory_context),
       EnvoyException,
       "requirement violation while creating match tree: INVALID_ARGUMENT: data input typeUrl "
