@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.sni_validation.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.sni_validation.v3";
+option java_outer_classname = "SniValidationProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: SniValidation]
+// Sni Validation :ref:`configuration overview <config_http_filters_sni_validation>`.
+// [#extension: envoy.filters.http.sni_validation]
+//
+// Reject the http request with [response code 421 (Misdirected Request)](https://datatracker.ietf.org/doc/html/rfc7540#section-11.7) if the connection has attribute.
+// [#not-implemented-hide:]
+message SniValidation {
+  message SniList {
+    // If specifies, the Host or :authority header must match one of the the element.
+    //
+    // The element will be matched against all wildcard domains, i.e. ``www.example.com``
+    // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
+    //
+    // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
+    repeated string allow_list = 1;
+
+    // If specifies, the Host or :authority header must NOT match one of the the element.
+    //
+    // The element will be matched against all wildcard domains, i.e. ``www.example.com``
+    // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
+    //
+    // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
+    repeated string deny_list = 2;
+  }
+
+  oneof match_type {
+    option (validate.required) = true;
+
+    // If set to true, the http request will be rejected if the Host header does not match the SNI of the connection.
+    //
+    // This is the conservative choice. If the cert allows ``*.example.com`` but the SNI is ``a.example.com``, the follow up ``b.exmaple.com``` host header will be rejected.
+    bool connection_sni = 1;
+
+    // The combination of allow and deny list match.
+    //
+    // Below example to allow ``guest1.example.com``, ``guest2.example.com`` but reject ``admin.example.com``.
+    //
+    // .. code-block:: yaml
+    //
+    //  sni_list:
+    //    allow_list: [*.example.com]
+    //    deny_list: [admin.example.com]
+    SniList sni_list = 2;
+  }
+}
