@@ -42,9 +42,9 @@ CryptoMbContext::CryptoMbContext(Event::Dispatcher& dispatcher,
 void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
   schedulable_ = dispatcher_.createSchedulableCallback([this, status]() -> void {
     // The status can't be set beforehand, because the callback asserts
-    // if some else races to call doHandshake() and the status goes to
+    // if someone else races to call doHandshake() and the status goes to
     // HandshakeComplete.
-    this->status_ = status;
+    setStatus(status);
     this->cb_.onPrivateKeyMethodComplete();
   });
   schedulable_->scheduleCallbackNextIteration();
@@ -133,9 +133,9 @@ int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned
   return 1;
 }
 
-ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t*, size_t*, size_t,
-                                             uint16_t signature_algorithm, const uint8_t* in,
-                                             size_t in_len) {
+ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
+                                             size_t max_out, uint16_t signature_algorithm,
+                                             const uint8_t* in, size_t in_len) {
   CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
 
@@ -177,7 +177,21 @@ ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t*, size_t*, size_t
     return ssl_private_key_failure;
   }
 
-  ops->addToQueue(mb_ctx);
+  bool synchronous_processing = ops->addToQueue(mb_ctx);
+
+  if (synchronous_processing) {
+    if (ops->mb_ctx_->getStatus() != RequestStatus::Success) {
+      ops->logWarnMsg("private key operation failed.");
+      return ssl_private_key_failure;
+    }
+    *out_len = ops->mb_ctx_->out_len_;
+    if (*out_len > max_out) {
+      ops->logWarnMsg("too long output message.");
+      return ssl_private_key_failure;
+    }
+    memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
+    return ssl_private_key_success;
+  }
 
   return ssl_private_key_retry;
 }
@@ -188,7 +202,7 @@ ssl_private_key_result_t ecdsaPrivateKeyDecrypt(SSL*, uint8_t*, size_t*, size_t,
   return ssl_private_key_failure;
 }
 
-ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t*, size_t*, size_t,
+ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
                                            uint16_t signature_algorithm, const uint8_t* in,
                                            size_t in_len) {
 
@@ -267,20 +281,33 @@ ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t*, size_t*, size_t,
     return status;
   }
 
-  ops->addToQueue(mb_ctx);
-
-  status = ssl_private_key_retry;
-
-  // We will be called when some other thread or timer processes this request
-  // from the queue.
   if (prefix_allocated) {
     OPENSSL_free(msg);
   }
+
+  bool synchronous_processing = ops->addToQueue(mb_ctx);
+
+  if (synchronous_processing) {
+    if (ops->mb_ctx_->getStatus() != RequestStatus::Success) {
+      ops->logWarnMsg("private key operation failed.");
+      return status;
+    }
+    *out_len = ops->mb_ctx_->out_len_;
+    if (*out_len > max_out) {
+      ops->logWarnMsg("too long output message.");
+      return status;
+    }
+    memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
+    status = ssl_private_key_success;
+  } else {
+    status = ssl_private_key_retry;
+  }
+
   return status;
 }
 
-ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t*, size_t*, size_t,
-                                              const uint8_t* in, size_t in_len) {
+ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
+                                              size_t max_out, const uint8_t* in, size_t in_len) {
   CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
       SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
 
@@ -310,7 +337,21 @@ ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t*, size_t*, size_
     return ssl_private_key_failure;
   }
 
-  ops->addToQueue(mb_ctx);
+  bool synchronous_processing = ops->addToQueue(mb_ctx);
+
+  if (synchronous_processing) {
+    if (ops->mb_ctx_->getStatus() != RequestStatus::Success) {
+      ops->logWarnMsg("private key operation failed.");
+      return ssl_private_key_failure;
+    }
+    *out_len = ops->mb_ctx_->out_len_;
+    if (*out_len > max_out) {
+      ops->logWarnMsg("too long output message.");
+      return ssl_private_key_failure;
+    }
+    memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
+    return ssl_private_key_success;
+  }
 
   return ssl_private_key_retry;
 }
@@ -357,8 +398,8 @@ ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                              IppCryptoSharedPtr ipp, Event::Dispatcher& d)
     : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp),
-      timer_(d.createTimer([this]() -> void { processRequests(); })) {
+      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() -> void { processRequests(); })),
+      sync_mode_(us_ == std::chrono::microseconds(0)) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
 
@@ -366,21 +407,29 @@ void CryptoMbQueue::startTimer() { timer_->enableHRTimer(us_); }
 
 void CryptoMbQueue::stopTimer() { timer_->disableTimer(); }
 
-void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) {
+bool CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) {
   // Add the request to the processing queue.
   ASSERT(request_queue_.size() < MULTIBUFF_BATCH);
   request_queue_.push_back(mb_ctx);
 
-  if (request_queue_.size() == 1) {
-    // First request in the queue, start the queue timer.
-    startTimer();
+  if (sync_mode_) {
+    // Single request, process synchronously (for testing).
+    ENVOY_LOG(debug, "processing directly 1 request (synchronous mode)");
+    processRequests();
+    return true; // synchronous processing
   } else if (request_queue_.size() == MULTIBUFF_BATCH) {
     // There are eight requests in the queue and we can process them.
     stopTimer();
 
     ENVOY_LOG(debug, "processing directly 8 requests");
     processRequests();
+    return false; // asynchronous processing
+  } else if (request_queue_.size() == 1) {
+    // First request in the queue, start the queue timer.
+    startTimer();
   }
+
+  return false; // asynchronous processing
 }
 
 void CryptoMbQueue::processRequests() {
@@ -467,7 +516,11 @@ void CryptoMbQueue::processEcdsaRequests() {
     }
 
     ctx_status = status[req_num];
-    mb_ctx->scheduleCallback(ctx_status);
+    if (!sync_mode_) {
+      mb_ctx->scheduleCallback(ctx_status);
+    } else {
+      mb_ctx->setStatus(ctx_status);
+    }
   }
 }
 
@@ -545,7 +598,11 @@ void CryptoMbQueue::processRsaRequests() {
     }
 
     ctx_status = status[req_num];
-    mb_ctx->scheduleCallback(ctx_status);
+    if (!sync_mode_) {
+      mb_ctx->scheduleCallback(ctx_status);
+    } else {
+      mb_ctx->setStatus(ctx_status);
+    }
   }
 }
 
@@ -572,9 +629,9 @@ void CryptoMbPrivateKeyMethodProvider::registerPrivateKeyMethod(
   SSL_set_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex(), ops);
 }
 
-void CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
+bool CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
   mb_ctx_ = mb_ctx;
-  queue_.addAndProcessEightRequests(mb_ctx_);
+  return queue_.addAndProcessEightRequests(mb_ctx_);
 }
 
 bool CryptoMbPrivateKeyMethodProvider::checkFips() {

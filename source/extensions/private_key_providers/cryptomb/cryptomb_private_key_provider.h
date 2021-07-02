@@ -28,6 +28,7 @@ public:
   CryptoMbContext(Event::Dispatcher& dispatcher, Ssl::PrivateKeyConnectionCallbacks& cb);
   ~CryptoMbContext() = default;
 
+  void setStatus(RequestStatus status) { status_ = status; }
   enum RequestStatus getStatus() { return status_; }
   void scheduleCallback(enum RequestStatus status);
 
@@ -96,7 +97,8 @@ public:
 
   CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                 IppCryptoSharedPtr ipp, Event::Dispatcher& d);
-  void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx);
+  // return true if processing is synchronous
+  bool addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx);
 
 private:
   void processRequests();
@@ -123,6 +125,9 @@ private:
 
   // Timer to trigger queue processing if eight requests are not received in time.
   Event::TimerPtr timer_{};
+
+  // Synchronous mode for testing purposes.
+  bool sync_mode_{};
 };
 
 // CryptoMbPrivateKeyConnection maintains the data needed by a given SSL
@@ -137,7 +142,8 @@ public:
   EVP_PKEY* getPrivateKey() { return pkey_.get(); };
   void logDebugMsg(std::string msg) { ENVOY_LOG(debug, "CryptoMb: {}", msg); }
   void logWarnMsg(std::string msg) { ENVOY_LOG(warn, "CryptoMb: {}", msg); }
-  void addToQueue(CryptoMbContextSharedPtr mb_ctx);
+  // return true if processing is synchronous
+  bool addToQueue(CryptoMbContextSharedPtr mb_ctx);
 
   CryptoMbQueue& queue_;
   Event::Dispatcher& dispatcher_;
