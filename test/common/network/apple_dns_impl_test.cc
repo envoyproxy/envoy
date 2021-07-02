@@ -220,11 +220,7 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
 // error conditions, and callback firing.
 class AppleDnsImplFakeApiTest : public testing::Test {
 public:
-  AppleDnsImplFakeApiTest() = default;
-
-  ~AppleDnsImplFakeApiTest() = default;
-
-  void createResolver() {
+  void SetUp() override {
     resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(dispatcher_, stats_store_);
   }
 
@@ -239,8 +235,6 @@ protected:
 };
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -276,7 +270,6 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
-  createResolver();
   file_event_ = new NiceMock<Event::MockFileEvent>;
 
   const std::string hostname = "foo.com";
@@ -314,7 +307,6 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
-  createResolver();
   file_event_ = new NiceMock<Event::MockFileEvent>;
 
   const std::string hostname = "foo.com";
@@ -357,8 +349,6 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, SynchronousErrorInGetAddrInfo) {
-  createResolver();
-
   EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, _, _, _, _, _, _))
       .WillOnce(Return(kDNSServiceErr_Unknown));
 
@@ -371,8 +361,6 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousErrorInGetAddrInfo) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -410,8 +398,6 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -446,8 +432,6 @@ TEST_F(AppleDnsImplFakeApiTest, QueryCompletedWithError) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -496,8 +480,6 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -539,8 +521,6 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -617,8 +597,6 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -688,8 +666,6 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -726,8 +702,6 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;
@@ -757,8 +731,6 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 }
 
 TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
-  createResolver();
-
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   addr4.sin_family = AF_INET;

@@ -149,7 +149,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     parent_.stats_.processing_failure_.inc();
     // Similar to receiving an error in onDNSServiceGetAddrInfoReply, an error while processing fd
     // events indicates that the sd_ref state is broken.
-    // Therefore, flush queries with_error == true.
+    // Therefore, finish resolving with an error.
     pending_cb_.status_ = ResolutionStatus::Failure;
     finishResolve();
   }
