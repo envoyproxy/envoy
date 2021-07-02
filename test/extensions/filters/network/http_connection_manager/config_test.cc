@@ -15,6 +15,7 @@
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -646,7 +647,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   - name: envoy.filters.http.router
  )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string, false),
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
                                      context_, date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_);
   Stats::TestUtil::TestStore store;
@@ -654,7 +655,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  Runtime::MockRandomGenerator generator;
+  Random::MockRandomGenerator generator;
   envoy::config::bootstrap::v3::LayeredRuntime runtime_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
@@ -663,7 +664,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
-  Runtime::RandomGeneratorImpl rand;
+  Random::RandomGeneratorImpl rand;
   for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
     config.requestIDExtension()->setTraceStatus(header, Envoy::Http::TraceStatus::Sampled);
