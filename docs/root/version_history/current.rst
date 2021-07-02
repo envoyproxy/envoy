@@ -106,6 +106,7 @@ New Features
 * http: added upstream and downstream alpha HTTP/3 support! See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` for downstream and the new http3_protocol_options in :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` for upstream HTTP/3.
 * input matcher: a new input matcher that :ref:`matches an IP address against a list of CIDR ranges <envoy_v3_api_file_envoy/extensions/matching/input_matchers/ip/v3/ip.proto>`.
 * jwt_authn: added support to fetch remote jwks asynchronously specified by :ref:`async_fetch <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.async_fetch>`.
+* jwt_authn: added support to add padding in the forwarded JWT payload specified by :ref:`pad_forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.pad_forward_payload_header>`.
 * listener: added ability to change an existing listener's address.
 * listener: added filter chain match support for :ref:`direct source address <envoy_v3_api_field_config.listener.v3.FilterChainMatch.direct_source_prefix_ranges>`.
 * local_rate_limit_filter: added suppoort for locally rate limiting http requests on a per connection basis. This can be enabled by setting the :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>` field to true.
