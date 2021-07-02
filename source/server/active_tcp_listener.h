@@ -112,12 +112,6 @@ public:
                       bool hand_off_restored_destination_connections, bool rebalanced) override;
 
   /**
-   * Remove and destroy an active connection.
-   * @param connection supplies the connection to remove.
-   */
-  void removeConnection(ActiveTcpConnection& connection);
-
-  /**
    * Create active connection from the server connection.
    */
   void newActiveConnection(const Network::FilterChain& filter_chain,
