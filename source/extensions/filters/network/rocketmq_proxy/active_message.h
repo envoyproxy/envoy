@@ -20,13 +20,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RocketmqProxy {
 
-constexpr std::string_view BrokerName = "broker_name";
-constexpr std::string_view ClusterName = "cluster_name";
-constexpr std::string_view WriteQueueNum = "write_queue_num";
-constexpr std::string_view ReadQueueNum = "read_queue_num";
-constexpr std::string_view BrokerId = "broker_id";
-constexpr std::string_view Perm = "perm";
-
 class ConnectionManager;
 
 /**

@@ -164,27 +164,30 @@ void ActiveMessage::onQueryTopicRoute() {
         const auto filter_it = filter_metadata.find(NetworkFilterNames::get().RocketmqProxy);
         ASSERT(filter_it != filter_metadata.end());
         const auto& metadata_fields = filter_it->second.fields();
-        ASSERT(metadata_fields.contains(BrokerName));
-        std::string broker_name = metadata_fields.at(BrokerName).string_value();
-        ASSERT(metadata_fields.contains(ClusterName));
-        std::string broker_cluster_name = metadata_fields.at(ClusterName).string_value();
+        ASSERT(metadata_fields.contains(std::string(BrokerName)));
+        std::string broker_name = metadata_fields.at(std::string(BrokerName)).string_value();
+        ASSERT(metadata_fields.contains(std::string(ClusterName)));
+        std::string broker_cluster_name =
+            metadata_fields.at(std::string(ClusterName)).string_value();
         // Proto3 will ignore the field if the value is zero.
         int32_t read_queue_num = 0;
-        if (metadata_fields.contains("read_queue_num")) {
+        if (metadata_fields.contains(std::string(ReadQueueNum))) {
           read_queue_num =
-              static_cast<int32_t>(metadata_fields.at("read_queue_num").number_value());
+              static_cast<int32_t>(metadata_fields.at(std::string(ReadQueueNum)).number_value());
         }
         int32_t write_queue_num = 0;
-        if (metadata_fields.contains(WriteQueueNum)) {
-          write_queue_num = static_cast<int32_t>(metadata_fields.at(WriteQueueNum).number_value());
+        if (metadata_fields.contains(std::string(WriteQueueNum))) {
+          write_queue_num =
+              static_cast<int32_t>(metadata_fields.at(std::string(WriteQueueNum)).number_value());
         }
         int32_t perm = 0;
-        if (metadata_fields.contains(Perm)) {
-          perm = static_cast<int32_t>(metadata_fields.at(Perm).number_value());
+        if (metadata_fields.contains(std::string(Perm))) {
+          perm = static_cast<int32_t>(metadata_fields.at(std::string(Perm)).number_value());
         }
         int32_t broker_id = 0;
-        if (metadata_fields.contains(BrokerId)) {
-          broker_id = static_cast<int32_t>(metadata_fields.at(BrokerId).number_value());
+        if (metadata_fields.contains(std::string(BrokerId))) {
+          broker_id =
+              static_cast<int32_t>(metadata_fields.at(std::string(BrokerId)).number_value());
         }
         queue_data_list.emplace_back(QueueData(broker_name, read_queue_num, write_queue_num, perm));
         if (connection_manager_.config().developMode()) {
@@ -259,12 +262,12 @@ void ActiveMessage::recordPopRouteInfo(Upstream::HostDescriptionConstSharedPtr h
     const auto filter_it = filter_metadata.find(NetworkFilterNames::get().RocketmqProxy);
     ASSERT(filter_it != filter_metadata.end());
     const auto& metadata_fields = filter_it->second.fields();
-    ASSERT(metadata_fields.contains(BrokerName));
-    std::string broker_name = metadata_fields.at(BrokerName).string_value();
+    ASSERT(metadata_fields.contains(std::string(BrokerName)));
+    std::string broker_name = metadata_fields.at(std::string(BrokerName)).string_value();
     // Proto3 will ignore the field if the value is zero.
     int32_t broker_id = 0;
-    if (metadata_fields.contains(BrokerId)) {
-      broker_id = static_cast<int32_t>(metadata_fields.at(BrokerId).number_value());
+    if (metadata_fields.contains(std::string(BrokerId))) {
+      broker_id = static_cast<int32_t>(metadata_fields.at(std::string(BrokerId)).number_value());
     }
     // Tag the request with upstream host metadata: broker-name, broker-id
     auto custom_header = request_->typedCustomHeader<CommandCustomHeader>();

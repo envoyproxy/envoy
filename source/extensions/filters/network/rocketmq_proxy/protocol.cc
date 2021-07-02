@@ -734,10 +734,9 @@ void MetadataHelper::parseRequest(RemotingCommandPtr& request, MessageMetadataSh
   metadata->headers().addCopy(Http::LowerCaseString("code"), code);
 
   if (enumToInt(RequestCode::AckMessage) == code) {
-    metadata->headers().addCopy(Http::LowerCaseString("broker_name"),
+    metadata->headers().addCopy(Http::LowerCaseString(BrokerName),
                                 custom_header->targetBrokerName());
-    metadata->headers().addCopy(Http::LowerCaseString("broker_id"),
-                                custom_header->targetBrokerId());
+    metadata->headers().addCopy(Http::LowerCaseString(BrokerId), custom_header->targetBrokerId());
   }
 }
 
