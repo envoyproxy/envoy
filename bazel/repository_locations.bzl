@@ -260,7 +260,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-07",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
-
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",

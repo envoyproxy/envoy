@@ -2,14 +2,13 @@
 
 #include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
-
 #include "envoy/stats/stats.h"
+
+#include "source/extensions/filters/http/sxg/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
-
-#include "source/extensions/filters/http/sxg/filter.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -3,16 +3,14 @@
 #include <memory>
 #include <string>
 
-#include "envoy/registry/registry.h"
-
-#include "source/common/protobuf/utility.h"
-
-#include "source/extensions/filters/http/sxg/filter.h"
 #include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
-
+#include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
+
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/sxg/filter.h"
 
 namespace Envoy {
 namespace Extensions {

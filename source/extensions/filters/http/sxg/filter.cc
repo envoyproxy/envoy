@@ -1,24 +1,24 @@
 #include "source/extensions/filters/http/sxg/filter.h"
 
-#include <cstdlib>
-#include <regex>
-#include <string>
-#include <chrono>
-
-#include <openssl/evp.h>
 #include <openssl/bio.h>
+#include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 
-#include "envoy/server/filter_config.h"
+#include <chrono>
+#include <cstdlib>
+#include <regex>
+#include <string>
 
-#include "absl/strings/escaping.h"
-#include "envoy/stats/scope.h"
 #include "envoy/http/codes.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/stats/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "libsxg.h"
 
 namespace Envoy {
@@ -66,8 +66,7 @@ const std::regex& matchAcceptHeaderRegex() {
                          std::regex_constants::icase);
 }
 
-void Filter::onDestroy() {
-}
+void Filter::onDestroy() {}
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "sxg filter from decodeHeaders: {}", headers);

@@ -1,10 +1,9 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-
-#include "envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
 
 #include "source/common/config/datasource.h"
 
