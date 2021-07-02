@@ -42,11 +42,10 @@ ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& p
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
                                                    Network::ListenerConfig& config)
-    : ActiveListenerImplBase(parent, &config), parent_(parent), 
+    : ActiveListenerImplBase(parent, &config), parent_(parent),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
-      dispatcher_(dispatcher),
-      listener_(std::move(listener)) {}
+      dispatcher_(dispatcher), listener_(std::move(listener)) {}
 
 void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
                                         StreamInfo::StreamInfo& stream_info) {

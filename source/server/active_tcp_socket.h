@@ -173,7 +173,6 @@ public:
     newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
   }
 
-
   /**
    * Schedule to remove and destroy the active connections owned by the filter chain.
    */
@@ -215,8 +214,9 @@ public:
 
 protected:
   /**
-   * Create the active connection from server connection. This active listener owns the created active connection.
-   * 
+   * Create the active connection from server connection. This active listener owns the created
+   * active connection.
+   *
    * @param filter_chain The network filter chain linking to the connection.
    * @param server_conn_ptr The server connection.
    * @param stream_info The stream info of the active connection.
