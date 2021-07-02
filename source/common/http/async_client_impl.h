@@ -225,7 +225,7 @@ private:
         hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
       }
       if (retry_policy.has_value()) {
-        // FIXME: ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
+        // ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
         retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
             retry_policy.value(), ProtobufMessage::getNullValidationVisitor());
       } else {
