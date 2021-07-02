@@ -323,7 +323,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
-  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
+  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
