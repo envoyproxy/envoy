@@ -252,6 +252,11 @@ ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
     auto* config = dump.add_configs();
     config->PackFrom(*message);
   }
+  if (dump.configs().empty() && mask.has_value()) {
+    return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+        Http::Code::BadRequest,
+        absl::StrCat("FieldMask ", *mask, " could not be successfully applied to any configs."))};
+  }
   return absl::nullopt;
 }
 

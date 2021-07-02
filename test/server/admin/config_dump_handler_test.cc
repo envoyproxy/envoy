@@ -1,5 +1,6 @@
 #include "test/server/admin/admin_instance.h"
 
+using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -573,7 +574,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
   std::string output = response.toString();
-  EXPECT_THAT(output, testing::HasSubstr("could not be successfully used"));
+  EXPECT_THAT(output, HasSubstr("could not be successfully used"));
 }
 
 // Test that a 404 Not found is returned if a non-existent resource is passed in as the
@@ -642,11 +643,9 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   });
 
   // `extensions` is a repeated field, and cannot be indexed through in a FieldMask.
-  EXPECT_EQ(Http::Code::OK,
+  EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?mask=bootstrap.node.extensions.name", header_map, response));
-  EXPECT_EQ(R"EOF({}
-)EOF",
-            response.toString());
+  EXPECT_THAT(response.toString(), HasSubstr("could not be successfully applied to any configs"));
 }
 
 TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
