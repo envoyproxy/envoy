@@ -392,8 +392,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       return wasm_factory(config, scope, cluster_manager, dispatcher, lifecycle_notifier,
                           toAbslStringView(vm_key));
     };
+    // TODO: May want to replace the public key with verification options defined in proxy_wasm.
     auto wasm = proxy_wasm::createWasm(
-        vm_key, code, plugin, proxy_wasm_factory,
+        vm_key, code, config.config().vm_config().public_key(), plugin, proxy_wasm_factory,
         getCloneFactory(wasm_extension, dispatcher, create_root_context_for_testing),
         config.config().vm_config().allow_precompiled());
     Stats::ScopeSharedPtr create_wasm_stats_scope =

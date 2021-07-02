@@ -9,6 +9,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files(["test_cpp.signed.wasm"])
+
 wasm_rust_binary(
     name = "test_rust.wasm",
     srcs = ["test_rust.rs"],

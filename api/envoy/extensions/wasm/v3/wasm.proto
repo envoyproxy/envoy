@@ -40,7 +40,7 @@ message SanitizationConfig {
 }
 
 // Configuration for a Wasm VM.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
@@ -82,6 +82,13 @@ message VmConfig {
 
   // The Wasm code that Envoy will execute.
   config.core.v3.AsyncDataSource code = 3;
+
+  // A hex-encoded Ed 25519 public key to use for verification.
+  // The runtime must verify an embedded signature over the
+  // Wasm code if specified before executing.
+  // TODO: May want to expand this field to a "VerificationOptions" message containing
+  // repeated public keys, options for all or none, and signature types.
+  string public_key = 8 [(validate.rules).string = {len: 64}];
 
   // The Wasm configuration used in initialization of a new VM
   // (proxy_on_start). `google.protobuf.Struct` is serialized as JSON before

@@ -37,6 +37,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/common/wasm/test_data:test_cpp.signed.wasm",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     external_deps = ["abseil_optional"],
