@@ -275,7 +275,6 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
   Stats::TestUtil::TestStore scope_;
   Event::SimulatedTimeSystem time_system_;
-  // Pinterest::Knox::ClientSharedPtr knox_client_;
   std::shared_ptr<FilterConfig> config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

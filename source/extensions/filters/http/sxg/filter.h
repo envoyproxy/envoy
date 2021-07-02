@@ -125,7 +125,7 @@ struct StringCmp {
 /**
  * Transaction flow:
  * 1. check accept request header for whether client can accept sxg
- * 2. check x-pinterest-should-encode-sxg from response headers
+ * 2. check x-envoy-should-encode-sxg from response headers
  * 3. if both true, buffer response body until stream end and then run through the libsxg encoder
  * thingy
  *
