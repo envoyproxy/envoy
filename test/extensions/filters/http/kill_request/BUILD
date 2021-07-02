@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/kill_request:kill_request_filter_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",

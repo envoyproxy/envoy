@@ -65,6 +65,8 @@ public:
   Stats::Scope& scope() const { return scope_; }
   double aggression() const;
   double successRateThreshold() const;
+  uint32_t rpsThreshold() const;
+  double maxRejectionProbability() const;
   ResponseEvaluator& responseEvaluator() const { return *response_evaluator_; }
 
 private:
@@ -74,6 +76,8 @@ private:
   Runtime::FeatureFlag admission_control_feature_;
   std::unique_ptr<Runtime::Double> aggression_;
   std::unique_ptr<Runtime::Percentage> sr_threshold_;
+  std::unique_ptr<Runtime::UInt32> rps_threshold_;
+  std::unique_ptr<Runtime::Percentage> max_rejection_probability_;
   std::shared_ptr<ResponseEvaluator> response_evaluator_;
 };
 

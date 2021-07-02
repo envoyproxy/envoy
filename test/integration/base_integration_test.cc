@@ -60,7 +60,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
-  ON_CALL(*mock_buffer_factory_, create_(_, _, _))
+  ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
@@ -389,9 +389,9 @@ void BaseIntegrationTest::createApiTestServer(const ApiFilesystemConfig& api_fil
                                port_names, validator_config, allow_lds_rejection);
 }
 
-void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* raw_http,
-                                                        std::string* response,
-                                                        bool disconnect_after_headers_complete) {
+void BaseIntegrationTest::sendRawHttpAndWaitForResponse(
+    int port, const char* raw_http, std::string* response, bool disconnect_after_headers_complete,
+    Network::TransportSocketPtr transport_socket) {
   auto connection = createConnectionDriver(
       port, raw_http,
       [response, disconnect_after_headers_complete](Network::ClientConnection& client,
@@ -400,7 +400,8 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
-      });
+      },
+      std::move(transport_socket));
 
   connection->run();
 }
@@ -427,15 +428,16 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
+  std::string contents;
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename);
+    contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: ", contents));
   return "";
 }
 

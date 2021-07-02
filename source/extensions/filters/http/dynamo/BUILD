@@ -46,7 +46,6 @@ envoy_cc_extension(
         ":dynamo_filter_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamo/v3:pkg_cc_proto",
     ],

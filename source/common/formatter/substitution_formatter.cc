@@ -820,8 +820,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          if (!stream_info.requestedServerName().empty()) {
-            result = stream_info.requestedServerName();
+          if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
+            result = std::string(stream_info.downstreamAddressProvider().requestedServerName());
           }
           return result;
         });
@@ -1146,9 +1146,15 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
     return absl::nullopt;
   }
 
-  std::string json = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
-  truncate(json, max_length_);
-  return json;
+  std::string str;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unquote_log_string_values") &&
+      value.kind_case() == ProtobufWkt::Value::kStringValue) {
+    str = value.string_value();
+  } else {
+    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+  }
+  truncate(str, max_length_);
+  return str;
 }
 
 ProtobufWkt::Value

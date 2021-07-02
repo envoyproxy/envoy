@@ -440,10 +440,10 @@ TEST(Context, ConnectionAttributes) {
   const std::string sni_name = "kittens.com";
   info.downstream_address_provider_->setLocalAddress(local);
   info.downstream_address_provider_->setRemoteAddress(remote);
+  info.downstream_address_provider_->setRequestedServerName(sni_name);
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
-  EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
   EXPECT_CALL(info, upstreamTransportFailureReason())

@@ -7,7 +7,6 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
 #include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
-#include "source/extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
 #include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -109,7 +108,7 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
     ENVOY_LOG(debug, "using default router filter");
 
     envoy::extensions::filters::network::dubbo_proxy::v3::DubboFilter router_config;
-    router_config.set_name(DubboFilters::DubboFilterNames::get().ROUTER);
+    router_config.set_name("envoy.filters.dubbo.router");
     registerFilter(router_config);
   } else {
     for (const auto& filter_config : config.dubbo_filters()) {

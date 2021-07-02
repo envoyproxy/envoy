@@ -17,8 +17,6 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filte
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Gzip]
-// Gzip :ref:`configuration overview <config_http_filters_gzip>`.
-// [#extension: envoy.filters.http.gzip]
 
 // [#next-free-field: 11]
 message Gzip {

@@ -65,9 +65,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
-  if (message->has_control_plane()) {
-    control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -75,6 +72,16 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
               "subscription {}.",
               message->system_version_info(), message->type_url());
     return;
+  }
+
+  if (message->has_control_plane()) {
+    control_plane_stats.identifier_.set(message->control_plane().identifier());
+  }
+
+  if (message->control_plane().identifier() != sub->second->control_plane_identifier_) {
+    sub->second->control_plane_identifier_ = message->control_plane().identifier();
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", message->type_url(),
+              sub->second->control_plane_identifier_);
   }
 
   kickOffAck(sub->second->sub_state_.handleResponse(*message));

@@ -15,7 +15,6 @@
 #include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter_config.h"
-#include "source/extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 #include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
@@ -128,7 +127,7 @@ ConfigImpl::ConfigImpl(
     ENVOY_LOG(debug, "using default router filter");
 
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftFilter router;
-    router.set_name(ThriftFilters::ThriftFilterNames::get().ROUTER);
+    router.set_name("envoy.filters.thrift.router");
     processFilter(router);
   } else {
     for (const auto& filter : config.thrift_filters()) {

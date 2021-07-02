@@ -24,7 +24,6 @@ static_resources:
                   cluster: local_service
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
     type: STRICT_DNS

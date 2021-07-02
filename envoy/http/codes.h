@@ -99,9 +99,11 @@ public:
   /**
    * Charge a response stat to both agg counters (*xx) as well as code specific counters. This
    * routine also looks for the x-envoy-upstream-canary header and if it is set, also charges
-   * canary stats.
+   * canary stats. exclude_http_code_stats will skip charging HTTP group/individual status
+   * code stats if set to True.
    */
-  virtual void chargeResponseStat(const ResponseStatInfo& info) const PURE;
+  virtual void chargeResponseStat(const ResponseStatInfo& info,
+                                  bool exclude_http_code_stats) const PURE;
 
   /**
    * Charge a response timing to the various dynamic stat postfixes.

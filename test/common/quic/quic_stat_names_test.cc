@@ -36,5 +36,22 @@ TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
                 .value());
 }
 
+TEST_F(QuicStatNamesTest, ResetStreamErrorStats) {
+  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, quic::QUIC_STREAM_CANCELLED, true,
+                                                   false);
+  EXPECT_EQ(1U,
+            scope_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED")
+                .value());
+}
+
+TEST_F(QuicStatNamesTest, OutOfRangeResetStreamErrorStats) {
+  uint64_t bad_error_code = quic::QUIC_STREAM_LAST_ERROR + 1;
+  quic_stat_names_.chargeQuicResetStreamErrorStats(
+      scope_, static_cast<quic::QuicRstStreamErrorCode>(bad_error_code), true, false);
+  EXPECT_EQ(
+      1U, scope_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_LAST_ERROR")
+              .value());
+}
+
 } // namespace Quic
 } // namespace Envoy
