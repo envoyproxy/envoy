@@ -7,11 +7,10 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "source/common/network/address_impl.h"
 #include "source/common/http/conn_manager_utility.h"
+#include "source/common/network/address_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/extensions/request_id/uuid/config.h"
-
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
@@ -19,9 +18,9 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/router/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
@@ -653,26 +652,25 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest(store);
 
-
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
   Runtime::MockRandomGenerator generator;
   envoy::config::bootstrap::v3::LayeredRuntime runtime_config;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  Runtime::LoaderImpl runtime(dispatcher, tls, runtime_config, local_info, store,
-                                generator, validation_visitor, *api);
+  Runtime::LoaderImpl runtime(dispatcher, tls, runtime_config, local_info, store, generator,
+                              validation_visitor, *api);
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
   Runtime::RandomGeneratorImpl rand;
-  for (int i = 0; i < 1000000; i++){
+  for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
     config.requestIDExtension()->setTraceStatus(header, Envoy::Http::TraceStatus::Sampled);
-    Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(
-      header, runtime, config, &route);
+    Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime, config,
+                                                                      &route);
 
-    if (config.requestIDExtension()->getTraceStatus(header) == Envoy::Http::TraceStatus::Sampled){
+    if (config.requestIDExtension()->getTraceStatus(header) == Envoy::Http::TraceStatus::Sampled) {
       sampled_count++;
     }
   }
