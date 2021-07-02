@@ -682,6 +682,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
