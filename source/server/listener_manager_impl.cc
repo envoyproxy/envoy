@@ -260,8 +260,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
           [this](const Matchers::StringMatcher& name_matcher) {
             return dumpListenerConfigs(name_matcher);
           })),
-      enable_dispatcher_stats_(enable_dispatcher_stats),
-      quic_stat_names_(quic_stat_names) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
