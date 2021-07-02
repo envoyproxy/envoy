@@ -68,22 +68,20 @@ void StatsMatcherImpl::optimizeLastMatcher() {
   }
 }
 
-bool StatsMatcherImpl::fastRejects(StatName stat_name) const {
+StatsMatcher::FastResult StatsMatcherImpl::fastRejects(StatName stat_name) const {
+  FastResult result;
   if (rejectsAll()) {
-    return true;
+    result.rejects_ = true;
+  } else {
+    result.fast_matches_ = fastRejectMatch(stat_name);
+    if (is_inclusive_ || matchers_.empty()) {
+      // We can short-circuit the slow matchers only if they are empty, or if
+      // we are in inclusive-mode and we find a match.
+      result.rejects_ = result.fast_matches_ == is_inclusive_;
+    }
   }
 
-  // We can short-circuit the slow matchers only if they are empty, or if
-  // we are in inclusive-mode and we find a match.
-  if (is_inclusive_ || matchers_.empty()) {
-    return fastRejectMatch(stat_name) == is_inclusive_;
-  }
-
-  // If there are both prefix and string matchers, and we are in exclusive
-  // mode, then it isn't helpful to run the prefix matchers early, so
-  // we return false. This forces the caller to eventually then call
-  // slowRejects(), where we'll handle this case below.
-  return false;
+  return result;
 }
 
 bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
@@ -91,26 +89,22 @@ bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
                      [stat_name](StatName prefix) { return stat_name.startsWith(prefix); });
 }
 
-bool StatsMatcherImpl::slowRejects(StatName stat_name) const {
+bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) const {
   bool match = slowRejectMatch(stat_name);
 
-  //  is_inclusive_ | match | return
-  // ---------------+-------+--------
-  //        T       |   T   |   T     Default-inclusive and matching an (exclusion) matcher, deny.
-  //        T       |   F   |   F     Otherwise, allow.
-  //        F       |   T   |   F     Default-exclusive and matching an (inclusion) matcher, allow.
-  //        F       |   F   |   T     Otherwise, deny.
-  //
-  // This is an XNOR, which can be evaluated by checking for equality.
-
-  if (is_inclusive_ || match || prefixes_.empty()) {
+  if (is_inclusive_ || match || !fast_result.fast_matches_) {
+    //  is_inclusive_ | match | return
+    // ---------------+-------+--------
+    //        T       |   T   |   T   Default-inclusive and matching an (exclusion) matcher, deny.
+    //        T       |   F   |   F   Otherwise, allow.
+    //        F       |   T   |   F   Default-exclusive and matching an (inclusion) matcher, allow.
+    //        F       |   F   |   T   Otherwise, deny.
+    //
+    // This is an XNOR, which can be evaluated by checking for equality.
     return match == is_inclusive_;
   }
 
-  // In exclusive-mode with both prefixes and matches, we must
-  // skip the fast-path prefix since we invert the results, so we can't
-  // definitively declare a rejection. So we must check them now.
-  return !fastRejectMatch(stat_name);
+  return false;
 }
 
 bool StatsMatcherImpl::slowRejectMatch(StatName stat_name) const {

@@ -1017,14 +1017,18 @@ public:
 
     StatNamePool pool(symbol_table_);
     for (int j = 0; j < 5; ++j) {
-      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.reject"))).WillOnce(Return(false));
+      StatsMatcher::FastResult no_fast_rejection;
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.reject")))
+          .WillOnce(Return(no_fast_rejection));
       if (j == 0) {
-        EXPECT_CALL(*matcher, slowRejects(pool.add("scope.reject"))).WillOnce(Return(true));
+        EXPECT_CALL(*matcher, slowRejects(no_fast_rejection, pool.add("scope.reject")))
+            .WillOnce(Return(true));
       }
       EXPECT_EQ("", lookup_stat("reject"));
-      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(no_fast_rejection));
       if (j == 0) {
-        EXPECT_CALL(*matcher, slowRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+        EXPECT_CALL(*matcher, slowRejects(no_fast_rejection, pool.add("scope.ok")))
+            .WillOnce(Return(false));
       }
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
@@ -1057,8 +1061,9 @@ public:
     store_.setStatsMatcher(std::move(matcher_ptr));
     StatNamePool pool(symbol_table_);
 
+    StatsMatcher::FastResult no_fast_rejection;
     for (int j = 0; j < 5; ++j) {
-      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(false));
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(no_fast_rejection));
       // Note: zero calls to slowReject() are made, as accept-all should short-circuit.
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }

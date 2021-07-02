@@ -13,6 +13,16 @@ class StatName;
 
 class StatsMatcher {
 public:
+  struct FastResult {
+    bool rejects() const { return rejects_; }
+    bool operator==(const FastResult& that) const {
+      return rejects_ == that.rejects_ && fast_matches_ == that.fast_matches_;
+    }
+
+    bool rejects_{false};
+    bool fast_matches_{false};
+  };
+
   virtual ~StatsMatcher() = default;
 
   /**
@@ -33,7 +43,7 @@ public:
    * @return bool true if that stat should not be instantiated, or whether we
    *                   need to check slowRejects.
    */
-  virtual bool fastRejects(StatName name) const PURE;
+  virtual FastResult fastRejects(StatName name) const PURE;
 
   /**
    * Takes a metric name and converts it to a string, if needed, to  determine
@@ -45,7 +55,7 @@ public:
    * @return bool true if that stat should not be instantiated, or whether we
    *                   need to check slowRejects.
    */
-  virtual bool slowRejects(StatName name) const PURE;
+  virtual bool slowRejects(FastResult result, StatName name) const PURE;
 
   /**
    * Helps determine whether the matcher needs to be called. This can be used

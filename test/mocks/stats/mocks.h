@@ -349,8 +349,8 @@ public:
   MockStatsMatcher();
   ~MockStatsMatcher() override;
   MOCK_METHOD(bool, rejects, (StatName name), (const));
-  MOCK_METHOD(bool, fastRejects, (StatName name), (const));
-  MOCK_METHOD(bool, slowRejects, (StatName name), (const));
+  MOCK_METHOD(StatsMatcher::FastResult, fastRejects, (StatName name), (const));
+  MOCK_METHOD(bool, slowRejects, (FastResult, StatName name), (const));
   bool acceptsAll() const override { return accepts_all_; }
   bool rejectsAll() const override { return rejects_all_; }
 

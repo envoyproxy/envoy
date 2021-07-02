@@ -27,9 +27,12 @@ public:
   StatsMatcherImpl() = default;
 
   // StatsMatcher
-  bool rejects(StatName name) const override { return fastRejects(name) || slowRejects(name); }
-  bool fastRejects(StatName name) const override;
-  bool slowRejects(StatName name) const override;
+  bool rejects(StatName name) const override {
+    FastResult fast_result = fastRejects(name);
+    return fast_result.rejects() || slowRejects(fast_result, name);
+  }
+  FastResult fastRejects(StatName name) const override;
+  bool slowRejects(FastResult, StatName name) const override;
   bool acceptsAll() const override {
     return is_inclusive_ && matchers_.empty() && prefixes_.empty();
   }
