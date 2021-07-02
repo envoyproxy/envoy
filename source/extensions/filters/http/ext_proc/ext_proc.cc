@@ -82,6 +82,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   ENVOY_LOG(debug, "Sending headers message");
   stream_->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
+  state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
 }
 
@@ -135,11 +136,30 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // We don't know what to do with the body until the response comes back.
     // We must buffer it in case we need it when that happens.
     if (end_stream) {
+      state.setPaused(true);
       return FilterDataStatus::StopIterationAndBuffer;
     } else {
       // Raise a watermark to prevent a buffer overflow until the response comes back.
+      state.setPaused(true);
       state.requestWatermark();
       return FilterDataStatus::StopIterationAndWatermark;
+    }
+  }
+
+  if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
+    // We were previously streaming the body, but there are more chunks waiting
+    // to be processed, so we can't send the body yet.
+    // Move the data for our chunk into a queue so that we can re-inject it later
+    // when the processor returns. Idempotentely raise the watermark if the
+    // queue is too large.
+    ENVOY_LOG(trace, "Enqueuing data while we wait for processing to finish");
+    state.enqueueStreamingChunk(data, end_stream, false);
+    if (end_stream) {
+      // But we need to buffer the last chunk because it's our last chance to do stuff
+      state.setPaused(true);
+      return FilterDataStatus::StopIterationNoBuffer;
+    } else {
+      return FilterDataStatus::Continue;
     }
   }
 
@@ -164,11 +184,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
                     ProcessorState::CallbackState::BufferedBodyCallback, true);
       // Since we just just moved the data into the buffer, return NoBuffer
       // so that we do not buffer this chunk twice.
+      state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
       break;
     }
 
     ENVOY_LOG(trace, "onData: Buffering");
+    state.setPaused(true);
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
 
@@ -183,20 +205,16 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       break;
     }
 
-    auto next_chunk = std::make_unique<QueuedChunk>();
-    // Clear the current chunk and save it on the queue while it's processed
-    next_chunk->data.move(data);
-    next_chunk->end_stream = end_stream;
-    // Send the chunk, and ensure that we have watermarked so that we don't overflow
-    // memory while waiting for responses.
-    state.requestWatermark();
-    sendBodyChunk(state, next_chunk->data, ProcessorState::CallbackState::StreamedBodyCallback,
+    // Send the chunk on the gRPC stream
+    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback,
                   end_stream);
-    state.enqueueStreamingChunk(std::move(next_chunk));
+    // Move the data to the queue and optionally raise the watermark.
+    state.enqueueStreamingChunk(data, end_stream, true);
 
     // At this point we will continue, but with no data, because that will come later
     if (end_stream) {
       // But we need to buffer the last chunk because it's our last chance to do stuff
+      state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
       result = FilterDataStatus::Continue;
@@ -228,6 +246,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     }
 
     sendTrailers(state, *new_trailers);
+    state.setPaused(true);
     return FilterDataStatus::StopIterationAndBuffer;
   }
   return result;
@@ -254,6 +273,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback ||
       state.callbackState() == ProcessorState::CallbackState::BufferedBodyCallback) {
     ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+    state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
 
@@ -262,6 +282,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
     // body has not arrived. With the arrival of trailers, we now know that the body
     // has arrived.
     sendBufferedData(state, ProcessorState::CallbackState::BufferedBodyCallback, true);
+    state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
   }
 
@@ -281,6 +302,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   }
 
   sendTrailers(state, trailers);
+  state.setPaused(true);
   return FilterTrailersStatus::StopIteration;
 }
 

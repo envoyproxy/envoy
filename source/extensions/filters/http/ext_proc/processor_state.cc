@@ -11,6 +11,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
+using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode;
 
 using envoy::service::ext_proc::v3alpha::BodyResponse;
 using envoy::service::ext_proc::v3alpha::CommonResponse;
@@ -92,17 +93,20 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           // We now know that we need to process what we have buffered in streaming mode.
           // Move the current buffer into the queue for remote processing and clear the
           // buffered data.
-          auto buffered_chunk = std::make_unique<QueuedChunk>();
-          auto& buffered_chunk_data = buffered_chunk->data;
+          Buffer::OwnedImpl buffered_chunk;
           modifyBufferedData(
-              [&buffered_chunk_data](Buffer::Instance& data) { buffered_chunk_data.move(data); });
+              [&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
           ENVOY_LOG(debug, "Sending first chunk using buffered data");
-          filter_.sendBodyChunk(*this, buffered_chunk_data,
+          filter_.sendBodyChunk(*this, buffered_chunk,
                                 ProcessorState::CallbackState::StreamedBodyCallback, false);
-          enqueueStreamingChunk(std::move(buffered_chunk));
+          enqueueStreamingChunk(buffered_chunk, false, true);
+          if (!queueOverBufferLimit()) {
+            clearWatermark();
+          }
+        } else {
+          clearWatermark();
         }
-        clearWatermark();
-        continueProcessing();
+        idempotentlyContinue();
         return true;
       }
 
@@ -118,7 +122,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
     // If we got here, then the processor doesn't care about the body or is not ready for
     // trailers, so we can just continue.
     headers_ = nullptr;
-    continueProcessing();
+    idempotentlyContinue();
     clearWatermark();
     return true;
   }
@@ -128,7 +132,8 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
 bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
   bool should_continue = false;
   if (callback_state_ == CallbackState::BufferedBodyCallback ||
-      callback_state_ == CallbackState::StreamedBodyCallback) {
+      callback_state_ == CallbackState::StreamedBodyCallback ||
+      callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
     ENVOY_LOG(debug, "Processing body response");
     if (callback_state_ == CallbackState::BufferedBodyCallback) {
       ENVOY_LOG(debug, "Applying body response to buffered data. State = {}", callback_state_);
@@ -139,20 +144,31 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
       callback_state_ = CallbackState::Idle;
       should_continue = true;
 
-    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (!chunks_for_processing_.empty()) {
-        QueuedChunkPtr chunk = std::move(chunks_for_processing_.front());
-        chunks_for_processing_.pop_front();
-        ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
-                  chunk->data.length());
-        MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+    } else if (callback_state_ == CallbackState::StreamedBodyCallback ||
+               callback_state_ == CallbackState::StreamedBodyCallbackFinishing) {
+      bool delivered_one = false;
+      while (auto queued_chunk = dequeueStreamingChunk(delivered_one)) {
+        // Loop through queue in case some of it is chunks that were never
+        // delivered because the processing mode changed.
+        auto chunk = std::move(*queued_chunk);
+        if (chunk->delivered) {
+          ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}",
+                    chunk->data.length());
+          MutationUtils::applyCommonBodyResponse(response, nullptr, chunk->data);
+          delivered_one = true;
+          // After we have delivered one chunk, don't process anything
+          // more from the queue unless it was never sent to the server.
+        }
         should_continue = chunk->end_stream;
         if (chunk->data.length() > 0) {
+          ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk->data.length());
           injectDataToFilterChain(chunk->data, false);
         }
       }
-      if (chunks_for_processing_.empty()) {
+      if (!queueOverBufferLimit()) {
         clearWatermark();
+      }
+      if (chunks_for_processing_.empty()) {
         callback_state_ = CallbackState::Idle;
       }
     }
@@ -171,8 +187,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     }
 
     if (should_continue) {
-      ENVOY_LOG(trace, "Continuing");
-      continueProcessing();
+      idempotentlyContinue();
     }
     return true;
   }
@@ -189,18 +204,50 @@ bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
     trailers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
-    continueProcessing();
+    idempotentlyContinue();
     return true;
   }
   return false;
 }
 
+void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream,
+                                           bool delivered) {
+  bytes_enqueued_ += data.length();
+  auto next_chunk = std::make_unique<QueuedChunk>();
+  next_chunk->data.move(data);
+  next_chunk->end_stream = end_stream;
+  next_chunk->delivered = delivered;
+  chunks_for_processing_.push_back(std::move(next_chunk));
+  if (bytes_enqueued_ > bufferLimit() / 2) {
+    requestWatermark();
+  }
+}
+
+absl::optional<QueuedChunkPtr> ProcessorState::dequeueStreamingChunk(bool undelivered_only) {
+  if (chunks_for_processing_.empty()) {
+    return absl::nullopt;
+  }
+  if (undelivered_only && chunks_for_processing_.front()->delivered) {
+    return absl::nullopt;
+  }
+  QueuedChunkPtr chunk = std::move(chunks_for_processing_.front());
+  chunks_for_processing_.pop_front();
+  bytes_enqueued_ -= chunk->data.length();
+  return chunk;
+}
+
+bool ProcessorState::queueOverBufferLimit() const { return bytes_enqueued_ > bufferLimit(); }
+
 void ProcessorState::clearAsyncState() {
   cleanUpTimer();
-  if (callback_state_ != CallbackState::Idle) {
-    continueProcessing();
-    callback_state_ = CallbackState::Idle;
+  while (auto queued_chunk = dequeueStreamingChunk(false)) {
+    auto chunk = std::move(*queued_chunk);
+    ENVOY_LOG(trace, "Injecting leftover buffer of {} bytes", chunk->data.length());
+    injectDataToFilterChain(chunk->data, false);
   }
+  clearWatermark();
+  idempotentlyContinue();
+  callback_state_ = CallbackState::Idle;
 }
 
 void ProcessorState::cleanUpTimer() const {
@@ -209,12 +256,30 @@ void ProcessorState::cleanUpTimer() const {
   }
 }
 
+void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) {
+  body_mode_ = body_mode;
+  if (callback_state_ == CallbackState::StreamedBodyCallback &&
+      body_mode != ProcessingMode::STREAMED) {
+    // Special handling for when the processing mode is changed while
+    // streaming.
+    callback_state_ = CallbackState::StreamedBodyCallbackFinishing;
+  }
+}
+
+void ProcessorState::idempotentlyContinue() {
+  if (paused_) {
+    ENVOY_LOG(debug, "Continuing processing");
+    paused_ = false;
+    continueProcessing();
+  }
+}
+
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.
   send_headers_ = mode.request_header_mode() != ProcessingMode::SKIP;
   send_trailers_ = mode.request_trailer_mode() == ProcessingMode::SEND;
-  body_mode_ = mode.request_body_mode();
+  setBodyMode(mode.request_body_mode());
 }
 
 void DecodingProcessorState::requestWatermark() {
@@ -238,7 +303,7 @@ void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mod
   // headers are sent by default and trailers are not.
   send_headers_ = mode.response_header_mode() != ProcessingMode::SKIP;
   send_trailers_ = mode.response_trailer_mode() == ProcessingMode::SEND;
-  body_mode_ = mode.response_body_mode();
+  setBodyMode(mode.response_body_mode());
 }
 
 void EncodingProcessorState::requestWatermark() {

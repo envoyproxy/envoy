@@ -45,6 +45,8 @@ using testing::Unused;
 
 using namespace std::chrono_literals;
 
+static const uint32_t BufferSize = 100000;
+
 // These tests are all unit tests that directly drive an instance of the
 // ext_proc filter and verify the behavior using mocks.
 
@@ -63,7 +65,9 @@ protected:
     config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
@@ -959,7 +963,6 @@ TEST_F(HttpFilterTest, PostStreamingBodies) {
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-    EXPECT_TRUE(encoding_watermarked);
     got_response_body.move(resp_chunk);
     processResponseBody(absl::nullopt, false);
   }
@@ -1049,7 +1052,6 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
     want_response_body.add(resp_chunk.toString());
     EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_chunk, false));
     response_buffer.move(resp_chunk);
-    EXPECT_TRUE(encoding_watermarked);
   }
 
   processResponseHeaders(false, absl::nullopt);
@@ -1062,7 +1064,6 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     want_response_body.add(resp_chunk.toString());
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-    EXPECT_TRUE(encoding_watermarked);
     got_response_body.move(resp_chunk);
   }
 
@@ -1087,6 +1088,174 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(10, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(10, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with streaming set for the response body,
+// change the processing mode after receiving some chunks and verify the
+// correct behavior.
+TEST_F(HttpFilterTest, GetStreamingBodyAndChangeMode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  // Send three bodies
+  for (int i = 0; i < 3; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    got_response_body.move(resp_chunk);
+  }
+
+  // Respond to the first one by asking to change the processing mode
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse& response, BodyResponse&) {
+        response.mutable_mode_override()->set_response_body_mode(ProcessingMode::NONE);
+      },
+      false);
+
+  // A new body chunk should not be sent to the server, but should be queued
+  // because we didn't get all the responses yet
+  Buffer::OwnedImpl resp_chunk;
+  TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+  want_response_body.add(resp_chunk.toString());
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+  got_response_body.move(resp_chunk);
+
+  // There should be two more messages outstanding, but not three, so respond
+  // just to them.
+  for (int i = 0; i < 2; i++) {
+    processResponseBody(absl::nullopt, false);
+  }
+
+  // Close the stream
+  Buffer::OwnedImpl last_resp_chunk;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(last_resp_chunk, true));
+  processResponseBody(absl::nullopt, false);
+
+  // At this point, the whole body should have been processed including things
+  // that were rejected.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(5, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(5, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// Using a configuration with streaming set for the response body,
+// change the processing mode after receiving some chunks and verify the
+// correct behavior.
+TEST_F(HttpFilterTest, GetStreamingBodyAndChangeModeDifferentOrder) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "NONE"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl want_response_body;
+  Buffer::OwnedImpl got_response_body;
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, false))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
+
+  // Send three bodies
+  for (int i = 0; i < 3; i++) {
+    Buffer::OwnedImpl resp_chunk;
+    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+    want_response_body.add(resp_chunk.toString());
+    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    got_response_body.move(resp_chunk);
+  }
+
+  // Respond to the first one by asking to change the processing mode
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse& response, BodyResponse&) {
+        response.mutable_mode_override()->set_response_body_mode(ProcessingMode::NONE);
+      },
+      false);
+
+  // A new body chunk should not be sent to the server, but should be queued
+  // because we didn't get all the responses yet
+  Buffer::OwnedImpl resp_chunk;
+  TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+  want_response_body.add(resp_chunk.toString());
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
+  got_response_body.move(resp_chunk);
+
+  // There should be two more messages outstanding, but not three, so respond
+  // just to them.
+  processResponseBody(absl::nullopt, false);
+  processResponseBody(absl::nullopt, true);
+
+  // At this point, the whole body should have been processed including things
+  // that were rejected.
+  EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
+  EXPECT_FALSE(encoding_watermarked);
+
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(5, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(5, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
