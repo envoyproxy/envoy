@@ -8,7 +8,6 @@ Incompatible Behavior Changes
 * grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter.
   The behavior can be reverted by changing runtime key ``envoy.reloadable_features.grpc_bridge_stats_disabled``.
 * tracing: update Apache SkyWalking tracer version to be compatible with 8.4.0 data collect protocol. This change will introduce incompatibility with SkyWalking 8.3.0.
-* xds: added the explicit wildcard mode, which allows subscribing to specific resource names on top of a wildcard subscription. This means that the resource name ``*`` is reserved. This may mean that in some cases the initial wildcard subscription request on the stream will not be empty, but will have a non-empty list of resources with a special name among them. See :ref:`wildcard mode description <xds_protocol_resource_hints>` and :ref:`unsubscribing from resources <xds_protocol_unsubscribing_from_resources>` for details.
 
 Minor Behavior Changes
 ----------------------
