@@ -53,7 +53,7 @@ The following is an example configuring the filter.
   # (Optional): defaults to `x-envoy-should-encode-sxg` if not provided
   should_encode_sxg_header: "x-custom-should-encode"
   # (Optional)
-  header_prefix_filters: 
+  header_prefix_filters:
     - "x-foo-"
     - "x-bar-"
 
