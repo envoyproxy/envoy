@@ -11,7 +11,7 @@ SXG
 
   The SXG filter is currently under active development.
 
-This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses [libsxg](https://github.com/google/libsxg/) to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document. 
+This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses [libsxg](https://github.com/google/libsxg/) to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document.
 
 Transaction flow:
 
@@ -77,4 +77,3 @@ The SXG filter outputs statistics in the *<stat_prefix>.* namespace.
   total_signed_attempts, Counter, Total requests where SXG encoding is attempted.
   total_signed_succeeded, Counter, Total requests where SXG encoding succeeds.
   total_signed_failed, Counter, Total requests where SXG encoding fails.
-      

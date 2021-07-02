@@ -744,7 +744,7 @@ TEST_F(FilterTest, FilterCustomHeaders) {
   setConfiguration({R"YAML(
 cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
-header_prefix_filters: 
+header_prefix_filters:
  - "x-foo-"
  - "x-bar-"
 )YAML"});

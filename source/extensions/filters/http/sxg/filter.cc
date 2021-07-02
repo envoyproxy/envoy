@@ -60,7 +60,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha:
 const std::regex& matchAcceptHeaderRegex() {
   // RegEx to detect Signed Exchange Accept Headers from:
   // https://web.dev/signed-exchanges/#best-practices
-  CONSTRUCT_ON_FIRST_USE(std::regex, 
+  CONSTRUCT_ON_FIRST_USE(std::regex,
                          "(?:^|,)\\s*(application/signed-exchange|text/"
                          "html)\\s*(?:;v=([\\w]+))?\\s*(?:;q=([\\d\\.]+))?\\s*",
                          std::regex_constants::icase);

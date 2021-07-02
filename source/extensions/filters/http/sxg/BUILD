@@ -17,14 +17,14 @@ envoy_extension_package()
 
 cmake_external(
     name = "libsxg",
-    lib_source = "@libsxg//:all",
+    lib_source = "@com_github_google_libsxg//:all",
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
         "SXG_BUILD_EXECUTABLES": "off",
         "SXG_BUILD_SHARED": "off",
         "SXG_BUILD_STATIC": "on",
         "SXG_WITH_CERT_CHAIN": "off",
-        "RUN_TEST": "off", 
+        "RUN_TEST": "off",
     },
     deps = ["@boringssl//:ssl"],
     static_libraries = ["libsxg.a"],

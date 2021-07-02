@@ -134,6 +134,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
+    _com_github_google_libsxg()
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
@@ -186,8 +187,6 @@ def envoy_dependencies(skip_targets = []):
     _rust_deps()
     _kafka_deps()
 
-    _libsxg()
-    
     _org_llvm_llvm()
     _com_github_wamr()
     _com_github_wavm_wavm()
@@ -312,6 +311,12 @@ def _com_github_google_libprotobuf_mutator():
     external_http_archive(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+
+def _com_github_google_libsxg():
+    external_http_archive(
+        name = "com_github_google_libsxg",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_jbeder_yaml_cpp():
@@ -928,12 +933,6 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
-    )
-
-def _libsxg():
-    external_http_archive(
-        name = "libsxg",
-        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _org_llvm_llvm():
