@@ -114,6 +114,21 @@ public:
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
       transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          envoy::config::core::v3::HeaderValueOption* header =
+              hcm.mutable_route_config()->mutable_request_headers_to_add()->Add();
+
+          header->mutable_header()->set_key("tsi_peer");
+
+          header->mutable_header()->set_value(
+              R"EOF(%DYNAMIC_METADATA(["envoy.transport_sockets.alts", "peer_name"])%)EOF");
+          // Actually start time can get in to the request header keyed by tsi_peer.
+          // header->mutable_header()->set_value("%START_TIME(%s.%3f)%");
+        });
+
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
   }
@@ -246,6 +261,17 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  bool contain_peer_name = false;
+  Http::TestRequestHeaderMapImpl upstream_request(upstream_request_->headers());
+  upstream_request.iterate(
+      [&contain_peer_name](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+        const std::string key{header.key().getStringView()};
+        if (key == "tsi_peer") {
+          contain_peer_name = true;
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      });
+  ASSERT(contain_peer_name);
 }
 
 TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {

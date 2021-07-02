@@ -121,6 +121,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       dynamic_metadata.mutable_fields()->insert({std::string("peer_name"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata("envoy.transport_sockets.alts",
                                                                dynamic_metadata);
+      ENVOY_CONN_LOG(debug, "TSI hanshake with peer: {}", callbacks_->connection(), tsi_info.name_);
     } else {
       ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
     }
