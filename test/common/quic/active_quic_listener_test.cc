@@ -75,9 +75,6 @@ public:
 
 class ActiveQuicListenerTest : public QuicMultiVersionTest {
 protected:
-  // using Socket =
-  //     Network::NetworkListenSocket<Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>;
-
   ActiveQuicListenerTest()
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),

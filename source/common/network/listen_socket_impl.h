@@ -80,8 +80,8 @@ public:
 
   Socket::Type socketType() const override { return T::type; }
 
-  // This four override is introduced to performa check at test. We can remove the override in
-  // the future.
+  // These four overrides are introduced to perform check. A null io handle is possible only if the
+  // io handle is listener side.
   IoHandle& ioHandle() override {
     ASSERT(io_handle_ != nullptr);
     return *io_handle_;
