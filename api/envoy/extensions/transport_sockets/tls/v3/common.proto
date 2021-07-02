@@ -233,35 +233,13 @@ message TlsSessionTicketKeys {
       [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
-// Config for Certificate provider to get certificates. This provider should allow certificates to be
-// fetched/refreshed over the network asynchronously with respect to the TLS handshake.
-// [#not-implemented-hide:]
-message CertificateProviderPlugin {
-  // opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
-  // a root-certificate (validation context) or "TLS" to specify a new tls-certificate.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Provider specific config.
-  // Note: an implementation is expected to dedup multiple instances of the same config
-  // to maintain a single certificate-provider instance. The sharing can happen, for
-  // example, among multiple clusters or between the tls_certificate and validation_context
-  // certificate providers of a cluster.
-  // This config could be supplied inline or (in future) a named xDS resource.
-  oneof config {
-    option (validate.required) = true;
-
-    config.core.v3.TypedExtensionConfig typed_config = 2;
-  }
-}
-
-// Similar to CertificateProviderPlugin above, but allows the provider instances to be configured on
-// the client side instead of being sent from the control plane.
+// Indicates a certificate to be obtained from a named CertificateProvider plugin instance.
+// The plugin instances are defined in the client's bootstrap file.
+// The plugin allows certificates to be fetched/refreshed over the network asynchronously with
+// respect to the TLS handshake.
 // [#not-implemented-hide:]
 message CertificateProviderPluginInstance {
-  // Provider instance name. This name must be defined in the client's configuration (e.g., a
-  // bootstrap file) to correspond to a provider instance (i.e., the same data in the typed_config
-  // field that would be sent in the CertificateProviderPlugin message if the config was sent by the
-  // control plane). If not present, defaults to "default".
+  // Provider instance name. If not present, defaults to "default".
   //
   // Instance names should generally be defined not in terms of the underlying provider
   // implementation (e.g., "file_watcher") but rather in terms of the function of the
@@ -275,7 +253,7 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
-// [#next-free-field: 15]
+// [#next-free-field: 14]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -331,20 +309,12 @@ message CertificateValidationContext {
   config.core.v3.DataSource trusted_ca = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
-  // Certificate provider for fetching TLS certificates.
-  //
-  // Only one of *trusted_ca*, *ca_certificate_provider*, and *ca_certificate_provider_instance*
-  // may be specified.
-  // [#not-implemented-hide:]
-  CertificateProviderPlugin ca_certificate_provider = 13
-      [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
-
   // Certificate provider instance for fetching TLS certificates.
   //
   // Only one of *trusted_ca*, *ca_certificate_provider*, and *ca_certificate_provider_instance*
   // may be specified.
   // [#not-implemented-hide:]
-  CertificateProviderPluginInstance ca_certificate_provider_instance = 14
+  CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
   // If specified, updates of a file-based *trusted_ca* source will be triggered

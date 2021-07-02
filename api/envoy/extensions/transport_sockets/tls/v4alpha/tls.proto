@@ -124,7 +124,7 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 16]
+// [#next-free-field: 15]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.transport_sockets.tls.v3.CommonTlsContext";
@@ -221,7 +221,7 @@ message CommonTlsContext {
   // used for clients that support ECDSA.
   //
   // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
+  // and *tls_certificate_provider_instance* may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -234,26 +234,19 @@ message CommonTlsContext {
   // are valid in the the certificates fetched through this setting.
   //
   // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
+  // and *tls_certificate_provider_instance* may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
       [(validate.rules).repeated = {max_items: 2}];
 
-  // Certificate provider for fetching TLS certs.
-  //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
-  // [#not-implemented-hide:]
-  CertificateProviderPlugin tls_certificate_provider = 14;
-
   // Certificate provider instance for fetching TLS certs.
   //
   // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // *tls_certificate_provider*, and *tls_certificate_provider_instance* may be used.
+  // and *tls_certificate_provider_instance* may be used.
   // [#not-implemented-hide:]
-  CertificateProviderPluginInstance tls_certificate_provider_instance = 15;
+  CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
 
   oneof validation_context_type {
     // How to validate peer certificates.
