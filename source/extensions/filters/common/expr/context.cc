@@ -184,7 +184,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
                                 info_.downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
-    return CelValue::CreateString(&info_.requestedServerName());
+    return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {
     auto id = info_.connectionID();
     if (id.has_value()) {

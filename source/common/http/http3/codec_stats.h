@@ -17,7 +17,13 @@ namespace Http3 {
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_reset)                                                                                \
   COUNTER(tx_reset)                                                                                \
-  COUNTER(metadata_not_supported_error)
+  COUNTER(metadata_not_supported_error)                                                            \
+  COUNTER(quic_version_43)                                                                         \
+  COUNTER(quic_version_46)                                                                         \
+  COUNTER(quic_version_50)                                                                         \
+  COUNTER(quic_version_51)                                                                         \
+  COUNTER(quic_version_h3_29)                                                                      \
+  COUNTER(quic_version_rfc_v1)
 
 /**
  * Wrapper struct for the HTTP/3 codec stats. @see stats_macros.h

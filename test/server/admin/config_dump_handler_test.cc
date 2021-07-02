@@ -564,24 +564,16 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   EXPECT_EQ(expected_json, output);
 }
 
-// Test that no fields are present in the JSON output if there is no intersection between the fields
+// Test that BadRequest is returned if there is no intersection between the fields
 // of the config dump and the fields present in the mask query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
-  const std::string expected_json = R"EOF({
- "configs": [
-  {
-   "@type": "type.googleapis.com/envoy.admin.v3.ClustersConfigDump.StaticCluster"
-  }
- ]
-}
-)EOF";
-  EXPECT_EQ(Http::Code::OK,
+  EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
   std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
+  EXPECT_THAT(output, testing::HasSubstr("could not be successfully used"));
 }
 
 // Test that a 404 Not found is returned if a non-existent resource is passed in as the
@@ -609,6 +601,56 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   });
   EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?resource=version_info", header_map, response));
+}
+
+TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+    auto* static_cluster = msg->add_static_clusters();
+    envoy::config::cluster::v3::Cluster inner_cluster;
+    inner_cluster.add_transport_socket_matches()->set_name("match1");
+    inner_cluster.add_transport_socket_matches()->set_name("match2");
+    static_cluster->mutable_cluster()->PackFrom(inner_cluster);
+    return msg;
+  });
+
+  // `transport_socket_matches` is a repeated field, and cannot be indexed through in a FieldMask.
+  EXPECT_EQ(Http::Code::BadRequest,
+            getCallback(
+                "/config_dump?resource=static_clusters&mask=cluster.transport_socket_matches.name",
+                header_map, response));
+  EXPECT_EQ("FieldMask paths: \"cluster.transport_socket_matches.name\"\n could not be "
+            "successfully used.",
+            response.toString());
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
+            Http::Headers::get().ContentTypeValues.Text);
+  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
+            Http::Headers::get().XContentTypeOptionValues.Nosniff);
+}
+
+TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  auto bootstrap = admin_.getConfigTracker().add("bootstrap", [] {
+    auto msg = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    auto* bootstrap = msg->mutable_bootstrap();
+    bootstrap->mutable_node()->add_extensions()->set_name("ext1");
+    bootstrap->mutable_node()->add_extensions()->set_name("ext2");
+    return msg;
+  });
+
+  // `extensions` is a repeated field, and cannot be indexed through in a FieldMask.
+  EXPECT_EQ(Http::Code::BadRequest,
+            getCallback("/config_dump?mask=bootstrap.node.extensions.name", header_map, response));
+  EXPECT_EQ("FieldMask paths: \"bootstrap.node.extensions.name\"\n could not be "
+            "successfully used.",
+            response.toString());
+  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
+            Http::Headers::get().ContentTypeValues.Text);
+  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
+            Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
 } // namespace Server

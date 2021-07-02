@@ -105,6 +105,7 @@ envoy_cc_test(
         "//source/server:connection_handler_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
@@ -116,6 +117,7 @@ envoy_cc_test(
     srcs = ["drain_manager_impl_test.cc"],
     deps = [
         "//source/server:drain_manager_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
