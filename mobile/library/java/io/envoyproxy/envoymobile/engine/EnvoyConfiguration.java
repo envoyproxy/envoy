@@ -17,6 +17,7 @@ public class EnvoyConfiguration {
   public final Integer dnsRefreshSeconds;
   public final Integer dnsFailureRefreshSecondsBase;
   public final Integer dnsFailureRefreshSecondsMax;
+  public final String dnsPreresolveHostnames;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
   public final Integer streamIdleTimeoutSeconds;
@@ -37,6 +38,7 @@ public class EnvoyConfiguration {
    * @param dnsRefreshSeconds            rate in seconds to refresh DNS.
    * @param dnsFailureRefreshSecondsBase base rate in seconds to refresh DNS on failure.
    * @param dnsFailureRefreshSecondsMax  max rate in seconds to refresh DNS on failure.
+   * @param dnsPreresolveHostnames       hostnames to preresolve on Envoy Client construction.
    * @param statsFlushSeconds            interval at which to flush Envoy stats.
    * @param streamIdleTimeoutSeconds     idle timeout for HTTP streams.
    * @param appVersion                   the App Version of the App using this Envoy Client.
@@ -49,9 +51,9 @@ public class EnvoyConfiguration {
   public EnvoyConfiguration(String grpcStatsDomain, @Nullable Integer statsdPort,
                             int connectTimeoutSeconds, int dnsRefreshSeconds,
                             int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
-                            int statsFlushSeconds, int streamIdleTimeoutSeconds, String appVersion,
-                            String appId, String virtualClusters,
-                            List<EnvoyNativeFilterConfig> nativeFilterChain,
+                            String dnsPreresolveHostnames, int statsFlushSeconds,
+                            int streamIdleTimeoutSeconds, String appVersion, String appId,
+                            String virtualClusters, List<EnvoyNativeFilterConfig> nativeFilterChain,
                             List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
                             Map<String, EnvoyStringAccessor> stringAccessors) {
     this.grpcStatsDomain = grpcStatsDomain;
@@ -60,6 +62,7 @@ public class EnvoyConfiguration {
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
+    this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.statsFlushSeconds = statsFlushSeconds;
     this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
     this.appVersion = appVersion;
@@ -106,6 +109,7 @@ public class EnvoyConfiguration {
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
         .append(String.format("- &dns_fail_base_interval %ss\n", dnsFailureRefreshSecondsBase))
         .append(String.format("- &dns_fail_max_interval %ss\n", dnsFailureRefreshSecondsMax))
+        .append(String.format("- &dns_preresolve_hostnames %s\n", dnsPreresolveHostnames))
         .append(String.format("- &stream_idle_timeout %ss\n", streamIdleTimeoutSeconds))
         .append(String.format("- &metadata { device_os: %s, app_version: %s, app_id: %s }\n",
                               "Android", appVersion, appId))

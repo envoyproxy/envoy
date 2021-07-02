@@ -229,6 +229,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsRefreshSeconds: 300,
       dnsFailureRefreshSecondsBase: 400,
       dnsFailureRefreshSecondsMax: 500,
+      dnsPreresolveHostnames: "[test]",
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
       appVersion: "v1.2.3",
@@ -249,6 +250,8 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_refresh_rate 300s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_base_interval 400s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_fail_max_interval 500s"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
+
     XCTAssertTrue(resolvedYAML.contains("&stream_idle_timeout 700s"))
 
     // Metadata
@@ -275,6 +278,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsRefreshSeconds: 300,
       dnsFailureRefreshSecondsBase: 400,
       dnsFailureRefreshSecondsMax: 500,
+      dnsPreresolveHostnames: "[test]",
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
       appVersion: "v1.2.3",

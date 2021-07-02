@@ -9,6 +9,7 @@
                       dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
            dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
             dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
+                 dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                       statsFlushSeconds:(UInt32)statsFlushSeconds
                streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
                              appVersion:(NSString *)appVersion
@@ -31,6 +32,7 @@
   self.dnsRefreshSeconds = dnsRefreshSeconds;
   self.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
+  self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
   self.appVersion = appVersion;
@@ -99,6 +101,8 @@
                             (unsigned long)self.dnsFailureRefreshSecondsBase];
   [definitions appendFormat:@"- &dns_fail_max_interval %lus\n",
                             (unsigned long)self.dnsFailureRefreshSecondsMax];
+  [definitions
+      appendFormat:@"- &dns_preresolve_hostnames %@\n", (unsigned long)self.dnsPreresolveHostnames];
   [definitions
       appendFormat:@"- &stream_idle_timeout %lus\n", (unsigned long)self.streamIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",

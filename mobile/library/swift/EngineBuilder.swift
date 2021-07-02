@@ -18,6 +18,7 @@ public class EngineBuilder: NSObject {
   private var dnsRefreshSeconds: UInt32 = 60
   private var dnsFailureRefreshSecondsBase: UInt32 = 2
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
+  private var dnsPreresolveHostnames: String = "[]"
   private var statsFlushSeconds: UInt32 = 60
   private var streamIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
@@ -101,6 +102,17 @@ public class EngineBuilder: NSObject {
   public func addDNSFailureRefreshSeconds(base: UInt32, max: UInt32) -> Self {
     self.dnsFailureRefreshSecondsBase = base
     self.dnsFailureRefreshSecondsMax = max
+    return self
+  }
+
+  /// Add a list of hostnames to preresolve on Engine startup.
+  ///
+  /// - parameter dnsPreresolveHostnames: the hostnames to resolve.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+    self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
 
@@ -247,6 +259,7 @@ public class EngineBuilder: NSObject {
       dnsRefreshSeconds: self.dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase: self.dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
+      dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       statsFlushSeconds: self.statsFlushSeconds,
       streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,
       appVersion: self.appVersion,

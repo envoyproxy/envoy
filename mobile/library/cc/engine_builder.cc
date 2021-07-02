@@ -40,6 +40,12 @@ EngineBuilder& EngineBuilder::addDnsFailureRefreshSeconds(int base, int max) {
   return *this;
 }
 
+EngineBuilder&
+EngineBuilder::addDnsPreresolveHostnames(const std::string& dns_preresolve_hostnames) {
+  this->dns_preresolve_hostnames_ = dns_preresolve_hostnames;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
   this->stats_flush_seconds_ = stats_flush_seconds;
   return *this;
@@ -71,6 +77,7 @@ EngineSharedPtr EngineBuilder::build() {
       {"{{ dns_failure_refresh_rate_seconds_max }}",
        std::to_string(this->dns_failure_refresh_seconds_max_)},
       {"{{ dns_refresh_rate_seconds }}", std::to_string(this->dns_refresh_seconds_)},
+      {"{{ dns_preresolve_hostnames }}", this->dns_preresolve_hostnames_},
       {"{{ native_filter_chain }}", ""},
       {"{{ platform_filter_chain }}", ""},
       {"{{ stats_domain }}", this->stats_domain_},

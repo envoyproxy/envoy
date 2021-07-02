@@ -28,7 +28,7 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving with default configuration resolves with values`() {
     val envoyConfiguration = EnvoyConfiguration(
-      "stats.foo.com", null, 123, 234, 345, 456, 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
+      "stats.foo.com", null, 123, 234, 345, 456, "[hostname]", 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
       listOf<EnvoyNativeFilterConfig>(EnvoyNativeFilterConfig("filter_name", "test_config")),
       emptyList(), emptyMap()
     )
@@ -40,6 +40,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_refresh_rate 234s")
     assertThat(resolvedTemplate).contains("&dns_fail_base_interval 345s")
     assertThat(resolvedTemplate).contains("&dns_fail_max_interval 456s")
+    assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
 
     // Metadata
     assertThat(resolvedTemplate).contains("os: Android")
@@ -60,7 +61,7 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolve templates with invalid templates will throw on build`() {
     val envoyConfiguration = EnvoyConfiguration(
-      "stats.foo.com", null, 123, 234, 345, 456, 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
+      "stats.foo.com", null, 123, 234, 345, 456, "[hostname]", 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
       emptyList(), emptyList(), emptyMap()
     )
 
@@ -75,7 +76,7 @@ class EnvoyConfigurationTest {
   @Test
   fun `cannot configure both statsD and gRPC stat sink`() {
     val envoyConfiguration = EnvoyConfiguration(
-      "stats.foo.com", 5050, 123, 234, 345, 456, 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
+      "stats.foo.com", 5050, 123, 234, 345, 456, "[hostname]", 567, 678, "v1.2.3", "com.mydomain.myapp", "[test]",
       emptyList(), emptyList(), emptyMap()
     )
 
