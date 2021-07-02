@@ -23,9 +23,6 @@ If there is an error generating the SXG package we fall back to the original HTM
 
 For more information on Signed HTTP Exchanges see: https://developers.google.com/web/updates/2018/11/signed-exchanges
 
-.. attention::
-
-The SXG filter is currently under active development.
 Example configuration
 ---------------------
 
