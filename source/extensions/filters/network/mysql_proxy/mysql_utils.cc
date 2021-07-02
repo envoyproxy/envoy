@@ -13,6 +13,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MySQLProxy {
 
+constexpr absl::string_view MYSQL_OLD_PASSWORD = "mysql_old_password";
+constexpr absl::string_view MYSQL_NATIVE_PASSWORD = "mysql_native_password";
+constexpr absl::string_view MYSQL_CLEAR_PASSWORD = "mysql_clear_password";
+constexpr absl::string_view MYSQL_SHA256_PASSWORD = "sha256_password";
+constexpr absl::string_view MYSQL_CACHE_SHA_PASSWORD = "caching_sha2_password";
+
 void BufferHelper::addUint8(Buffer::Instance& buffer, uint8_t val) {
   buffer.writeLEInt<uint8_t>(val);
 }
@@ -233,40 +239,22 @@ AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_n
     return AuthMethod::NativePassword;
   }
 
-  if (auth_plugin_name == "mysql_old_password") {
+  if (auth_plugin_name == MYSQL_OLD_PASSWORD) {
     return AuthMethod::OldPassword;
   }
-  if (auth_plugin_name == "mysql_native_password") {
+  if (auth_plugin_name == MYSQL_NATIVE_PASSWORD) {
     return AuthMethod::NativePassword;
   }
-  if (auth_plugin_name == "sha256_password") {
+  if (auth_plugin_name == MYSQL_SHA256_PASSWORD) {
     return AuthMethod::Sha256Password;
   }
-  if (auth_plugin_name == "caching_sha2_password") {
+  if (auth_plugin_name == MYSQL_CACHE_SHA_PASSWORD) {
     return AuthMethod::CacheSha2Password;
   }
-  if (auth_plugin_name == "mysql_clear_password") {
+  if (auth_plugin_name == MYSQL_CLEAR_PASSWORD) {
     return AuthMethod::ClearPassword;
   }
   return AuthMethod::Unknown;
-}
-
-std::string AuthHelper::authPluginName(AuthMethod method) {
-  switch (method) {
-  case AuthMethod::OldPassword:
-    return "mysql_old_password";
-  case AuthMethod::NativePassword:
-    return "mysql_native_password";
-  case AuthMethod::Sha256Password:
-    return "sha256_password";
-  case AuthMethod::CacheSha2Password:
-    return "caching_sha2_password";
-  case AuthMethod::ClearPassword:
-    return "mysql_clear_password";
-  case AuthMethod::Unknown:
-  default:
-    return "unknown auth plugin";
-  }
 }
 
 // https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L186
@@ -281,7 +269,7 @@ std::vector<uint8_t> OldPassword::signature(const std::string& password,
   auto hash_seed = hash(seed);
   RandStruct rand_st(hash_pass[0] ^ hash_seed[0], hash_pass[1] ^ hash_seed[1]);
   for (int i = 0; i < SEED_LENGTH; i++) {
-    to[i] = static_cast<char>((floor(rand_st.myRnd() * 31) + 64));
+    to[i] = static_cast<uint8_t>((floor(rand_st.myRnd() * 31) + 64));
   }
   char extra = static_cast<char>(floor(rand_st.myRnd() * 31));
   for (int i = 0; i < SEED_LENGTH; i++) {
