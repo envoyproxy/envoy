@@ -251,13 +251,13 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& drain
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory,
-                                         bool enable_dispatcher_stats)
+                                         bool enable_dispatcher_stats,
+                                         Quic::QuicStatNames& quic_stat_names)
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })),
-      enable_dispatcher_stats_(enable_dispatcher_stats),
-      quic_stat_names_(server_.stats().symbolTable()) {
+      enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));

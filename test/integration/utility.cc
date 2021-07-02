@@ -180,6 +180,7 @@ BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecType type,
+                                   Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
                                    const std::string& host, const std::string& content_type) {
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   NiceMock<Random::MockRandomGenerator> random;
@@ -221,8 +222,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     // Docker only works with loopback v6 address.
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
-  Network::ClientConnectionPtr connection =
-      Quic::createQuicNetworkConnection(*persistent_info, *dispatcher, addr, local_address);
+  Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
+      *persistent_info, *dispatcher, addr, local_address, quic_stat_names, scope);
   connection->addConnectionCallbacks(connection_callbacks);
   Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
   // Quic connection needs to finish handshake.
@@ -237,11 +238,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecType type,
-                                   Network::Address::IpVersion ip_version, const std::string& host,
-                                   const std::string& content_type) {
+                                   Network::Address::IpVersion ip_version,
+                                   Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope,
+                                   const std::string& host, const std::string& content_type) {
   auto addr = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(ip_version), port));
-  return makeSingleRequest(addr, method, url, body, type, host, content_type);
+  return makeSingleRequest(addr, method, url, body, type, quic_stat_names, scope, host,
+                           content_type);
 }
 
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& request_data,

@@ -232,7 +232,7 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   return Quic::createQuicNetworkConnection(*quic_connection_persistent_info_, *dispatcher_,
-                                           server_addr, local_addr);
+                                           server_addr, local_addr, quic_stat_names_, stats_store_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -302,7 +302,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
     : BaseIntegrationTest(upstream_address_fn, version, config),
-      downstream_protocol_(downstream_protocol) {
+      downstream_protocol_(downstream_protocol), quic_stat_names_(stats_store_.symbolTable()) {
   // Legacy integration tests expect the default listener to be named "http" for
   // lookupPort calls.
   config_helper_.renameListener("http");
@@ -595,7 +595,8 @@ void HttpIntegrationTest::testRouterNotFound() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_, quic_stat_names_,
+      stats_store_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
@@ -605,7 +606,8 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
+      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_,
+      quic_stat_names_, stats_store_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
@@ -1378,7 +1380,8 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
   // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_,
+      quic_stat_names_, stats_store_);
   EXPECT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().getStatusValue());
   EXPECT_EQ("OK\n", admin_response->body());

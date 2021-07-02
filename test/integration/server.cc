@@ -241,6 +241,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     admin_address_ = server.admin().socket().addressProvider().localAddress();
     server_ = &server;
     stat_store_ = &stat_store;
+    quic_stat_names_ = &server.quic_stat_names();
     serverReady();
     server.run();
   }
@@ -254,7 +255,8 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
     if (admin_address != nullptr) {
       BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1);
+          admin_address, "POST", "/quitquitquit", "", Http::CodecType::HTTP1, *quic_stat_names_,
+          *stat_store_);
       EXPECT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
       server_gone_.WaitForNotification();

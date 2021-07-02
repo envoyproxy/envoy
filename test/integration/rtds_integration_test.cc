@@ -114,7 +114,8 @@ public:
 
   std::string getRuntimeKey(const std::string& key) {
     auto response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "GET", "/runtime?format=json", "", downstreamProtocol(), version_);
+        lookupPort("admin"), "GET", "/runtime?format=json", "", downstreamProtocol(), version_,
+        quic_stat_names_, stats_store_);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());

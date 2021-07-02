@@ -111,7 +111,7 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, stats_store_);
     return session;
   }
 

@@ -399,9 +399,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ(7, config_dump_with_eds.configs_size());
 
   // Validate that the "inboundonly" does not stop the default listener.
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
-                                                "/drain_listeners?inboundonly", "",
-                                                downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly", "", downstreamProtocol(),
+      version_, quic_stat_names_, stats_store_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
@@ -413,7 +413,8 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Now validate that the drain_listeners stops the listeners.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners", "",
-                                                downstreamProtocol(), version_);
+                                                downstreamProtocol(), version_, quic_stat_names_,
+                                                stats_store_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
@@ -433,7 +434,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("admin"), "POST", "/drain_listeners?inboundonly", "", downstreamProtocol(),
-      version_);
+      version_, quic_stat_names_, stats_store_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
@@ -511,7 +512,8 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
       TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     initialize();
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "GET", "/server_info", "", downstreamProtocol(), version_);
+        lookupPort("admin"), "GET", "/server_info", "", downstreamProtocol(), version_,
+        quic_stat_names_, stats_store_);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
@@ -541,7 +543,8 @@ public:
   }
   void makeRequest() {
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
-                                                   downstreamProtocol(), version_);
+                                                   downstreamProtocol(), version_, quic_stat_names_,
+                                                   stats_store_);
     ASSERT_TRUE(response_->complete());
     EXPECT_EQ("200", response_->headers().getStatusValue());
   }

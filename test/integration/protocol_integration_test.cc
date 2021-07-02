@@ -93,7 +93,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, quic_stat_names_,
+      stats_store_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
@@ -108,7 +109,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, quic_stat_names_,
+      stats_store_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
@@ -121,7 +123,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
+      lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, quic_stat_names_,
+      stats_store_, "www.redirect.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("301", response->headers().getStatusValue());
   EXPECT_EQ("https://www.redirect.com/foo",

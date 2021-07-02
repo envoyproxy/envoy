@@ -161,7 +161,8 @@ TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
   ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_, quic_stat_names_,
+      stats_store_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogRequest(EXPECTED_REQUEST_MESSAGE));
@@ -183,7 +184,8 @@ TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
-                                                downstream_protocol_, version_);
+                                                downstream_protocol_, version_, quic_stat_names_,
+                                                stats_store_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());

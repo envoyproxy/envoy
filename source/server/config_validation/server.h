@@ -16,6 +16,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/runtime/runtime_impl.h"
@@ -208,6 +209,7 @@ private:
   Router::ContextImpl router_context_;
   Event::TimeSystem& time_system_;
   ServerFactoryContextImpl server_contexts_;
+  Quic::QuicStatNames quic_stat_names_;
 };
 
 } // namespace Server

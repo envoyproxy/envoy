@@ -45,8 +45,9 @@ public:
     new Event::MockSchedulableCallback(&dispatcher_);
     Network::ConnectionSocket::OptionsSharedPtr options;
     Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
-                             options, transport_options, state_, simTime());
+    pool_ =
+        allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                         transport_options, state_, simTime(), quic_stat_names_, scope_);
   }
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
@@ -62,6 +63,8 @@ public:
   Quic::QuicClientTransportSocketFactory factory_{
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
       context_};
+  Stats::IsolatedStoreImpl scope_;
+  Quic::QuicStatNames quic_stat_names_{scope_.symbolTable()};
   ConnectionPool::InstancePtr pool_;
 };
 

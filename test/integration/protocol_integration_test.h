@@ -22,6 +22,8 @@ public:
   // calls for some downstream protocols and not for others, and those still
   // need the full mesh.
   bool testing_upstream_intentionally_{};
+  Stats::IsolatedStoreImpl scope_;
+  Quic::QuicStatNames quic_stat_names_{scope_.symbolTable()};
 };
 
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols

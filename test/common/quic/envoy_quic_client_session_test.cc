@@ -109,11 +109,12 @@ public:
             quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr))),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
-        envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
-                            *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
+        quic_stat_names_(scope_.symbolTable()),
+        envoy_quic_session_(
+            quic_config_, quic_version_,
+            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr, *dispatcher_,
+            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, scope_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -174,6 +175,8 @@ protected:
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
+  Stats::IsolatedStoreImpl scope_;
+  QuicStatNames quic_stat_names_;
   EnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
@@ -181,7 +184,6 @@ protected:
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
-  Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
@@ -283,6 +285,11 @@ TEST_P(EnvoyQuicClientSessionTest, ConnectionClose) {
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),
             envoy_quic_session_.transportFailureReason());
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
+
+  EXPECT_EQ(
+      1U, TestUtility::findCounter(
+              scope_, "http3.upstream.rx.quic_connection_close_error_code_QUIC_INVALID_FRAME_DATA")
+              ->value());
 }
 
 TEST_P(EnvoyQuicClientSessionTest, ConnectionCloseWithActiveStream) {
@@ -315,11 +322,12 @@ public:
             createConnectionSocket(peer_addr_, self_addr_, nullptr))),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
-        envoy_quic_session_(quic_config_, quic::test::SupportedVersions(GetParam()),
-                            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-                            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
-                            *dispatcher_,
-                            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_),
+        quic_stat_names_(scope_.symbolTable()),
+        envoy_quic_session_(
+            quic_config_, quic::test::SupportedVersions(GetParam()),
+            std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
+            quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr, *dispatcher_,
+            /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, scope_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
                                       POOL_GAUGE_PREFIX(scope_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,
@@ -365,6 +373,8 @@ protected:
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
+  Stats::IsolatedStoreImpl scope_;
+  QuicStatNames quic_stat_names_;
   EnvoyQuicClientSession envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
   Http::MockServerConnectionCallbacks http_connection_callbacks_;
@@ -372,7 +382,6 @@ protected:
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
-  Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
