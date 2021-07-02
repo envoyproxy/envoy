@@ -50,10 +50,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha:
       mi_record_size_(proto_config.mi_record_size() ? proto_config.mi_record_size() : 4096L),
       client_can_accept_sxg_header_((proto_config.client_can_accept_sxg_header().length() > 0)
                                         ? proto_config.client_can_accept_sxg_header()
-                                        : "x-envoy-client-can-accept-sxg"),
+                                        : "x-client-can-accept-sxg"),
       should_encode_sxg_header_((proto_config.should_encode_sxg_header().length() > 0)
                                     ? proto_config.should_encode_sxg_header()
-                                    : "x-envoy-should-encode-sxg"),
+                                    : "x-should-encode-sxg"),
       header_prefix_filters_(initializeHeaderPrefixFilters(proto_config.header_prefix_filters())),
       time_source_(time_source), secret_reader_(secret_reader) {}
 
@@ -367,35 +367,35 @@ bool Filter::getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* 
     const auto& filtered_headers = filteredResponseHeaders();
     const auto& should_encode_sxg_header = xShouldEncodeSxgKey().get();
     const auto& prefix_filters = config_->headerPrefixFilters();
-    response_headers_->iterate(
-        [filtered_headers, should_encode_sxg_header, prefix_filters, &raw,
-         &retval](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-          const auto header_key = header.key().getStringView();
+    response_headers_->iterate([filtered_headers, should_encode_sxg_header, prefix_filters, &raw,
+                                &retval](
+                                   const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      const auto header_key = header.key().getStringView();
 
-          // filter out all headers that should not be encoded in the SXG document
-          if (absl::StartsWith(header_key, "x-envoy-")) {
-            return Http::HeaderMap::Iterate::Continue;
-          }
-          if (should_encode_sxg_header == header_key) {
-            return Http::HeaderMap::Iterate::Continue;
-          }
-          for (const auto& prefix_filter : prefix_filters) {
-            if (absl::StartsWith(header_key, prefix_filter)) {
-              return Http::HeaderMap::Iterate::Continue;
-            }
-          }
-          if (filtered_headers.find(header_key) != filtered_headers.end()) {
-            return Http::HeaderMap::Iterate::Continue;
-          }
-
-          const auto header_value = header.value().getStringView();
-          if (!sxg_header_append_string(std::string(header_key).c_str(),
-                                        std::string(header_value).c_str(), &raw.header)) {
-            retval = false;
-            return Http::HeaderMap::Iterate::Break;
-          }
+      // filter out all headers that should not be encoded in the SXG document
+      if (absl::StartsWith(header_key, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
+      if (should_encode_sxg_header == header_key) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
+      for (const auto& prefix_filter : prefix_filters) {
+        if (absl::StartsWith(header_key, prefix_filter)) {
           return Http::HeaderMap::Iterate::Continue;
-        });
+        }
+      }
+      if (filtered_headers.find(header_key) != filtered_headers.end()) {
+        return Http::HeaderMap::Iterate::Continue;
+      }
+
+      const auto header_value = header.value().getStringView();
+      if (!sxg_header_append_string(std::string(header_key).c_str(),
+                                    std::string(header_value).c_str(), &raw.header)) {
+        retval = false;
+        return Http::HeaderMap::Iterate::Break;
+      }
+      return Http::HeaderMap::Iterate::Continue;
+    });
   }
   if (retval && !sxg_encode_response(config_->miRecordSize(), &raw, encoded)) {
     retval = false;
