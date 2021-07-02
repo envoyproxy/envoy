@@ -88,7 +88,7 @@ public:
     auto labels_key_it =
         bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
     if (labels_key_it != bootstrap.node().metadata().fields().end()) {
-      for (const auto & labels_it : labels_key_it->second.struct_value().fields()) {
+      for (const auto& labels_it : labels_key_it->second.struct_value().fields()) {
         destination_labels_[labels_it.first] = labels_it.second.string_value();
       }
     }
