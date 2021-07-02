@@ -314,7 +314,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "libsxg-{version}",
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
         use_category = ["other"],
-        extensions = ["envoy.extensions.filters.http.sxg"],
+        extensions = ["envoy.filters.http.sxg"],
         release_date = "2021-06-23",
         cpe = "N/A",
     ),

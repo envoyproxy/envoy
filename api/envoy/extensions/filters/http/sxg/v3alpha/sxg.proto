@@ -26,7 +26,7 @@ message SXG {
   // SDS key for private key data.
   transport_sockets.tls.v3.SdsSecretConfig private_key = 2;
 
-  // Duration for which the generated SXG package will be valid. Default is 604800 (7 days in seconds).
+  // Duration for which the generated SXG package will be valid. Default is 604800s (7 days in seconds).
   // Note that in order to account for clock skew, the timestamp will be backdated by a day. So, if
   // duration is set to 7 days, that will be 7 days from 24 hours ago (6 days from now).
   google.protobuf.Duration duration = 3;
