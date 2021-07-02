@@ -249,6 +249,27 @@ message RemoteJwks {
   // * Jwks is ready when the requests come, not need to wait for the Jwks fetching.
   //
   JwksAsyncFetch async_fetch = 3;
+
+  // Retry policy for fetching Jwks. optional. turned off by default.
+  //
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     per_try_timeout: 20s
+  //     retry_on: 5xx,gateway-error,connect-failure,reset
+  //     retry_back_off:
+  //       base_interval: 0.01s
+  //       max_interval: 20s
+  //     num_retries: 10
+  //
+  // will yield a randomized truncated exponential backoff policy with an initial delay of 10ms
+  // 10 maximum attempts spaced at most 20s seconds.
+  //
+  // requires the upstream.use_retry feature to be enabled.
+  //
+  config.route.v3.RetryPolicy retry_policy = 4;
 }
 
 // Fetch Jwks asynchronously in the main thread when the filter config is parsed.
