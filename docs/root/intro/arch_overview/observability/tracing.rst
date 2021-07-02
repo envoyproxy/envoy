@@ -71,14 +71,15 @@ to be correlated.
 
 .. attention::
 
-  The sampling policy of Envoy is determined by the value of :ref:`x-request-id <config_http_conn_man_headers_x-request-id>`,
-  if no additional settings are made. However, such a sampling policy is only valid for
-  fleets of Envoys, and if a service proxy that is not an Envoy is present in the fleet,
-  sampling will be performed without considering its policy. In such a mesh consisting of
-  multiple types of service proxies, it is more effective to bypass the sampling policy of
-  Envoy and perform span processing based on the sampling policy of the tracing provider.
-  This can be achieved by setting the :ref:`trace_request_id_sample_decision_policy <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.trace_request_id_sample_decision_policy>`
-  to ByPass.
+  The sampling policy for Envoy is determined by the value of x-request-id by default.
+  However, such a sampling policy is only valid for the fleet of Envoys. if a service proxy
+  that is not Envoy is present in the fleet, sampling is performed without considering the policy of that proxy.
+  For meshes consisting of multiple service proxies such as this, it is more effective to
+  bypass Envoy's sampling policy and span based on the trace provider's sampling policy. This can be achieved by setting
+  :ref:`use_request_id_for_trace_sampling <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.use_request_id_for_trace_sampling>`
+  to false.
+
+Translated with www.DeepL.com/Translator (free version)
 
 The tracing providers also require additional context, to enable the parent/child relationships
 between the spans (logical units of work) to be understood. This can be achieved by using the

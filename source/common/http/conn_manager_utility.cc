@@ -283,7 +283,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
 
   auto rid_extension = config.requestIDExtension();
-  if (rid_extension->requestIdMutationPolicy() == Http::RequestIDMutationPolicy::Skip) {
+  if (!rid_extension->useRequestIdForTraceSampling()) {
     return Tracing::Reason::Sampling;
   }
   const auto rid_to_integer = rid_extension->toInteger(request_headers);
