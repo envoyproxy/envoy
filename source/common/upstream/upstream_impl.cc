@@ -338,13 +338,16 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
   ASSERT(!address->envoyInternalAddress());
-  if (true) {
-    return std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options);
-  }
-  Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(),
-      socket_factory.createTransportSocket(std::move(transport_socket_options)),
-      connection_options);
+  Network::ClientConnectionPtr connection =
+
+    true ?
+     std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
+  :
+    dispatcher.createClientConnection(
+        address, cluster.sourceAddress(),
+        socket_factory.createTransportSocket(std::move(transport_socket_options)),
+        connection_options);
+
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);
   return connection;

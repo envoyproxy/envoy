@@ -16,10 +16,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       socket_factory_(socket_factory),
       transport_socket_options_(transport_socket_options),
       options_(options) {
-  connection_ = std::make_unique<ClientConnectionImpl>(dispatcher_,
-                                                       address_, source_address_,
-                                                       socket_factory_.createTransportSocket(std::move(transport_socket_options_)),
-                                                       options_);
+  connection_ = createConnection();
 }
 
 HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() = default;
@@ -147,6 +144,13 @@ void HappyEyeballsConnectionImpl::setDelayedCloseTimeout(std::chrono::millisecon
 // ScopeTrackedObject
 void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   connection_->dumpState(os, indent_level);
+}
+
+std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createConnection() {
+  return dispatcher_.createClientConnection(
+      address_, source_address_,
+      socket_factory_.createTransportSocket(transport_socket_options_),
+      options_);
 }
 
 } // namespace Network

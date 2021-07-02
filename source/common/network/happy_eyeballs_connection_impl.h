@@ -81,8 +81,10 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
-  std::unique_ptr<ClientConnectionImpl> connection_;
-  std::unique_ptr<ClientConnectionImpl> pending_connection_;
+  std::unique_ptr<ClientConnection> createConnection();
+
+  std::unique_ptr<ClientConnection> connection_;
+  std::unique_ptr<ClientConnection> pending_connection_;
   Event::Dispatcher& dispatcher_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr source_address_;
