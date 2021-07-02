@@ -86,6 +86,7 @@ public:
       uint32_t priority, TimeSource& time_source);
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
+    absl::ReaderMutexLock lock(&metadata_mutex_);
     return socket_factory_;
   }
 
@@ -103,8 +104,13 @@ public:
     return metadata_;
   }
   void metadata(MetadataConstSharedPtr new_metadata) override {
-    absl::WriterMutexLock lock(&metadata_mutex_);
-    metadata_ = new_metadata;
+    auto& new_socket_factory = resolveTransportSocketFactory(address_, new_metadata.get());
+    {
+      absl::WriterMutexLock lock(&metadata_mutex_);
+      metadata_ = new_metadata;
+      // Update data members dependent on metadata.
+      socket_factory_ = new_socket_factory;
+    }
   }
 
   const ClusterInfo& cluster() const override { return *cluster_; }
@@ -178,7 +184,8 @@ private:
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
-  Network::TransportSocketFactory& socket_factory_;
+  std::reference_wrapper<Network::TransportSocketFactory>
+      socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
 };
 

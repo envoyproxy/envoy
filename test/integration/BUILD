@@ -30,6 +30,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/common:matchers_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
