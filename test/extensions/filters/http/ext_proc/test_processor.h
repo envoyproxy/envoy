@@ -50,7 +50,7 @@ public:
   // the listening threads.
   void shutdown();
 
-  // Return the port that the processor is listening on from the call to 
+  // Return the port that the processor is listening on from the call to
   // "start".
   int port() const { return listening_port_; }
 

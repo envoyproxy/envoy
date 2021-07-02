@@ -106,7 +106,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         } else {
           clearWatermark();
         }
-        idempotentlyContinue();
+        continueIfNecessary();
         return true;
       }
 
@@ -122,7 +122,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
     // If we got here, then the processor doesn't care about the body or is not ready for
     // trailers, so we can just continue.
     headers_ = nullptr;
-    idempotentlyContinue();
+    continueIfNecessary();
     clearWatermark();
     return true;
   }
@@ -187,7 +187,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
     }
 
     if (should_continue) {
-      idempotentlyContinue();
+      continueIfNecessary();
     }
     return true;
   }
@@ -204,7 +204,7 @@ bool ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
     trailers_ = nullptr;
     callback_state_ = CallbackState::Idle;
     message_timer_->disableTimer();
-    idempotentlyContinue();
+    continueIfNecessary();
     return true;
   }
   return false;
@@ -246,7 +246,7 @@ void ProcessorState::clearAsyncState() {
     injectDataToFilterChain(chunk->data, false);
   }
   clearWatermark();
-  idempotentlyContinue();
+  continueIfNecessary();
   callback_state_ = CallbackState::Idle;
 }
 
@@ -266,7 +266,7 @@ void ProcessorState::setBodyMode(ProcessingMode_BodySendMode body_mode) {
   }
 }
 
-void ProcessorState::idempotentlyContinue() {
+void ProcessorState::continueIfNecessary() {
   if (paused_) {
     ENVOY_LOG(debug, "Continuing processing");
     paused_ = false;

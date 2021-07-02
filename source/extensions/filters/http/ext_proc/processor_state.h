@@ -107,7 +107,7 @@ public:
   virtual Http::HeaderMap* addTrailers() PURE;
 
   virtual void continueProcessing() const PURE;
-  void idempotentlyContinue();
+  void continueIfNecessary();
   void clearAsyncState();
 
   virtual envoy::service::ext_proc::v3alpha::HttpHeaders*
@@ -194,8 +194,7 @@ public:
     return trailers_;
   }
 
-  void continueProcessing() const override { decoder_callbacks_->continueDecoding(); 
-  }
+  void continueProcessing() const override { decoder_callbacks_->continueDecoding(); }
 
   envoy::service::ext_proc::v3alpha::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {

@@ -150,8 +150,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // We were previously streaming the body, but there are more chunks waiting
     // to be processed, so we can't send the body yet.
     // Move the data for our chunk into a queue so that we can re-inject it later
-    // when the processor returns. Idempotentely raise the watermark if the
-    // queue is too large.
+    // when the processor returns. Raise the watermark in an idempotent way
+    // if the queue is too large.
     ENVOY_LOG(trace, "Enqueuing data while we wait for processing to finish");
     state.enqueueStreamingChunk(data, end_stream, false);
     if (end_stream) {
@@ -206,8 +206,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     }
 
     // Send the chunk on the gRPC stream
-    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback,
-                  end_stream);
+    sendBodyChunk(state, data, ProcessorState::CallbackState::StreamedBodyCallback, end_stream);
     // Move the data to the queue and optionally raise the watermark.
     state.enqueueStreamingChunk(data, end_stream, true);
 
