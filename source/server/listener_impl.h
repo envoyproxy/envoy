@@ -54,12 +54,11 @@ public:
   Network::SocketSharedPtr getListenSocket() override;
 
   /**
-   * @return the socket shared by worker threads; otherwise return null.
+   * @return the socket shared by worker threads; otherwise return nullopt.
    */
   Network::SocketOptRef sharedSocket() const override {
-    // If a tcp listener socket doesn't bind to port, there is no listen socket so there is no
-    // shared socket.
-    if (socketType() == Network::Socket::Type::Stream && !bind_to_port_) {
+    // If listen socket doesn't bind to port, consider it not shared.
+    if (!bind_to_port_) {
       return absl::nullopt;
     }
     if (!reuse_port_) {

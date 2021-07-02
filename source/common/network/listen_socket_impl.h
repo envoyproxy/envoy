@@ -53,8 +53,7 @@ public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
       : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address) : nullptr,
-                         address),
-        bind_to_port_(bind_to_port) {
+                         address) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
       RELEASE_ASSERT(io_handle_->isOpen(), "");
@@ -75,18 +74,33 @@ public:
 
   NetworkListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options)
-      : ListenSocketImpl(std::move(io_handle), address), bind_to_port_(io_handle_ == nullptr) {
+      : ListenSocketImpl(std::move(io_handle), address) {
     setListenSocketOptions(options);
   }
 
   Socket::Type socketType() const override { return T::type; }
 
-  // This four override is introduced to execute bind_to_port_ check. We can remove the override in
+  // This four override is introduced to performa check at test. We can remove the override in
   // the future.
-  IoHandle& ioHandle() override { return ListenSocketImpl::ioHandle(); }
-  const IoHandle& ioHandle() const override { return ListenSocketImpl::ioHandle(); }
-  void close() override { return ListenSocketImpl::close(); }
-  bool isOpen() const override { return ListenSocketImpl::isOpen(); }
+  IoHandle& ioHandle() override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  const IoHandle& ioHandle() const override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  void close() override {
+    if (io_handle_ != nullptr) {
+      if (io_handle_->isOpen()) {
+        io_handle_->close();
+      }
+    }
+  }
+  bool isOpen() const override {
+    ASSERT(io_handle_ != nullptr);
+    return io_handle_->isOpen();
+  }
 
 protected:
   void setPrebindSocketOptions() {
@@ -98,45 +112,11 @@ protected:
     RELEASE_ASSERT(status.rc_ != -1, "failed to set SO_REUSEADDR socket option");
 #endif
   }
-  // This flag is used to confirm whether this socket own an io handle.
-  const bool bind_to_port_;
 };
 
 template <>
 inline void
 NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
-
-// UDP listen socket desires io handle regardless bind_to_port is true or false.
-template <>
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
-    const Address::InstanceConstSharedPtr& address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
-
-template <>
-inline IoHandle& NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::ioHandle() {
-  ASSERT(bind_to_port_);
-  return *io_handle_;
-}
-template <>
-inline const IoHandle&
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::ioHandle() const {
-  ASSERT(bind_to_port_);
-  return *io_handle_;
-}
-
-template <> inline void NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::close() {
-  if (bind_to_port_) {
-    if (io_handle_->isOpen()) {
-      io_handle_->close();
-    }
-  }
-}
-
-template <>
-inline bool NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>::isOpen() const {
-  ASSERT(bind_to_port_);
-  return io_handle_->isOpen();
-}
 
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
