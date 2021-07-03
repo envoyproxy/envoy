@@ -3,6 +3,9 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
+#include "source/common/common/statusor.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -131,6 +134,24 @@ bool shouldIncludeEdsInDump(const Http::Utility::QueryParams& params) {
   return Utility::queryParam(params, "include_eds") != absl::nullopt;
 }
 
+absl::StatusOr<Matchers::StringMatcherPtr>
+buildNameMatcher(const Http::Utility::QueryParams& params) {
+  const auto name_regex = Utility::queryParam(params, "name_regex");
+  if (!name_regex.has_value()) {
+    return std::make_unique<Matchers::UniversalStringMatcher>();
+  }
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
+  matcher.set_regex(*name_regex);
+  TRY_ASSERT_MAIN_THREAD
+  return Regex::Utility::parseRegex(matcher);
+  END_TRY
+  catch (EnvoyException& e) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Error while parsing name_regex from ", *name_regex, ": ", e.what()));
+  }
+}
+
 } // namespace
 
 ConfigDumpHandler::ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server)
@@ -143,14 +164,20 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
   const bool include_eds = shouldIncludeEdsInDump(query_params);
+  const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher = buildNameMatcher(query_params);
+  if (!name_matcher.ok()) {
+    response.add(name_matcher.status().ToString());
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+    return Http::Code::BadRequest;
+  }
 
   envoy::admin::v3::ConfigDump dump;
 
   absl::optional<std::pair<Http::Code, std::string>> err;
   if (resource.has_value()) {
-    err = addResourceToDump(dump, mask, resource.value(), include_eds);
+    err = addResourceToDump(dump, mask, resource.value(), **name_matcher, include_eds);
   } else {
-    err = addAllConfigToDump(dump, mask, include_eds);
+    err = addAllConfigToDump(dump, mask, **name_matcher, include_eds);
   }
   if (err.has_value()) {
     response_headers.addReference(Http::Headers::get().XContentTypeOptions,
@@ -166,22 +193,24 @@ Http::Code ConfigDumpHandler::handlerConfigDump(absl::string_view url,
   return Http::Code::OK;
 }
 
-absl::optional<std::pair<Http::Code, std::string>>
-ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
-                                     const absl::optional<std::string>& mask,
-                                     const std::string& resource, bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourceToDump(
+    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+    const std::string& resource, const Matchers::StringMatcher& name_matcher,
+    bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
+        return dumpEndpointConfigs(name_matcher);
+      });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(name_matcher);
     ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
@@ -219,22 +248,23 @@ ConfigDumpHandler::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
       std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
-absl::optional<std::pair<Http::Code, std::string>>
-ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
-                                      const absl::optional<std::string>& mask,
-                                      bool include_eds) const {
+absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConfigToDump(
+    envoy::admin::v3::ConfigDump& dump, const absl::optional<std::string>& mask,
+    const Matchers::StringMatcher& name_matcher, bool include_eds) const {
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     auto all_clusters = server_.clusterManager().clusters();
     if (!all_clusters.active_clusters_.empty()) {
-      callbacks_map.emplace("endpoint", [this] { return dumpEndpointConfigs(); });
+      callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
+        return dumpEndpointConfigs(name_matcher);
+      });
     }
   }
 
   for (const auto& [name, callback] : callbacks_map) {
     UNREFERENCED_PARAMETER(name);
-    ProtobufTypes::MessagePtr message = callback();
+    ProtobufTypes::MessagePtr message = callback(name_matcher);
     ASSERT(message);
 
     if (mask.has_value()) {
@@ -255,7 +285,8 @@ ConfigDumpHandler::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
   return absl::nullopt;
 }
 
-ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
+ProtobufTypes::MessagePtr
+ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto endpoint_config_dump = std::make_unique<envoy::admin::v3::EndpointsConfigDump>();
   // TODO(mattklein123): Add ability to see warming clusters in admin output.
   auto all_clusters = server_.clusterManager().clusters();
@@ -269,6 +300,9 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
       cluster_load_assignment.set_cluster_name(cluster_info->edsServiceName().value());
     } else {
       cluster_load_assignment.set_cluster_name(cluster_info->name());
+    }
+    if (!name_matcher.match(cluster_load_assignment.cluster_name())) {
+      continue;
     }
     auto& policy = *cluster_load_assignment.mutable_policy();
 
@@ -303,7 +337,6 @@ ProtobufTypes::MessagePtr ConfigDumpHandler::dumpEndpointConfigs() const {
         }
       }
     }
-
     if (cluster_info->addedViaApi()) {
       auto& dynamic_endpoint = *endpoint_config_dump->mutable_dynamic_endpoint_configs()->Add();
       dynamic_endpoint.mutable_endpoint_config()->PackFrom(cluster_load_assignment);

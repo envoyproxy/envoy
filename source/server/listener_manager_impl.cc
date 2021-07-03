@@ -240,7 +240,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
     envoy::config::listener::v3::Listener::DrainType drain_type) {
-  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type, server_.dispatcher())};
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
@@ -255,15 +255,20 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
-          "listeners", [this] { return dumpListenerConfigs(); })),
-      enable_dispatcher_stats_(enable_dispatcher_stats) {
+          "listeners",
+          [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpListenerConfigs(name_matcher);
+          })),
+      enable_dispatcher_stats_(enable_dispatcher_stats),
+      quic_stat_names_(server_.stats().symbolTable()) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
-ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
+ProtobufTypes::MessagePtr
+ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
 
@@ -272,6 +277,9 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
+    if (!name_matcher.match(listener->config().name())) {
+      continue;
+    }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
       static_listener.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener->config()));
@@ -296,6 +304,9 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   }
 
   for (const auto& listener : warming_listeners_) {
+    if (!name_matcher.match(listener->config().name())) {
+      continue;
+    }
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(listener->name(), *config_dump, listener_map);
     DynamicListenerState* dump_listener = dynamic_listener->mutable_warming_state();
@@ -303,6 +314,9 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   }
 
   for (const auto& draining_listener : draining_listeners_) {
+    if (!name_matcher.match(draining_listener.listener_->config().name())) {
+      continue;
+    }
     const auto& listener = draining_listener.listener_;
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(listener->name(), *config_dump, listener_map);
