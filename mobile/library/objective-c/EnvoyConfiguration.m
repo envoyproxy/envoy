@@ -101,8 +101,7 @@
                             (unsigned long)self.dnsFailureRefreshSecondsBase];
   [definitions appendFormat:@"- &dns_fail_max_interval %lus\n",
                             (unsigned long)self.dnsFailureRefreshSecondsMax];
-  [definitions
-      appendFormat:@"- &dns_preresolve_hostnames %@\n", (unsigned long)self.dnsPreresolveHostnames];
+  [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
   [definitions
       appendFormat:@"- &stream_idle_timeout %lus\n", (unsigned long)self.streamIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
