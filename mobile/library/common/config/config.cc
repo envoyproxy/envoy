@@ -106,6 +106,7 @@ const char* config_template = R"(
   stats_cluster: &stats_cluster
     name: stats
     type: LOGICAL_DNS
+    wait_for_warm_on_init: false
     connect_timeout: *connect_timeout
     dns_refresh_rate: *dns_refresh_rate
     http2_protocol_options: {}

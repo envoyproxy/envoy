@@ -32,6 +32,5 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
         "@envoy_mobile//library/common/extensions/filters/http/test_accessor:config",
-        "@envoy_mobile//library/common/extensions/stat_sinks/metrics_service:config",
     ],
 )
