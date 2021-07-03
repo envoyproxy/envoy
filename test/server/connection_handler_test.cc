@@ -917,13 +917,14 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
       }));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   Stats::Gauge& downstream_pre_cx_active =
       stats_store_.gauge("downstream_pre_cx_active", Stats::Gauge::ImportMode::Accumulate);
   EXPECT_EQ(1UL, downstream_pre_cx_active.value());
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(*test_filter, destroy_());
   // Barrier: test_filter must be destructed before findFilterChain
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
@@ -938,6 +939,12 @@ TEST_F(ConnectionHandlerTest, ContinueOnListenerFilterTimeout) {
   EXPECT_EQ(1UL, stats_store_.counter("no_filter_chain_match").value());
 
   EXPECT_CALL(*listener, onDestroy());
+
+  // Verify the file event created by listener filter was reset. If not
+  // the initializeFileEvent will trigger the assertion.
+  io_handle.initializeFileEvent(
+      dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
 // Timeout is disabled once the listener filters complete.
@@ -965,11 +972,12 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
       }));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   Network::IoSocketHandleImpl io_handle{42};
-  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
 
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle)).RetiresOnSaturation();
   EXPECT_CALL(*test_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   EXPECT_CALL(*access_log_, log(_, _, _, _));
@@ -977,6 +985,12 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeoutResetOnSuccess) {
   listener_filter_cb->continueFilterChain(true);
 
   EXPECT_CALL(*listener, onDestroy());
+
+  // Verify the file event created by listener filter was reset. If not
+  // the initializeFileEvent will trigger the assertion.
+  io_handle.initializeFileEvent(
+      dispatcher_, [](uint32_t) -> void {}, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read | Event::FileReadyType::Closed);
 }
 
 // Ensure there is no timeout when the timeout is disabled with 0s.
