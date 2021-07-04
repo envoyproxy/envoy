@@ -95,6 +95,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  socket_->addressProvider().setConnectionID(id());
 }
 
 ConnectionImpl::~ConnectionImpl() {
