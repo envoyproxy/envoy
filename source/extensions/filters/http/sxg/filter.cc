@@ -7,7 +7,6 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <regex>
 #include <string>
 
 #include "envoy/http/codes.h"
@@ -56,15 +55,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha:
                                     : "x-should-encode-sxg"),
       header_prefix_filters_(initializeHeaderPrefixFilters(proto_config.header_prefix_filters())),
       time_source_(time_source), secret_reader_(secret_reader) {}
-
-const std::regex& matchAcceptHeaderRegex() {
-  // RegEx to detect Signed Exchange Accept Headers from:
-  // https://web.dev/signed-exchanges/#best-practices
-  CONSTRUCT_ON_FIRST_USE(std::regex,
-                         "(?:^|,)\\s*(application/signed-exchange|text/"
-                         "html)\\s*(?:;v=([\\w]+))?\\s*(?:;q=([\\d\\.]+))?\\s*",
-                         std::regex_constants::icase);
-}
 
 void Filter::onDestroy() {}
 
@@ -214,29 +204,32 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 bool Filter::clientAcceptSXG(const Http::RequestHeaderMap& headers) {
   const absl::string_view accept = headers.getInlineValue(accept_handle.handle());
 
-  std::string html_q_value = "0";
-  std::string sxg_q_value = "";
-  auto begin = std::regex_iterator<absl::string_view::const_iterator>(accept.begin(), accept.end(),
-                                                                      matchAcceptHeaderRegex());
-  auto end = std::regex_iterator<absl::string_view::const_iterator>();
-  // Respond with Signed Exchange if accept header has:
+  absl::string_view html_q_value = "0";
+  absl::string_view sxg_q_value = "";
+  // Client can accept signed exchange if accept header has:
   // a) application/signed-exchange
   // b) with appropriate version (v=b3)
   // c) q-value of signed exchange is >= that of text/html
   // from: https://web.dev/signed-exchanges/#best-practices
-  for (auto i = begin; i != end; ++i) {
-    std::match_results<absl::string_view::const_iterator> m = *i;
-    if (m.size() != 4) {
-      continue;
+  for (const auto& token : StringUtil::splitToken(accept, ",")) {
+    const auto& type = StringUtil::trim(StringUtil::cropRight(token, ";"));
+    absl::string_view q_value = "1";
+    absl::string_view version = "";
+
+    const auto params = StringUtil::cropLeft(token, ";");
+    for (const auto& param : StringUtil::splitToken(params, ";")) {
+      if (absl::EqualsIgnoreCase("q", StringUtil::trim(StringUtil::cropRight(param, "=")))) {
+        q_value = StringUtil::trim(StringUtil::cropLeft(param, "="));
+      }
+      if (absl::EqualsIgnoreCase("v", StringUtil::trim(StringUtil::cropRight(param, "=")))) {
+        version = StringUtil::trim(StringUtil::cropLeft(param, "="));
+      }
     }
-    // m[1]: main content type (text/html, application/signed-exchange)
-    // m[2]: v parameter (v=b3 for valid signed exchange version)
-    // m[3]: q value (note that this defaults to 1 if not present)
-    if (m[1].str().compare(htmlContentType()) == 0) {
-      html_q_value = m[3].matched ? m[3].str() : "1";
-    } else if (m[1].str().compare(sxgContentTypeUnversioned()) == 0 && m[2].matched &&
-               m[2].str().compare(acceptedSxgVersion()) == 0) {
-      sxg_q_value = m[3].matched ? m[3].str() : "1";
+
+    if (type == "application/signed-exchange" && version == "b3") {
+      sxg_q_value = q_value;
+    } else if (type == "text/html") {
+      html_q_value = q_value;
     }
   }
 
