@@ -460,7 +460,12 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 const Network::FilterChain*
 FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
   const auto& address = socket.addressProvider().localAddress();
-
+  ENVOY_LOG(debug,
+            "#### FilterChainManagerImpl::findFilterChain, socket localaddress {}, remoteaddress "
+            "{}, directremoteaddress {}",
+            socket.addressProvider().localAddress()->asStringView(),
+            socket.addressProvider().remoteAddress()->asStringView(),
+            socket.addressProvider().directRemoteAddress()->asStringView());
   const Network::FilterChain* best_match_filter_chain = nullptr;
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {

@@ -132,7 +132,7 @@ ReadOrParseState Filter::onReadWorker() {
     }
     socket.addressProvider().setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
-
+  ENVOY_LOG(debug, "###### done {}", socket.addressProvider().remoteAddress()->asStringView());
   // Release the file event so that we do not interfere with the connection read events.
   socket.ioHandle().resetFileEvents();
   cb_->continueFilterChain(true);
