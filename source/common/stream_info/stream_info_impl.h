@@ -332,7 +332,6 @@ private:
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
-  absl::optional<uint64_t> connection_id_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
 };
