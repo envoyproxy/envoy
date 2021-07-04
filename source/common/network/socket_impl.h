@@ -49,12 +49,9 @@ public:
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     server_name_ = std::string(requested_server_name);
   }
-  absl::optional<uint64_t> connectionID() const override {
-    return connection_id_;
-  }
-  void setConnectionID(uint64_t id) override {
-    connection_id_ = id;
-  }
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
+
 private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
