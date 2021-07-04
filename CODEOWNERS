@@ -168,7 +168,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # SXG filter
-/*/extensions/filters/http/sxg @cpapazian @rgs1
+/*/extensions/filters/http/sxg @cpapazian @rgs1 @alyssawilk
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
