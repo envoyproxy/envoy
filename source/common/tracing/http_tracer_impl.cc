@@ -322,7 +322,7 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
   const auto entry = ctx.trace_context->getTraceContext(name_);
-  return entry.has_value() ? entry.value() : default_value_;
+  return entry.value_or(default_value_);
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

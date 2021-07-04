@@ -21,6 +21,10 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     ot_span_context_handle(Http::CustomHeaders::get().OtSpanContext);
 
 namespace {
+
+/**
+ * TODO(wbpcode): Use opentracing::TextMapWriter to replace opentracing::HTTPHeadersWriter.
+ */
 class OpenTracingHeadersWriter : public opentracing::HTTPHeadersWriter {
 public:
   explicit OpenTracingHeadersWriter(Tracing::TraceContext& trace_context)
@@ -38,6 +42,9 @@ private:
   Tracing::TraceContext& trace_context_;
 };
 
+/**
+ * TODO(wbpcode): Use opentracing::TextMapReader to replace opentracing::HTTPHeadersReader.
+ */
 class OpenTracingHeadersReader : public opentracing::HTTPHeadersReader {
 public:
   explicit OpenTracingHeadersReader(const Tracing::TraceContext& trace_context)
