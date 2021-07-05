@@ -450,7 +450,7 @@ void InstanceImpl::initialize(const Options& options,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options);
-    runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   initial_config.initAccesslog(bootstrap_, *this);
   hooks.onRuntimeCreated();
@@ -557,7 +557,6 @@ void InstanceImpl::initialize(const Options& options,
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);

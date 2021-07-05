@@ -231,7 +231,8 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
   }
 }
 
-void InitialImpl::initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server){
+void InitialImpl::initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                Instance& server){
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
@@ -247,7 +248,6 @@ void InitialImpl::initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& b
         file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
         server.accessLogManager()));
   }
-
  }
 
 } // namespace Configuration
