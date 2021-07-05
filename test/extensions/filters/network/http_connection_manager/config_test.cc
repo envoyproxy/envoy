@@ -670,10 +670,9 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
     config.requestIDExtension()->setTraceReason(header, Envoy::Tracing::Reason::Sampling);
-    Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime, config,
+    auto reason = Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime, config,
                                                                       &route);
-
-    if (config.requestIDExtension()->getTraceReason(header) == Envoy::Tracing::Reason::Sampling) {
+    if (reason == Envoy::Tracing::Reason::Sampling) {
       sampled_count++;
     }
   }
