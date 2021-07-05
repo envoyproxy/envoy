@@ -111,13 +111,13 @@ private:
   const std::string private_key_identifier_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Helper type to facilitate comparing an absl::string_view key to a std::string.
  */
 struct StringCmp {
-  using is_transparent = void;
+  using IsTransparent = void;
   bool operator()(absl::string_view a, absl::string_view b) const { return a < b; }
 };
 
@@ -132,7 +132,7 @@ struct StringCmp {
 class Filter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
-  ~Filter() = default;
+  ~Filter() override = default;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -149,7 +149,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override;
-  virtual void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:
   friend class FilterTest;
@@ -195,7 +195,7 @@ private:
   const std::string& acceptedSxgVersion() const;
   const std::string& sxgContentType() const;
 
-  using HeaderFilterSet = std::set<std::string, StringCmp>;
+  using HeaderFilterSet = std::set<absl::string_view, StringCmp>;
   const HeaderFilterSet& filteredResponseHeaders() const;
 };
 

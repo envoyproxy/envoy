@@ -83,7 +83,7 @@ bool ClearSignature(std::string& buffer) {
   }
 
   const size_t start = sig_pos + 5;
-  const size_t len = buffer.find("*", start) - start;
+  const size_t len = buffer.find('*', start) - start;
 
   // decrement the sig_size in the SXG document by the calculated length
   const size_t modified_sig_size = sig_size - len;
@@ -151,12 +151,12 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void TestPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
+  void testPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
                            Http::TestResponseHeaderMapImpl& response_headers) {
-    TestPassthroughHtml(request_headers, response_headers, NULL);
+    testPassthroughHtml(request_headers, response_headers, NULL);
   }
 
-  void TestPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
+  void testPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
                            Http::TestResponseHeaderMapImpl& response_headers,
                            Http::TestResponseTrailerMapImpl* response_trailers) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -201,12 +201,12 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     EXPECT_EQ("<html><body>hi!</body></html>\n", data.toString());
   }
 
-  void TestEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
+  void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers) {
-    TestEncodeSignedExchange(request_headers, response_headers, NULL);
+    testEncodeSignedExchange(request_headers, response_headers, NULL);
   }
 
-  void TestEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
+  void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers,
                                 Http::TestResponseTrailerMapImpl* response_trailers) {
     const Buffer::OwnedImpl sxg(
@@ -220,16 +220,16 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
         "typeItext/htmlPcontent-encodingLmi-sha256-03\0\0\0\0\0\0\x10\0<html><body>hi!</body></"
         "html>\n",
         472);
-    TestEncodeSignedExchange(request_headers, response_headers, response_trailers, sxg);
+    testEncodeSignedExchange(request_headers, response_headers, response_trailers, sxg);
   }
 
-  void TestEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
+  void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers,
                                 const Buffer::OwnedImpl& sxg) {
-    TestEncodeSignedExchange(request_headers, response_headers, NULL, sxg);
+    testEncodeSignedExchange(request_headers, response_headers, NULL, sxg);
   }
 
-  void TestEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
+  void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers,
                                 Http::TestResponseTrailerMapImpl* response_trailers,
                                 const Buffer::OwnedImpl& sxg) {
@@ -286,7 +286,7 @@ TEST_F(FilterTest, NoHostHeader) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -304,7 +304,7 @@ TEST_F(FilterTest, AcceptTextHtml) {
       {"accept", "text/html"}, {"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -323,7 +323,7 @@ TEST_F(FilterTest, HtmlWithTrailers) {
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "text/html"},
                                                    {":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-sample-trailer", "wait for me!"}};
-  TestPassthroughHtml(request_headers, response_headers, &response_trailers);
+  testPassthroughHtml(request_headers, response_headers, &response_trailers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -341,7 +341,7 @@ TEST_F(FilterTest, NoPathHeader) {
                                                  {"host", "example.org"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -358,7 +358,7 @@ TEST_F(FilterTest, NoAcceptHeader) {
   Http::TestRequestHeaderMapImpl request_headers{{"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -377,7 +377,7 @@ TEST_F(FilterTest, NoStatusHeader) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "text/html"},
                                                    {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -398,7 +398,7 @@ TEST_F(FilterTest, Status404) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "404"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -420,7 +420,7 @@ TEST_F(FilterTest, XShouldEncodeNotSet) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "text/html"},
                                                    {":status", "200"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -442,7 +442,7 @@ TEST_F(FilterTest, AcceptTextHtmlWithQ) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -460,7 +460,7 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeNoVersion) {
       {"accept", "application/signed-exchange"}, {"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -479,7 +479,7 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB2) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -498,7 +498,7 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3) {
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -520,7 +520,7 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3WithQ) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -542,7 +542,7 @@ TEST_F(FilterTest, AcceptMultipleTextHtml) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestPassthroughHtml(request_headers, response_headers);
+  testPassthroughHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_TRUE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -562,7 +562,7 @@ TEST_F(FilterTest, AcceptMultipleSignedExchange) {
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -618,7 +618,7 @@ TEST_F(FilterTest, UrlWithQueryParam) {
       "typeItext/htmlPcontent-encodingLmi-sha256-03\0\0\0\0\0\0\x10\0<html><body>hi!</body></"
       "html>\n",
       481);
-  TestEncodeSignedExchange(request_headers, response_headers, expected_sxg);
+  testEncodeSignedExchange(request_headers, response_headers, expected_sxg);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -653,7 +653,7 @@ validity_url: "https://amp.example.org/validity.msg"
       "typeItext/htmlPcontent-encodingLmi-sha256-03\0\0\0\0\0\0\x10\0<html><body>hi!</body></"
       "html>\n",
       470);
-  TestEncodeSignedExchange(request_headers, response_headers, expected_sxg);
+  testEncodeSignedExchange(request_headers, response_headers, expected_sxg);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -676,7 +676,7 @@ TEST_F(FilterTest, WithHttpTrailers) {
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
   Http::TestResponseTrailerMapImpl response_trailers{{"x-test-sample-trailer", "wait for me!"}};
-  TestEncodeSignedExchange(request_headers, response_headers, &response_trailers);
+  testEncodeSignedExchange(request_headers, response_headers, &response_trailers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -702,7 +702,7 @@ should_encode_sxg_header: "x-custom-should-encode-sxg"
       {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-custom-should-encode-sxg", "true"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -725,7 +725,7 @@ TEST_F(FilterTest, FilterXEnvoyHeaders) {
                                                    {":status", "200"},
                                                    {"x-should-encode-sxg", "true"},
                                                    {"x-envoy-something", "something"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -755,7 +755,7 @@ header_prefix_filters:
                                                    {"x-should-encode-sxg", "true"},
                                                    {"x-foo-bar", "foo"},
                                                    {"x-bar-baz", "bar"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -789,7 +789,7 @@ TEST_F(FilterTest, CustomHeader) {
       "typeItext/htmlPcontent-encodingLmi-sha256-03Px-special-headerLvery special"
       "\0\0\0\0\0\0\x10\0<html><body>hi!</body></html>\n",
       502);
-  TestEncodeSignedExchange(request_headers, response_headers, expected_sxg);
+  testEncodeSignedExchange(request_headers, response_headers, expected_sxg);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -826,7 +826,7 @@ TEST_F(FilterTest, ExtraHeaders) {
       "\0\0\0\0\0\0\x10\0<html><body>hi!</body></html>\n",
       506);
 
-  TestEncodeSignedExchange(request_headers, response_headers, expected_sxg);
+  testEncodeSignedExchange(request_headers, response_headers, expected_sxg);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -874,7 +874,7 @@ validity_url: "/.sxg/validity.msg"
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-  TestEncodeSignedExchange(request_headers, response_headers);
+  testEncodeSignedExchange(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());

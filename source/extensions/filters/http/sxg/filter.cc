@@ -246,7 +246,7 @@ bool Filter::shouldEncodeSXG(const Http::ResponseHeaderMap& headers) {
 }
 
 const std::string Filter::toAbsolute(const std::string& url_or_relative_path) const {
-  if (url_or_relative_path.size() > 0 && url_or_relative_path[0] == '/') {
+  if (!url_or_relative_path.empty() && url_or_relative_path[0] == '/') {
     return origin_ + url_or_relative_path;
   } else {
     return url_or_relative_path;
@@ -284,14 +284,14 @@ X509* Filter::loadX09Cert() {
   const std::string cert_str = config_->certificate();
   BIO* bio = BIO_new(BIO_s_mem());
   if (!bio) {
-    return NULL;
+    return nullptr;
   }
   if (BIO_puts(bio, cert_str.c_str()) < 0) {
     BIO_vfree(bio);
-    return NULL;
+    return nullptr;
   }
 
-  X509* cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+  X509* cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
   BIO_vfree(bio);
 
   return cert;
@@ -301,14 +301,14 @@ EVP_PKEY* Filter::loadPrivateKey() {
   const std::string pri_key_str = config_->privateKey();
   BIO* bio = BIO_new(BIO_s_mem());
   if (!bio) {
-    return NULL;
+    return nullptr;
   }
   if (BIO_puts(bio, pri_key_str.c_str()) < 0) {
     BIO_vfree(bio);
-    return NULL;
+    return nullptr;
   }
 
-  EVP_PKEY* pri_key = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+  EVP_PKEY* pri_key = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
   BIO_vfree(bio);
 
   return pri_key;
@@ -363,7 +363,7 @@ bool Filter::getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* 
     response_headers_->iterate([filtered_headers, should_encode_sxg_header, prefix_filters, &raw,
                                 &retval](
                                    const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      const auto header_key = header.key().getStringView();
+      const auto& header_key = header.key().getStringView();
 
       // filter out all headers that should not be encoded in the SXG document
       if (absl::StartsWith(header_key, ThreadSafeSingleton<Http::PrefixValue>::get().prefix())) {
