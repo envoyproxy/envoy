@@ -26,7 +26,7 @@ public:
   static constexpr ssize_t MAX_SIGNATURE_SIZE = 512;
 
   CryptoMbContext(Event::Dispatcher& dispatcher, Ssl::PrivateKeyConnectionCallbacks& cb);
-  ~CryptoMbContext() = default;
+  virtual ~CryptoMbContext() = default;
 
   void setStatus(RequestStatus status) { status_ = status; }
   enum RequestStatus getStatus() { return status_; }
@@ -55,6 +55,7 @@ class CryptoMbEcdsaContext : public CryptoMbContext {
 public:
   CryptoMbEcdsaContext(Event::Dispatcher& dispatcher, Ssl::PrivateKeyConnectionCallbacks& cb)
       : CryptoMbContext(dispatcher, cb) {}
+  ~CryptoMbEcdsaContext() override { BN_free(&k_); }
   bool ecdsaInit(EC_KEY* ec, const uint8_t* in, size_t in_len);
 
   // EC parameters.
