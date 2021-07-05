@@ -187,6 +187,7 @@ private:
   Ssl::BoringSslPrivateKeyMethodSharedPtr method_{};
   Api::Api& api_;
   bssl::UniquePtr<EVP_PKEY> pkey_;
+  enum KeyType key_type_;
 
   ThreadLocal::TypedSlotPtr<ThreadLocalData> tls_;
 };

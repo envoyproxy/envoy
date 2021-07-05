@@ -635,11 +635,23 @@ bool CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
 }
 
 bool CryptoMbPrivateKeyMethodProvider::checkFips() {
-  RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
-  if (rsa_private_key == nullptr || !RSA_check_fips(rsa_private_key)) {
-    return false;
+  switch (key_type_) {
+  case KeyType::Rsa: {
+    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
+    if (rsa_private_key && RSA_check_fips(rsa_private_key)) {
+      return true;
+    }
+    break;
   }
-  return true;
+  case KeyType::Ec: {
+    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey_.get());
+    if (ecdsa_private_key && EC_KEY_check_fips(ecdsa_private_key)) {
+      return true;
+    }
+    break;
+  }
+  }
+  return false;
 }
 
 Ssl::BoringSslPrivateKeyMethodSharedPtr
@@ -681,12 +693,11 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
 
   method_ = std::make_shared<SSL_PRIVATE_KEY_METHOD>();
 
-  enum KeyType key_type;
   int key_size;
 
   if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
     ENVOY_LOG(debug, "CryptoMb key type: RSA");
-    key_type = KeyType::Rsa;
+    key_type_ = KeyType::Rsa;
 
     method_->sign = rsaPrivateKeySign;
     method_->decrypt = rsaPrivateKeyDecrypt;
@@ -728,7 +739,7 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     BN_free(&e_check);
   } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
     ENVOY_LOG(debug, "CryptoMb key type: ECDSA");
-    key_type = KeyType::Ec;
+    key_type_ = KeyType::Ec;
 
     method_->sign = ecdsaPrivateKeySign;
     method_->decrypt = ecdsaPrivateKeyDecrypt;
@@ -750,6 +761,8 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   }
 
   pkey_ = std::move(pkey);
+
+  enum KeyType key_type = key_type_;
 
   // Create a single queue for every worker thread to avoid locking.
   tls_->set([poll_delay, key_type, key_size, ipp](Event::Dispatcher& d) {
