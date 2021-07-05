@@ -59,7 +59,7 @@ bool writeIntToBytes(std::string& bytes, uint64_t int_to_write, size_t offset, s
 }
 
 // The sig value of the SXG document is unique, so we strip it in tests
-bool ClearSignature(std::string& buffer) {
+bool clearSignature(std::string& buffer) {
   if (buffer.find("sxg1-b3", 0, 7) == std::string::npos) {
     return false;
   }
@@ -68,7 +68,7 @@ bool ClearSignature(std::string& buffer) {
   }
 
   // The fallback URL length is contained in the 2 bytes following the sxg-b3
-  // prefix string and the null byte that follows. We need to know this length
+  // prefix string and the nullptr byte that follows. We need to know this length
   // because the signature length is located after the fallback URL.
   size_t fallback_url_size_offset = 8;
   size_t fallback_url_size = extractIntFromBytes(buffer, fallback_url_size_offset, 2);
@@ -99,7 +99,7 @@ bool ClearSignature(std::string& buffer) {
 
 class FilterTest : public testing::Test {
 public:
-  FilterTest() {}
+  FilterTest() = default;
 
   void setConfiguration() {
     std::string config_str(R"YAML(
@@ -153,7 +153,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
   void testPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
                            Http::TestResponseHeaderMapImpl& response_headers) {
-    testPassthroughHtml(request_headers, response_headers, NULL);
+    testPassthroughHtml(request_headers, response_headers, nullptr);
   }
 
   void testPassthroughHtml(Http::TestRequestHeaderMapImpl& request_headers,
@@ -180,7 +180,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     EXPECT_EQ("<html><body>hi!</body></html>\n", data.toString());
   }
 
-  void TestFallbackToHtml(Http::TestRequestHeaderMapImpl& request_headers,
+  void testFallbackToHtml(Http::TestRequestHeaderMapImpl& request_headers,
                           Http::TestResponseHeaderMapImpl& response_headers) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -203,7 +203,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
   void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers) {
-    testEncodeSignedExchange(request_headers, response_headers, NULL);
+    testEncodeSignedExchange(request_headers, response_headers, nullptr);
   }
 
   void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
@@ -226,7 +226,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
   void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
                                 Http::TestResponseHeaderMapImpl& response_headers,
                                 const Buffer::OwnedImpl& sxg) {
-    testEncodeSignedExchange(request_headers, response_headers, NULL, sxg);
+    testEncodeSignedExchange(request_headers, response_headers, nullptr, sxg);
   }
 
   void testEncodeSignedExchange(Http::TestRequestHeaderMapImpl& request_headers,
@@ -260,7 +260,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     }
 
     std::string result = accumulated_data.toString();
-    EXPECT_TRUE(ClearSignature(result));
+    EXPECT_TRUE(clearSignature(result));
     EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-type")).size(), 1);
     EXPECT_EQ(
         response_headers.get(Http::LowerCaseString("content-type"))[0]->value().getStringView(),
@@ -585,7 +585,7 @@ TEST_F(FilterTest, ResponseExceedsMaxPayloadSize) {
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
   EXPECT_CALL(encoder_callbacks_, encoderBufferLimit).WillRepeatedly([]() { return 10; });
-  TestFallbackToHtml(request_headers, response_headers);
+  testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -913,7 +913,7 @@ validity_url: "/.sxg/validity.msg"
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
 
-  TestFallbackToHtml(request_headers, response_headers);
+  testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
@@ -965,7 +965,7 @@ validity_url: "/.sxg/validity.msg"
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
 
-  TestFallbackToHtml(request_headers, response_headers);
+  testFallbackToHtml(request_headers, response_headers);
   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
       "x-client-can-accept-sxg");
   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
