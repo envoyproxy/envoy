@@ -16,12 +16,11 @@ class UpstreamEndpointIntegrationTest : public testing::TestWithParam<Network::A
                                         public HttpIntegrationTest {
 public:
   UpstreamEndpointIntegrationTest()
-      : HttpIntegrationTest(
-            Http::CodecType::HTTP1,
-            [](int) {
-              return Network::Utility::parseInternetAddress(
-                  Network::Test::getLoopbackAddressString(GetParam()), 0);
-            },
-            GetParam()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1,
+                            [](int) {
+                              return Network::Utility::parseInternetAddress(
+                                  Network::Test::getLoopbackAddressString(GetParam()), 0);
+                            },
+                            GetParam()) {}
 };
 } // namespace Envoy

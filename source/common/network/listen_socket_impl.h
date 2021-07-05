@@ -186,8 +186,11 @@ public:
   }
 
   ~AcceptedSocketImpl() override {
-    overload_state_.tryDeallocateResource(
-        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+    if (overload_state_.isResourceMonitorEnabled(
+            Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+      overload_state_.tryDeallocateResource(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+    }
     ASSERT(global_accepted_socket_count_.load() > 0);
     --global_accepted_socket_count_;
   }
@@ -197,9 +200,8 @@ public:
   static uint64_t acceptedSocketCount() { return global_accepted_socket_count_.load(); }
 
 private:
-  // to be removed.
-  static std::atomic<uint64_t> global_accepted_socket_count_;
   Server::ThreadLocalOverloadState& overload_state_;
+  static std::atomic<uint64_t> global_accepted_socket_count_;
 };
 
 // ConnectionSocket used with client connections.

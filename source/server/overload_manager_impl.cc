@@ -1,6 +1,7 @@
 #include "source/server/overload_manager_impl.h"
 
 #include <chrono>
+#include <iostream>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -55,7 +56,8 @@ public:
       }
     } else {
       ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
-      return false;
+      // Resource monitor is not configured, pass through mode.
+      return true;
     }
   }
 
@@ -64,24 +66,21 @@ public:
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryDeallocateResource(decrement)) {
+        std::cerr << "***Deallocated resource" << std::endl;
         return true;
       } else {
         return false;
       }
     } else {
       ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
+      std::cerr << "***Failed to deallocate unknown proactive resource" << std::endl;
       return false;
     }
   }
 
-  int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) override {
+  bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
-    if (proactive_resource != proactive_resources_->end()) {
-      return proactive_resource->second.currentResourceUsage();
-    } else {
-      ENVOY_LOG_MISC(warn, " {Failed to get resource usage for unknown proactive resource }");
-      return false;
-    }
+    return proactive_resource != proactive_resources_->end();
   }
 
 private:
@@ -321,7 +320,7 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
   // proactive and regular resource monitors in configuration API. But internally we will maintain
   // two distinct collections of proactive and regular resources. Proactive resources are not
   // subject to periodic flushes and can be recalculated/updated on demand by invoking
-  // `tryAllocateResource/tryDeallocateResource` in overload manager.
+  // `tryAllocateResource/tryDeallocateResource` via thread local overload state.
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
     // Check if it is a proactive resource.
@@ -338,9 +337,8 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
       auto monitor = factory.createProactiveResourceMonitor(*config, context);
 
-      auto result = proactive_resources_->try_emplace(
-          proactive_resource_it->second, name,
-          std::make_unique<Server::ActiveConnectionsResourceMonitor>(1), stats_scope);
+      auto result = proactive_resources_->try_emplace(proactive_resource_it->second, name,
+                                                      std::move(monitor), stats_scope);
       if (!result.second) {
         throw EnvoyException(absl::StrCat("Duplicate proactive resource monitor ", name));
       }

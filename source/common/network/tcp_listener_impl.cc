@@ -20,9 +20,36 @@ namespace Network {
 const absl::string_view TcpListenerImpl::GlobalMaxCxRuntimeKey =
     "overload.global_downstream_max_connections";
 
+// TODO(nezdolik) clean up this method once downstream connections limit runtime key is fully
+// deprecated.
 bool TcpListenerImpl::rejectCxOverGlobalLimit() {
-  return overload_state_.tryAllocateResource(
-      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+  Runtime::Loader* runtime = Runtime::LoaderSingleton::getExisting();
+  // If downstream connections limit is configured via runtime variable and overload manager, prefer
+  // overload manager config.
+  if (runtime != nullptr &&
+      overload_state_.isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
+      runtime->threadsafeSnapshot()->get(Network::TcpListenerImpl::GlobalMaxCxRuntimeKey)) {
+    ENVOY_LOG_MISC(warn,
+                   "Global downstream connections limits is configured via runtime key {} and in "
+                   "overload manager. Using overload manager config.",
+                   TcpListenerImpl::GlobalMaxCxRuntimeKey);
+    return !(overload_state_.tryAllocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1));
+  } else if (overload_state_.isResourceMonitorEnabled(
+                 Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
+    // If runtime key for downstream connections limit is not specified, use overload manager config
+    // instead.
+    return !(overload_state_.tryAllocateResource(
+        Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1));
+  } else if (runtime != nullptr) {
+    const uint64_t global_cx_limit = runtime->threadsafeSnapshot()->getInteger(
+        GlobalMaxCxRuntimeKey, std::numeric_limits<uint64_t>::max());
+    return AcceptedSocketImpl::acceptedSocketCount() >= global_cx_limit;
+  } else {
+    // Pass-through mode if both runtime and resource monitor are not available.
+    return false;
+  }
 }
 
 void TcpListenerImpl::onSocketEvent(short flags) {
@@ -86,9 +113,9 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
-  socket.ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Level, Event::FileReadyType::Read);
+  socket.ioHandle().initializeFileEvent(dispatcher,
+                                        [this](uint32_t events) -> void { onSocketEvent(events); },
+                                        Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::config::core::v3::SocketOption::STATE_LISTENING)) {

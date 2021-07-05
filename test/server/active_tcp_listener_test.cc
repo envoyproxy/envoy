@@ -13,6 +13,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/network_utility.h"
 
 #include "gmock/gmock.h"
@@ -58,6 +59,7 @@ public:
   NiceMock<Network::MockFilterChainFactory> filter_chain_factory_;
   std::shared_ptr<Network::MockFilterChain> filter_chain_;
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
+  Server::NullThreadLocalOverloadState overload_state_;
 };
 
 // Verify that the server connection with recovered address is rebalanced at redirected listener.
@@ -82,7 +84,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved1 = std::make_unique<Network::MockListener>();
   auto& listener1 = *mock_listener_will_be_moved1;
   auto active_listener1 = std::make_unique<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1);
+      conn_handler_, std::move(mock_listener_will_be_moved1), listener_config1, overload_state_);
 
   NiceMock<Network::MockListenerConfig> listener_config2;
   Network::MockConnectionBalancer balancer2;
@@ -103,7 +105,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   auto mock_listener_will_be_moved2 = std::make_unique<Network::MockListener>();
   auto& listener2 = *mock_listener_will_be_moved2;
   auto active_listener2 = std::make_shared<ActiveTcpListener>(
-      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2);
+      conn_handler_, std::move(mock_listener_will_be_moved2), listener_config2, overload_state_);
 
   auto* test_filter = new NiceMock<Network::MockListenerFilter>();
   EXPECT_CALL(*test_filter, destroy_());

@@ -360,6 +360,8 @@ protected:
     upstream_config_.http2_options_.MergeFrom(options);
   }
 
+  Server::OverloadManager& overloadManager() { return test_server_->server().overloadManager(); }
+
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.

@@ -7,6 +7,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -41,40 +42,6 @@ public:
 };
 
 using ProactiveResourceMonitorPtr = std::unique_ptr<ProactiveResourceMonitor>;
-
-// Example of proactive resource monitor. To be removed.
-class ActiveConnectionsResourceMonitor : public ProactiveResourceMonitor {
-public:
-  ActiveConnectionsResourceMonitor(uint64_t max_active_conns)
-      : max_(max_active_conns), current_(0){};
-
-  bool tryAllocateResource(int64_t increment) override {
-    int64_t new_val = (current_ += increment);
-    if (new_val > static_cast<int64_t>(max_) || new_val < 0) {
-      current_ -= increment;
-      return false;
-    }
-    return true;
-  }
-
-  bool tryDeallocateResource(int64_t decrement) override {
-    RELEASE_ASSERT(decrement <= current_,
-                   "Cannot deallocate resource, current resource usage is lower than decrement");
-    int64_t new_val = (current_ -= decrement);
-    if (new_val < 0) {
-      current_ += decrement;
-      return false;
-    }
-    return true;
-  }
-
-  int64_t currentResourceUsage() const override { return current_.load(); }
-  uint64_t maxResourceUsage() const override { return max_; };
-
-protected:
-  uint64_t max_;
-  std::atomic<int64_t> current_;
-};
 
 class ProactiveResource {
 public:

@@ -1087,7 +1087,11 @@ envoy_cc_test(
     shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
+        "//envoy/network:filter_interface",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
         "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/config:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],

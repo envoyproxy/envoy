@@ -82,7 +82,7 @@ public:
   createProactiveResourceMonitor(const Protobuf::Message& config,
                                  ResourceMonitorFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.proactive_resource_monitors"; }
+  std::string category() const override { return "envoy.resource_monitors"; }
 };
 
 } // namespace Configuration

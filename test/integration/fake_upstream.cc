@@ -242,11 +242,11 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!waitForWithDispatcherRun(
-          time_system_, lock_,
-          [this, body_length]()
-              ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return (body_.length() >= body_length); },
-          client_dispatcher, timeout)) {
+  if (!waitForWithDispatcherRun(time_system_, lock_,
+                                [this, body_length]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+                                  return (body_.length() >= body_length);
+                                },
+                                client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   return AssertionSuccess();
@@ -267,10 +267,10 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!waitForWithDispatcherRun(
-          time_system_, lock_,
-          [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; }, client_dispatcher,
-          timeout)) {
+  if (!waitForWithDispatcherRun(time_system_, lock_,
+                                [this]()
+                                    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; },
+                                client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
   return AssertionSuccess();
@@ -515,7 +515,9 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
       read_disable_on_new_connection_(true), enable_half_close_(config.enable_half_close_),
       listener_(*this, http_type_ == Http::CodecType::HTTP3),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))),
-      stats_scope_(stats_store_.createScope("test_server_scope")) {
+      stats_scope_(stats_store_.createScope("test_server_scope")),
+      overload_state_(std::make_unique<FakeThreadLocalOverloadState>(
+          FakeThreadLocalOverloadState(*dispatcher_))) {
   ENVOY_LOG(info, "starting fake server at {}. UDP={} codec={}", localAddress()->asString(),
             config.udp_fake_upstream_.has_value(), FakeHttpConnection::typeToString(http_type_));
   if (config.udp_fake_upstream_.has_value() &&
@@ -571,7 +573,7 @@ void FakeUpstream::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 }
 
 void FakeUpstream::threadRoutine() {
-  handler_->addListener(absl::nullopt, listener_);
+  handler_->addListener(absl::nullopt, listener_, *overload_state_);
   server_initialized_.setReady();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
@@ -640,12 +642,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       FakeUpstream& upstream = *it;
       {
         absl::MutexLock lock(&upstream.lock_);
-        if (!waitForWithDispatcherRun(
-                upstream.time_system_, upstream.lock_,
-                [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
-                  return !upstream.new_connections_.empty();
-                },
-                client_dispatcher, 5ms)) {
+        if (!waitForWithDispatcherRun(upstream.time_system_, upstream.lock_,
+                                      [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
+                                        return !upstream.new_connections_.empty();
+                                      },
+                                      client_dispatcher, 5ms)) {
           continue;
         }
       }

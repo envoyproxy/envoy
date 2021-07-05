@@ -270,7 +270,7 @@ private:
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
       bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
       bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
-      int64_t currentResourceUsage(OverloadProactiveResourceName) override { return 0; }
+      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };

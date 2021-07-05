@@ -67,6 +67,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",

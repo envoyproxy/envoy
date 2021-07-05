@@ -170,6 +170,7 @@ envoy_cc_mock(
     hdrs = ["overload_manager.h"],
     deps = [
         "//envoy/server/overload:overload_manager_interface",
+        "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
     ],
 )

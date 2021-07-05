@@ -11,6 +11,7 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -50,7 +51,7 @@ public:
     EXPECT_CALL(socket_factory_, localAddress())
         .WillOnce(ReturnRef(socket_->addressProvider().localAddress()));
     EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
-    connection_handler_->addListener(absl::nullopt, *this);
+    connection_handler_->addListener(absl::nullopt, *this, overload_state_);
     conn_ = dispatcher_->createClientConnection(socket_->addressProvider().localAddress(),
                                                 Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
@@ -176,6 +177,7 @@ public:
   const Network::FilterChainSharedPtr filter_chain_;
   const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
+  Server::NullThreadLocalOverloadState overload_state_;
 };
 
 // Parameterize the listener socket address version.

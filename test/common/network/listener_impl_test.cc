@@ -10,6 +10,7 @@
 
 #include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
@@ -35,8 +36,9 @@ static void errorCallbackTest(Address::IpVersion version) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
+  Server::NullThreadLocalOverloadState overload_state;
+  Network::ListenerPtr listener = dispatcher->createListener(
+      socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
       socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -68,9 +70,10 @@ class TestTcpListenerImpl : public TcpListenerImpl {
 public:
   TestTcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random_generator,
                       SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
+                      Server::ThreadLocalOverloadState& overload_state,
                       uint32_t tcp_backlog = ENVOY_TCP_BACKLOG_SIZE)
       : TcpListenerImpl(dispatcher, random_generator, std::move(socket), cb, bind_to_port,
-                        tcp_backlog) {}
+                        tcp_backlog, overload_state) {}
 
   MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (os_fd_t fd));
 };
@@ -84,6 +87,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpListenerImplTest,
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
+  Server::NullThreadLocalOverloadState overload_state;
 
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
@@ -91,14 +95,15 @@ TEST_P(TcpListenerImplTest, SetListeningSocketOptionsSuccess) {
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               overload_state);
 }
 
 // Test that an exception is thrown if there is an error setting socket options.
 TEST_P(TcpListenerImplTest, SetListeningSocketOptionsError) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
+  Server::NullThreadLocalOverloadState overload_state;
 
   auto socket = std::make_shared<TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
@@ -106,11 +111,11 @@ TEST_P(TcpListenerImplTest, SetListeningSocketOptionsError) {
   socket->addOption(option);
   EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(false));
-  EXPECT_THROW_WITH_MESSAGE(
-      TestTcpListenerImpl(dispatcherImpl(), random_generator, socket, listener_callbacks, true),
-      CreateListenerException,
-      fmt::format("cannot set post-listen socket option on socket: {}",
-                  socket->addressProvider().localAddress()->asString()));
+  EXPECT_THROW_WITH_MESSAGE(TestTcpListenerImpl(dispatcherImpl(), random_generator, socket,
+                                                listener_callbacks, true, overload_state),
+                            CreateListenerException,
+                            fmt::format("cannot set post-listen socket option on socket: {}",
+                                        socket->addressProvider().localAddress()->asString()));
 }
 
 TEST_P(TcpListenerImplTest, UseActualDst) {
@@ -119,12 +124,13 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   auto socketDst = std::make_shared<TcpListenSocket>(alt_address_, nullptr, false);
   Network::MockTcpListenerCallbacks listener_callbacks1;
   Random::MockRandomGenerator random_generator;
+  Server::NullThreadLocalOverloadState overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks1, true);
+                                        listener_callbacks1, true, overload_state);
   Network::MockTcpListenerCallbacks listener_callbacks2;
   Network::TestTcpListenerImpl listenerDst(dispatcherImpl(), random_generator, socketDst,
-                                           listener_callbacks2, false);
+                                           listener_callbacks2, false, overload_state);
 
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -158,8 +164,9 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   auto socket = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
-  Network::ListenerPtr listener =
-      dispatcher_->createListener(socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE);
+  Server::NullThreadLocalOverloadState overload_state;
+  Network::ListenerPtr listener = dispatcher_->createListener(
+      socket, listener_callbacks, true, ENVOY_TCP_BACKLOG_SIZE, overload_state);
 
   std::vector<Network::ClientConnectionPtr> client_connections;
   std::vector<Network::ConnectionPtr> server_connections;
@@ -222,9 +229,10 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
+  Server::NullThreadLocalOverloadState overload_state;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks, true);
+                                        listener_callbacks, true, overload_state);
 
   auto local_dst_address =
       Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
@@ -263,12 +271,13 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
                                                   options, true);
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
+  Server::NullThreadLocalOverloadState overload_state;
 
   ASSERT_TRUE(socket->addressProvider().localAddress()->ip()->isAnyAddress());
 
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket,
-                                        listener_callbacks, true);
+                                        listener_callbacks, true, overload_state);
 
   auto listener_address =
       Network::Utility::getAddressWithPort(*Network::Test::getCanonicalLoopbackAddress(version_),
@@ -307,8 +316,9 @@ TEST_P(TcpListenerImplTest, DisableAndEnableListener) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  Server::NullThreadLocalOverloadState overload_state;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               overload_state);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
   listener.disable();
@@ -348,8 +358,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionZero) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  Server::NullThreadLocalOverloadState overload_state;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               overload_state);
 
   listener.setRejectFraction(UnitFloat(0));
 
@@ -379,8 +390,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionIntermediate) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  Server::NullThreadLocalOverloadState overload_state;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               overload_state);
 
   listener.setRejectFraction(UnitFloat(0.5f));
 
@@ -442,8 +454,9 @@ TEST_P(TcpListenerImplTest, SetListenerRejectFractionAll) {
   MockTcpListenerCallbacks listener_callbacks;
   MockConnectionCallbacks connection_callbacks;
   Random::MockRandomGenerator random_generator;
-  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks,
-                               true);
+  Server::NullThreadLocalOverloadState overload_state;
+  TestTcpListenerImpl listener(dispatcherImpl(), random_generator, socket, listener_callbacks, true,
+                               overload_state);
 
   listener.setRejectFraction(UnitFloat(1));
 

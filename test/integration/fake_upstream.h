@@ -695,6 +695,20 @@ private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, const FakeUpstreamConfig& config);
 
+  struct FakeThreadLocalOverloadState : public Server::ThreadLocalOverloadState {
+    FakeThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    const Server::OverloadActionState& getState(const std::string&) override { return inactive_; }
+    bool tryAllocateResource(Server::OverloadProactiveResourceName, int64_t) override {
+      return true;
+    }
+    bool tryDeallocateResource(Server::OverloadProactiveResourceName, int64_t) override {
+      return true;
+    }
+    bool isResourceMonitorEnabled(Server::OverloadProactiveResourceName) override { return true; }
+    Event::Dispatcher& dispatcher_;
+    const Server::OverloadActionState inactive_ = Server::OverloadActionState::inactive();
+  };
+
   class FakeListenSocketFactory : public Network::ListenSocketFactory {
   public:
     FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
@@ -838,6 +852,7 @@ private:
   const Network::FilterChainSharedPtr filter_chain_;
   std::list<Network::UdpRecvData> received_datagrams_ ABSL_GUARDED_BY(lock_);
   Stats::ScopePtr stats_scope_;
+  std::unique_ptr<Server::ThreadLocalOverloadState> overload_state_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

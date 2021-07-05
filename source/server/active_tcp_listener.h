@@ -38,7 +38,7 @@ public:
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
                     ThreadLocalOverloadState& overload_state);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
-                    Network::ListenerConfig& config);
+                    Network::ListenerConfig& config, ThreadLocalOverloadState& overload_state);
   ~ActiveTcpListener() override;
   bool listenerConnectionLimitReached() const {
     // TODO(tonya11en): Delegate enforcement of per-listener connection limits to overload
@@ -113,6 +113,9 @@ public:
   // connection balancing across per-handler listeners.
   std::atomic<uint64_t> num_listener_connections_{};
   bool is_deleting_{false};
+
+private:
+  ThreadLocalOverloadState& overload_state_;
 };
 
 /**

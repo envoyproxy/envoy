@@ -20,6 +20,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -439,7 +440,8 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE);
+    listener_ = dispatcher_->createListener(socket_, *server_, true, ENVOY_TCP_BACKLOG_SIZE,
+                                            overload_state_);
     updateDnsResolverOptions();
     if (setResolverInConstructor()) {
       resolver_ = dispatcher_->createDnsResolver({socket_->addressProvider().localAddress()},
@@ -558,6 +560,7 @@ protected:
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
+  Server::NullThreadLocalOverloadState overload_state_;
 };
 
 // Parameterize the DNS test server socket address.

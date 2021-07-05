@@ -21,7 +21,7 @@ class OverloadProactiveResourceNameValues {
 public:
   // Overload action to stop accepting new HTTP requests.
   const std::string GlobalDownstreamMaxConnections =
-      "envoy.proactive_resource_monitors.global_downstream_max_connections";
+      "envoy.resource_monitors.global_downstream_max_connections";
 
   std::set<std::string> proactive_resource_names_{GlobalDownstreamMaxConnections};
 
@@ -67,14 +67,32 @@ class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
-
+  /**
+   * Invokes corresponding resource monitor to allocate resource for given resource monitor in
+   * thread safe manner. Returns true if there is enough resource quota available and allocation has
+   * succeeded, false if allocation failed or resource is not registered.
+   * @param name of corresponding resource monitor.
+   * @param increment to add to current resource usage value within monitor.
+   */
   virtual bool tryAllocateResource(OverloadProactiveResourceName resource_name,
                                    int64_t increment) PURE;
-
+  /**
+   * Invokes corresponding resource monitor to deallocate resource for given resource monitor in
+   * thread safe manner. Returns true if there is enough resource quota available and deallocation
+   * has succeeded, false if deallocation failed or resource is not registered.
+   * @param name of corresponding resource monitor.
+   * @param decrement to subtract from current resource usage value within monitor.
+   */
   virtual bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
                                      int64_t decrement) PURE;
 
-  virtual int64_t currentResourceUsage(OverloadProactiveResourceName resource_name) PURE;
+  /**
+   * TODO(nezdolik) remove this method once downstream connection tracking is fully moved to
+   * overload manager. Checks if resource monitor is registered and resource usage tracking is
+   * enabled in overload manager. Returns true if resource monitor is registered, false otherwise.
+   * @param name of resource monitor to check.
+   */
+  virtual bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) PURE;
 };
 
 } // namespace Server

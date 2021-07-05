@@ -1,6 +1,7 @@
 #include "source/server/active_tcp_listener.h"
 
 #include <chrono>
+#include <iostream>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -32,14 +33,16 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                         parent.dispatcher().createListener(
                             config.listenSocketFactory().getListenSocket(), *this,
                             config.bindToPort(), config.tcpBacklogSize(), overload_state),
-                        config) {}
+                        config, overload_state) {}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
-                                     Network::ListenerConfig& config)
+                                     Network::ListenerConfig& config,
+                                     ThreadLocalOverloadState& overload_state)
     : ActiveListenerImplBase(parent, &config), parent_(parent), listener_(std::move(listener)),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
-      continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()) {
+      continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
+      overload_state_(overload_state) {
   config.connectionBalancer().registerHandler(*this);
 }
 
@@ -211,7 +214,11 @@ void ActiveTcpSocket::newConnection() {
 }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
-  if (listenerConnectionLimitReached()) {
+  // If downstream connections resource monitor is configured in overload manager, we don't check
+  // per listener connection limit.
+  if (!overload_state_.isResourceMonitorEnabled(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections) &&
+      listenerConnectionLimitReached()) {
     RELEASE_ASSERT(socket->addressProvider().remoteAddress() != nullptr, "");
     ENVOY_LOG(trace, "closing connection from {}: listener connection limit reached for {}",
               socket->addressProvider().remoteAddress()->asString(), config_->name());

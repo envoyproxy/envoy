@@ -10,6 +10,7 @@
 
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/resource_monitors/common/factory_base.h"
+#include "source/extensions/resource_monitors/downstream_connections/downstream_connections_monitor.h"
 #include "source/server/overload_manager_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -100,7 +101,9 @@ public:
   createProactiveResourceMonitor(const Protobuf::Message&,
                                  Server::Configuration::ResourceMonitorFactoryContext&) override {
 
-    auto monitor = std::make_unique<ActiveConnectionsResourceMonitor>(3);
+    config_.set_max_active_downstream_connections(3);
+    auto monitor = std::make_unique<Extensions::ResourceMonitors::DownstreamConnections::
+                                        ActiveDownstreamConnectionsResourceMonitor>(config_);
     monitor_ = monitor.get();
     return monitor;
   }
@@ -111,7 +114,10 @@ public:
 
   std::string name() const override { return name_; }
 
-  ActiveConnectionsResourceMonitor* monitor_; // not owned
+  Extensions::ResourceMonitors::DownstreamConnections::ActiveDownstreamConnectionsResourceMonitor*
+      monitor_; // not owned
+  envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
+      config_;
   const std::string name_;
 };
 
@@ -171,7 +177,7 @@ protected:
         factory2_("envoy.resource_monitors.fake_resource2"),
         factory3_("envoy.resource_monitors.fake_resource3"),
         factory4_("envoy.resource_monitors.fake_resource4"),
-        factory5_("envoy.proactive_resource_monitors.global_downstream_max_connections"),
+        factory5_("envoy.resource_monitors.global_downstream_max_connections"),
         register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
         register_factory4_(factory4_), register_factory5_(factory5_),
         api_(Api::createApiForTest(stats_)) {}
@@ -224,7 +230,7 @@ constexpr char kRegularStateConfig[] = R"YAML(
     - name: envoy.resource_monitors.fake_resource2
     - name: envoy.resource_monitors.fake_resource3
     - name: envoy.resource_monitors.fake_resource4
-    - name: envoy.proactive_resource_monitors.global_downstream_max_connections
+    - name: envoy.resource_monitors.global_downstream_max_connections
   actions:
     - name: envoy.overload_actions.dummy_action
       triggers:
@@ -734,14 +740,14 @@ TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTe
   setDispatcherExpectation();
   auto manager(createOverloadManager(kRegularStateConfig));
   Stats::Counter& failed_updates =
-      stats_.counter("overload.envoy.proactive_resource_monitors.global_downstream_max_connections."
+      stats_.counter("overload.envoy.resource_monitors.global_downstream_max_connections."
                      "failed_updates");
   manager->start();
   bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_EQ(true, resource_allocated);
   resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
-      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 2);
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);
   EXPECT_EQ(false, resource_allocated);
   EXPECT_EQ(1, failed_updates.value());
 

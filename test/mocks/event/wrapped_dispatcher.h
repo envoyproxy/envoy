@@ -67,8 +67,9 @@ public:
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override {
-    return impl_.createListener(std::move(socket), cb, bind_to_port, backlog_size);
+                                      uint32_t backlog_size,
+                                      Server::ThreadLocalOverloadState& overload_state) override {
+    return impl_.createListener(std::move(socket), cb, bind_to_port, backlog_size, overload_state);
   }
 
   Network::UdpListenerPtr

@@ -52,6 +52,7 @@ envoy_cc_test(
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",

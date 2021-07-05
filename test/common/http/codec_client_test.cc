@@ -15,6 +15,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
@@ -303,7 +304,7 @@ public:
         socket->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), nullptr);
     upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
-                                                     ENVOY_TCP_BACKLOG_SIZE);
+                                                     ENVOY_TCP_BACKLOG_SIZE, overload_state_);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
@@ -336,7 +337,6 @@ public:
     // care about them in these tests.
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose)).Times(AtMost(1));
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose)).Times(AtMost(1));
-
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -376,6 +376,7 @@ protected:
   NiceMock<MockRequestEncoder> inner_encoder_;
   NiceMock<MockResponseDecoder> outer_decoder_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Server::NullThreadLocalOverloadState overload_state_;
 };
 
 // Send a block of data from upstream, and ensure it is received by the codec.
@@ -394,6 +395,7 @@ TEST_P(CodecNetworkTest, SendData) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_));
+
   close();
 }
 

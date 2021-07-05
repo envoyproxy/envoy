@@ -27,7 +27,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api), overload_state_(overload_manager.getThreadLocalOverloadState()) {
+      api_(api), overload_manager_(overload_manager) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -47,7 +47,8 @@ void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
     // TODO(chaoqin-li1123): Make add listener return a error status instead of catching an
     // exception.
     TRY_NEEDS_AUDIT {
-      handler_->addListener(overridden_listener, listener, overload_state_);
+      handler_->addListener(overridden_listener, listener,
+                            overload_manager_.getThreadLocalOverloadState());
       hooks_.onWorkerListenerAdded();
       completion(true);
     }

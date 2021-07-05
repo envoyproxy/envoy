@@ -24,6 +24,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -136,8 +137,8 @@ protected:
     }
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true,
+                                            ENVOY_TCP_BACKLOG_SIZE, overload_state_);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -269,6 +270,7 @@ protected:
   Address::InstanceConstSharedPtr source_address_;
   Socket::OptionsSharedPtr socket_options_;
   StreamInfo::StreamInfoImpl stream_info_;
+  Server::NullThreadLocalOverloadState overload_state_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplTest,
@@ -1342,8 +1344,8 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
   dispatcher_ = api_->allocateDispatcher("test_thread");
   socket_ = std::make_shared<Network::TcpListenSocket>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  listener_ =
-      dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true,
+                                          ENVOY_TCP_BACKLOG_SIZE, overload_state_);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->addressProvider().localAddress(), source_address_,
@@ -2813,8 +2815,8 @@ public:
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::TcpListenSocket>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true,
+                                            ENVOY_TCP_BACKLOG_SIZE, overload_state_);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
