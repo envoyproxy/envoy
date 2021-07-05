@@ -27,7 +27,7 @@ namespace Upstream {
 //
 // Adding an object will cause the scheduler to rebuild internal structures on the first pick that
 // follows. This first pick operation will be linear on the number of unique weights among objects
-// inserted.  Subsequent picks will be logarithmic with the number of unique weights. Adding objects
+// inserted. Subsequent picks will be logarithmic with the number of unique weights. Adding objects
 // is always constant time.
 //
 // For the case where all object weights are the same, WRSQ behaves identical to vanilla

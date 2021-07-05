@@ -21,7 +21,8 @@ public:
    * return the second item which will be picked. As picks occur, that window
    * will shrink.
    *
-   * @param calculate_weight for implemenations that choose to support it, this predicate specifies the new weight of the entry.
+   * @param calculate_weight for implemenations that choose to support it, this predicate specifies
+   * the new weight of the entry.
    * @return std::shared_ptr<C> the best effort subsequent pick.
    */
 
@@ -30,7 +31,8 @@ public:
   /**
    * Pick a queue entry with closest deadline.
    *
-   * @param calculate_weight for implemenations that choose to support it, this predicate specifies the new weight of the entry.
+   * @param calculate_weight for implemenations that choose to support it, this predicate specifies
+   * the new weight of the entry.
    * @return std::shared_ptr<C> to next valid the queue entry if or nullptr if none exists.
    */
   virtual std::shared_ptr<C> pickAndAdd(std::function<double(const C&)> calculate_weight) = 0;
