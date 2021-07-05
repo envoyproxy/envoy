@@ -641,7 +641,10 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   route_config:
     name: local_route
   tracing:
-    operation_name: ingress
+    client_sampling:
+      value: 0.1
+    random_sampling:
+      value: 0.1
     overall_sampling:
       value: 0.1
   http_filters:
@@ -652,6 +655,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
                                      context_, date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
+
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest(store);
 
