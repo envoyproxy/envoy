@@ -114,9 +114,9 @@ void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socke
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
-  socket.ioHandle().initializeFileEvent(dispatcher,
-                                        [this](uint32_t events) -> void { onSocketEvent(events); },
-                                        Event::FileTriggerType::Level, Event::FileReadyType::Read);
+  socket.ioHandle().initializeFileEvent(
+      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+      Event::FileTriggerType::Level, Event::FileReadyType::Read);
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
                                      envoy::config::core::v3::SocketOption::STATE_LISTENING)) {

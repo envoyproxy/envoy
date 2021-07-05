@@ -134,6 +134,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/resource_monitors/downstream_connections @antoniovicente @mattklein123
 /*/extensions/retry/priority @snowp @alyssawilk
 /*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
 /*/extensions/retry/host @snowp @alyssawilk

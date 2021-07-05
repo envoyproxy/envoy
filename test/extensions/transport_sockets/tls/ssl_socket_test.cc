@@ -2780,14 +2780,15 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   // Verify that server sent list with 2 acceptable client certificate CA names.
   const SslHandshakerImpl* ssl_socket =
       dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
-  SSL_set_cert_cb(ssl_socket->ssl(),
-                  [](SSL* ssl, void*) -> int {
-                    STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
-                    EXPECT_NE(nullptr, list);
-                    EXPECT_EQ(2U, sk_X509_NAME_num(list));
-                    return 1;
-                  },
-                  nullptr);
+  SSL_set_cert_cb(
+      ssl_socket->ssl(),
+      [](SSL* ssl, void*) -> int {
+        STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
+        EXPECT_NE(nullptr, list);
+        EXPECT_EQ(2U, sk_X509_NAME_num(list));
+        return 1;
+      },
+      nullptr);
 
   client_connection->connect();
 

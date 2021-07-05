@@ -242,11 +242,11 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!waitForWithDispatcherRun(time_system_, lock_,
-                                [this, body_length]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-                                  return (body_.length() >= body_length);
-                                },
-                                client_dispatcher, timeout)) {
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this, body_length]()
+              ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return (body_.length() >= body_length); },
+          client_dispatcher, timeout)) {
     return AssertionFailure() << "Timed out waiting for data.";
   }
   return AssertionSuccess();
@@ -267,10 +267,10 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
   absl::MutexLock lock(&lock_);
-  if (!waitForWithDispatcherRun(time_system_, lock_,
-                                [this]()
-                                    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; },
-                                client_dispatcher, timeout)) {
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; }, client_dispatcher,
+          timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
   return AssertionSuccess();
@@ -642,11 +642,12 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       FakeUpstream& upstream = *it;
       {
         absl::MutexLock lock(&upstream.lock_);
-        if (!waitForWithDispatcherRun(upstream.time_system_, upstream.lock_,
-                                      [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
-                                        return !upstream.new_connections_.empty();
-                                      },
-                                      client_dispatcher, 5ms)) {
+        if (!waitForWithDispatcherRun(
+                upstream.time_system_, upstream.lock_,
+                [&upstream]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(upstream.lock_) {
+                  return !upstream.new_connections_.empty();
+                },
+                client_dispatcher, 5ms)) {
           continue;
         }
       }
