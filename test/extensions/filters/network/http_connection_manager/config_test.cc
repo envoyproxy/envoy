@@ -649,7 +649,8 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
                                      context_, date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_, http_tracer_manager_);
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
   Stats::TestUtil::TestStore store;
   Api::ApiPtr api = Api::createApiForTest(store);
 
