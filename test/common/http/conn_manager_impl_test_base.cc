@@ -70,6 +70,8 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
   filter_callbacks_.connection_.stream_info_.downstream_address_provider_
       ->setDirectRemoteAddressForTest(std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
+  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRequestedServerName(
+      server_name_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());

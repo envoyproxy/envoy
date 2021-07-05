@@ -54,7 +54,7 @@ void StrictDnsClusterImpl::startPreInit() {
   }
   // If the config provides no endpoints, the cluster is initialized immediately as if all hosts are
   // resolved in failure.
-  if (resolve_targets_.empty()) {
+  if (resolve_targets_.empty() || !wait_for_warm_on_init_) {
     onPreInitComplete();
   }
 }

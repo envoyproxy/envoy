@@ -887,9 +887,9 @@ Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/code_format/check_format.py check
-./tools/spelling/check_spelling.sh check
+./tools/spelling/check_spelling_pedantic.py check
 ./tools/code_format/check_format.py fix
-./tools/spelling/check_spelling.sh fix
+./tools/spelling/check_spelling_pedantic.py fix
 ```
 
 # Advanced caching setup
