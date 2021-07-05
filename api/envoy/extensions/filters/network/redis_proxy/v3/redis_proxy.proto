@@ -212,7 +212,8 @@ message RedisProxy {
   message HotKey {
     enum CacheType {
       // default.
-      // Use LFU cache. Least Frequently Used eviction mode.
+      // Use LFU cache. Least Frequently Used eviction mode. The lowest frequency is eliminated,
+      // and the specified number of high-frequency hotkeys is reserved.
       LFU = 0;
     }
 
@@ -220,33 +221,55 @@ message RedisProxy {
     CacheType cache_type = 1 [(validate.rules).enum = {defined_only: true}];
 
     // Configure Cache Capacity. This changes the number of hot keys that can be counted at most.
+    //
+    // default: 32
     // min: 1
     // max: 255
-    // default: 32
     google.protobuf.UInt32Value cache_capacity = 2 [(validate.rules).uint32 = {lte: 255 gte: 1}];
 
     // Configure the dispatch interval for the collection operation.
+    //
+    // default: 5s
     // min: 0.5s
     // max: 3600s
-    // default: 5s
     google.protobuf.Duration collect_dispatch_interval = 3 [(validate.rules).duration = {
       lte {seconds: 3600}
       gte {nanos: 500000000}
     }];
 
     // Configure the dispatch interval for the attenuation operation.
+    // To avoid full heat over a period of time, we need to attenuate it regularly.
+    //
+    // If there are two hotkeys in the cache. The last update time of A is 0. The last update time
+    // of B is 7. If the ``attenuate_dispatch_interval`` is 3s. If the ``attenuate_cache_interval``
+    // is 4s.
+    //
+    // * When the current time is 2, no operation is performed.
+    // * When the current time is 3(``attenuate_dispatch_interval``, 1st), the attenuation check is
+    //   performed. But the decay operation is not performed because of ( 3 - 0 ) = 3 < 4.
+    // * When the current time is 4, no operation is performed.
+    // * When the current time is 5, no operation is performed.
+    // * When the current time is 6(``attenuate_dispatch_interval``, 2nd), no operation is performed.
+    //   And attenuate A because of ( 6 - 0 ) = 6 > 4. But B is not attenuated because of 6 < 7.
+    //
+    // default: 30s
     // min: 0.5s
     // max: 3600s
-    // default: 30s
     google.protobuf.Duration attenuate_dispatch_interval = 4 [(validate.rules).duration = {
       lte {seconds: 3600}
       gte {nanos: 500000000}
     }];
 
     // Configure the minimum duration of cache for attenuation operations.
+    //
+    // When performing a attenuation operation, the last operation of a single hotkey cache (add-in,
+    // add-up, attenuation, etc.) will take longer than or equal to the specified time before the
+    // actual attenuation operation will occur, otherwise the attenuation operation will not be
+    // attenuated until the next one is performed.
+    //
+    // default: 60s
     // min: 0s
     // max: 3600s
-    // default: 60s
     google.protobuf.Duration attenuate_cache_interval = 5 [(validate.rules).duration = {
       lte {seconds: 3600}
       gte {}
