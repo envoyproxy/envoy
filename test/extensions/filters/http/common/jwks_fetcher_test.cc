@@ -168,9 +168,8 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
 }
 struct RetryingParameters {
   RetryingParameters(const std::string& config, uint32_t n, int64_t base_ms, int64_t max_ms)
-      : config_(config), expected_num_retries_(n), expected_backoff_base_interval_ms_(base_ms)
-      , expected_backoff_max_interval_ms_( max_ms)
-  {}
+      : config_(config), expected_num_retries_(n), expected_backoff_base_interval_ms_(base_ms),
+        expected_backoff_max_interval_ms_(max_ms) {}
 
   std::string config_;
 
@@ -195,7 +194,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Retrying, JwksFetcherRetryingTest,
-                        testing::Values( RetryingParameters{ R"(
+                         testing::Values(RetryingParameters{R"(
 http_uri:
   uri: https://pubkey_server/pubkey_path
   cluster: pubkey_cluster
@@ -206,16 +205,18 @@ retry_policy:
     base_interval: 0.1s
     max_interval: 32s
   num_retries: 10
-)", 10, 100, 32000},
-                                         RetryingParameters{ R"(
+)",
+                                                            10, 100, 32000},
+                                         RetryingParameters{R"(
 http_uri:
   uri: https://pubkey_server/pubkey_path
   cluster: pubkey_cluster
   timeout:
     seconds: 5
 retry_policy: {}
-)", 1, 1000, 10000},
-                                         RetryingParameters{ R"(
+)",
+                                                            1, 1000, 10000},
+                                         RetryingParameters{R"(
 http_uri:
   uri: https://pubkey_server/pubkey_path
   cluster: pubkey_cluster
@@ -223,8 +224,8 @@ http_uri:
     seconds: 5
 retry_policy:
   num_retries: 2
-)", 2, 1000, 10000}
-));
+)",
+                                                            2, 1000, 10000}));
 
 TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
@@ -242,27 +243,30 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
       .WillOnce(Invoke(
           [](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
-
-            RetryingParameters const & rp = GetParam();
+            RetryingParameters const& rp = GetParam();
 
             EXPECT_TRUE(options.retry_policy.has_value());
             EXPECT_TRUE(options.buffer_body_for_retry);
             EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), rp.expected_num_retries_);
+            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries),
+                      rp.expected_num_retries_);
 
             EXPECT_TRUE(options.retry_policy.value().has_retry_back_off());
             EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_base_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(), base_interval),
+            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
+                                               base_interval),
                       rp.expected_backoff_base_interval_ms_);
             EXPECT_TRUE(options.retry_policy.value().retry_back_off().has_max_interval());
-            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(), max_interval),
+            EXPECT_EQ(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
+                                               max_interval),
                       rp.expected_backoff_max_interval_ms_);
 
             EXPECT_TRUE(options.retry_policy.value().has_per_try_timeout());
-            EXPECT_LE(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(), max_interval),
+            EXPECT_LE(PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value().retry_back_off(),
+                                               max_interval),
                       PROTOBUF_GET_MS_REQUIRED(options.retry_policy.value(), per_try_timeout));
 
-            const std::string & retry_on = options.retry_policy.value().retry_on();
+            const std::string& retry_on = options.retry_policy.value().retry_on();
             std::set<std::string> retry_on_modes = absl::StrSplit(retry_on, ',');
 
             EXPECT_EQ(retry_on_modes.count("5xx"), 1);
