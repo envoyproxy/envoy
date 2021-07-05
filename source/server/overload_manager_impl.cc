@@ -1,7 +1,6 @@
 #include "source/server/overload_manager_impl.h"
 
 #include <chrono>
-#include <iostream>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -66,14 +65,12 @@ public:
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
       if (proactive_resource->second.tryDeallocateResource(decrement)) {
-        std::cerr << "***Deallocated resource" << std::endl;
         return true;
       } else {
         return false;
       }
     } else {
       ENVOY_LOG_MISC(warn, " {Failed to deallocate unknown proactive resource }");
-      std::cerr << "***Failed to deallocate unknown proactive resource" << std::endl;
       return false;
     }
   }

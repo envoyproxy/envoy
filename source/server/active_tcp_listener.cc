@@ -1,7 +1,6 @@
 #include "source/server/active_tcp_listener.h"
 
 #include <chrono>
-#include <iostream>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
