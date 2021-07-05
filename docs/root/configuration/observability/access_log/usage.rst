@@ -323,6 +323,7 @@ The following command operators are supported:
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached to max stream duration.
+    * **OM**: Overload Manager terminated the request.
 
 %ROUTE_NAME%
   Name of the route.

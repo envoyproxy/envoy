@@ -150,7 +150,7 @@ public:
 
   void raiseEventUpstreamConnectFailed(uint32_t conn_index,
                                        ConnectionPool::PoolFailureReason reason) {
-    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
+    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, "", upstream_hosts_.at(conn_index));
   }
 
   Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {

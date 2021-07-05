@@ -86,8 +86,10 @@ enum ResponseFlag {
   UpstreamProtocolError = 0x800000,
   // No cluster found for a given request.
   NoClusterFound = 0x1000000,
+  // Overload Manager terminated the stream.
+  OverloadManager = 0x2000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = NoClusterFound,
+  LastFlag = OverloadManager,
 };
 
 /**

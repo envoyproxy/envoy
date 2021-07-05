@@ -63,7 +63,7 @@ rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
-pip3 install --require-hashes -r "${SCRIPT_DIR}"/requirements.txt
+pip3 install --require-hashes -r "${SCRIPT_DIR}"/../tools/docs/requirements.txt
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
