@@ -669,11 +669,11 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
   Envoy::Random::RandomGeneratorImpl rand;
   for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
-    config.requestIDExtension()->setTraceStatus(header, Envoy::Http::TraceStatus::Sampled);
+    config.requestIDExtension()->setTraceReason(header, Envoy::Tracing::Reason::Sampling);
     Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime, config,
                                                                       &route);
 
-    if (config.requestIDExtension()->getTraceStatus(header) == Envoy::Http::TraceStatus::Sampled) {
+    if (config.requestIDExtension()->getTraceReason(header) == Envoy::Tracing::Reason::Sampling) {
       sampled_count++;
     }
   }
