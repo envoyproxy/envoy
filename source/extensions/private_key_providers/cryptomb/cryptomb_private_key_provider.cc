@@ -133,12 +133,10 @@ int calculateDigest(const EVP_MD* md, const uint8_t* in, size_t in_len, unsigned
   return 1;
 }
 
-ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
-                                             size_t max_out, uint16_t signature_algorithm,
-                                             const uint8_t* in, size_t in_len) {
-  CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
-      SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
-
+ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops,
+                                                     uint8_t* out, size_t* out_len, size_t max_out,
+                                                     uint16_t signature_algorithm,
+                                                     const uint8_t* in, size_t in_len) {
   if (ops == nullptr) {
     return ssl_private_key_failure;
   }
@@ -196,20 +194,26 @@ ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out
   return ssl_private_key_retry;
 }
 
+ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
+                                             size_t max_out, uint16_t signature_algorithm,
+                                             const uint8_t* in, size_t in_len) {
+  return ecdsaPrivateKeySignInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                         ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                                     out, out_len, max_out, signature_algorithm, in, in_len);
+}
+
 ssl_private_key_result_t ecdsaPrivateKeyDecrypt(SSL*, uint8_t*, size_t*, size_t, const uint8_t*,
                                                 size_t) {
   // Expecting to get only signing requests.
   return ssl_private_key_failure;
 }
 
-ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
-                                           uint16_t signature_algorithm, const uint8_t* in,
-                                           size_t in_len) {
+ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
+                                                   size_t* out_len, size_t max_out,
+                                                   uint16_t signature_algorithm, const uint8_t* in,
+                                                   size_t in_len) {
 
   ssl_private_key_result_t status = ssl_private_key_failure;
-  CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
-      SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
-
   if (ops == nullptr) {
     return status;
   }
@@ -306,10 +310,17 @@ ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_l
   return status;
 }
 
-ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
-                                              size_t max_out, const uint8_t* in, size_t in_len) {
-  CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
-      SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
+ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
+                                           uint16_t signature_algorithm, const uint8_t* in,
+                                           size_t in_len) {
+  return rsaPrivateKeySignInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                       ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                                   out, out_len, max_out, signature_algorithm, in, in_len);
+}
+
+ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnection* ops,
+                                                      uint8_t* out, size_t* out_len, size_t max_out,
+                                                      const uint8_t* in, size_t in_len) {
 
   if (ops == nullptr) {
     return ssl_private_key_failure;
@@ -356,12 +367,16 @@ ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* ou
   return ssl_private_key_retry;
 }
 
-ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
-                                            size_t max_out) {
+ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
+                                              size_t max_out, const uint8_t* in, size_t in_len) {
+  return rsaPrivateKeyDecryptInternal(
+      static_cast<CryptoMbPrivateKeyConnection*>(
+          SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+      out, out_len, max_out, in, in_len);
+}
 
-  CryptoMbPrivateKeyConnection* ops = static_cast<CryptoMbPrivateKeyConnection*>(
-      SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()));
-
+ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
+                                                    size_t* out_len, size_t max_out) {
   if (ops == nullptr) {
     return ssl_private_key_failure;
   }
@@ -393,7 +408,37 @@ ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_
   return ssl_private_key_success;
 }
 
+ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
+                                            size_t max_out) {
+  return privateKeyCompleteInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                        ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                                    out, out_len, max_out);
+}
+
 } // namespace
+
+// External linking, meant for testing without SSL context.
+ssl_private_key_result_t privateKeyCompleteForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
+                                                   size_t* out_len, size_t max_out) {
+  return privateKeyCompleteInternal(ops, out, out_len, max_out);
+}
+ssl_private_key_result_t ecdsaPrivateKeySignForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
+                                                    size_t* out_len, size_t max_out,
+                                                    uint16_t signature_algorithm, const uint8_t* in,
+                                                    size_t in_len) {
+  return ecdsaPrivateKeySignInternal(ops, out, out_len, max_out, signature_algorithm, in, in_len);
+}
+ssl_private_key_result_t rsaPrivateKeySignForTest(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
+                                                  size_t* out_len, size_t max_out,
+                                                  uint16_t signature_algorithm, const uint8_t* in,
+                                                  size_t in_len) {
+  return rsaPrivateKeySignInternal(ops, out, out_len, max_out, signature_algorithm, in, in_len);
+}
+ssl_private_key_result_t rsaPrivateKeyDecryptForTest(CryptoMbPrivateKeyConnection* ops,
+                                                     uint8_t* out, size_t* out_len, size_t max_out,
+                                                     const uint8_t* in, size_t in_len) {
+  return rsaPrivateKeyDecryptInternal(ops, out, out_len, max_out, in, in_len);
+}
 
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                              IppCryptoSharedPtr ipp, Event::Dispatcher& d)

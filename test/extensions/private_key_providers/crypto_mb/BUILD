@@ -57,3 +57,22 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "ops_test",
+    srcs = [
+        "ops_test.cc",
+    ],
+    data = [
+        "//test/extensions/private_key_providers/crypto_mb/test_data:certs",
+    ],
+    deps = [
+        ":test_fake_factory",
+        "//source/extensions/private_key_providers/cryptomb:config",
+        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

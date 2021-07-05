@@ -61,6 +61,42 @@ CryptoMbPrivateKeyMethodProvider* createWithConfig(std::string yaml,
           .get());
 }
 
+TEST(CryptoMbConfigTest, CreateRsa1024) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-1024.pem" }
+)EOF";
+
+  EXPECT_NE(nullptr, createWithConfig(yaml));
+}
+
+TEST(CryptoMbConfigTest, CreateRsa2048) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-2048.pem" }
+)EOF";
+
+  EXPECT_NE(nullptr, createWithConfig(yaml));
+}
+
+TEST(CryptoMbConfigTest, CreateRsa3072) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-3072.pem" }
+)EOF";
+
+  EXPECT_NE(nullptr, createWithConfig(yaml));
+}
+
 TEST(CryptoMbConfigTest, CreateRsa4096) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
@@ -176,6 +212,7 @@ TEST(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
   EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml, false), EnvoyException,
                             "Multi-buffer CPU instructions not available.");
 }
+
 } // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions
