@@ -8,7 +8,7 @@
 #
 # alternatively, if you have the necessary python deps available
 #
-#  ./tools/code_format/python_check.py -h
+#  PYTHONPATH=. ./tools/code_format/python_check.py -h
 #
 # python requires: flake8, yapf
 #

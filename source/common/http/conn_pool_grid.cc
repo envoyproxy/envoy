@@ -1,7 +1,7 @@
-#include "common/http/conn_pool_grid.h"
+#include "source/common/http/conn_pool_grid.h"
 
-#include "common/http/http3/conn_pool.h"
-#include "common/http/mixed_conn_pool.h"
+#include "source/common/http/http3/conn_pool.h"
+#include "source/common/http/mixed_conn_pool.h"
 
 #include "quiche/quic/core/quic_versions.h"
 
@@ -190,7 +190,7 @@ ConnectivityGrid::ConnectivityGrid(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     AlternateProtocolsCacheSharedPtr alternate_protocols,
     std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)

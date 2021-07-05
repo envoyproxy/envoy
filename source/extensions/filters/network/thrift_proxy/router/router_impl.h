@@ -11,15 +11,14 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "common/common/logger.h"
-#include "common/http/header_utility.h"
-#include "common/upstream/load_balancer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/conn_manager.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
-#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -224,7 +223,7 @@ public:
 
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
+    UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -235,6 +234,7 @@ private:
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -247,7 +247,7 @@ private:
     void chargeResponseTiming();
 
     Router& parent_;
-    Tcp::ConnectionPool::Instance& conn_pool_;
+    Upstream::TcpPoolData& conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};

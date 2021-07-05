@@ -5,11 +5,12 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tcp/upstream.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/http/codec_client.h"
-#include "common/router/header_parser.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -21,19 +22,20 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
-  bool valid() const { return conn_pool_ != nullptr; }
+  bool valid() const { return conn_pool_data_.has_value(); }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  Tcp::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -52,7 +54,7 @@ public:
   ~HttpConnPool() override;
 
   // HTTP/3 upstreams are not supported at the moment.
-  bool valid() const { return conn_pool_ != nullptr && type_ <= Http::CodecType::HTTP2; }
+  bool valid() const { return conn_pool_data_.has_value() && type_ <= Http::CodecType::HTTP2; }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -97,7 +99,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfig config_;
   Http::CodecType type_;
-  Http::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;

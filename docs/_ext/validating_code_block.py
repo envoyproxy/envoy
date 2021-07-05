@@ -1,10 +1,13 @@
+import os
+import subprocess
+from functools import cached_property
+
+import yaml
+
 from docutils.parsers.rst import directives
 
 from sphinx.directives.code import CodeBlock
 from sphinx.errors import ExtensionError
-
-import os
-import subprocess
 
 
 class ValidatingCodeBlock(CodeBlock):
@@ -22,7 +25,39 @@ class ValidatingCodeBlock(CodeBlock):
         'type-name': directives.unchanged,
     }
     option_spec.update(CodeBlock.option_spec)
-    skip_validation = (os.getenv('SPHINX_SKIP_CONFIG_VALIDATION') or 'false').lower() == 'true'
+
+    @cached_property
+    def configs(self) -> dict:
+        _configs = dict(
+            descriptor_path="",
+            skip_validation=False,
+            validator_path="bazel-bin/tools/config_validation/validate_fragment")
+        if os.environ.get("ENVOY_DOCS_BUILD_CONFIG"):
+            with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
+                _configs.update(yaml.safe_load(f.read()))
+        return _configs
+
+    @property
+    def descriptor_path(self) -> str:
+        return self.configs["descriptor_path"]
+
+    @property
+    def skip_validation(self) -> bool:
+        return bool(self.configs["skip_validation"])
+
+    @property
+    def validator_args(self) -> tuple:
+        args = (
+            self.options.get('type-name'),
+            '-s',
+            '\n'.join(self.content),
+        )
+        return (
+            args + ("--descriptor_path", self.descriptor_path) if self.descriptor_path else args)
+
+    @property
+    def validator_path(self) -> str:
+        return self.configs["validator_path"]
 
     def run(self):
         source, line = self.state_machine.get_source_and_line(self.lineno)
@@ -30,20 +65,18 @@ class ValidatingCodeBlock(CodeBlock):
         if self.options.get('type-name') == None:
             raise ExtensionError("Expected type name in: {0} line: {1}".format(source, line))
 
-        if not ValidatingCodeBlock.skip_validation:
-            args = [
-                'bazel-bin/tools/config_validation/validate_fragment',
-                self.options.get('type-name'), '-s', '\n'.join(self.content)
-            ]
-            completed = subprocess.run(
-                args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding='utf-8')
+        if not self.skip_validation:
+            completed = subprocess.run((self.validator_path,) + self.validator_args,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       encoding='utf-8')
             if completed.returncode != 0:
                 raise ExtensionError(
                     "Failed config validation for type: '{0}' in: {1} line: {2}:\n {3}".format(
                         self.options.get('type-name'), source, line, completed.stderr))
 
         self.options.pop('type-name', None)
-        return list(CodeBlock.run(self))
+        return list(super().run())
 
 
 def setup(app):

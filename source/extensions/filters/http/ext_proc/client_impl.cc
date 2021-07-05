@@ -1,4 +1,4 @@
-#include "extensions/filters/http/ext_proc/client_impl.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 namespace Envoy {
 namespace Extensions {

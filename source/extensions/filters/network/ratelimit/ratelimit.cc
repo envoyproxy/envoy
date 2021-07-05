@@ -1,4 +1,4 @@
-#include "extensions/filters/network/ratelimit/ratelimit.h"
+#include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,9 @@
 #include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/fmt.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

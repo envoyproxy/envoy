@@ -1,4 +1,4 @@
-#include "common/router/scoped_rds.h"
+#include "source/common/router/scoped_rds.h"
 
 #include <memory>
 
@@ -9,18 +9,18 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/config/resource_name.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_resource.h"
-#include "common/init/manager_impl.h"
-#include "common/init/watcher_impl.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/resource_name.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/watcher_impl.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/router/scoped_config_impl.h"
 
 #include "absl/strings/str_join.h"
 
@@ -393,6 +393,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
+  stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
@@ -520,7 +521,8 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
 
-ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
+ProtobufTypes::MessagePtr
+ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
@@ -534,6 +536,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
+        if (!name_matcher.match(it.second->configProto().name())) {
+          continue;
+        }
         dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
             API_RECOVER_ORIGINAL(it.second->configProto()));
       }
@@ -549,6 +554,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
+      if (!name_matcher.match(config_proto->name())) {
+        continue;
+      }
       inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
           API_RECOVER_ORIGINAL(*config_proto));
     }

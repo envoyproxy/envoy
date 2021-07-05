@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.jwt_authn.v3.JwtProvider";
@@ -189,6 +189,15 @@ message JwtProvider {
   // If it is not specified, the payload will not be forwarded.
   string forward_payload_header = 8
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // When :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
+  // is specified, the base64 encoded payload will be added to the headers.
+  // Normally JWT based64 encode doesn't add padding. If this field is true,
+  // the header will be padded.
+  //
+  // This field is only relevant if :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
+  // is specified.
+  bool pad_forward_payload_header = 11;
 
   // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
   // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**

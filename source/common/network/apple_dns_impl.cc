@@ -1,4 +1,4 @@
-#include "common/network/apple_dns_impl.h"
+#include "source/common/network/apple_dns_impl.h"
 
 #include <dns_sd.h>
 
@@ -11,10 +11,10 @@
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -182,8 +182,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     }
 
     // Proceed with resolution after establishing that the resolver has a live main_sd_ref_.
-    std::unique_ptr<PendingResolution> pending_resolution(
-        new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
+    auto pending_resolution =
+        std::make_unique<PendingResolution>(*this, callback, dispatcher_, main_sd_ref_, dns_name);
 
     DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
     if (error != kDNSServiceErr_NoError) {

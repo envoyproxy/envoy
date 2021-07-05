@@ -12,7 +12,7 @@ envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
     ],
 )
@@ -59,8 +59,8 @@ envoy_cc_library(
     hdrs = ["client.h"],
     deps = [
         ":codec_lib",
-        ":supported_commands_lib",
-        "//include/envoy/upstream:cluster_manager_interface",
+        ":redis_command_stats_lib",
+        "//envoy/upstream:cluster_manager_interface",
     ],
 )
 
@@ -79,13 +79,11 @@ envoy_cc_library(
     deps = [
         ":client_interface",
         ":codec_lib",
-        ":fault_interface",
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/router:router_interface",
-        "//include/envoy/stats:timespan_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
+        ":utility_lib",
+        "//envoy/router:router_interface",
+        "//envoy/stats:timespan_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -98,9 +96,49 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
+    deps = [
+        ":codec_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "redis_command_stats_lib",
+    srcs = ["redis_command_stats.cc"],
+    hdrs = ["redis_command_stats.h"],
+    deps = [
+        ":codec_interface",
+        ":supported_commands_lib",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:timespan_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:timespan_lib",
+        "//source/common/stats:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "fault_interface",
     hdrs = ["fault.h"],
     deps = [
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "fault_lib",
+    srcs = ["fault_impl.cc"],
+    hdrs = ["fault_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":fault_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

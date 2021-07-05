@@ -2,10 +2,8 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/router/string_accessor_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -73,7 +71,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
   }
 
   HttpFilter filter;
-  filter.set_name(HttpFilterNames::get().JwtAuthn);
+  filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrDie(filter);
 }
@@ -87,7 +85,7 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   async_fetch->set_fast_listener(fast_listener);
 
   HttpFilter filter;
-  filter.set_name(HttpFilterNames::get().JwtAuthn);
+  filter.set_name("envoy.filters.http.jwt_authn");
   filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessageOrDie(filter);
 }
@@ -592,7 +590,7 @@ public:
           auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
           auto& per_route_any =
               (*virtual_host->mutable_routes(0)
-                    ->mutable_typed_per_filter_config())[HttpFilterNames::get().JwtAuthn];
+                    ->mutable_typed_per_filter_config())["envoy.filters.http.jwt_authn"];
           per_route_any.PackFrom(per_route);
         });
 

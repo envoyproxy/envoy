@@ -8,7 +8,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -66,6 +66,11 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr config);
+  ~Filter() override {
+    if (cb_) {
+      cb_->socket().ioHandle().resetFileEvents();
+    }
+  }
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;

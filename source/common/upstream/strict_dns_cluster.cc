@@ -1,4 +1,4 @@
-#include "common/upstream/strict_dns_cluster.h"
+#include "source/common/upstream/strict_dns_cluster.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -15,11 +15,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api, factory_context.dispatcher().timeSource()),
-      load_assignment_{
-          cluster.has_load_assignment()
-              ? cluster.load_assignment()
-              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())},
-      local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
+      load_assignment_(cluster.load_assignment()), local_info_(factory_context.localInfo()),
+      dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()) {
@@ -57,7 +54,7 @@ void StrictDnsClusterImpl::startPreInit() {
   }
   // If the config provides no endpoints, the cluster is initialized immediately as if all hosts are
   // resolved in failure.
-  if (resolve_targets_.empty()) {
+  if (resolve_targets_.empty() || !wait_for_warm_on_init_) {
     onPreInitComplete();
   }
 }

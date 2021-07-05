@@ -1,10 +1,10 @@
-#include "extensions/tracers/skywalking/skywalking_tracer_impl.h"
+#include "source/extensions/tracers/skywalking/skywalking_tracer_impl.h"
 
 #include <memory>
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/http/path_utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/path_utility.h"
 
 #include "cpp2sky/propagation.h"
 
@@ -62,7 +62,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   } else {
     auto header_value_string = propagation_header[0]->value().getStringView();
     try {
-      SpanContextPtr span_context = createSpanContext(header_value_string);
+      SpanContextPtr span_context =
+          createSpanContext(toStdStringView(header_value_string)); // NOLINT(std::string_view)
       tracing_context = tracing_context_factory_->create(span_context);
     } catch (TracerException& e) {
       ENVOY_LOG(warn, "New SkyWalking Span/Segment cannot be created for error: {}", e.what());

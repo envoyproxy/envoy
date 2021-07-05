@@ -2,9 +2,9 @@
 
 #include <regex>
 
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
 namespace Extensions {

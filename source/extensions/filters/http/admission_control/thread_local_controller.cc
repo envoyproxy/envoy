@@ -1,4 +1,4 @@
-#include "extensions/filters/http/admission_control/thread_local_controller.h"
+#include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include <cstdint>
 
@@ -16,6 +16,15 @@ static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 ThreadLocalControllerImpl::ThreadLocalControllerImpl(TimeSource& time_source,
                                                      std::chrono::seconds sampling_window)
     : time_source_(time_source), sampling_window_(sampling_window) {}
+
+uint32_t ThreadLocalControllerImpl::averageRps() const {
+  if (historical_data_.empty() || global_data_.requests == 0) {
+    return 0;
+  }
+  using std::chrono::seconds;
+  seconds secs = std::max(seconds(1), std::chrono::duration_cast<seconds>(ageOfOldestSample()));
+  return global_data_.requests / secs.count();
+}
 
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
   // Purge stale samples.

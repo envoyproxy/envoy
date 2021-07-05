@@ -15,17 +15,17 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/c_smart_ptr.h"
-#include "common/common/empty_string.h"
-#include "common/common/thread.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/opaque_resource_decoder_impl.h"
-#include "common/config/version_converter.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/opaque_resource_decoder_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
@@ -277,6 +277,29 @@ public:
   waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Wait for a histogram to have samples.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @param time_system the time system to use for waiting.
+   * @param timeout the maximum time to wait before timing out, or 0 for no timeout.
+   * @return AssertionSuccess() if the histogram was populated within the timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitUntilHistogramHasSamples(
+      Stats::Store& store, const std::string& name, Event::TestTimeSystem& time_system,
+      Event::Dispatcher& main_dispatcher,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Read a histogram's sample count from the main thread.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @return uint64_t the sample count.
+   */
+  static uint64_t readSampleCount(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram);
 
   /**
    * Find a readout in a stats store.
@@ -554,7 +577,9 @@ public:
    */
   static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
     envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_hidden_envoy_deprecated_regex(str);
+    auto* regex = matcher.mutable_safe_regex();
+    regex->mutable_google_re2();
+    regex->set_regex(str);
     return matcher;
   }
 
@@ -841,6 +866,33 @@ private:
   bool ready_ ABSL_GUARDED_BY(mutex_){false};
 };
 
+namespace Tracing {
+
+class TestTraceContextImpl : public Tracing::TraceContext {
+public:
+  TestTraceContextImpl(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+    for (const auto& value : values) {
+      context_map_[value.first] = value.second;
+    }
+  }
+
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+    auto iter = context_map_.find(key);
+    if (iter == context_map_.end()) {
+      return absl::nullopt;
+    }
+    return iter->second;
+  }
+
+  void setTraceContext(absl::string_view key, absl::string_view val) override {
+    context_map_.insert({std::string(key), std::string(val)});
+  }
+
+  absl::flat_hash_map<std::string, std::string> context_map_;
+};
+
+} // namespace Tracing
+
 namespace Http {
 
 /**
@@ -1054,6 +1106,25 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+    ASSERT(header_map_);
+    return header_map_->getTraceContext(key);
+  }
+  void setTraceContext(absl::string_view key, absl::string_view value) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContext(key, value);
+  }
+
+  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContextReferenceKey(key, val);
+  }
+
+  void setTraceContextReference(absl::string_view key, absl::string_view val) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContextReference(key, val);
+  }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

@@ -3,8 +3,8 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/instance.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
 
 #include "test/test_common/utility.h"
 
@@ -64,9 +64,9 @@ public:
   TrackedWatermarkBufferFactory() = default;
   ~TrackedWatermarkBufferFactory() override;
   // Buffer::WatermarkFactory
-  Buffer::InstancePtr create(std::function<void()> below_low_watermark,
-                             std::function<void()> above_high_watermark,
-                             std::function<void()> above_overflow_watermark) override;
+  Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                                   std::function<void()> above_high_watermark,
+                                   std::function<void()> above_overflow_watermark) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;

@@ -24,15 +24,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-#include "common/init/watcher_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/route_config_update_receiver_impl.h"
-#include "common/router/vhds.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
@@ -97,15 +97,16 @@ private:
 /**
  * All RDS stats. @see stats_macros.h
  */
-#define ALL_RDS_STATS(COUNTER)                                                                     \
+#define ALL_RDS_STATS(COUNTER, GAUGE)                                                              \
   COUNTER(config_reload)                                                                           \
-  COUNTER(update_empty)
+  COUNTER(update_empty)                                                                            \
+  GAUGE(config_reload_time_ms, NeverImport)
 
 /**
  * Struct definition for all RDS stats. @see stats_macros.h
  */
 struct RdsStats {
-  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
+  ALL_RDS_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class RdsRouteConfigProviderImpl;
@@ -241,7 +242,8 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  std::unique_ptr<envoy::admin::v3::RoutesConfigDump> dumpRouteConfigs() const;
+  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
+  dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const;
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(

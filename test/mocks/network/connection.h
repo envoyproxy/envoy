@@ -5,7 +5,7 @@
 
 #include "envoy/network/connection.h"
 
-#include "common/network/filter_manager_impl.h"
+#include "source/common/network/filter_manager_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stream_info/mocks.h"

@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -23,7 +23,7 @@
 
 #include "openssl/ssl.h"
 #include "envoy/network/filter.h"
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Quic {

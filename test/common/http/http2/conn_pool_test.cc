@@ -2,11 +2,11 @@
 #include <memory>
 #include <vector>
 
-#include "common/event/dispatcher_impl.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -41,7 +41,7 @@ public:
   TestConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Envoy::Upstream::ClusterConnectivityState& state)
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
@@ -347,7 +347,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   createTestClients(1);
   EXPECT_CALL(*factory_ptr, createTransportSocket(_))
       .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
+          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
             EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http2);

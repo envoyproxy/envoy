@@ -4,14 +4,14 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/http/codec_client.h"
-#include "common/http/http1/conn_pool.h"
-#include "common/http/utility.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/http1/conn_pool.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -300,7 +300,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
   EXPECT_CALL(*factory, createTransportSocket(_))
       .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
+          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
             EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http11);

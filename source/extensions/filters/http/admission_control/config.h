@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class AdmissionControlFilterFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl> {
 public:
-  AdmissionControlFilterFactory() : FactoryBase(HttpFilterNames::get().AdmissionControl) {}
+  AdmissionControlFilterFactory() : FactoryBase("envoy.filters.http.admission_control") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl&

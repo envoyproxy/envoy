@@ -1,8 +1,8 @@
-#include "common/quic/envoy_quic_packet_writer.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include <memory>
 
-#include "common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {

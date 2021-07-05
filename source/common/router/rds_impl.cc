@@ -1,4 +1,4 @@
-#include "common/router/rds_impl.h"
+#include "source/common/router/rds_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,14 +11,14 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/http/header_map_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -88,7 +88,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
           [this]() { subscription_->start({route_config_name_}); }),
       local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
-      stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
+      stat_prefix_(stat_prefix),
+      stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), optional_http_filters_(optional_http_filters) {
   const auto resource_name = getResourceName();
@@ -131,6 +132,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
+    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
     if (config_update_info_->protobufConfiguration().has_vhds() &&
         config_update_info_->vhdsConfigurationChanged()) {
       ENVOY_LOG(
@@ -326,7 +328,9 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
   config_tracker_entry_ =
-      admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
+      admin.getConfigTracker().add("routes", [this](const Matchers::StringMatcher& matcher) {
+        return dumpRouteConfigs(matcher);
+      });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");
@@ -377,7 +381,8 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
 }
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
-RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
+RouteConfigProviderManagerImpl::dumpRouteConfigs(
+    const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
@@ -389,6 +394,9 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     ASSERT(subscription->route_config_provider_opt_.has_value());
 
     if (subscription->routeConfigUpdate()->configInfo()) {
+      if (!name_matcher.match(subscription->routeConfigUpdate()->protobufConfiguration().name())) {
+        continue;
+      }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
       dynamic_config->mutable_route_config()->PackFrom(
@@ -400,6 +408,9 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
+    if (!name_matcher.match(provider->configInfo().value().config_.name())) {
+      continue;
+    }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
     static_config->mutable_route_config()->PackFrom(
         API_RECOVER_ORIGINAL(provider->configInfo().value().config_));

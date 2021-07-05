@@ -1,12 +1,11 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/common/jwks_fetcher.h"
-#include "extensions/filters/http/jwt_authn/authenticator.h"
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/common/jwks_fetcher.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/common/mock.h"
 #include "test/extensions/filters/http/jwt_authn/mock.h"
@@ -111,6 +110,23 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 
   EXPECT_EQ(1U, filter_config_->stats().jwks_fetch_success_.value());
   EXPECT_EQ(0U, filter_config_->stats().jwks_fetch_failed_.value());
+}
+
+TEST_F(AuthenticatorTest, TestCompletePaddingInJwtPayload) {
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_pad_forward_payload_header(
+      true);
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
+      .WillOnce(Invoke([this](const envoy::config::core::v3::HttpUri&, Tracing::Span&,
+                              JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValueWithPadding);
 }
 
 // This test verifies the Jwt is forwarded if "forward" flag is set.

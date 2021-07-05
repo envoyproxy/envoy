@@ -7,10 +7,9 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/http_connection_manager/config.h"
-#include "extensions/request_id/uuid/config.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/request_id/uuid/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
@@ -1410,7 +1409,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1440,7 +1438,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1480,7 +1477,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 1024
   custom_settings_parameters: { identifier: 3, value: 2048 }
@@ -1509,7 +1505,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1543,7 +1538,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 8, value: 0 }
@@ -1567,7 +1561,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   allow_connect: true
   )EOF";
@@ -1591,7 +1584,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters: { identifier: 2, value: 1 }
   )EOF";
@@ -1616,7 +1608,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1649,7 +1640,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 10, value: 0 }

@@ -8,8 +8,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/subscription_factory_impl.h"
-#include "common/config/xds_resource.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/xds_resource.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -225,20 +225,6 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile)
                             EnvoyException,
                             "envoy::api::v2::Path must refer to an existing path in the system: "
                             "'/blahblah' does not exist");
-}
-
-TEST_F(SubscriptionFactoryTest, LegacySubscription) {
-  envoy::config::core::v3::ConfigSource config;
-  auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(
-      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
-  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
-  api_config_source->add_cluster_names("static_cluster");
-  Upstream::ClusterManager::ClusterSet primary_clusters;
-  primary_clusters.insert("static_cluster");
-  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config)->start({"static_cluster"}),
-                          EnvoyException, "REST_LEGACY no longer a supported ApiConfigSource.*");
 }
 
 TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {

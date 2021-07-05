@@ -2,14 +2,13 @@
 
 #include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
 
-#include "common/common/base64.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/message_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/http/wasm/config.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/http/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"
@@ -129,15 +128,29 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  WasmFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
-  EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
-  Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamFilter(_));
-  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
-  cb(filter_callback);
+
+  // Intentionally we scope the factory here, and make the context outlive it.
+  // This case happens when the config is updated by ECDS, and
+  // we have to make sure that contexts still hold valid WasmVMs in these cases.
+  std::shared_ptr<Envoy::Extensions::Common::Wasm::Context> context = nullptr;
+  {
+    WasmFilterConfig factory;
+    Http::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+    EXPECT_CALL(init_watcher_, ready());
+    context_.initManager().initialize(init_watcher_);
+    EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+    Http::MockFilterChainFactoryCallbacks filter_callback;
+    EXPECT_CALL(filter_callback, addStreamFilter(_))
+        .WillOnce([&context](Http::StreamFilterSharedPtr filter) {
+          context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
+        });
+    EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+    cb(filter_callback);
+  }
+  // Check if the context still holds a valid Wasm even after the factory is destroyed.
+  EXPECT_TRUE(context);
+  EXPECT_TRUE(context->wasm());
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
