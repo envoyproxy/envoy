@@ -202,6 +202,7 @@ envoy_cmake_external(
     ],
     lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
     static_libraries = ["libcrypto_mb.a"],
+    tags = ["skip_on_windows"],
     working_directory = "sources/ippcp/crypto_mb",
     deps = ["@boringssl//:ssl"],
 )
