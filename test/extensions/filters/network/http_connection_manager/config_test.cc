@@ -7,6 +7,7 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -665,7 +666,7 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   int sampled_count = 0;
   NiceMock<Router::MockRoute> route;
-  Random::RandomGeneratorImpl rand;
+  Envoy::Random::RandomGeneratorImpl rand;
   for (int i = 0; i < 1000000; i++) {
     Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
     config.requestIDExtension()->setTraceStatus(header, Envoy::Http::TraceStatus::Sampled);
