@@ -162,7 +162,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
-        "//source/extensions/filters/network/redis_proxy:router_interface",
         "//source/extensions/filters/network/redis_proxy/hotkey:hotkey_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
