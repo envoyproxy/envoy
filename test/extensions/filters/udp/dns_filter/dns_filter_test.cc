@@ -119,12 +119,6 @@ stat_prefix: "my_prefix"
 server_config:
   inline_dns_table:
     external_retry_count: 3
-    known_suffixes:
-    - suffix: foo1.com
-    - suffix: foo2.com
-    - suffix: foo3.com
-    - suffix: foo16.com
-    - suffix: thisismydomainforafivehundredandtwelvebytetest.com
     virtual_domains:
     - name: "www.foo1.com"
       endpoint:
@@ -197,9 +191,6 @@ client_config:
 server_config:
   inline_dns_table:
     external_retry_count: 0
-    known_suffixes:
-    - suffix: foo1.com
-    - suffix: foo2.com
     virtual_domains:
       - name: "www.foo1.com"
         endpoint:
@@ -277,7 +268,6 @@ server_config:
   const std::string external_dns_table_json = R"EOF(
 {
   "external_retry_count": 3,
-  "known_suffixes": [ { "suffix": "com" } ],
   "virtual_domains": [
     {
       "name": "www.external_foo1.com",
@@ -297,8 +287,6 @@ server_config:
 
   const std::string external_dns_table_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "com"
 virtual_domains:
   - name: "www.external_foo1.com"
     endpoint:
@@ -324,8 +312,6 @@ virtual_domains:
 
   const std::string max_records_table_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "ermac.com"
 virtual_domains:
   - name: "one.web.ermac.com"
     endpoint:
@@ -388,8 +374,6 @@ virtual_domains:
 
   const std::string external_dns_table_services_yaml = R"EOF(
 external_retry_count: 3
-known_suffixes:
-  - suffix: "subzero.com"
 virtual_domains:
   - name: "primary.voip.subzero.com"
     endpoint:
@@ -584,6 +568,33 @@ TEST_F(DnsFilterTest, SingleTypeAQuery) {
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
   EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
   EXPECT_EQ(1, config_->stats().local_a_record_answers_.value());
+  EXPECT_EQ(1, config_->stats().a_record_queries_.value());
+  EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
+  EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
+}
+
+TEST_F(DnsFilterTest, NoHostForSingleTypeAQuery) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  const std::string domain("www.api.foo3.com");
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+
+  EXPECT_EQ(DNS_RESPONSE_CODE_NAME_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(0, query_ctx_->answers_.size());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+  EXPECT_EQ(0, config_->stats().local_a_record_answers_.value());
   EXPECT_EQ(1, config_->stats().a_record_queries_.value());
   EXPECT_TRUE(config_->stats().downstream_rx_bytes_.used());
   EXPECT_TRUE(config_->stats().downstream_tx_bytes_.used());
@@ -2128,6 +2139,39 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
   EXPECT_EQ(false, dns_resolver_options_.use_tcp_for_dns_lookups());
   // `false` here means no_default_search_domain is set true
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
+}
+
+TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DeprecatedKnownSuffixes)) {
+  InSequence s;
+
+  const std::string config_using_known_suffixes = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    known_suffixes:
+    - suffix: "foo1.com"
+    virtual_domains:
+      - name: "www.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(config_using_known_suffixes);
+
+  const std::string query =
+      Utils::buildQueryForDomain("www.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  query_ctx_ = response_parser_->createQueryContext(udp_response_, counters_);
+  EXPECT_TRUE(query_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
 }
 
 } // namespace

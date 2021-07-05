@@ -4,7 +4,6 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/macros.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -61,7 +60,7 @@ public:
       proto_config_.set_transport_api_version(apiVersion());
 
       envoy::config::listener::v3::Filter ext_authz_filter;
-      ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+      ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
@@ -472,7 +471,7 @@ public:
 
       TestUtility::loadFromYaml(default_config_, proto_config_);
       envoy::config::listener::v3::Filter ext_authz_filter;
-      ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+      ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
@@ -730,7 +729,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     TestUtility::loadFromYaml(ext_authz_config, proto_config);
 
     envoy::config::listener::v3::Filter ext_authz_filter;
-    ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
     config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
   });

@@ -162,6 +162,7 @@ public:
   ~MockDrainDecision() override;
 
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {
@@ -321,7 +322,7 @@ public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
   bool is_closed_;
 };
 

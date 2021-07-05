@@ -110,7 +110,8 @@ public:
         *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
-        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE);
+        /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
+        persistent_info.crypto_stream_factory_);
     return session;
   }
 
@@ -273,6 +274,13 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
     test_server_->waitForCounterEq("listener.[__1]_0.http3.downstream.rx.quic_connection_close_"
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
+  }
+  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
+  } else if (GetParam().second == QuicVersionType::GquicTls) {
+    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  } else {
+    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
   }
 }
 

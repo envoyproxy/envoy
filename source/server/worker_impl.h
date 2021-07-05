@@ -49,13 +49,13 @@ public:
   void removeFilterChains(uint64_t listener_tag,
                           const std::list<const Network::FilterChain*>& filter_chains,
                           std::function<void()> completion) override;
-  void start(GuardDog& guard_dog) override;
+  void start(GuardDog& guard_dog, const Event::PostCb& cb) override;
   void initializeStats(Stats::Scope& scope) override;
   void stop() override;
   void stopListener(Network::ListenerConfig& listener, std::function<void()> completion) override;
 
 private:
-  void threadRoutine(GuardDog& guard_dog);
+  void threadRoutine(GuardDog& guard_dog, const Event::PostCb& cb);
   void stopAcceptingConnectionsCb(OverloadActionState state);
   void rejectIncomingConnectionsCb(OverloadActionState state);
 

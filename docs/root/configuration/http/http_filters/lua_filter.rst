@@ -459,7 +459,7 @@ streamInfo()
 
   local streamInfo = handle:streamInfo()
 
-Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
+Returns :repo:`information <envoy/stream_info/stream_info.h>` related to the current request.
 
 Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
@@ -470,7 +470,7 @@ connection()
 
   local connection = handle:connection()
 
-Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
+Returns the current request's underlying :repo:`connection <envoy/network/connection.h>`.
 
 Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
@@ -658,7 +658,7 @@ protocol()
 
   streamInfo:protocol()
 
-Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
+Returns the string representation of :repo:`HTTP protocol <envoy/http/protocol.h>`
 used by the current request. The possible values are: ``HTTP/1.0``, ``HTTP/1.1``, ``HTTP/2`` and ``HTTP/3*``.
 
 downstreamLocalAddress()
@@ -668,7 +668,7 @@ downstreamLocalAddress()
 
   streamInfo:downstreamLocalAddress()
 
-Returns the string representation of :repo:`downstream remote address <include/envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream remote address <envoy/stream_info/stream_info.h>`
 used by the current request.
 
 downstreamDirectRemoteAddress()
@@ -678,7 +678,7 @@ downstreamDirectRemoteAddress()
 
   streamInfo:downstreamDirectRemoteAddress()
 
-Returns the string representation of :repo:`downstream directly connected address <include/envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`downstream directly connected address <envoy/stream_info/stream_info.h>`
 used by the current request. This is equivalent to the address of the physical connection.
 
 dynamicMetadata()
@@ -697,7 +697,7 @@ downstreamSslConnection()
 
   streamInfo:downstreamSslConnection()
 
-Returns :repo:`information <include/envoy/ssl/connection.h>` related to the current SSL connection.
+Returns :repo:`information <envoy/ssl/connection.h>` related to the current SSL connection.
 
 Returns a downstream :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
@@ -710,7 +710,7 @@ requestedServerName()
 
   streamInfo:requestedServerName()
 
-Returns the string representation of :repo:`requested server name <include/envoy/stream_info/stream_info.h>`
+Returns the string representation of :repo:`requested server name <envoy/stream_info/stream_info.h>`
 (e.g. SNI in TLS) for the current request if present.
 
 Dynamic metadata object API
@@ -784,7 +784,7 @@ ssl()
     print("secure")
   end
 
-Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
+Returns :repo:`SSL connection <envoy/ssl/connection.h>` object when the connection is
 secured and *nil* when it is not.
 
 Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.

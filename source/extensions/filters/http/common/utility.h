@@ -2,7 +2,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/common/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,21 +44,22 @@ private:
     CONSTRUCT_ON_FIRST_USE(
         DeprecatedNameMap,
         {
-            {"envoy.buffer", HttpFilters::HttpFilterNames::get().Buffer},
-            {"envoy.cors", HttpFilters::HttpFilterNames::get().Cors},
-            {"envoy.csrf", HttpFilters::HttpFilterNames::get().Csrf},
-            {"envoy.ext_authz", HttpFilters::HttpFilterNames::get().ExtAuthorization},
-            {"envoy.fault", HttpFilters::HttpFilterNames::get().Fault},
-            {"envoy.grpc_http1_bridge", HttpFilters::HttpFilterNames::get().GrpcHttp1Bridge},
-            {"envoy.grpc_json_transcoder", HttpFilters::HttpFilterNames::get().GrpcJsonTranscoder},
-            {"envoy.grpc_web", HttpFilters::HttpFilterNames::get().GrpcWeb},
-            {"envoy.health_check", HttpFilters::HttpFilterNames::get().HealthCheck},
-            {"envoy.http_dynamic_filter", HttpFilters::HttpFilterNames::get().Dynamo},
-            {"envoy.ip_tagging", HttpFilters::HttpFilterNames::get().IpTagging},
-            {"envoy.lua", HttpFilters::HttpFilterNames::get().Lua},
-            {"envoy.rate_limit", HttpFilters::HttpFilterNames::get().RateLimit},
-            {"envoy.router", HttpFilters::HttpFilterNames::get().Router},
-            {"envoy.squash", HttpFilters::HttpFilterNames::get().Squash},
+            {"envoy.buffer", "envoy.filters.http.buffer"},
+            {"envoy.cors", "envoy.filters.http.cors"},
+            {"envoy.csrf", "envoy.filters.http.csrf"},
+            {"envoy.ext_authz", "envoy.filters.http.ext_authz"},
+            {"envoy.fault", "envoy.filters.http.fault"},
+            {"envoy.grpc_http1_bridge", "envoy.filters.http.grpc_http1_bridge"},
+            {"envoy.grpc_json_transcoder", "envoy.filters.http.grpc_json_transcoder"},
+            {"envoy.grpc_web", "envoy.filters.http.grpc_web"},
+            {"envoy.gzip", "envoy.filters.http.gzip"},
+            {"envoy.health_check", "envoy.filters.http.health_check"},
+            {"envoy.http_dynamic_filter", "envoy.filters.http.dynamo"},
+            {"envoy.ip_tagging", "envoy.filters.http.ip_tagging"},
+            {"envoy.lua", "envoy.filters.http.lua"},
+            {"envoy.rate_limit", "envoy.filters.http.ratelimit"},
+            {"envoy.router", "envoy.filters.http.router"},
+            {"envoy.squash", "envoy.filters.http.squash"},
         });
   }
 };

@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -48,7 +47,6 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     deps = [
         "//envoy/registry",
-        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",

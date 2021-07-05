@@ -569,13 +569,13 @@ public:
 
   const std::string& expectedALPNProtocol() const { return expected_alpn_protocol_; }
 
-  TestUtilOptionsV2&
-  setTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options) {
+  TestUtilOptionsV2& setTransportSocketOptions(
+      Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
     transport_socket_options_ = transport_socket_options;
     return *this;
   }
 
-  Network::TransportSocketOptionsSharedPtr transportSocketOptions() const {
+  Network::TransportSocketOptionsConstSharedPtr transportSocketOptions() const {
     return transport_socket_options_;
   }
 
@@ -600,7 +600,7 @@ private:
   std::string expected_server_cert_digest_;
   std::string expected_requested_server_name_;
   std::string expected_alpn_protocol_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::string expected_transport_failure_reason_contains_;
 };
 
@@ -4601,7 +4601,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
@@ -4623,7 +4623,7 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
 
-  Network::TransportSocketOptionsSharedPtr transport_socket_options(
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedRequestedServerName("example.com")
@@ -4890,7 +4890,7 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
-    EXPECT_CALL(*factory, create_(_, _, _))
+    EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(4)
         .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {

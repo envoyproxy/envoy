@@ -8,6 +8,7 @@
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -448,6 +449,49 @@ TEST(UdpStatsdSinkWithTagsTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:4|ms|#key1:value1,key2:value2"));
   sink.onHistogramComplete(duration_milli, 4);
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkWithTagsTest, GraphiteTagSyntax) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  writer_ptr->delegateBufferFake();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, true, getDefaultPrefix(), 1024, getGraphiteTagFormat());
+
+  std::vector<Stats::Tag> tags = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  NiceMock<Stats::MockCounter> counter;
+  counter.name_ = "test_counter";
+  counter.used_ = true;
+  counter.latch_ = 1;
+  counter.setTags(tags);
+  snapshot.counters_.push_back({1, counter});
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 1);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(0), "envoy.test_counter;key1=value1;key2=value2:1|c");
+  counter.used_ = false;
+
+  NiceMock<Stats::MockGauge> gauge;
+  gauge.name_ = "test_gauge";
+  gauge.value_ = 1;
+  gauge.used_ = true;
+  gauge.setTags(tags);
+  snapshot.gauges_.push_back(gauge);
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr), writeBuffer(_));
+  sink.flush(snapshot);
+  EXPECT_EQ(writer_ptr->buffer_writes.size(), 2);
+  EXPECT_EQ(writer_ptr->buffer_writes.at(1), "envoy.test_gauge;key1=value1;key2=value2:1|g");
+
+  NiceMock<Stats::MockHistogram> timer;
+  timer.name_ = "test_timer";
+  timer.setTags(tags);
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.test_timer;key1=value1;key2=value2:5|ms"));
+  sink.onHistogramComplete(timer, 5);
 
   tls_.shutdownThread();
 }
