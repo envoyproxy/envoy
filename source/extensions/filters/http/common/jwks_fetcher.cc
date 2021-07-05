@@ -145,7 +145,7 @@ private:
    *          for this to work.
    *
    * @param retry policy from the RemoteJwks proto
-   * @return a retry policy useable by the http async client.
+   * @return a retry policy usable by the http async client.
    */
   static envoy::config::route::v3::RetryPolicy
   adaptRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy) {
