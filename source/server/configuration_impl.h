@@ -170,8 +170,7 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options,
-              Instance& server);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -179,6 +178,8 @@ public:
   const envoy::config::bootstrap::v3::LayeredRuntime& runtime() override {
     return layered_runtime_;
   }
+
+  void initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server) ;
 
 private:
   struct AdminImpl : public Admin {

@@ -193,23 +193,9 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options, Instance& server)
+                         const Options& options)
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
-
-  for (const auto& access_log : admin.access_log()) {
-    AccessLog::InstanceSharedPtr current_access_log =
-        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
-    admin_.access_logs_.emplace_back(current_access_log);
-  }
-
-  if (!admin.access_log_path().empty()) {
-    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
-                                          admin.access_log_path()};
-    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
-        server.accessLogManager()));
-  }
 
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
@@ -244,6 +230,25 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
         val;
   }
 }
+
+void InitialImpl::initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server){
+  const auto& admin = bootstrap.admin();
+
+  for (const auto& access_log : admin.access_log()) {
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, server.serverFactoryContext());
+    admin_.access_logs_.emplace_back(current_access_log);
+  }
+
+  if (!admin.access_log_path().empty()) {
+    Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File,
+                                          admin.access_log_path()};
+    admin_.access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
+        file_info, {}, Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        server.accessLogManager()));
+  }
+
+ }
 
 } // namespace Configuration
 } // namespace Server
