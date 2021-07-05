@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["hotkey_impl.cc"],
     hdrs = ["hotkey_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:thread_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy/hotkey/cache:cache_factory_lib",

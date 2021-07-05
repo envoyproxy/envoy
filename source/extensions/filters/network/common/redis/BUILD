@@ -44,8 +44,8 @@ envoy_cc_library(
     ],
     deps = [
         ":codec_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/stats:timespan_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:timespan_interface",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
