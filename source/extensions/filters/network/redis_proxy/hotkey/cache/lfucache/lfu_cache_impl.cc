@@ -1,5 +1,4 @@
 #include "source/common/common/assert.h"
-
 #include "source/extensions/filters/network/redis_proxy/hotkey/cache/lfucache/lfu_cache.h"
 
 namespace Envoy {
