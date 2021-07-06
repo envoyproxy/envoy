@@ -2,7 +2,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 
 #include "source/common/config/resource_name.h"
-#include "source/common/config/unified_mux/sotw_subscription_state.h"
+#include "source/common/config/xds_mux/sotw_subscription_state.h"
 #include "source/common/config/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 
@@ -25,19 +25,12 @@ namespace {
 
 class SotwSubscriptionStateTest : public testing::Test {
 protected:
-  SotwSubscriptionStateTest(const unsigned int initial_fetch_timeout = 0U)
-      : resource_decoder_("cluster_name") {
-    if (initial_fetch_timeout > 0) {
-      initial_fetch_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-      EXPECT_CALL(*initial_fetch_timeout_timer_,
-                  enableTimer(std::chrono::milliseconds(initial_fetch_timeout), _));
-    }
+  SotwSubscriptionStateTest() : resource_decoder_("cluster_name") {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
-    state_ = std::make_unique<UnifiedMux::SotwSubscriptionState>(
+    state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
         Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             envoy::config::core::v3::ApiVersion::V3),
-        callbacks_, std::chrono::milliseconds(initial_fetch_timeout), dispatcher_,
-        resource_decoder_);
+        callbacks_, dispatcher_, resource_decoder_);
     state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
@@ -113,26 +106,10 @@ protected:
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  Event::MockTimer* initial_fetch_timeout_timer_;
   Event::MockTimer* ttl_timer_;
   // We start out interested in three resources: name1, name2, and name3.
-  std::unique_ptr<UnifiedMux::SotwSubscriptionState> state_;
+  std::unique_ptr<XdsMux::SotwSubscriptionState> state_;
 };
-
-class InitialFetchTimeoutSotwSubscriptionStateTest : public SotwSubscriptionStateTest {
-public:
-  InitialFetchTimeoutSotwSubscriptionStateTest() : SotwSubscriptionStateTest(100L) {}
-};
-
-TEST_F(InitialFetchTimeoutSotwSubscriptionStateTest, InitialFetchTimeoutTimerCreated) {
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, _));
-  initial_fetch_timeout_timer_->invokeCallback();
-}
-
-TEST_F(InitialFetchTimeoutSotwSubscriptionStateTest, InitialFetchTimeoutTimerCanBeCancelled) {
-  EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
-  state_->disableInitFetchTimeoutTimer();
-}
 
 // Basic gaining/losing interest in resources should lead to changes in subscriptions.
 TEST_F(SotwSubscriptionStateTest, SubscribeAndUnsubscribe) {

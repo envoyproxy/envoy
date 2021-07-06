@@ -1,17 +1,16 @@
-#include "source/common/config/unified_mux/sotw_subscription_state.h"
+#include "source/common/config/xds_mux/sotw_subscription_state.h"
 
 #include "source/common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
                                              UntypedConfigUpdateCallbacks& callbacks,
-                                             std::chrono::milliseconds init_fetch_timeout,
                                              Event::Dispatcher& dispatcher,
                                              OpaqueResourceDecoder& resource_decoder)
-    : SubscriptionState(std::move(type_url), callbacks, init_fetch_timeout, dispatcher),
+    : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher),
       resource_decoder_(resource_decoder) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
@@ -121,6 +120,6 @@ bool SotwSubscriptionState::isHeartbeatResource(const DecodedResource& resource,
          version == last_good_version_info_.value();
 }
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

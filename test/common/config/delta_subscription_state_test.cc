@@ -4,7 +4,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/delta_subscription_state.h"
-#include "source/common/config/unified_mux/delta_subscription_state.h"
+#include "source/common/config/xds_mux/delta_subscription_state.h"
 #include "source/common/config/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 
@@ -34,21 +34,13 @@ class DeltaSubscriptionStateTestBase : public testing::TestWithParam<LegacyOrUni
 protected:
   DeltaSubscriptionStateTestBase(
       const std::string& type_url, const bool wildcard, LegacyOrUnified legacy_or_unified,
-      const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"},
-      const unsigned int initial_fetch_timeout = 0U)
+      const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
       : should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
-    if (should_use_unified_ && initial_fetch_timeout > 0) {
-      initial_fetch_timeout_timer_ = new Event::MockTimer(&dispatcher_);
-      EXPECT_CALL(*initial_fetch_timeout_timer_,
-                  enableTimer(std::chrono::milliseconds(initial_fetch_timeout), _));
-    }
-
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     if (should_use_unified_) {
-      state_ = std::make_unique<Envoy::Config::UnifiedMux::DeltaSubscriptionState>(
-          type_url, callbacks_, std::chrono::milliseconds(initial_fetch_timeout), dispatcher_,
-          wildcard);
+      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(
+          type_url, callbacks_, dispatcher_, wildcard);
     } else {
       state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
           type_url, callbacks_, local_info_, dispatcher_, wildcard);
@@ -139,10 +131,9 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* ttl_timer_;
-  Event::MockTimer* initial_fetch_timeout_timer_;
   // We start out interested in three resources: name1, name2, and name3.
   absl::variant<std::unique_ptr<Envoy::Config::DeltaSubscriptionState>,
-                std::unique_ptr<Envoy::Config::UnifiedMux::DeltaSubscriptionState>>
+                std::unique_ptr<Envoy::Config::XdsMux::DeltaSubscriptionState>>
       state_;
   bool should_use_unified_;
 };
@@ -156,22 +147,6 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
     resource->set_version(item.second);
   }
   return add_to;
-}
-
-class InitialFetchTimeoutSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
-public:
-  InitialFetchTimeoutSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase(TypeUrl, false, LegacyOrUnified::Unified, {}, 100U) {}
-};
-
-TEST_F(InitialFetchTimeoutSubscriptionStateTest, InitialFetchTimeoutTimerCreated) {
-  EXPECT_CALL(callbacks_, onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, _));
-  initial_fetch_timeout_timer_->invokeCallback();
-}
-
-TEST_F(InitialFetchTimeoutSubscriptionStateTest, InitialFetchTimeoutTimerCanBeCancelled) {
-  EXPECT_CALL(*initial_fetch_timeout_timer_, disableTimer());
-  absl::get<1>(state_)->disableInitFetchTimeoutTimer();
 }
 
 class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {

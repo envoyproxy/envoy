@@ -5,22 +5,21 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/unified_mux/subscription_state.h"
+#include "source/common/config/xds_mux/subscription_state.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 // Tracks the state of a delta xDS-over-gRPC protocol session.
 class DeltaSubscriptionState
-    : public SubscriptionState<envoy::service::discovery::v3::DeltaDiscoveryResponse,
-                               envoy::service::discovery::v3::DeltaDiscoveryRequest> {
+    : public BaseSubscriptionState<envoy::service::discovery::v3::DeltaDiscoveryResponse,
+                                   envoy::service::discovery::v3::DeltaDiscoveryRequest> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         std::chrono::milliseconds init_fetch_timeout,
                          Event::Dispatcher& dispatcher, const bool wildcard);
 
   ~DeltaSubscriptionState() override;
@@ -94,6 +93,6 @@ private:
   std::set<std::string> names_removed_;
 };
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

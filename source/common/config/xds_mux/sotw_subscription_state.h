@@ -6,23 +6,22 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
 #include "source/common/config/decoded_resource_impl.h"
-#include "source/common/config/unified_mux/subscription_state.h"
+#include "source/common/config/xds_mux/subscription_state.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 // Tracks the state of a "state-of-the-world" (i.e. not delta) xDS-over-gRPC protocol session.
 class SotwSubscriptionState
-    : public SubscriptionState<envoy::service::discovery::v3::DiscoveryResponse,
-                               envoy::service::discovery::v3::DiscoveryRequest> {
+    : public BaseSubscriptionState<envoy::service::discovery::v3::DiscoveryResponse,
+                                   envoy::service::discovery::v3::DiscoveryRequest> {
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher,
-                        OpaqueResourceDecoder& resource_decoder);
+                        Event::Dispatcher& dispatcher, OpaqueResourceDecoder& resource_decoder);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -63,6 +62,6 @@ private:
   absl::flat_hash_set<std::string> names_tracked_;
 };
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

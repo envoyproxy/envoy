@@ -77,7 +77,7 @@ envoy_cc_test(
         "//source/common/config:delta_subscription_state_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:new_grpc_mux_lib",
-        "//source/common/config/unified_mux:delta_subscription_state_lib",
+        "//source/common/config/xds_mux:delta_subscription_state_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",
@@ -97,7 +97,7 @@ envoy_cc_test(
     srcs = ["sotw_subscription_state_test.cc"],
     deps = [
         "//source/common/config:resource_name_lib",
-        "//source/common/config/unified_mux:sotw_subscription_state_lib",
+        "//source/common/config/xds_mux:sotw_subscription_state_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
         "//test/mocks/config:config_mocks",

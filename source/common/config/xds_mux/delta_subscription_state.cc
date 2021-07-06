@@ -1,4 +1,4 @@
-#include "source/common/config/unified_mux/delta_subscription_state.h"
+#include "source/common/config/xds_mux/delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -9,13 +9,12 @@
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
-                                               std::chrono::milliseconds init_fetch_timeout,
                                                Event::Dispatcher& dispatcher, const bool wildcard)
-    : SubscriptionState(std::move(type_url), watch_map, init_fetch_timeout, dispatcher),
+    : BaseSubscriptionState(std::move(type_url), watch_map, dispatcher),
       // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
       // empty resources as updates.
       supports_heartbeats_(type_url_ != "envoy.config.route.v3.VirtualHost"), wildcard_(wildcard) {}
@@ -192,6 +191,6 @@ void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& e
   callbacks().onConfigUpdate({}, removed_resources, "");
 }
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

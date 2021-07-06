@@ -17,7 +17,9 @@
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
+
+class SubscriptionState {};
 
 // Tracks the protocol state of an individual ongoing xDS-over-gRPC session, for a single type_url.
 // There can be multiple SubscriptionStates active, one per type_url. They will all be
@@ -25,24 +27,17 @@ namespace UnifiedMux {
 // together by ADS.
 // This is the abstract parent class for both the delta and state-of-the-world xDS variants.
 template <class RS, class RQ>
-class SubscriptionState : public Logger::Loggable<Logger::Id::config> {
+class BaseSubscriptionState : public SubscriptionState,
+                              public Logger::Loggable<Logger::Id::config> {
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
-  SubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                    std::chrono::milliseconds init_fetch_timeout, Event::Dispatcher& dispatcher)
+  BaseSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        Event::Dispatcher& dispatcher)
       : ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
              dispatcher, dispatcher.timeSource()),
-        type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher) {
-    if (init_fetch_timeout.count() > 0) {
-      init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
-        ENVOY_LOG(warn, "config: initial fetch timed out for {}", type_url_);
-        callbacks_.onConfigUpdateFailed(ConfigUpdateFailureReason::FetchTimedout, nullptr);
-      });
-      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout);
-    }
-  }
+        type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher) {}
 
-  virtual ~SubscriptionState() = default;
+  virtual ~BaseSubscriptionState() = default;
 
   // Update which resources we're interested in subscribing to.
   virtual void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -94,13 +89,6 @@ public:
     return request;
   }
 
-  void disableInitFetchTimeoutTimer() {
-    if (init_fetch_timeout_timer_) {
-      init_fetch_timeout_timer_->disableTimer();
-      init_fetch_timeout_timer_.reset();
-    }
-  }
-
   virtual void ttlExpiryCallback(const std::vector<std::string>& type_url) PURE;
 
 protected:
@@ -122,11 +110,9 @@ protected:
   // callbacks_ is expected (outside of tests) to be a WatchMap.
   UntypedConfigUpdateCallbacks& callbacks_;
   Event::Dispatcher& dispatcher_;
-  // tracks initial configuration fetch timeout.
-  Event::TimerPtr init_fetch_timeout_timer_;
   bool dynamic_context_changed_{};
 };
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy
