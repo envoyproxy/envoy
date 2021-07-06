@@ -449,7 +449,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   initial_config.initAccesslog(bootstrap_, *this);
