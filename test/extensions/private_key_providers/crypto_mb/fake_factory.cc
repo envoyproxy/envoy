@@ -77,7 +77,7 @@ uint32_t FakeIppCryptoImpl::mbxNistp256EcdsaSignSslMb8(uint8_t* pa_sign_r[8], ui
     ECDSA_SIG_free(sig);
     EC_KEY_free(key);
 
-    status = mbxSetSts(status, i, true);
+    status = mbxSetSts(status, i, !injectErrors_);
   }
 
   UNREFERENCED_PARAMETER(pa_eph_skey);
@@ -119,7 +119,7 @@ uint32_t FakeIppCryptoImpl::mbxRsaPrivateCrtSslMb8(
 
     RSA_free(rsa);
 
-    status = mbxSetSts(status, i, ret);
+    status = mbxSetSts(status, i, injectErrors_ ? !ret : ret);
   }
 
   UNREFERENCED_PARAMETER(expected_rsa_bitsize);
@@ -151,7 +151,7 @@ uint32_t FakeIppCryptoImpl::mbxRsaPublicSslMb8(const uint8_t* const from_pa[8],
 
     RSA_free(rsa);
 
-    status = mbxSetSts(status, i, ret);
+    status = mbxSetSts(status, i, injectErrors_ ? !ret : ret);
   }
 
   UNREFERENCED_PARAMETER(expected_rsa_bitsize);

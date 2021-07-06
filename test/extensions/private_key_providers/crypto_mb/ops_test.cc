@@ -430,6 +430,120 @@ TEST(CryptoMbProviderTest, TestErrors) {
   EXPECT_EQ(res, ssl_private_key_failure);
 }
 
+TEST(CryptoMbProviderTest, TestRSATimer) {
+  Event::SimulatedTimeSystem time_system;
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system);
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
+  std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
+  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
+  const BIGNUM *e, *n, *d;
+  RSA_get0_key(rsa, &n, &e, &d);
+  fakeIpp->setRsaKey(n, e, d);
+
+  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp, *dispatcher);
+
+  size_t in_len = 32;
+  uint8_t in[32] = {0x7f};
+
+  ssl_private_key_result_t res;
+  TestCallbacks cbs[8];
+
+  // First request
+  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
+  res =
+      rsaPrivateKeySignForTest(&op0, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  res = privateKeyCompleteForTest(&op0, nullptr, nullptr, 128);
+  // No processing done yet after first request
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  time_system.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  size_t out_len = 0;
+  uint8_t out[128] = {0};
+
+  res = privateKeyCompleteForTest(&op0, out, &out_len, 128);
+  EXPECT_EQ(res, ssl_private_key_success);
+  EXPECT_NE(out_len, 0);
+
+  // Add crypto library errors
+  fakeIpp->injectErrors(true);
+
+  CryptoMbPrivateKeyConnection op1(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
+  res =
+      rsaPrivateKeySignForTest(&op1, nullptr, nullptr, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  res = privateKeyCompleteForTest(&op1, nullptr, nullptr, 128);
+  // No processing done yet after first request
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  time_system.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  res = privateKeyCompleteForTest(&op1, out, &out_len, 128);
+  EXPECT_EQ(res, ssl_private_key_failure);
+}
+
+TEST(CryptoMbProviderTest, TestEcdsaTimer) {
+  Event::SimulatedTimeSystem time_system;
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system);
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  bssl::UniquePtr<EVP_PKEY> pkey = makeEcdsaKey();
+  std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
+
+  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Ec, 256, fakeIpp, *dispatcher);
+
+  size_t in_len = 32;
+  uint8_t in[32] = {0x7f};
+
+  ssl_private_key_result_t res;
+  TestCallbacks cbs[8];
+
+  // First request
+  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
+  res = ecdsaPrivateKeySignForTest(&op0, nullptr, nullptr, 128, SSL_SIGN_ECDSA_SECP256R1_SHA256, in,
+                                   in_len);
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  res = privateKeyCompleteForTest(&op0, nullptr, nullptr, 128);
+  // No processing done yet after first request
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  time_system.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  size_t out_len = 0;
+  uint8_t out[128] = {0};
+
+  res = privateKeyCompleteForTest(&op0, out, &out_len, 128);
+  EXPECT_EQ(res, ssl_private_key_success);
+  EXPECT_NE(out_len, 0);
+
+  // Add crypto library errors
+  fakeIpp->injectErrors(true);
+
+  CryptoMbPrivateKeyConnection op1(cbs[0], *dispatcher, bssl::UpRef(pkey), queue);
+  res = ecdsaPrivateKeySignForTest(&op1, nullptr, nullptr, 128, SSL_SIGN_ECDSA_SECP256R1_SHA256, in,
+                                   in_len);
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  res = privateKeyCompleteForTest(&op1, nullptr, nullptr, 128);
+  // No processing done yet after first request
+  EXPECT_EQ(res, ssl_private_key_retry);
+
+  time_system.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher,
+                                Event::Dispatcher::RunType::NonBlock);
+
+  res = privateKeyCompleteForTest(&op1, out, &out_len, 128);
+  EXPECT_EQ(res, ssl_private_key_failure);
+}
+
 } // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions

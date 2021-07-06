@@ -38,6 +38,8 @@ public:
     d_ = BN_dup(d);
   };
 
+  void injectErrors(bool enabled) { injectErrors_ = enabled; }
+
 private:
   uint32_t mbxSetSts(uint32_t status, unsigned req_num, bool success);
 
@@ -45,6 +47,8 @@ private:
   BIGNUM* n_{};
   BIGNUM* e_{};
   BIGNUM* d_{};
+
+  bool injectErrors_{};
 };
 
 class FakeCryptoMbPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
