@@ -672,7 +672,7 @@ TEST_F(EdsTest, ReadOnlyMapUpdateOfPrioritySet) {
   EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
   test_host_map = cluster_->prioritySet().readOnlyHostMap();
 
-  for (auto host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+  for (const auto& host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
     // Remove the pending HC flag. This is normally done by the health checker.
     host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     // Mark the hosts as healthy
