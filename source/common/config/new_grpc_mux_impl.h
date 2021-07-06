@@ -38,6 +38,14 @@ public:
                  const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
+  ~NewGrpcMuxImpl() override;
+
+  // Causes all NewGrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `NewGrpcMuxImpl` to be destructed.
+  static void shutdownAll();
+
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -170,6 +178,10 @@ private:
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
   const envoy::config::core::v3::ApiVersion transport_api_version_;
   Event::Dispatcher& dispatcher_;
+
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  bool shutdown_{false};
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

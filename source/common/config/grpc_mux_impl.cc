@@ -14,6 +14,24 @@
 namespace Envoy {
 namespace Config {
 
+namespace {
+struct AllMuxesState {
+  void insert(GrpcMuxImpl* mux) {
+    absl::WriterMutexLock locker(&lock_);
+    muxes_.insert(mux);
+  }
+
+  void erase(GrpcMuxImpl* mux) {
+    absl::WriterMutexLock locker(&lock_);
+    muxes_.erase(mux);
+  }
+
+  absl::flat_hash_set<GrpcMuxImpl*> muxes_;
+  absl::Mutex lock_;
+};
+using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
+} // namespace
+
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
@@ -30,6 +48,17 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
             onDynamicContextUpdate(resource_type_url);
           })) {
   Config::Utility::checkLocalInfo("ads", local_info);
+  AllMuxes::get().insert(this);
+}
+
+GrpcMuxImpl::~GrpcMuxImpl() { AllMuxes::get().erase(this); }
+
+void GrpcMuxImpl::shutdownAll() {
+  auto& state = AllMuxes::get();
+  absl::WriterMutexLock locker(&state.lock_);
+  for (auto& mux : state.muxes_) {
+    mux->shutdown_ = true;
+  }
 }
 
 void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
@@ -44,6 +73,10 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
+  if (shutdown_) {
+    return;
+  }
+
   ApiState& api_state = apiStateFor(type_url);
   auto& request = api_state.request_;
   request.mutable_resource_names()->Clear();
