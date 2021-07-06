@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
-#include "extensions/filters/network/redis_proxy/hotkey/cache/lfucache/lfu_cache.h"
+#include "source/extensions/filters/network/redis_proxy/hotkey/cache/lfucache/lfu_cache.h"
 
 namespace Envoy {
 namespace Extensions {

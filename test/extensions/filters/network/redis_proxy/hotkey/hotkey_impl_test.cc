@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
+#include "source/extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"

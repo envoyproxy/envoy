@@ -8,10 +8,10 @@
 
 #include "envoy/event/dispatcher.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 
-#include "extensions/filters/network/redis_proxy/hotkey/cache/cache_factory.h"
+#include "source/extensions/filters/network/redis_proxy/hotkey/cache/cache_factory.h"
 
 namespace Envoy {
 namespace Extensions {

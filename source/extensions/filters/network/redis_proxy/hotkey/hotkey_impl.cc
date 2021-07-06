@@ -1,9 +1,9 @@
-#include "extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
+#include "source/extensions/filters/network/redis_proxy/hotkey/hotkey_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/hotkey/cache/cache.h"
+#include "source/extensions/filters/network/redis_proxy/hotkey/cache/cache.h"
 
 #include "absl/base/attributes.h"
 
