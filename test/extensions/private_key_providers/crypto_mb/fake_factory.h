@@ -38,7 +38,7 @@ public:
     d_ = BN_dup(d);
   };
 
-  void injectErrors(bool enabled) { injectErrors_ = enabled; }
+  void injectErrors(bool enabled) { inject_errors_ = enabled; }
 
 private:
   uint32_t mbxSetSts(uint32_t status, unsigned req_num, bool success);
@@ -48,7 +48,7 @@ private:
   BIGNUM* e_{};
   BIGNUM* d_{};
 
-  bool injectErrors_{};
+  bool inject_errors_{};
 };
 
 class FakeCryptoMbPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstanceFactory {
