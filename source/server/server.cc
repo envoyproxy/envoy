@@ -450,9 +450,6 @@ void InstanceImpl::initialize(const Options& options,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_, options, *this);
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
-  initial_config.initAccesslog(bootstrap_, *this);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -524,6 +521,11 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.enable_dispatcher_stats()) {
     dispatcher_->initializeStats(stats_store_, "server.");
   }
+
+  // Init runtime sinleton, admin access log
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
+  initial_config.initAccesslog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
