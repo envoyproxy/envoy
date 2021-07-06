@@ -83,6 +83,16 @@ public:
    * Returns the transport socket options which should be applied on upstream connections
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
+
+  using ExpectedHostStatus = uint32_t;
+  using ExpectedHost = std::pair<std::string, ExpectedHostStatus>;
+
+  /**
+   * Returns the primary host the load balancer shouled slected.If the expected host exists and the
+   * health status of the host matches the expectation, the load balancer can bypass the load
+   * balancing algorithm and return the corresponding host directly.
+   */
+  virtual absl::optional<ExpectedHost> primaryHostShouldSelected() const PURE;
 };
 
 /**
@@ -119,9 +129,12 @@ public:
   virtual ~LoadBalancerFactory() = default;
 
   /**
+   * Create a new worker local load balancer.
+   *
+   * @param thread_local_priority_set supplies worker local PrioritySet for host selection.
    * @return LoadBalancerPtr a new load balancer.
    */
-  virtual LoadBalancerPtr create() PURE;
+  virtual LoadBalancerPtr create(const PrioritySet& thread_local_priority_set) PURE;
 };
 
 using LoadBalancerFactorySharedPtr = std::shared_ptr<LoadBalancerFactory>;

@@ -609,6 +609,95 @@ TEST_F(EdsTest, UseHostnameForHealthChecks) {
   EXPECT_EQ(hosts[0]->hostnameForHealthChecks(), "foo");
 }
 
+// Verify that the readOnlyHostMap of PrioritySet can be updated correctly after a host is added or
+// removed.
+TEST_F(EdsTest, ReadOnlyMapUpdateOfPrioritySet) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+  initialize();
+
+  auto add_endpoint = [&cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  HostMapConstSharedPtr test_host_map{};
+
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 1);
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+  test_host_map = cluster_->prioritySet().readOnlyHostMap();
+
+  // Run health check callbacks to complete finishInitialization. Since we currently only have one
+  // host, we only need to call health check callbacks once.
+  health_checker->runCallbacks(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Unchanged);
+
+  // Add 81.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 2);
+  // Because Eds always creates a new HostMap, test_host_map is always not equal to readOnlyHostMap.
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+  test_host_map = cluster_->prioritySet().readOnlyHostMap();
+
+  // Remove 81.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 1);
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+  test_host_map = cluster_->prioritySet().readOnlyHostMap();
+
+  // Add 81.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 2);
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+  test_host_map = cluster_->prioritySet().readOnlyHostMap();
+
+  for (auto host : cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()) {
+    // Remove the pending HC flag. This is normally done by the health checker.
+    host->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Mark the hosts as healthy
+    host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  // Remove 81 but the size of the host map will not change temporarily.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 2);
+  // Although the host has not changed, Eds will still rebuild the HostMap.
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+  test_host_map = cluster_->prioritySet().readOnlyHostMap();
+
+  // Remove 81 actually by health check failed.
+  auto host_to_move = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[1];
+  host_to_move->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  // Run health check callbacks to update PrioritySet.
+  health_checker->runCallbacks(host_to_move, HealthTransition::Changed);
+
+  EXPECT_EQ(cluster_->prioritySet().readOnlyHostMap()->size(), 1);
+  EXPECT_NE(test_host_map.get(), cluster_->prioritySet().readOnlyHostMap().get());
+}
+
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
 // fails active HC.
 TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
@@ -703,7 +792,7 @@ TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
     EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   }
 
-  // Add back 81. Verify that we have a new host. This will show that the all_hosts_ was updated
+  // Add back 81. Verify that we have a new host. This will show that the all_host_map_ was updated
   // correctly.
   cluster_load_assignment.clear_endpoints();
   add_endpoint(80);

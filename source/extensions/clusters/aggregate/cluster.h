@@ -135,7 +135,7 @@ private:
 struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
   AggregateLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override {
+  Upstream::LoadBalancerPtr create(const Upstream::PrioritySet&) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);

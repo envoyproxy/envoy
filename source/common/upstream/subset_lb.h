@@ -162,6 +162,10 @@ private:
       return wrapped_->upstreamTransportSocketOptions();
     }
 
+    absl::optional<ExpectedHost> primaryHostShouldSelected() const override {
+      return wrapped_->primaryHostShouldSelected();
+    }
+
   private:
     LoadBalancerContext* wrapped_;
     Router::MetadataMatchCriteriaConstPtr metadata_match_;

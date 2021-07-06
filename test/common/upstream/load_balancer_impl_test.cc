@@ -14,6 +14,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -32,6 +33,10 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+static constexpr uint32_t UnhealthyStatus = 0b001u;
+static constexpr uint32_t DegradedStatus = 0b010u;
+static constexpr uint32_t HealthyStatus = 0b100u;
 
 class LoadBalancerTestBase : public Event::TestUsingSimulatedTime,
                              public testing::TestWithParam<bool> {
@@ -537,6 +542,88 @@ TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
     uint32_t healthy_hosts = std::min<uint32_t>(num_hosts, rand.random() % 100);
     // Make sure random health situations don't trigger the assert in recalculatePerPriorityState
     updateHostSet(*priority_set_.getMockHostSet(i), num_hosts, healthy_hosts);
+  }
+}
+
+TEST_P(LoadBalancerBaseTest, SelectPrimaryHostTestInLb) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+  LoadBalancerContext::ExpectedHost expected_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+  EXPECT_CALL(context, primaryHostShouldSelected())
+      .WillOnce(Return(absl::make_optional(expected_host)));
+
+  auto host_map = std::make_shared<HostMap>();
+  host_map->insert({"1.2.3.4", mock_host});
+  priority_set_.read_only_host_map_ = host_map;
+  EXPECT_EQ(mock_host, lb_.chooseHost(&context));
+}
+
+TEST(LoadBalancerBaseTest, SelectPrimaryHostTest) {
+  NiceMock<MockPrioritySet> priority_set;
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  {
+    // No valid host map.
+    priority_set.read_only_host_map_ = nullptr;
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
+  }
+  {
+    // No valid load balancer context.
+    priority_set.read_only_host_map_ = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, nullptr));
+  }
+  {
+    // No valid expected host.
+    EXPECT_CALL(context, primaryHostShouldSelected()).WillOnce(Return(absl::nullopt));
+    priority_set.read_only_host_map_ = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
+  }
+  {
+    // The host map does not contain the expected host.
+    LoadBalancerContext::ExpectedHost expected_host{"1.2.3.4", HealthyStatus};
+    EXPECT_CALL(context, primaryHostShouldSelected())
+        .WillOnce(Return(absl::make_optional(expected_host)));
+    priority_set.read_only_host_map_ = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
+  }
+  {
+    // The host map does not contain the expected host.
+    LoadBalancerContext::ExpectedHost expected_host{"1.2.3.4", HealthyStatus};
+    EXPECT_CALL(context, primaryHostShouldSelected())
+        .WillOnce(Return(absl::make_optional(expected_host)));
+    priority_set.read_only_host_map_ = std::make_shared<HostMap>();
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
+  }
+  {
+    // The status of host is not as expected.
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Unhealthy));
+
+    LoadBalancerContext::ExpectedHost expected_host{"1.2.3.4", HealthyStatus};
+    EXPECT_CALL(context, primaryHostShouldSelected())
+        .WillOnce(Return(absl::make_optional(expected_host)));
+
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    priority_set.read_only_host_map_ = host_map;
+    EXPECT_EQ(nullptr, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
+  }
+  {
+    // Get expected host.
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+    LoadBalancerContext::ExpectedHost expected_host{"1.2.3.4", HealthyStatus | DegradedStatus};
+    EXPECT_CALL(context, primaryHostShouldSelected())
+        .WillOnce(Return(absl::make_optional(expected_host)));
+
+    auto host_map = std::make_shared<HostMap>();
+    host_map->insert({"1.2.3.4", mock_host});
+    priority_set.read_only_host_map_ = host_map;
+    EXPECT_EQ(mock_host, LoadBalancerBase::selectPrimaryHost(priority_set, &context));
   }
 }
 
@@ -1902,6 +1989,59 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
                             "fallback_keys_subset cannot be equal to keys");
+}
+
+TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
+    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), HealthyStatus);
+  }
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
+    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
+    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
+
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), UnhealthyStatus);
+  }
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    statuses.Add(envoy::config::core::v3::HealthStatus::DEGRADED);
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), DegradedStatus);
+  }
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), 0);
+  }
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
+    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
+    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
+    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), 0b101u);
+  }
+
+  {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus> statuses;
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNHEALTHY);
+    statuses.Add(envoy::config::core::v3::HealthStatus::DRAINING);
+    statuses.Add(envoy::config::core::v3::HealthStatus::TIMEOUT);
+    statuses.Add(envoy::config::core::v3::HealthStatus::UNKNOWN);
+    statuses.Add(envoy::config::core::v3::HealthStatus::HEALTHY);
+    statuses.Add(envoy::config::core::v3::HealthStatus::DEGRADED);
+    EXPECT_EQ(LoadBalancerContextBase::createExpectedHostStatus(statuses), 0b111u);
+  }
+
+  EXPECT_TRUE(LoadBalancerContextBase::validateExpectedHostStatus(Host::Health::Unhealthy,
+                                                                  UnhealthyStatus));
+  EXPECT_TRUE(
+      LoadBalancerContextBase::validateExpectedHostStatus(Host::Health::Healthy, HealthyStatus));
+  EXPECT_FALSE(
+      LoadBalancerContextBase::validateExpectedHostStatus(Host::Health::Healthy, UnhealthyStatus));
 }
 
 } // namespace

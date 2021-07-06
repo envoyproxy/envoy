@@ -48,13 +48,22 @@ public:
     factory_->onHostHealthUpdate();
   }
 
+  Upstream::LoadBalancerPtr createThreadLocalLoadBalancer() {
+    // When creating a thread local load balancer for redis cluster, the thread_local_priority_set
+    // parameter will be ignored. Redis cluster does not rely on thread_local_priority_set to select
+    // a suitable upstream host, so an empty PrioritySet can be used to assist the test.
+    const Upstream::PrioritySetImpl empty_priority_set;
+
+    return lb_->factory()->create(empty_priority_set);
+  }
+
   void validateAssignment(Upstream::HostVector& hosts,
                           const std::vector<std::pair<uint32_t, uint32_t>>& expected_assignments,
                           bool read_command = false,
                           NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
                               NetworkFilters::Common::Redis::Client::ReadPolicy::Primary) {
 
-    Upstream::LoadBalancerPtr lb = lb_->factory()->create();
+    Upstream::LoadBalancerPtr lb = createThreadLocalLoadBalancer();
     for (auto& assignment : expected_assignments) {
       TestLoadBalancerContext context(assignment.first, read_command, read_policy);
       auto host = lb->chooseHost(&context);
@@ -97,7 +106,7 @@ public:
 // Works correctly without any hosts.
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, createThreadLocalLoadBalancer()->chooseHost(nullptr));
 };
 
 // Works correctly with empty context
@@ -119,7 +128,7 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   init();
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
   TestLoadBalancerContext context(absl::nullopt);
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(&context));
+  EXPECT_EQ(nullptr, createThreadLocalLoadBalancer()->chooseHost(&context));
 };
 
 TEST_F(RedisClusterLoadBalancerTest, Basic) {
@@ -308,7 +317,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   validateAssignment(hosts, primary_assignments, true,
                      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
 
-  Upstream::LoadBalancerPtr lb = lb_->factory()->create();
+  Upstream::LoadBalancerPtr lb = createThreadLocalLoadBalancer();
   TestLoadBalancerContext context(1100, true,
                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
   auto host = lb->chooseHost(&context);

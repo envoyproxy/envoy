@@ -10,7 +10,7 @@ namespace Aggregate {
 
 // AggregateLoadBalancerContext wraps the load balancer context to re-assign priority load
 // according the to host priority selected by the aggregate load balancer.
-class AggregateLoadBalancerContext : public Upstream::LoadBalancerContext {
+class AggregateLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   AggregateLoadBalancerContext(Upstream::LoadBalancerContext* context,
                                Upstream::LoadBalancerBase::HostAvailability host_availability,

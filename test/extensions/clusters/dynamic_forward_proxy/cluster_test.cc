@@ -101,7 +101,15 @@ public:
     host_map_[host]->address_ = Network::Utility::parseInternetAddress(address);
   }
 
-  void refreshLb() { lb_ = lb_factory_->create(); }
+  void refreshLb() {
+    // When creating a thread local load balancer for dynamic forward proxy cluster, the
+    // thread_local_priority_set parameter will be ignored. dynamic forward proxy cluster does not
+    // rely on thread_local_priority_set to select a suitable upstream host, so an empty PrioritySet
+    // can be used to assist the test.
+    const Upstream::PrioritySetImpl empty_priority_set;
+
+    lb_ = lb_factory_->create(empty_priority_set);
+  }
 
   Upstream::MockLoadBalancerContext* setHostAndReturnContext(const std::string& host) {
     downstream_headers_.remove(":authority");

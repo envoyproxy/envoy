@@ -25,6 +25,7 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
       }));
+  ON_CALL(*this, readOnlyHostMap()).WillByDefault(ReturnRef(read_only_host_map_));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;

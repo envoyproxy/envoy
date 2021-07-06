@@ -478,7 +478,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
 
   // Now setup for cross-thread updates.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
+      [&cm_cluster, &cluster, this](const HostVector&, const HostVector& hosts_removed) -> void {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -495,6 +495,14 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
             postThreadLocalDrainConnections(cluster, hosts_removed);
           }
         }
+
+        // A read only HostMap is used to provide fast host search for the corresponding
+        // PrioritySet. In order to reduce the memory overhead, the HostMap is shared by the
+        // PrioritySet in all threads. When any member of the current cluster changes, the HostMap
+        // in the PrioritySet of main thread needs to be synchronized to each worker thread.
+        //
+        // NOTE: Currently only the PrioritySet of the EDS cluster has a valid read only HostMap.
+        postThreadLocalHostMapUpdate(cm_cluster);
       });
 
   cluster_data->second->priority_update_cb_ = cluster.prioritySet().addPriorityUpdateCb(
@@ -1006,6 +1014,46 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
       });
 }
 
+void ClusterManagerImpl::postThreadLocalHostMapUpdate(ClusterManagerCluster& cm_cluster) {
+  bool add_or_update_cluster = false;
+  if (!cm_cluster.addedOrUpdated()) {
+    add_or_update_cluster = true;
+    cm_cluster.setAddedOrUpdated();
+  }
+  LoadBalancerFactorySharedPtr load_balancer_factory;
+  if (add_or_update_cluster) {
+    load_balancer_factory = cm_cluster.loadBalancerFactory();
+  }
+
+  tls_.runOnAllThreads([info = cm_cluster.cluster().info(), add_or_update_cluster,
+                        load_balancer_factory,
+                        host_map = cm_cluster.cluster().prioritySet().readOnlyHostMap()](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ThreadLocalClusterManagerImpl::ClusterEntry* cluster_entry = nullptr;
+    if (add_or_update_cluster) {
+      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+        ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
+      } else {
+        ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
+      }
+      cluster_entry = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
+                                                                      load_balancer_factory);
+      cluster_manager->thread_local_clusters_[info->name()].reset(cluster_entry);
+
+      for (auto& cb : cluster_manager->update_callbacks_) {
+        cb->onClusterAddOrUpdate(*cluster_entry);
+      }
+    } else {
+      ASSERT(cluster_manager->thread_local_clusters_.find(info->name()) !=
+             cluster_manager->thread_local_clusters_.end());
+      cluster_entry = cluster_manager->thread_local_clusters_[info->name()].get();
+    }
+
+    ASSERT(cluster_entry != nullptr);
+    cluster_entry->priority_set_.setReadOnlyHostMap(host_map);
+  });
+}
+
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
   tls_.runOnAllThreads([host](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     cluster_manager->onHostHealthFailure(host);
@@ -1245,7 +1293,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    cluster_entry->lb_ = cluster_entry->lb_factory_->create();
+    cluster_entry->lb_ = cluster_entry->lb_factory_->create(cluster_entry->priority_set_);
   }
 }
 
@@ -1371,7 +1419,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Maglev:
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ != nullptr);
-      lb_ = lb_factory_->create();
+      lb_ = lb_factory_->create(priority_set_);
       break;
     }
     }

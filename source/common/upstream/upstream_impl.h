@@ -477,6 +477,12 @@ public:
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
+  const HostMapConstSharedPtr& readOnlyHostMap() const override { return read_only_host_map_; }
+
+  virtual void setReadOnlyHostMap(HostMapConstSharedPtr host_map) {
+    read_only_host_map_ = std::move(host_map);
+  }
+
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
@@ -506,6 +512,8 @@ private:
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
+
+  HostMapConstSharedPtr read_only_host_map_{};
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage

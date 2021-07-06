@@ -161,6 +161,11 @@ public:
   MOCK_METHOD(void, post, (const HostVector&));
 };
 
+class MockLocalHostMapUpdate {
+public:
+  MOCK_METHOD(void, post, (ClusterManagerCluster&));
+};
+
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
@@ -187,6 +192,10 @@ public:
     }
     return clusters;
   }
+
+  void runPostThreadLocalHostMapUpdate(ClusterManagerCluster& cm_cluster) {
+    ClusterManagerImpl::postThreadLocalHostMapUpdate(cm_cluster);
+  }
 };
 
 // Override postThreadLocalClusterUpdate so we can test that merged updates calls
@@ -200,11 +209,13 @@ public:
       Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
       ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
-      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context)
+      MockLocalHostMapUpdate& local_host_map_update, Http::Context& http_context,
+      Grpc::Context& grpc_context, Router::Context& router_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, local_info, log_manager,
                                main_thread_dispatcher, admin, validation_context, api, http_context,
                                grpc_context, router_context),
-        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
+        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed),
+        local_host_map_update_(local_host_map_update) {}
 
 protected:
   void postThreadLocalClusterUpdate(ClusterManagerCluster&,
@@ -219,8 +230,13 @@ protected:
     local_hosts_removed_.post(hosts_removed);
   }
 
+  void postThreadLocalHostMapUpdate(ClusterManagerCluster& cm_cluster) override {
+    local_host_map_update_.post(cm_cluster);
+  }
+
   MockLocalClusterUpdate& local_cluster_update_;
   MockLocalHostsRemoved& local_hosts_removed_;
+  MockLocalHostMapUpdate& local_host_map_update_;
 };
 
 } // namespace Upstream

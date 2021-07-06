@@ -27,7 +27,8 @@ EdsClusterImpl::EdsClusterImpl(
       local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()) {
+                        : cluster.eds_cluster_config().service_name()),
+      all_host_map_(std::make_shared<HostMap>()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -103,7 +104,10 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
         priority_state_manager, updated_hosts, all_new_hosts);
   }
 
-  parent_.all_hosts_ = std::move(updated_hosts);
+  // Update parent_.all_host_map_ and set it into PrioritySet of main thread. This HostMap will then
+  // be synchronized to each worker thread by the member update callback of PrioritySet.
+  parent_.all_host_map_ = std::make_shared<HostMap>(std::move(updated_hosts));
+  parent_.priority_set_.setReadOnlyHostMap(parent_.all_host_map_);
 
   if (!cluster_rebuilt) {
     parent_.info_->stats().update_no_rebuild_.inc();
@@ -202,6 +206,20 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     host_to_exclude = nullptr;
   }
 
+  if (host_to_exclude != nullptr) {
+    ASSERT(all_host_map_->find(host_to_exclude->address()->asString()) != all_host_map_->end());
+
+    // all_host_map_ will be shared by the main thread and the worker threads, so we cannot modify
+    // its content directly.
+    HostMap host_map_copy = *all_host_map_;
+    host_map_copy.erase(host_to_exclude->address()->asString());
+
+    // Update parent_.all_host_map_ and set it into PrioritySet of main thread. This HostMap will
+    // then be synchronized to each worker thread by the member update callback of PrioritySet.
+    all_host_map_ = std::make_shared<HostMap>(std::move(host_map_copy));
+    priority_set_.setReadOnlyHostMap(all_host_map_);
+  }
+
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
@@ -226,11 +244,6 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
                               host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
-  }
-
-  if (host_to_exclude != nullptr) {
-    ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
-    all_hosts_.erase(host_to_exclude->address()->asString());
   }
 }
 
@@ -257,7 +270,7 @@ bool EdsClusterImpl::updateHostsPerLocality(
   // about this. In the future we may need to do better here.
   const bool hosts_updated =
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
-                            updated_hosts, all_hosts_, all_new_hosts);
+                            updated_hosts, *all_host_map_, all_new_hosts);
   if (hosts_updated || host_set.overprovisioningFactor() != overprovisioning_factor ||
       locality_weights_map != new_locality_weights_map) {
     ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),

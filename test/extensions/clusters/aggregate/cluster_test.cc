@@ -90,6 +90,16 @@ public:
     setupSecondary(1, 1, 1, 1);
   }
 
+  Upstream::LoadBalancerPtr createThreadLocalLoadBalancer() {
+    // When creating a thread local load balancer for aggregate cluster, the
+    // thread_local_priority_set parameter will be ignored. Aggregate cluster does not rely on
+    // thread_local_priority_set to select a suitable upstream host, so an empty PrioritySet can be
+    // used to assist the test.
+    const Upstream::PrioritySetImpl empty_priority_set;
+
+    return lb_factory_->create(empty_priority_set);
+  }
+
   void initialize(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
@@ -121,7 +131,7 @@ public:
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
-    lb_ = lb_factory_->create();
+    lb_ = createThreadLocalLoadBalancer();
   }
 
   Stats::TestUtil::TestStore stats_store_;

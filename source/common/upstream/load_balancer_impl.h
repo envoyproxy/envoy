@@ -42,6 +42,9 @@ public:
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
+  static HostConstSharedPtr selectPrimaryHost(const PrioritySet& priority_set,
+                                              LoadBalancerContext* context);
+
 protected:
   /**
    * By implementing this method instead of chooseHost, host selection will
@@ -165,6 +168,10 @@ private:
 
 class LoadBalancerContextBase : public LoadBalancerContext {
 public:
+  static ExpectedHostStatus createExpectedHostStatus(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus>& statuses);
+  static bool validateExpectedHostStatus(Host::Health health, ExpectedHostStatus status);
+
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
@@ -188,6 +195,8 @@ public:
   Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
     return nullptr;
   }
+
+  absl::optional<ExpectedHost> primaryHostShouldSelected() const override { return {}; }
 };
 
 /**

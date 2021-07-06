@@ -2195,6 +2195,10 @@ TEST(PrioritySet, Extend) {
   // We expect to see two priority changes, but only one membership change.
   EXPECT_EQ(3, priority_changes);
   EXPECT_EQ(2, membership_changes);
+
+  HostMapSharedPtr test_host_map = std::make_shared<HostMap>();
+  priority_set.setReadOnlyHostMap(test_host_map);
+  EXPECT_EQ(test_host_map.get(), priority_set.readOnlyHostMap().get());
 }
 
 class ClusterInfoImplTest : public testing::Test {

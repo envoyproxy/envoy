@@ -110,8 +110,9 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random,
+                     const PrioritySet& thread_local_priority_set)
+        : stats_(stats), random_(random), priority_set_(thread_local_priority_set) {}
 
     // Upstream::LoadBalancer
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
@@ -123,6 +124,9 @@ private:
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
+
+    // PrioritySet for current ThreadLocalCluster.
+    const PrioritySet& priority_set_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -130,7 +134,7 @@ private:
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
-    LoadBalancerPtr create() override;
+    LoadBalancerPtr create(const PrioritySet& thread_local_priority_set) override;
 
     ClusterStats& stats_;
     Random::RandomGenerator& random_;

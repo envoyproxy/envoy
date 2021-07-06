@@ -22,6 +22,10 @@ static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
+static constexpr uint32_t UnhealthyStatus = 0b001u;
+static constexpr uint32_t DegradedStatus = 0b010u;
+static constexpr uint32_t HealthyStatus = 0b100u;
+
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
   // number of healthy hosts.
@@ -507,8 +511,66 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
+LoadBalancerContext::ExpectedHostStatus LoadBalancerContextBase::createExpectedHostStatus(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthStatus>& statuses) {
+  ExpectedHostStatus expected_host_statuses = 0;
+  for (auto status : statuses) {
+    switch (status) {
+    case envoy::config::core::v3::HealthStatus::UNKNOWN:
+    case envoy::config::core::v3::HealthStatus::HEALTHY:
+      expected_host_statuses |= HealthyStatus;
+      break;
+    case envoy::config::core::v3::HealthStatus::UNHEALTHY:
+    case envoy::config::core::v3::HealthStatus::DRAINING:
+    case envoy::config::core::v3::HealthStatus::TIMEOUT:
+      expected_host_statuses |= UnhealthyStatus;
+      break;
+    case envoy::config::core::v3::HealthStatus::DEGRADED:
+      expected_host_statuses |= DegradedStatus;
+      break;
+    default:
+      break;
+    }
+  }
+  return expected_host_statuses;
+}
+
+bool LoadBalancerContextBase::validateExpectedHostStatus(Host::Health health,
+                                                         ExpectedHostStatus status) {
+  static ExpectedHostStatus STATUSES[3] = {UnhealthyStatus, DegradedStatus, HealthyStatus};
+  return status & STATUSES[static_cast<uint32_t>(health)];
+}
+
+HostConstSharedPtr LoadBalancerBase::selectPrimaryHost(const PrioritySet& priority_set,
+                                                       LoadBalancerContext* context) {
+  const auto& host_map = priority_set.readOnlyHostMap();
+  if (host_map == nullptr || context == nullptr) {
+    return nullptr;
+  }
+
+  auto expected_host = context->primaryHostShouldSelected();
+  if (!expected_host.has_value()) {
+    return nullptr;
+  }
+
+  auto host_iter = host_map->find(expected_host.value().first);
+  HostConstSharedPtr host = host_iter != host_map->end() ? host_iter->second : nullptr;
+
+  if (host != nullptr && LoadBalancerContextBase::validateExpectedHostStatus(
+                             host->health(), expected_host.value().second)) {
+    return host;
+  }
+  return nullptr;
+}
+
 HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
+
+  host = selectPrimaryHost(priority_set_, context);
+  if (host != nullptr && !context->shouldSelectAnotherHost(*host)) {
+    return host;
+  }
+
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (size_t i = 0; i < max_attempts; ++i) {
     host = chooseHostOnce(context);

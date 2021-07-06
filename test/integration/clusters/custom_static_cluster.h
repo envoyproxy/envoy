@@ -51,7 +51,9 @@ private:
   struct LbFactory : public Upstream::LoadBalancerFactory {
     LbFactory(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(host_); }
+    Upstream::LoadBalancerPtr create(const Upstream::PrioritySet&) override {
+      return std::make_unique<LbImpl>(host_);
+    }
 
     const Upstream::HostSharedPtr host_;
   };

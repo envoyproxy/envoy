@@ -134,7 +134,7 @@ public:
   void onHostHealthUpdate() override;
 
   // Upstream::LoadBalancerFactory
-  Upstream::LoadBalancerPtr create() override;
+  Upstream::LoadBalancerPtr create(const Upstream::PrioritySet& thread_local_priority_set) override;
 
 private:
   class RedisShard {

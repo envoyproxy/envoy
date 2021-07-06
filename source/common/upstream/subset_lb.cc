@@ -276,6 +276,12 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr primary_host =
+      LoadBalancerBase::selectPrimaryHost(original_priority_set_, context);
+  if (primary_host != nullptr && !context->shouldSelectAnotherHost(*primary_host)) {
+    return primary_host;
+  }
+
   if (context) {
     bool host_chosen;
     HostConstSharedPtr host = tryChooseHostFromContext(context, host_chosen);
@@ -765,7 +771,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create();
+    lb_ = thread_aware_lb_->factory()->create(*this);
     break;
 
   case LoadBalancerType::Maglev:
@@ -776,7 +782,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
         subset_lb.lb_maglev_config_, subset_lb.common_config_);
     thread_aware_lb_->initialize();
-    lb_ = thread_aware_lb_->factory()->create();
+    lb_ = thread_aware_lb_->factory()->create(*this);
     break;
 
   case LoadBalancerType::OriginalDst:
@@ -949,7 +955,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
   if (thread_aware_lb_ != nullptr) {
-    lb_ = thread_aware_lb_->factory()->create();
+    lb_ = thread_aware_lb_->factory()->create(*this);
   }
 }
 

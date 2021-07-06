@@ -119,8 +119,8 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, validation_context_,
-        *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-        router_context_);
+        *factory_.api_, local_cluster_update_, local_hosts_removed_, local_host_map_update_,
+        http_context_, grpc_context_, router_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -166,8 +166,9 @@ public:
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  MockLocalClusterUpdate local_cluster_update_;
-  MockLocalHostsRemoved local_hosts_removed_;
+  NiceMock<MockLocalClusterUpdate> local_cluster_update_;
+  NiceMock<MockLocalHostsRemoved> local_hosts_removed_;
+  NiceMock<MockLocalHostMapUpdate> local_host_map_update_;
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
@@ -3441,6 +3442,65 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   ConnectionPool::Instance::DrainedCb drained_cb = []() {};
   EXPECT_CALL(*pool_mock, addDrainedCallback(_));
   opt_cp.value().addDrainedCallback(drained_cb);
+}
+
+// Test that the read only host map in the main thread is correctly synchronized to the worker
+// thread when the cluster's host set is updated.
+TEST_F(ClusterManagerImplTest, ReadOnlyHostMapSyncTest) {
+  createWithLocalClusterUpdate(false);
+
+  const auto host_map_ptr = std::make_shared<const HostMap>();
+  EXPECT_CALL(local_host_map_update_, post(_))
+      .WillOnce(
+          Invoke([cm = cluster_manager_.get(), host_map_ptr](ClusterManagerCluster& cm_cluster) {
+            EXPECT_EQ(host_map_ptr, cm_cluster.cluster().prioritySet().readOnlyHostMap());
+            cm->runPostThreadLocalHostMapUpdate(cm_cluster);
+            EXPECT_EQ(cm->getThreadLocalCluster("cluster_1")->prioritySet().readOnlyHostMap(),
+                      host_map_ptr);
+          }));
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+  dynamic_cast<Upstream::PrioritySetImpl&>(cluster.prioritySet()).setReadOnlyHostMap(host_map_ptr);
+
+  hosts_removed.push_back((*hosts)[0]);
+  cluster.prioritySet().updateHosts(
+      0,
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+      {}, hosts_added, hosts_removed, absl::nullopt);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  const auto new_host_map_ptr = std::make_shared<const HostMap>();
+  EXPECT_CALL(local_host_map_update_, post(_))
+      .WillOnce(Invoke(
+          [cm = cluster_manager_.get(), new_host_map_ptr](ClusterManagerCluster& cm_cluster) {
+            EXPECT_EQ(new_host_map_ptr, cm_cluster.cluster().prioritySet().readOnlyHostMap());
+            cm->runPostThreadLocalHostMapUpdate(cm_cluster);
+            EXPECT_EQ(cm->getThreadLocalCluster("cluster_1")->prioritySet().readOnlyHostMap(),
+                      new_host_map_ptr);
+          }));
+
+  // Update host map in main thread.
+  dynamic_cast<Upstream::PrioritySetImpl&>(cluster.prioritySet())
+      .setReadOnlyHostMap(new_host_map_ptr);
+
+  hosts_added.push_back((*hosts)[0]);
+  hosts_removed.clear();
+  cluster.prioritySet().updateHosts(
+      0,
+      updateHostsParams(hosts, hosts_per_locality,
+                        std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
+      {}, hosts_added, hosts_removed, absl::nullopt);
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {

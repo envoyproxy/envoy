@@ -319,6 +319,8 @@ protected:
   virtual void postThreadLocalDrainConnections(const Cluster& cluster,
                                                const HostVector& hosts_removed);
 
+  virtual void postThreadLocalHostMapUpdate(ClusterManagerCluster& cm_cluster);
+
   // Parameters for calling postThreadLocalClusterUpdate()
   struct ThreadLocalClusterUpdateParams {
     struct PerPriority {

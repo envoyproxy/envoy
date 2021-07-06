@@ -197,6 +197,8 @@ using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
+using HostMapSharedPtr = std::shared_ptr<HostMap>;
+using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -497,6 +499,13 @@ public:
    * @param callback callback to use to add hosts.
    */
   virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
+
+  /**
+   * @return const HostMapConstSharedPtr& host map that will be used to search host by address
+   * string. If the PrioritySet does not provide the fast searching of host, this method returns
+   * nullptr.
+   */
+  virtual const HostMapConstSharedPtr& readOnlyHostMap() const PURE;
 };
 
 /**

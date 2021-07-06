@@ -59,6 +59,8 @@ public:
     lb_->initialize();
   }
 
+  // In order to simplify the test code, priority_set_ is also used as a thread local PrioritySet to
+  // create a thread local load balancer.
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
@@ -75,7 +77,7 @@ public:
 // Works correctly without any hosts.
 TEST_F(MaglevLoadBalancerTest, NoHost) {
   init(7);
-  EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(priority_set_)->chooseHost(nullptr));
 };
 
 // Throws an exception if table size is not a prime number.
@@ -121,7 +123,7 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   // maglev: i=4 host=127.0.0.1:95
   // maglev: i=5 host=127.0.0.1:90
   // maglev: i=6 host=127.0.0.1:93
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{2, 4, 0, 1, 5, 0, 3};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
@@ -156,7 +158,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
   // maglev: i=4 host=94
   // maglev: i=5 host=91
   // maglev: i=6 host=90
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{2, 5, 0, 3, 4, 1, 0};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
@@ -191,7 +193,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
   // maglev: i=4 host=94
   // maglev: i=5 host=91
   // maglev: i=6 host=90
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{2, 5, 0, 3, 4, 1, 0};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
@@ -224,7 +226,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
   // maglev: i=4 host=127.0.0.1:95
   // maglev: i=5 host=127.0.0.1:90
   // maglev: i=6 host=127.0.0.1:93
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   {
     // Confirm that i=3 is selected by the hash.
     TestLoadBalancerContext context(10);
@@ -275,7 +277,7 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
   // maglev: i=14 host=127.0.0.1:91
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:91
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 1,
                                                    1, 1, 1, 1, 0, 1, 0, 1};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
@@ -318,7 +320,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   // maglev: i=14 host=127.0.0.1:91
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:91
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 0,
                                                    1, 0, 1, 0, 0, 1, 0, 1};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
@@ -362,7 +364,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   // maglev: i=14 host=127.0.0.1:90
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:90
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{1, 0, 0, 0, 0, 0, 1, 0, 0,
                                                    1, 0, 1, 0, 0, 0, 0, 0};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
@@ -382,7 +384,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
   init(17);
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   TestLoadBalancerContext context(0);
   EXPECT_EQ(nullptr, lb->chooseHost(&context));
 }
@@ -420,7 +422,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   // maglev: i=14 host=127.0.0.1:91
   // maglev: i=15 host=127.0.0.1:90
   // maglev: i=16 host=127.0.0.1:91
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
   const std::vector<uint32_t> expected_assignments{1, 0, 0, 1, 0, 1, 1, 0, 0,
                                                    1, 0, 1, 0, 0, 1, 0, 1};
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
@@ -449,7 +451,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, lb_->stats().max_entries_per_host_.value());
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  LoadBalancerPtr lb = lb_->factory()->create(priority_set_);
 
   // Populate a histogram of the number of table entries for each host...
   uint32_t counts[1024] = {0};
