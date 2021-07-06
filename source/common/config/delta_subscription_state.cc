@@ -14,7 +14,7 @@ namespace Config {
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
-                                               Event::Dispatcher& dispatcher, const bool wildcard)
+                                               Event::Dispatcher& dispatcher)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -31,9 +31,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)),
-      mode_(wildcard ? WildcardMode::Implicit : WildcardMode::Disabled), watch_map_(watch_map),
-      local_info_(local_info), dispatcher_(dispatcher) {}
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
+      dispatcher_(dispatcher) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
@@ -58,30 +57,16 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     names_added_.erase(r);
     names_removed_.insert(r);
   }
-  switch (mode_) {
-  case WildcardMode::Implicit:
-    if (names_removed_.find("*") != names_removed_.end()) {
-      // we explicitly cancel the wildcard subscription
-      mode_ = WildcardMode::Disabled;
-    } else if (!names_added_.empty()) {
-      // switch to explicit mode if we requested some extra names
-      mode_ = WildcardMode::Explicit;
-    }
-    break;
-
-  case WildcardMode::Explicit:
-    if (names_removed_.find("*") != names_removed_.end()) {
-      // we explicitly cancel the wildcard subscription
-      mode_ = WildcardMode::Disabled;
-    }
-    break;
-
-  case WildcardMode::Disabled:
-    if (names_added_.find("*") != names_added_.end()) {
-      // we switch into an explicit wildcard subscription
-      mode_ = WildcardMode::Explicit;
-    }
-    break;
+  // Handle the special case of an empty initial resources list as making a wildcard subscription.
+  if (!any_request_sent_yet_in_current_stream_ && cur_added.empty() && cur_removed.empty()) {
+    names_removed_.erase("*");
+    names_added_.insert("*");
+  }
+  if (names_added_.find("*") != names_added_.end()) {
+    has_wildcard_subscription_ = true;
+  }
+  if (names_removed_.find("*") != names_removed_.end()) {
+    has_wildcard_subscription_ = false;
   }
 }
 
@@ -210,7 +195,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
       // Add resource names to resource_names_subscribe only if this is not a wildcard subscription
       // request or if we requested this resource explicitly (so we are actually in explicit
       // wildcard mode).
-      if (mode_ == WildcardMode::Disabled ||
+      if (!has_wildcard_subscription_ ||
           resource_state.type() == ResourceType::ExplicitlyRequested) {
         names_added_.insert(resource_name);
       }
@@ -219,7 +204,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // then the set should already be empty. If we are in explicit wildcard mode then the set will
     // contain the names we explicitly requested, but we need to add * to the list to make sure it's
     // sent too.
-    if (mode_ == WildcardMode::Explicit) {
+    if (has_wildcard_subscription_) {
       names_added_.insert("*");
     }
     names_removed_.clear();

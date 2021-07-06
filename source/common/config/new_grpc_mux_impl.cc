@@ -135,11 +135,10 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    // No resources or an existence of the special name implies that
-    // this is a wildcard request subscription.
-    const bool wildcard = resources.empty() || (resources.find("*") != resources.end());
-    addSubscription(type_url, options.use_namespace_matching_, wildcard);
-    return addWatch(type_url, resources, callbacks, resource_decoder, options);
+    addSubscription(type_url, options.use_namespace_matching_);
+    const absl::flat_hash_set<std::string> wildcard_resource{"*"};
+    const auto& effective_resources = (resources.empty() ? wildcard_resource : resources);
+    return addWatch(type_url, effective_resources, callbacks, resource_decoder, options);
   }
 
   Watch* watch = entry->second->watch_map_.addWatch(callbacks, resource_decoder);
@@ -210,11 +209,10 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
-                                     const bool wildcard) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_,
-                                                                       use_namespace_matching,
-                                                                       dispatcher_, wildcard));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
+                                     const bool use_namespace_matching) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_));
   subscription_ordering_.emplace_back(type_url);
 }
 
