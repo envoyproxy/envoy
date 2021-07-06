@@ -10,6 +10,9 @@
 namespace Envoy {
 namespace Config {
 
+const std::string Wildcard = "*";
+const absl::flat_hash_set<std::string> WildcardSet = {Wildcard};
+
 namespace {
 // Returns the namespace part (if there's any) in the resource name.
 std::string namespaceFromName(const std::string& resource_name) {
@@ -49,7 +52,7 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
-  if (update_to_these_names.contains("*")) {
+  if (update_to_these_names.contains(Wildcard)) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);

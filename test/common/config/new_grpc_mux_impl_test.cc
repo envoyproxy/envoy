@@ -119,7 +119,7 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
   // This is a wildcard subscription, thus expect the wildcard symbol.
-  expectSendMessage("bar", {"*"}, {});
+  expectSendMessage("bar", {Wildcard}, {});
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
   local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
@@ -131,7 +131,7 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
   // Wildcard subscription will be cancelled, just like any other
   // subscription.
-  expectSendMessage("bar", {}, {"*"});
+  expectSendMessage("bar", {}, {Wildcard});
   expectSendMessage("foo", {}, {"x", "y"});
 }
 
@@ -201,7 +201,7 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send a wildcard request on new connection.
-  expectSendMessage(type_url, {"*"}, {});
+  expectSendMessage(type_url, {Wildcard}, {});
   grpc_mux_->start();
 
   // An helper function to create a response with a single load_assignment resource
@@ -262,11 +262,11 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info, and an asterisk
   // because this is a wildcard request.
-  expectSendMessage(type_url, {"*"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+  expectSendMessage(type_url, {Wildcard}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     {{"x", "1000"}, {"y", "2000"}});
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   // Destruction of wildcard will issue an unsubscribe request for the resources.
-  expectSendMessage(type_url, {}, {"*"});
+  expectSendMessage(type_url, {}, {Wildcard});
 }
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.

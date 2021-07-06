@@ -136,8 +136,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     addSubscription(type_url, options.use_namespace_matching_);
-    const absl::flat_hash_set<std::string> wildcard_resource{"*"};
-    const auto& effective_resources = (resources.empty() ? wildcard_resource : resources);
+    const auto& effective_resources = (resources.empty() ? WildcardSet : resources);
     return addWatch(type_url, effective_resources, callbacks, resource_decoder, options);
   }
 

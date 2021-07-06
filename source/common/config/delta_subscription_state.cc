@@ -59,13 +59,13 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
   }
   // Handle the special case of an empty initial resources list as making a wildcard subscription.
   if (!any_request_sent_yet_in_current_stream_ && cur_added.empty() && cur_removed.empty()) {
-    names_removed_.erase("*");
-    names_added_.insert("*");
+    names_removed_.erase(Wildcard);
+    names_added_.insert(Wildcard);
   }
-  if (names_added_.find("*") != names_added_.end()) {
+  if (names_added_.find(Wildcard) != names_added_.end()) {
     has_wildcard_subscription_ = true;
   }
-  if (names_removed_.find("*") != names_removed_.end()) {
+  if (names_removed_.find(Wildcard) != names_removed_.end()) {
     has_wildcard_subscription_ = false;
   }
 }
@@ -200,7 +200,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
       }
     }
     if (has_wildcard_subscription_) {
-      names_added_.insert("*");
+      names_added_.insert(Wildcard);
     }
     names_removed_.clear();
   }

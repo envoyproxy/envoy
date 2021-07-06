@@ -104,7 +104,7 @@ public:
 // Delta subscription state of a wildcard subscription request.
 class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
-  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, {"*"}) {}
+  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, {Wildcard}) {}
 };
 
 // Basic gaining/losing interest in resources should lead to subscription updates.
@@ -356,7 +356,7 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   // Add a wildcard subscription.
-  state_.updateSubscriptionInterest({"name4", "*"}, {"name1"});
+  state_.updateSubscriptionInterest({"name4", Wildcard}, {"name1"});
   state_.markStreamFresh(); // simulate a stream reconnection
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
@@ -366,7 +366,7 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   // name4: yes do include: we are explicitly interested
   // *: explicit wildcard subscription
   EXPECT_THAT(cur_request.resource_names_subscribe(),
-              UnorderedElementsAre("name2", "name3", "name4", "*"));
+              UnorderedElementsAre("name2", "name3", "name4", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
   // Here we will receive the resource name5, which is not a resource we are explicitly interested
@@ -387,7 +387,7 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   // initial request
   // *: explicit wildcard subscription
   EXPECT_THAT(cur_request.resource_names_subscribe(),
-              UnorderedElementsAre("name2", "name3", "name4", "*"));
+              UnorderedElementsAre("name2", "name3", "name4", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -408,7 +408,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   // *: include, it's a wildcard subscription
   // name1: do not include: we lost interest.
   // name2: do not include: we are implicitly interested, but for wildcard it shouldn't be provided.
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("*"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre(Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -423,10 +423,10 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingWildcardSubscription) {
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   // Cancel the wildcard subscription.
-  state_.updateSubscriptionInterest({"name3"}, {"name1", "*"});
+  state_.updateSubscriptionInterest({"name3"}, {"name1", Wildcard});
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "*"));
+  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", Wildcard));
   state_.markStreamFresh(); // simulate a stream reconnection
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
@@ -450,7 +450,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   // interest and initial wildcard request should not contain those).
   state_.markStreamFresh(); // simulate a stream reconnection
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("*"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre(Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
   // Express the interest in name1 explicitly and verify that the follow-up request will contain it.
@@ -463,7 +463,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   // have a wildcard subscription).
   state_.markStreamFresh(); // simulate a stream reconnection
   cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1", "*"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
   // Verify that getting an update on name1 will keep name1 in the explicit interest mode
@@ -472,7 +472,7 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   deliverDiscoveryResponse(add1_2_b, {}, "debugversion1");
   state_.markStreamFresh(); // simulate a stream reconnection
   cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1", "*"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
