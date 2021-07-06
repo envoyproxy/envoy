@@ -76,6 +76,11 @@ private:
   const envoy::type::matcher::v3::DoubleMatcher matcher_;
 };
 
+class UniversalStringMatcher : public StringMatcher {
+public:
+  bool match(absl::string_view) const override { return true; }
+};
+
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
   explicit StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher);
