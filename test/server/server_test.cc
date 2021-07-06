@@ -1722,8 +1722,6 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilterStart) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
-
-  EXPECT_EQ(1, server_->admin().accessLogs().size());
 }
 
 } // namespace
