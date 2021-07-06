@@ -129,6 +129,8 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, {});
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
+  // Wildcard subscription will be cancelled, just like any other
+  // subscription.
   expectSendMessage("bar", {}, {"*"});
   expectSendMessage("foo", {}, {"x", "y"});
 }
