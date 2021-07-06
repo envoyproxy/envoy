@@ -19,7 +19,7 @@ namespace ProxyProtocol {
 
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsSharedPtr options, ProxyProtocolConfig_Version version)
+    Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig_Version version)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(version) {}
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
@@ -110,7 +110,7 @@ UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     : transport_socket_factory_(std::move(transport_socket_factory)), config_(config) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr options) const {
+    Network::TransportSocketOptionsConstSharedPtr options) const {
   auto inner_socket = transport_socket_factory_->createTransportSocket(options);
   if (inner_socket == nullptr) {
     return nullptr;

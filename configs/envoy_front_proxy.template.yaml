@@ -70,7 +70,6 @@
                 envoy_grpc:
                   cluster_name: ratelimit
         - name: envoy.filters.http.router
-          typed_config: {}
         add_user_agent: true
         {% if tracing %}
         tracing:

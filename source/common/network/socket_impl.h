@@ -24,7 +24,8 @@ public:
     os << spaces << "SocketAddressSetterImpl " << this
        << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
-       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView()) << "\n";
+       << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView())
+       << DUMP_MEMBER(server_name_) << "\n";
   }
 
   // SocketAddressSetter
@@ -44,12 +45,17 @@ public:
   const Address::InstanceConstSharedPtr& directRemoteAddress() const override {
     return direct_remote_address_;
   }
+  absl::string_view requestedServerName() const override { return server_name_; }
+  void setRequestedServerName(const absl::string_view requested_server_name) override {
+    server_name_ = std::string(requested_server_name);
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
+  std::string server_name_;
 };
 
 class SocketImpl : public virtual Socket {

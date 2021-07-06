@@ -180,11 +180,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(1,
               stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
-    EXPECT_EQ("", stream_info.requestedServerName());
-    absl::string_view sni_name = "stubserver.org";
-    stream_info.setRequestedServerName(sni_name);
-    EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
-
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
     stream_info.setUpstreamClusterInfo(cluster_info);
