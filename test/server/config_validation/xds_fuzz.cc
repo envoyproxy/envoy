@@ -6,6 +6,8 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 
+#include "source/common/config/watch_map.h"
+
 namespace Envoy {
 
 // Helper functions to build API responses.
@@ -234,7 +236,8 @@ void XdsFuzzTest::replay() {
   initialize();
 
   // Set up cluster.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {Config::Wildcard},
+                                      {Config::Wildcard}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");

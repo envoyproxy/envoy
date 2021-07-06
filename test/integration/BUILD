@@ -57,6 +57,7 @@ envoy_cc_test(
         ":ads_integration_lib",
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:watch_map_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
@@ -117,6 +118,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:watch_map_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -210,6 +212,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:watch_map_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -734,6 +737,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/config:watch_map_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
