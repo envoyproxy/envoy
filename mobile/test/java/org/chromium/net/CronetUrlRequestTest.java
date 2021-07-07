@@ -9,7 +9,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import android.annotation.SuppressLint;
 import android.os.Build;
 import android.os.ConditionVariable;
 import android.os.StrictMode;
@@ -57,8 +56,6 @@ import org.robolectric.RobolectricTestRunner;
  */
 @RunWith(RobolectricTestRunner.class)
 public class CronetUrlRequestTest {
-
-  private static final String TAG = CronetUrlRequestTest.class.getSimpleName();
 
   // URL used for base tests.
   private static final String TEST_URL = "http://127.0.0.1:8000";
@@ -516,7 +513,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Debug me")
+  @Ignore("Consider deleting - header values don't get dropped - this test seems bogus")
   public void testMultiRequestHeaders() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     String headerName = "header-name";
@@ -801,7 +798,7 @@ public class CronetUrlRequestTest {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  @Ignore("Debug me")
+  @Ignore("https://github.com/envoyproxy/envoy-mobile/issues/1540")
   public void testSimpleGetBufferUpdates() throws Exception {
     TestUrlRequestCallback callback = new TestUrlRequestCallback();
     callback.setAutoAdvance(false);
