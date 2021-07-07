@@ -262,6 +262,7 @@ envoy_cc_test_library(
         "//source/common/init:manager_lib",
         "//source/server:listener_manager_lib",
         "//test/mocks/init:init_mocks",
+        "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:guard_dog_mocks",
