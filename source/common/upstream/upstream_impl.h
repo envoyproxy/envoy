@@ -871,6 +871,7 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
+  const bool wait_for_warm_on_init_;
 
 protected:
   TimeSource& time_source_;
