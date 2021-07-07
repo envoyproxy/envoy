@@ -64,6 +64,7 @@ stages:
       inputs:
         key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
+      condition: ne(variables['PostSubmit'], true)
       continueOnError: true
 
     - script: ci/run_envoy_docker.sh 'ci/check_and_fix_format.sh'
@@ -91,6 +92,7 @@ stages:
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
+      condition: ne(variables['PostSubmit'], true)
       continueOnError: true
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
@@ -339,6 +341,7 @@ stages:
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
+      condition: ne(variables['PostSubmit'], true)
       continueOnError: true
 
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
@@ -445,6 +448,7 @@ stages:
       inputs:
         key: '"windows.release" | ./WORKSPACE | **/*.bzl'
         path: $(Build.StagingDirectory)/repository_cache
+      condition: ne(variables['PostSubmit'], true)
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
       displayName: "Run Windows msvc-cl CI"
@@ -480,6 +484,7 @@ stages:
       inputs:
         key: '"windows.release" | ./WORKSPACE | **/*.bzl'
         path: $(Build.StagingDirectory)/repository_cache
+      condition: ne(variables['PostSubmit'], true)
       continueOnError: true
     - bash: ci/run_envoy_docker.sh ci/windows_ci_steps.sh
       displayName: "Run Windows clang-cl CI"

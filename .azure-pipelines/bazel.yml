@@ -23,6 +23,7 @@ steps:
   inputs:
     key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
     path: $(Build.StagingDirectory)/repository_cache
+  condition: ne(variables['PostSubmit'], true)
   continueOnError: true
 
 - bash: |
