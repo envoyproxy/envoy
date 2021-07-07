@@ -572,7 +572,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplTest,
 TEST_P(DnsImplTest, DestructPending) {
   ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, false);
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   // Also validate that pending events are around to exercise the resource
   // reclamation path.
   EXPECT_GT(peer_->events().size(), 0U);
@@ -806,7 +806,7 @@ TEST_P(DnsImplTest, Cancel) {
                                              {"201.134.56.7"}, {}, absl::nullopt));
 
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

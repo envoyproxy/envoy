@@ -49,6 +49,7 @@ namespace.
   dns_query_attempt, Counter, Number of DNS query attempts.
   dns_query_success, Counter, Number of DNS query successes.
   dns_query_failure, Counter, Number of DNS query failures.
+  dns_query_timeout, Counter, Number of DNS query :ref:`timeouts <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`.
   host_address_changed, Counter, Number of DNS queries that resulted in a host address change.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.

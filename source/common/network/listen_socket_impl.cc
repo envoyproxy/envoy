@@ -44,16 +44,6 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
   bind(address_provider_->localAddress());
 }
 
-// UDP listen socket desires io handle regardless bind_to_port is true or false.
-template <>
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
-    const Address::InstanceConstSharedPtr& address,
-    const Network::Socket::OptionsSharedPtr& options, bool)
-    : ListenSocketImpl(Network::ioHandleForAddr(Socket::Type::Datagram, address), address) {
-  setPrebindSocketOptions();
-  setupSocket(options);
-}
-
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address), address) {
   RELEASE_ASSERT(io_handle_->isOpen(), "");
