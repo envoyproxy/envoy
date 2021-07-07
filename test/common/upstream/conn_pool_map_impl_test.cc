@@ -439,7 +439,7 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryDrainConnectionsTripsAssert) {
   ON_CALL(*mock_pools_[0], addIdleCallback(_))
       .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->drainConnections(); }),
+  EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
 }
 
