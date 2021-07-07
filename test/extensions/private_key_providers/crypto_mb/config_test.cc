@@ -29,8 +29,8 @@ parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
   return private_key_provider;
 }
 
-CryptoMbPrivateKeyMethodProvider* createWithConfig(std::string yaml,
-                                                   bool supported_instruction_set = true) {
+Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml,
+                                                        bool supported_instruction_set = true) {
   FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(supported_instruction_set);
   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
       cryptomb_private_key_method_factory(cryptomb_factory);
@@ -53,12 +53,10 @@ CryptoMbPrivateKeyMethodProvider* createWithConfig(std::string yaml,
       .WillOnce(testing::ReturnRef(private_key_method_manager))
       .WillRepeatedly(testing::ReturnRef(private_key_method_manager));
 
-  return dynamic_cast<CryptoMbPrivateKeyMethodProvider*>(
-      server_factory_context.sslContextManager()
-          .privateKeyMethodManager()
-          .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
-                                          server_factory_context)
-          .get());
+  return server_factory_context.sslContextManager()
+      .privateKeyMethodManager()
+      .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
+                                      server_factory_context);
 }
 
 TEST(CryptoMbConfigTest, CreateRsa1024) {
@@ -70,7 +68,9 @@ TEST(CryptoMbConfigTest, CreateRsa1024) {
         private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-1024.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(true, provider->checkFips());
 }
 
 TEST(CryptoMbConfigTest, CreateRsa2048) {
@@ -131,7 +131,9 @@ TEST(CryptoMbConfigTest, CreateEcdsaP256) {
         private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/ecdsa-p256.pem" }
 )EOF";
 
-  EXPECT_NE(nullptr, createWithConfig(yaml));
+  Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
+  EXPECT_NE(nullptr, provider);
+  EXPECT_EQ(true, provider->checkFips());
 }
 
 TEST(CryptoMbConfigTest, CreateEcdsaP256Inline) {

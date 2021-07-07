@@ -680,8 +680,12 @@ bool CryptoMbPrivateKeyConnection::addToQueue(CryptoMbContextSharedPtr mb_ctx) {
 }
 
 bool CryptoMbPrivateKeyMethodProvider::checkFips() {
+  ASSERT(pkey_);
+
   switch (key_type_) {
   case KeyType::Rsa: {
+    // TODO: should we disallow 1024-bit RSA keys, or just assume that RSA_check_fips() does the
+    // right thing?
     RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey_.get());
     if (rsa_private_key && RSA_check_fips(rsa_private_key)) {
       return true;

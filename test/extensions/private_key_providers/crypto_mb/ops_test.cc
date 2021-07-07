@@ -544,6 +544,47 @@ TEST(CryptoMbProviderTest, TestEcdsaTimer) {
   EXPECT_EQ(res, ssl_private_key_failure);
 }
 
+TEST(CryptoMbProviderTest, TestSyncQueues) {
+  Event::SimulatedTimeSystem time_system;
+  Stats::TestUtil::TestStore server_stats_store;
+  Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system);
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  bssl::UniquePtr<EVP_PKEY> pkey = makeEcdsaKey();
+  bssl::UniquePtr<EVP_PKEY> rsa_pkey = makeRsaKey();
+  std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
+  RSA* rsa = EVP_PKEY_get0_RSA(rsa_pkey.get());
+  const BIGNUM *e, *n, *d;
+  RSA_get0_key(rsa, &n, &e, &d);
+  fakeIpp->setRsaKey(n, e, d);
+
+  CryptoMbQueue ec_queue(std::chrono::milliseconds(0), KeyType::Ec, 256, fakeIpp, *dispatcher);
+  CryptoMbQueue rsa_queue(std::chrono::milliseconds(0), KeyType::Rsa, 1024, fakeIpp, *dispatcher);
+
+  size_t in_len = 32;
+  uint8_t in[32] = {0x7f};
+
+  ssl_private_key_result_t res;
+  TestCallbacks cb;
+
+  CryptoMbPrivateKeyConnection op_ec(cb, *dispatcher, bssl::UpRef(pkey), ec_queue);
+  CryptoMbPrivateKeyConnection op_rsa1(cb, *dispatcher, bssl::UpRef(rsa_pkey), rsa_queue);
+  CryptoMbPrivateKeyConnection op_rsa2(cb, *dispatcher, bssl::UpRef(rsa_pkey), rsa_queue);
+
+  size_t out_len = 0;
+  uint8_t out[128] = {0};
+
+  res = ecdsaPrivateKeySignForTest(&op_ec, out, &out_len, 128, SSL_SIGN_ECDSA_SECP256R1_SHA256, in,
+                                   in_len);
+  EXPECT_EQ(res, ssl_private_key_success);
+
+  res =
+      rsaPrivateKeySignForTest(&op_rsa1, out, &out_len, 128, SSL_SIGN_RSA_PKCS1_SHA256, in, in_len);
+  EXPECT_EQ(res, ssl_private_key_success);
+
+  res = rsaPrivateKeyDecryptForTest(&op_rsa2, out, &out_len, 128, in, in_len);
+  EXPECT_EQ(res, ssl_private_key_success);
+}
+
 } // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider
 } // namespace Extensions
