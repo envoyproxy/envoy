@@ -7,6 +7,7 @@
 #include "source/common/common/empty_string.h"
 
 #include "absl/container/fixed_array.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace {
@@ -232,6 +233,13 @@ std::string Base64::encode(const char* input, uint64_t length, bool add_padding)
   encodeLast(pos, next_c, ret, CHAR_TABLE, add_padding);
 
   return ret;
+}
+
+void Base64::completePadding(std::string& encoded) {
+  if (encoded.length() % 4 != 0) {
+    std::string trailing_padding(4 - encoded.length() % 4, '=');
+    absl::StrAppend(&encoded, trailing_padding);
+  }
 }
 
 std::string Base64Url::decode(const std::string& input) {

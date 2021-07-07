@@ -26,6 +26,7 @@
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/init/mocks.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -1153,7 +1154,8 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
   time_system_.setSystemTime(std::chrono::milliseconds(1001001001001));
-
+  NiceMock<Matchers::MockStringMatcher> mock_matcher;
+  ON_CALL(mock_matcher, match(_)).WillByDefault(Return(false));
   InSequence s;
 
   auto* lds_api = new MockLdsApi();
@@ -1201,6 +1203,13 @@ dynamic_listeners:
         seconds: 1001001001
         nanos: 1000000
 )EOF");
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version1"));
+  checkConfigDump(R"EOF(
+version_info: version1
+static_listeners:
+dynamic_listeners:
+)EOF",
+                  mock_matcher);
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
@@ -1245,6 +1254,13 @@ dynamic_listeners:
         seconds: 2002002002
         nanos: 2000000
 )EOF");
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version2"));
+  checkConfigDump(R"EOF(
+version_info: version2
+static_listeners:
+dynamic_listeners:
+)EOF",
+                  mock_matcher);
 
   // Validate that workers_started stat is zero before calling startWorkers.
   EXPECT_EQ(0, server_.stats_store_
@@ -1319,6 +1335,14 @@ dynamic_listeners:
         seconds: 2002002002
         nanos: 2000000
 )EOF");
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version3"));
+  checkConfigDump(R"EOF(
+version_info: version3
+static_listeners:
+dynamic_listeners:
+)EOF",
+                  mock_matcher);
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo_update1->drain_manager_->drain_sequence_completion_();
@@ -1414,6 +1438,14 @@ dynamic_listeners:
         seconds: 5005005005
         nanos: 5000000
 )EOF");
+
+  EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return("version5"));
+  checkConfigDump(R"EOF(
+version_info: version5
+static_listeners:
+dynamic_listeners:
+)EOF",
+                  mock_matcher);
 
   // Update a duplicate baz that is currently warming.
   EXPECT_FALSE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "", true));

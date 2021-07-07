@@ -275,8 +275,11 @@ protected:
                                           .value());
   }
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
+  void checkConfigDump(
+      const std::string& expected_dump_yaml,
+      const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
+    auto message_ptr =
+        server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"](name_matcher);
     const auto& listeners_config_dump =
         dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 

@@ -36,6 +36,7 @@ Minor Behavior Changes
   ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: the behavior of the ``present_match`` in route header matcher changed. The value of ``present_match`` is ignored in the past. The new behavior is ``present_match`` performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
+* listener: added an option when balancing across active listeners and wildcard matching is used to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
@@ -54,6 +55,7 @@ Bug Fixes
   reverted by setting the ``envoy.reloadable_features.http2_consume_stream_refused_errors`` runtime guard to false.
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
+* jwt_authn: unauthorized responses now correctly include a `www-authenticate` header.
 * listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
 * udp: limit each UDP listener to read maxmium 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
@@ -84,6 +86,7 @@ New Features
 * bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query.
 * cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains.
 * cluster: added :ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.host_rewrite_literal>` to WeightedCluster.
+* cluster: added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>`, which allows cluster readiness to not block on cluster warm-up. It is true by default, which preserves existing behavior. Currently, only applicable for DNS-based clusters.
 * composite filter: can now be used with filters that also add an access logger, such as the WASM filter.
 * config: added stat :ref:`config_reload_time_ms <subscription_statistics>`.
 * connection_limit: added new :ref:`Network connection limit filter <config_network_filters_connection_limit>`.
@@ -107,6 +110,7 @@ New Features
 * http: added upstream and downstream alpha HTTP/3 support! See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` for downstream and the new http3_protocol_options in :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` for upstream HTTP/3.
 * input matcher: a new input matcher that :ref:`matches an IP address against a list of CIDR ranges <envoy_v3_api_file_envoy/extensions/matching/input_matchers/ip/v3/ip.proto>`.
 * jwt_authn: added support to fetch remote jwks asynchronously specified by :ref:`async_fetch <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.async_fetch>`.
+* jwt_authn: added support to add padding in the forwarded JWT payload specified by :ref:`pad_forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.pad_forward_payload_header>`.
 * listener: added ability to change an existing listener's address.
 * listener: added filter chain match support for :ref:`direct source address <envoy_v3_api_field_config.listener.v3.FilterChainMatch.direct_source_prefix_ranges>`.
 * local_rate_limit_filter: added suppoort for locally rate limiting http requests on a per connection basis. This can be enabled by setting the :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>` field to true.
