@@ -88,6 +88,20 @@ TEST_F(CryptoMbConfigTest, CreateRsa2048) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
+TEST_F(CryptoMbConfigTest, CreateRsa2048WithExponent3) {
+  const std::string yaml = R"EOF(
+      provider_name: cryptomb
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig
+        poll_delay: 0.02s
+        private_key: { "filename": "{{ test_rundir }}/test/extensions/private_key_providers/crypto_mb/test_data/rsa-2048-exponent-3.pem" }
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(createWithConfig(yaml), EnvoyException,
+                            "Only RSA keys with \"e\" parameter value 65537 are allowed, because "
+                            "we can validate the signatures using multi-buffer instructions.");
+}
+
 TEST_F(CryptoMbConfigTest, CreateRsa3072) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
