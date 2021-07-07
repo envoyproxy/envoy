@@ -342,7 +342,7 @@ static void ios_http_filter_on_error(envoy_error error, const void *context) {
   @autoreleasepool {
     EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
     if (filter.onError == nil) {
-      error.message.release(error.message.context);
+      release_envoy_error(error);
       return;
     }
 
@@ -350,7 +350,7 @@ static void ios_http_filter_on_error(envoy_error error, const void *context) {
                                                       length:error.message.length
                                                     encoding:NSUTF8StringEncoding];
 
-    error.message.release(error.message.context);
+    release_envoy_error(error);
     filter.onError(error.error_code, errorMessage, error.attempt_count);
   }
 }

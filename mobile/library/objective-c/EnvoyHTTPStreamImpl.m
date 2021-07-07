@@ -96,7 +96,7 @@ static void *ios_on_error(envoy_error error, void *context) {
       NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
                                                         length:error.message.length
                                                       encoding:NSUTF8StringEncoding];
-      error.message.release(error.message.context);
+      release_envoy_error(error);
       callbacks.onError(error.error_code, errorMessage, error.attempt_count);
     }
 

@@ -88,7 +88,7 @@ static inline NSData *to_ios_data(envoy_data data) {
   // TODO: we are copying from envoy_data to NSData.
   // https://github.com/lyft/envoy-mobile/issues/398
   NSData *platformData = [NSData dataWithBytes:(void *)data.bytes length:data.length];
-  data.release(data.context);
+  release_envoy_data(data);
   return platformData;
 }
 
@@ -96,7 +96,7 @@ static inline NSString *to_ios_string(envoy_data data) {
   NSString *platformString = [[NSString alloc] initWithBytes:data.bytes
                                                       length:data.length
                                                     encoding:NSUTF8StringEncoding];
-  data.release(data.context);
+  release_envoy_data(data);
   return platformString;
 }
 

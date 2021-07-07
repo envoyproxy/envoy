@@ -423,7 +423,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
     platform_filter_.on_error({error_code, error_message, attempt_count},
                               platform_filter_.instance_context);
   } else {
-    error_message.release(error_message.context);
+    release_envoy_data(error_message);
   }
 
   response_filter_base_->state_.headers_forwarded_ = true;

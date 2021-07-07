@@ -309,7 +309,7 @@ static void* jvm_on_data(const char* method, envoy_data data, bool end_stream, v
   jobject result =
       env->CallObjectMethod(j_context, jmid_onData, j_data, end_stream ? JNI_TRUE : JNI_FALSE);
 
-  data.release(data.context);
+  release_envoy_data(data);
   env->DeleteLocalRef(j_data);
   env->DeleteLocalRef(jcls_JvmCallbackContext);
 
@@ -609,7 +609,7 @@ static void* call_jvm_on_error(envoy_error error, void* context) {
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count);
 
-  error.message.release(error.message.context);
+  release_envoy_error(error);
   env->DeleteLocalRef(jcls_JvmObserverContext);
   env->DeleteLocalRef(j_error_message);
   return result;

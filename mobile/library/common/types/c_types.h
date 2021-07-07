@@ -123,6 +123,20 @@ typedef envoy_map envoy_headers;
 
 typedef envoy_map envoy_stats_tags;
 
+/*
+ * Error struct.
+ */
+typedef struct {
+  envoy_error_code_t error_code;
+  envoy_data message;
+  // the number of times an operation was attempted before firing this error.
+  // For instance this is used in envoy_on_error_f to account for the number of upstream requests
+  // made in a retry series before the on error callback fired.
+  // -1 is used in scenarios where it does not make sense to have an attempt count for an error.
+  // This is different from 0, which intentionally conveys that the action was _not_ executed.
+  int32_t attempt_count;
+} envoy_error;
+
 #ifdef __cplusplus
 extern "C" { // utility functions
 #endif
@@ -143,13 +157,25 @@ void* safe_malloc(size_t size);
 void* safe_calloc(size_t count, size_t size);
 
 /**
- * Helper function to free/release memory associated with underlying headers.
+ * Called by a receiver of envoy_data to indicate memory/resources can be released.
+ * @param data, envoy_data to release.
+ */
+void release_envoy_data(envoy_data data);
+
+/**
+ * Called by a receiver of envoy_headers to indicate memory/resources can be released.
  * @param headers, envoy_headers to release.
  */
 void release_envoy_headers(envoy_headers headers);
 
 /**
- * Helper function to free/release memory associated with underlying stats_tags.
+ * Called by a receiver of envoy_error to indicate memory/resources can be released.
+ * @param error, envoy_error to release.
+ */
+void release_envoy_error(envoy_error error);
+
+/**
+ * Called by a receiver of envoy_stats_tags to indicate memory/resources can be released.
  * @param headers, envoy_stats_tags to release.
  */
 void release_envoy_stats_tags(envoy_stats_tags stats_tags);
@@ -181,20 +207,6 @@ extern const envoy_headers envoy_noheaders;
 
 // Convenience constant to pass to function calls with no tags.
 extern const envoy_stats_tags envoy_stats_notags;
-
-/*
- * Error struct.
- */
-typedef struct {
-  envoy_error_code_t error_code;
-  envoy_data message;
-  // the number of times an operation was attempted before firing this error.
-  // For instance this is used in envoy_on_error_f to account for the number of upstream requests
-  // made in a retry series before the on error callback fired.
-  // -1 is used in scenarios where it does not make sense to have an attempt count for an error.
-  // This is different from 0, which intentionally conveys that the action was _not_ executed.
-  int32_t attempt_count;
-} envoy_error;
 
 #ifdef __cplusplus
 extern "C" { // function pointers

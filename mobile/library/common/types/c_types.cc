@@ -37,7 +37,11 @@ void release_envoy_data_map(envoy_map map) {
   free(map.entries);
 }
 
+void release_envoy_data(envoy_data data) { data.release(data.context); }
+
 void release_envoy_headers(envoy_headers headers) { release_envoy_data_map(headers); }
+
+void release_envoy_error(envoy_error error) { error.message.release(error.message.context); }
 
 void release_envoy_stats_tags(envoy_stats_tags stats_tags) { release_envoy_data_map(stats_tags); }
 
