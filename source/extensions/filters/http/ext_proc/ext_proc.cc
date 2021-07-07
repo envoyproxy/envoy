@@ -291,10 +291,14 @@ void Filter::sendHeaders(ProcessorState& state, const Http::RequestOrResponseHea
   auto attributes = Attributes(state.streamInfo());
   google::api::expr::v1alpha1::Value attrs_value;
   if (state.isDecoder()) {
-    attributes.setRequestHeaders(&headers);
+    if (RequestHeaderMap* headers = dynamic_cast<RequestHeaderMap*>(&headers)) {
+      attributes.setRequestHeaders(headers);
+    }
     attrs_value = attributes.buildAttributesValue(config_->requestAttributes());
   } else {
-    attributes.setResponseHeaders(&headers);
+    if (ResponseHeaderMap* headers = dynamic_cast<ResponseHeaderMap*>(&headers)) {
+      attributes.setResponseHeaders(headers);
+    }
     attrs_value = attributes.buildAttributesValue(config_->responseAttributes());
   }
   MutationUtils::attrsToProto(attrs_value, *headers_req->mutable_attributes());

@@ -531,12 +531,6 @@ absl::optional<Value> Attributes::getGrpcStatus() {
   }
   return absl::nullopt;
 }
-void Attributes::setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
-  request_headers_ = request_headers;
-}
-void Attributes::setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
-  response_headers_ = response_headers;
-}
 
 } // namespace Attributes
 } // namespace Common

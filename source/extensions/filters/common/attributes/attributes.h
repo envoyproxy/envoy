@@ -61,8 +61,12 @@ class Attributes : public Logger::Loggable<Logger::Id::filter> {
 public:
   Attributes(StreamInfo::StreamInfo& stream_info) : stream_info_(stream_info){};
 
-  void setRequestHeaders(const Http::RequestHeaderMap* request_headers);
-  void setResponseHeaders(const Http::ResponseHeaderMap* response_headers);
+  void setRequestHeaders(const Http::RequestHeaderMap* request_headers) {
+    request_headers_ = request_headers;
+  }
+  void setResponseHeaders(const Http::ResponseHeaderMap* response_headers) {
+    response_headers_ = response_headers;
+  }
   void setRequestTrailers(const Http::RequestTrailerMap* request_trailers);
   void setResponseTrailers(const Http::ResponseTrailerMap* response_trailers);
   Value buildAttributesValue(const std::vector<AttributeId>& attrs);
