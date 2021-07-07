@@ -522,7 +522,6 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
-  // Init runtime sinleton, admin access log
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
   initial_config.initAccesslog(bootstrap_, *this);
