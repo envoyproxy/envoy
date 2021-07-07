@@ -44,6 +44,7 @@ public:
   // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
   // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
   // would then cause all `NewGrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   static void shutdownAll();
 
   void shutdown() { shutdown_ = true; }

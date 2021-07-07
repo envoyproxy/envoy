@@ -827,6 +827,7 @@ void InstanceImpl::terminate() {
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
 
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   Config::GrpcMuxImpl::shutdownAll();
   Config::NewGrpcMuxImpl::shutdownAll();
 

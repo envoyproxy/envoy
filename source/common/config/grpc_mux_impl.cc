@@ -36,6 +36,8 @@ public:
 
 private:
   absl::flat_hash_set<GrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
+
+  // TODO(ggreenway): can this lock be removed? Is this code only run on the main thread?
   absl::Mutex lock_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
