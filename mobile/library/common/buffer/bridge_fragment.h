@@ -21,7 +21,7 @@ public:
   const void* data() const override { return data_.bytes; }
   size_t size() const override { return data_.length; }
   void done() override {
-    data_.release(data_.context);
+    release_envoy_data(data_);
     delete this;
   }
 
