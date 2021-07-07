@@ -614,6 +614,7 @@ TEST(InitialImplTest, LayeredRuntime) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server);
+  config.initAccesslog(bootstrap, server);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
 
@@ -627,6 +628,7 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server);
+  config.initAccesslog(bootstrap, server);
 
   const std::string expected_yaml = R"EOF(
   layers:
@@ -678,6 +680,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server_);
+  config.initAccesslog(bootstrap, server);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -718,6 +721,7 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server_);
+  config.initAccesslog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1041,6 +1045,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server_);
+  config.initAccesslog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
@@ -1065,6 +1070,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options, server_);
+  config.initAccesslog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

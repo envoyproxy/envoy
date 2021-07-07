@@ -100,6 +100,7 @@ public:
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap, options, server_);
+    initial_config.initAccesslog(bootstrap, server_);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
