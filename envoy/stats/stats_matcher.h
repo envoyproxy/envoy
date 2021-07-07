@@ -16,21 +16,10 @@ public:
   // Holds the result of fastRejects(). This contains state that must be then
   // passed to slowRejects() for the final 2-phase determination of whether a
   // stat can be rejected.
-  struct FastResult {
-    /**
-     * @return Whether the stat can be quickly rejected without calling slowRejects().
-     */
-    bool rejects() const { return rejects_; }
-
-    /**
-     * @return whether two FastReults objects are equivalent; this is needed for mocks.
-     */
-    bool operator==(const FastResult& that) const {
-      return rejects_ == that.rejects_ && fast_matches_ == that.fast_matches_;
-    }
-
-    bool rejects_{false};
-    bool fast_matches_{false};
+  enum class FastResult {
+    NoMatch,
+    Rejects,
+    Matches,
   };
 
   virtual ~StatsMatcher() = default;

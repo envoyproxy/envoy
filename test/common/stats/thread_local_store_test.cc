@@ -1016,8 +1016,8 @@ public:
     store_.setStatsMatcher(std::move(matcher_ptr));
 
     StatNamePool pool(symbol_table_);
+    StatsMatcher::FastResult no_fast_rejection = StatsMatcher::FastResult::NoMatch;
     for (int j = 0; j < 5; ++j) {
-      StatsMatcher::FastResult no_fast_rejection;
       EXPECT_CALL(*matcher, fastRejects(pool.add("scope.reject")))
           .WillOnce(Return(no_fast_rejection));
       if (j == 0) {
@@ -1061,7 +1061,7 @@ public:
     store_.setStatsMatcher(std::move(matcher_ptr));
     StatNamePool pool(symbol_table_);
 
-    StatsMatcher::FastResult no_fast_rejection;
+    StatsMatcher::FastResult no_fast_rejection = StatsMatcher::FastResult::NoMatch;
     for (int j = 0; j < 5; ++j) {
       EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(no_fast_rejection));
       // Note: zero calls to slowReject() are made, as accept-all should short-circuit.

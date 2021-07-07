@@ -544,7 +544,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatNameWithTags(
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
-  if (fast_reject_result.rejects()) {
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_counter_;
   }
 
@@ -603,7 +603,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
-  if (fast_reject_result.rejects()) {
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_gauge_;
   }
 
@@ -646,7 +646,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
   StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
-  if (fast_reject_result.rejects()) {
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_histogram_;
   }
 
@@ -725,7 +725,7 @@ TextReadout& ThreadLocalStoreImpl::ScopeImpl::textReadoutFromStatNameWithTags(
   Stats::StatName final_stat_name = joiner.nameWithTags();
 
   StatsMatcher::FastResult fast_reject_result = parent_.fastRejects(final_stat_name);
-  if (fast_reject_result.rejects()) {
+  if (fast_reject_result == StatsMatcher::FastResult::Rejects) {
     return parent_.null_text_readout_;
   }
 

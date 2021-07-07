@@ -69,19 +69,18 @@ void StatsMatcherImpl::optimizeLastMatcher() {
 }
 
 StatsMatcher::FastResult StatsMatcherImpl::fastRejects(StatName stat_name) const {
-  FastResult result;
   if (rejectsAll()) {
-    result.rejects_ = true;
-  } else {
-    result.fast_matches_ = fastRejectMatch(stat_name);
-    if (is_inclusive_ || matchers_.empty()) {
-      // We can short-circuit the slow matchers only if they are empty, or if
-      // we are in inclusive-mode and we find a match.
-      result.rejects_ = result.fast_matches_ == is_inclusive_;
-    }
+    return FastResult::NoMatch;
   }
-
-  return result;
+  bool matches = fastRejectMatch(stat_name);
+  if ((is_inclusive_ || matchers_.empty()) && matches == is_inclusive_) {
+    // We can short-circuit the slow matchers only if they are empty, or if
+    // we are in inclusive-mode and we find a match.
+    return FastResult::Rejects;
+  } else if (matches) {
+    return FastResult::Matches;
+  }
+  return FastResult::NoMatch;
 }
 
 bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
@@ -92,7 +91,7 @@ bool StatsMatcherImpl::fastRejectMatch(StatName stat_name) const {
 bool StatsMatcherImpl::slowRejects(FastResult fast_result, StatName stat_name) const {
   bool match = slowRejectMatch(stat_name);
 
-  if (is_inclusive_ || match || !fast_result.fast_matches_) {
+  if (is_inclusive_ || match || fast_result != FastResult::Matches) {
     //  is_inclusive_ | match | return
     // ---------------+-------+--------
     //        T       |   T   |   T   Default-inclusive and matching an (exclusion) matcher, deny.

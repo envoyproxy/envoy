@@ -29,7 +29,7 @@ public:
   // StatsMatcher
   bool rejects(StatName name) const override {
     FastResult fast_result = fastRejects(name);
-    return fast_result.rejects() || slowRejects(fast_result, name);
+    return fast_result == FastResult::Rejects || slowRejects(fast_result, name);
   }
   FastResult fastRejects(StatName name) const override;
   bool slowRejects(FastResult, StatName name) const override;
