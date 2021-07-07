@@ -256,6 +256,14 @@ embargo policy to share binary distributions of the security fixes before the pu
 This includes, but is not limited to, Envoy binaries and Docker images. It is expected that
 distributors have a method to stage and validate new binaries without exposing them publicly.
 
+If Envoy is running in a hosted environment, the fix may rollout ahead of the embargo lift date
+only if the end user **cannot** access the running Envoy process and possibly reverse engineer the fix.
+If a security fix includes changes to the controlplane then the controlplane binaries, Docker images,
+and running process should not be accessible to the end user. If the above conditions hold in a hosted
+controlplane then the rollout may proceed ahead of the embargo lift date. If the controlplane produces
+XDS output containing textual keys pertaining to the fix, such as specific filter metadata keys then
+the hosted controlplane **may not** be rolled out until the embargo lifts.
+
 If the information shared is under embargo from a third party, where Envoy is one of many projects
 that a disclosure is shared with, it is critical to consider that the ramifications of any leak will
 extend beyond the Envoy community and will leave us in a position in which we will be less likely to
