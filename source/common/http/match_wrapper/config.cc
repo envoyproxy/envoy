@@ -103,9 +103,16 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
-  auto match_tree =
-      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(prefix, context, validation_visitor)
-          .create(proto_config.matcher());
+  Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData> matcher_factory(prefix, context,
+                                                                           validation_visitor);
+  Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
+  if (proto_config.has_matcher_tree()) {
+    factory_cb = matcher_factory.create(proto_config.matcher_tree());
+  } else if (proto_config.has_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.matcher());
+  } else {
+    throw EnvoyException("one of `matcher` and `matcher_tree` must be set.");
+  }
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
@@ -113,8 +120,8 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
                                      validation_visitor.errors()[0]));
   }
 
-  return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree());
+  return [filter_factory, factory_cb](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    DelegatingFactoryCallbacks delegated_callbacks(callbacks, factory_cb());
 
     return filter_factory(delegated_callbacks);
   };
