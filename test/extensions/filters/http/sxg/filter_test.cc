@@ -34,6 +34,33 @@ private:
   const std::string private_key_;
 };
 
+class MockFilterLoadSigner : public Filter {
+public:
+  MockFilterLoadSigner(const std::shared_ptr<FilterConfig>& config) : Filter(config){};
+  MOCK_METHOD(bool, loadSigner, (const uint64_t, sxg_signer_list_t*), (override));
+};
+
+class MockFilterLoadContent : public Filter {
+public:
+  MockFilterLoadContent(const std::shared_ptr<FilterConfig>& config) : Filter(config){};
+  MOCK_METHOD(bool, loadContent, (Buffer::Instance & data, sxg_buffer_t* buf), (override));
+};
+
+class MockFilterGetEncodedResponse : public Filter {
+public:
+  MockFilterGetEncodedResponse(const std::shared_ptr<FilterConfig>& config) : Filter(config){};
+  MOCK_METHOD(bool, getEncodedResponse, (Buffer::Instance&, sxg_encoded_response_t*), (override));
+};
+
+class MockFilterWriteSxg : public Filter {
+public:
+  MockFilterWriteSxg(const std::shared_ptr<FilterConfig>& config) : Filter(config){};
+  MOCK_METHOD(bool, writeSxg,
+              (const sxg_signer_list_t*, const std::string, const sxg_encoded_response_t*,
+               sxg_buffer_t*),
+              (override));
+};
+
 int extractIntFromBytes(std::string bytes, size_t offset, size_t size) {
   if (size <= 0 || size > 8 || bytes.size() < offset + size) {
     return 0;
@@ -146,7 +173,12 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
     auto secret_reader = std::make_shared<MockSecretReader>(certificate, private_key);
     config_ = std::make_shared<FilterConfig>(proto, time_system_, secret_reader, "", scope_);
-    filter_ = std::make_shared<Filter>(config_);
+  }
+
+  void setFilter() { setFilter(std::make_shared<Filter>(config_)); }
+
+  void setFilter(std::shared_ptr<Filter> filter) {
+    filter_ = filter;
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -283,6 +315,8 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
 TEST_F(FilterTest, NoHostHeader) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
@@ -301,6 +335,8 @@ TEST_F(FilterTest, NoHostHeader) {
 
 TEST_F(FilterTest, AcceptTextHtml) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "text/html"}, {"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
@@ -319,6 +355,8 @@ TEST_F(FilterTest, AcceptTextHtml) {
 
 TEST_F(FilterTest, HtmlWithTrailers) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "text/html"}, {"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "text/html"},
@@ -338,6 +376,8 @@ TEST_F(FilterTest, HtmlWithTrailers) {
 
 TEST_F(FilterTest, NoPathHeader) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"}};
   Http::TestResponseHeaderMapImpl response_headers{
@@ -356,6 +396,8 @@ TEST_F(FilterTest, NoPathHeader) {
 
 TEST_F(FilterTest, NoAcceptHeader) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
@@ -373,6 +415,8 @@ TEST_F(FilterTest, NoAcceptHeader) {
 
 TEST_F(FilterTest, NoStatusHeader) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -394,6 +438,8 @@ TEST_F(FilterTest, NoStatusHeader) {
 
 TEST_F(FilterTest, Status404) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -415,6 +461,8 @@ TEST_F(FilterTest, Status404) {
 
 TEST_F(FilterTest, XShouldEncodeNotSet) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
@@ -437,6 +485,8 @@ TEST_F(FilterTest, XShouldEncodeNotSet) {
 
 TEST_F(FilterTest, AcceptTextHtmlWithQ) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "text/html;q=0.8"},
                                                  {":protocol", "https"},
                                                  {":host", "example.org"},
@@ -457,6 +507,8 @@ TEST_F(FilterTest, AcceptTextHtmlWithQ) {
 
 TEST_F(FilterTest, AcceptApplicationSignedExchangeNoVersion) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "application/signed-exchange"}, {"host", "example.org"}, {":path", "/hello.html"}};
   Http::TestResponseHeaderMapImpl response_headers{
@@ -475,6 +527,8 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeNoVersion) {
 
 TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB2) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b2"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -494,6 +548,8 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB2) {
 
 TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -515,6 +571,8 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3) {
 
 TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3WithQ) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "application/signed-exchange;v=b3;q=0.9"},
       {"host", "example.org"},
@@ -537,6 +595,8 @@ TEST_F(FilterTest, AcceptApplicationSignedExchangeWithVersionB3WithQ) {
 
 TEST_F(FilterTest, AcceptMultipleTextHtml) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
       {"accept", "application/signed-exchange;v=b3;q=0.8,text/html;q=0.9"},
@@ -557,6 +617,8 @@ TEST_F(FilterTest, AcceptMultipleTextHtml) {
 
 TEST_F(FilterTest, AcceptMultipleSignedExchange) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
@@ -579,6 +641,8 @@ TEST_F(FilterTest, AcceptMultipleSignedExchange) {
 
 TEST_F(FilterTest, ResponseExceedsMaxPayloadSize) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"host", "example.org"},
       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
@@ -602,6 +666,8 @@ TEST_F(FilterTest, ResponseExceedsMaxPayloadSize) {
 
 TEST_F(FilterTest, UrlWithQueryParam) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "application/signed-exchange;v=b3;q=0.9"},
       {"host", "example.org"},
@@ -638,6 +704,8 @@ TEST_F(FilterTest, CborValdityFullUrls) {
 cbor_url: "https://amp.example.org/cert.cbor"
 validity_url: "https://amp.example.org/validity.msg"
 )YAML"});
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -670,6 +738,8 @@ validity_url: "https://amp.example.org/validity.msg"
 
 TEST_F(FilterTest, WithHttpTrailers) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "application/signed-exchange;v=b3;q=0.9"},
       {"host", "example.org"},
@@ -697,6 +767,8 @@ cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 should_encode_sxg_header: "x-custom-should-encode-sxg"
 )YAML"});
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{
       {"accept", "application/signed-exchange;v=b3;q=0.9"},
       {"host", "example.org"},
@@ -719,6 +791,8 @@ should_encode_sxg_header: "x-custom-should-encode-sxg"
 
 TEST_F(FilterTest, FilterXEnvoyHeaders) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -748,6 +822,8 @@ header_prefix_filters:
  - "x-foo-"
  - "x-bar-"
 )YAML"});
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -772,6 +848,8 @@ header_prefix_filters:
 
 TEST_F(FilterTest, CustomHeader) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -806,6 +884,8 @@ TEST_F(FilterTest, CustomHeader) {
 
 TEST_F(FilterTest, ExtraHeaders) {
   setConfiguration();
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -841,28 +921,109 @@ TEST_F(FilterTest, ExtraHeaders) {
   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_failed").value());
 }
 
-// TEST_F(FilterTest, GetEncodedResponseFailure) {
-//   setConfiguration();
-//   Http::TestRequestHeaderMapImpl request_headers{
-//       {"host", "example.org"},
-//       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
-//       {":path", "/hello.html"}};
-//   Http::TestResponseHeaderMapImpl response_headers{
-//       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
-//   EXPECT_CALL(*filter_, getEncodedResponse).WillRepeatedly(Return(false));
-//   testFallbackToHtml(request_headers, response_headers);
-//   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
-//       "x-client-can-accept-sxg");
-//   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
-//   EXPECT_EQ("true",
-//             request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
-//   EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
-//   EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
-//   EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
-//   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_attempts").value());
-//   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
-//   EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
-// }
+TEST_F(FilterTest, LoadSignerFailure) {
+  setConfiguration();
+  auto filter = std::make_shared<MockFilterLoadSigner>(config_);
+  EXPECT_CALL(*filter, loadSigner).WillRepeatedly(Return(false));
+  setFilter(filter);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"host", "example.org"},
+      {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
+      {":path", "/hello.html"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+  testFallbackToHtml(request_headers, response_headers);
+  const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
+      "x-client-can-accept-sxg");
+  EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
+  EXPECT_EQ("true",
+            request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
+}
+
+TEST_F(FilterTest, LoadContentFailure) {
+  setConfiguration();
+  auto filter = std::make_shared<MockFilterLoadContent>(config_);
+  EXPECT_CALL(*filter, loadContent).WillRepeatedly(Return(false));
+  setFilter(filter);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"host", "example.org"},
+      {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
+      {":path", "/hello.html"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+  testFallbackToHtml(request_headers, response_headers);
+  const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
+      "x-client-can-accept-sxg");
+  EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
+  EXPECT_EQ("true",
+            request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
+}
+
+TEST_F(FilterTest, WriteSxgFailure) {
+  setConfiguration();
+  auto filter = std::make_shared<MockFilterWriteSxg>(config_);
+  EXPECT_CALL(*filter, writeSxg).WillRepeatedly(Return(false));
+  setFilter(filter);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"host", "example.org"},
+      {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
+      {":path", "/hello.html"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+  testFallbackToHtml(request_headers, response_headers);
+  const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
+      "x-client-can-accept-sxg");
+  EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
+  EXPECT_EQ("true",
+            request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
+}
+
+TEST_F(FilterTest, GetEncodedResponseFailure) {
+  setConfiguration();
+  auto filter = std::make_shared<MockFilterGetEncodedResponse>(config_);
+  EXPECT_CALL(*filter, getEncodedResponse).WillRepeatedly(Return(false));
+  setFilter(filter);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"host", "example.org"},
+      {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
+      {":path", "/hello.html"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+  testFallbackToHtml(request_headers, response_headers);
+  const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
+      "x-client-can-accept-sxg");
+  EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
+  EXPECT_EQ("true",
+            request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_attempts").value());
+  EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+  EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
+}
 
 // MyCombinedCertKeyId
 TEST_F(FilterTest, CombiedCertificateId) {
@@ -893,6 +1054,8 @@ cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 )YAML"},
                    certificate, certificate);
+  setFilter();
+
   Http::TestRequestHeaderMapImpl request_headers{{"accept", "application/signed-exchange;v=b3"},
                                                  {"host", "example.org"},
                                                  {":path", "/hello.html"}};
@@ -930,6 +1093,7 @@ cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 )YAML"},
                    certificate, private_key);
+  setFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{"host", "example.org"},
                                                  {"accept", "application/signed-exchange;v=b3"},
@@ -982,6 +1146,7 @@ cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 )YAML"},
                    certificate, private_key);
+  setFilter();
 
   Http::TestRequestHeaderMapImpl request_headers{{"host", "example.org"},
                                                  {"accept", "application/signed-exchange;v=b3"},

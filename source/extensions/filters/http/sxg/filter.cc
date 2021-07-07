@@ -129,9 +129,7 @@ void Filter::doSxg() {
     config_->stats().total_signed_attempts_.inc();
 
     sxg_encoded_response_t encoded = sxg_empty_encoded_response();
-    std::cout << "errp\n";
     if (!getEncodedResponse(enc_buf, &encoded)) {
-      std::cout << "derp\n";
       sxg_encoded_response_release(&encoded);
       config_->stats().total_signed_failed_.inc();
       return;
@@ -334,7 +332,6 @@ bool Filter::loadContent(Buffer::Instance& data, sxg_buffer_t* buf) {
 }
 
 bool Filter::getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* encoded) {
-  std::cout << "wat!\n";
   sxg_raw_response_t raw = sxg_empty_raw_response();
   bool retval = true;
   if (!loadContent(data, &raw.payload)) {

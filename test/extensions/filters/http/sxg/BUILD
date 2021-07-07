@@ -17,12 +17,12 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.sxg",
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/sxg:config",
         "//source/extensions/filters/http/sxg:sxg_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )
@@ -33,12 +33,12 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.sxg",
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/sxg:config",
         "//source/extensions/filters/http/sxg:sxg_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
     ],
 )

@@ -6,7 +6,6 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/config/datasource.h"
-
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "libsxg.h"
@@ -160,11 +159,11 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
 
-  bool loadSigner(const uint64_t, sxg_signer_list_t*);
-  bool loadContent(Buffer::Instance& data, sxg_buffer_t* buf);
-  bool getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* encoded);
-  bool writeSxg(const sxg_signer_list_t* signers, const std::string url,
-                const sxg_encoded_response_t* encoded, sxg_buffer_t* output);
+  virtual bool loadSigner(const uint64_t, sxg_signer_list_t*);
+  virtual bool loadContent(Buffer::Instance& data, sxg_buffer_t* buf);
+  virtual bool getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* encoded);
+  virtual bool writeSxg(const sxg_signer_list_t* signers, const std::string url,
+                        const sxg_encoded_response_t* encoded, sxg_buffer_t* output);
 
   void doSxg();
 
