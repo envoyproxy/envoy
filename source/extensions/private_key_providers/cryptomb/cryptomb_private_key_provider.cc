@@ -149,19 +149,16 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
   if (!calculateDigest(md, in, in_len, hash, &hash_len)) {
-    ops->logWarnMsg("failed to calculate message digest.");
     return ssl_private_key_failure;
   }
 
   EVP_PKEY* pkey = ops->getPrivateKey();
   if (EVP_PKEY_id(pkey) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
-    ops->logWarnMsg("wrong signature algorithm key type.");
     return ssl_private_key_failure;
   }
 
   bssl::UniquePtr<EC_KEY> ec_key(EVP_PKEY_get1_EC_KEY(pkey));
   if (ec_key == nullptr) {
-    ops->logWarnMsg("no valid EC key.");
     return ssl_private_key_failure;
   }
 
@@ -171,7 +168,6 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
       std::make_shared<CryptoMbEcdsaContext>(ops->dispatcher_, ops->cb_);
 
   if (!mb_ctx->ecdsaInit(ec_key.get(), hash, hash_len)) {
-    ops->logWarnMsg("initializing the multibuffer context failed.");
     return ssl_private_key_failure;
   }
 
@@ -184,7 +180,6 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
     }
     *out_len = ops->mb_ctx_->out_len_;
     if (*out_len > max_out) {
-      ops->logWarnMsg("too long output message.");
       return ssl_private_key_failure;
     }
     memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
@@ -221,13 +216,11 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
   EVP_PKEY* rsa_pkey = ops->getPrivateKey();
   // Check if the SSL instance has correct data attached to it.
   if (EVP_PKEY_id(rsa_pkey) != SSL_get_signature_algorithm_key_type(signature_algorithm)) {
-    ops->logWarnMsg("wrong signature algorithm key type.");
     return status;
   }
 
   RSA* rsa = EVP_PKEY_get0_RSA(rsa_pkey);
   if (rsa == nullptr) {
-    ops->logWarnMsg("not RSA key.");
     return status;
   }
 
@@ -251,12 +244,10 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     msg_len = RSA_size(rsa);
     msg = static_cast<uint8_t*>(OPENSSL_malloc(msg_len));
     if (msg == nullptr) {
-      ops->logWarnMsg("failed to add RSA padding.");
       return status;
     }
     prefix_allocated = 1;
     if (!RSA_padding_add_PKCS1_PSS_mgf1(rsa, msg, hash, md, nullptr, -1)) {
-      ops->logWarnMsg("failed to add RSA PSS padding.");
       if (prefix_allocated) {
         OPENSSL_free(msg);
       }
@@ -264,7 +255,6 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     }
   } else {
     if (!RSA_add_pkcs1_prefix(&msg, &msg_len, &prefix_allocated, EVP_MD_type(md), hash, hash_len)) {
-      ops->logWarnMsg("failed to add RSA PKCS1 padding.");
       if (prefix_allocated) {
         OPENSSL_free(msg);
       }
@@ -278,7 +268,6 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
       std::make_shared<CryptoMbRsaContext>(ops->dispatcher_, ops->cb_);
 
   if (!mb_ctx->rsaInit(rsa, msg, msg_len)) {
-    ops->logWarnMsg("initializing the multibuffer context failed.");
     if (prefix_allocated) {
       OPENSSL_free(msg);
     }
@@ -298,7 +287,6 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
     }
     *out_len = ops->mb_ctx_->out_len_;
     if (*out_len > max_out) {
-      ops->logWarnMsg("too long output message.");
       return status;
     }
     memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
@@ -330,13 +318,11 @@ ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnecti
 
   // Check if the SSL instance has correct data attached to it.
   if (rsa_pkey == nullptr) {
-    ops->logWarnMsg("no valid key.");
     return ssl_private_key_failure;
   }
 
   RSA* rsa = EVP_PKEY_get0_RSA(rsa_pkey);
   if (rsa == nullptr) {
-    ops->logWarnMsg("not RSA key.");
     return ssl_private_key_failure;
   }
 
@@ -344,7 +330,6 @@ ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnecti
       std::make_shared<CryptoMbRsaContext>(ops->dispatcher_, ops->cb_);
 
   if (!mb_ctx->rsaInit(rsa, in, in_len)) {
-    ops->logWarnMsg("initializing the multibuffer context failed.");
     return ssl_private_key_failure;
   }
 
@@ -357,7 +342,6 @@ ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnecti
     }
     *out_len = ops->mb_ctx_->out_len_;
     if (*out_len > max_out) {
-      ops->logWarnMsg("too long output message.");
       return ssl_private_key_failure;
     }
     memcpy(out, ops->mb_ctx_->out_buf_, *out_len); // NOLINT(safe-memcpy)
@@ -399,7 +383,6 @@ ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection
   *out_len = ops->mb_ctx_->out_len_;
 
   if (*out_len > max_out) {
-    ops->logWarnMsg("too long output message.");
     return ssl_private_key_failure;
   }
 
@@ -525,7 +508,7 @@ void CryptoMbQueue::processEcdsaRequests() {
         std::static_pointer_cast<CryptoMbEcdsaContext>(request_queue_[req_num]);
     enum RequestStatus ctx_status;
     if (ipp_->mbxGetSts(ecdsa_sts, req_num)) {
-      ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] success", req_num);
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} success", req_num);
       status[req_num] = RequestStatus::Success;
 
       // Use previously known size of the r and s (32).
@@ -540,15 +523,12 @@ void CryptoMbQueue::processEcdsaRequests() {
 
         // Make sure that the signature fits into out_buf_.
         if (CryptoMbContext::MAX_SIGNATURE_SIZE < mb_ctx->ecdsa_sig_size_) {
-          ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] too long key size", req_num);
           status[req_num] = RequestStatus::Error;
         } else {
           // BoringSSL uses CBB to marshaling the signature to out_buf_.
           CBB cbb;
           if (!CBB_init_fixed(&cbb, mb_ctx->out_buf_, mb_ctx->ecdsa_sig_size_) ||
               !ECDSA_SIG_marshal(&cbb, sig) || !CBB_finish(&cbb, nullptr, &mb_ctx->out_len_)) {
-            ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] failed to create signature",
-                      req_num);
             status[req_num] = RequestStatus::Error;
             CBB_cleanup(&cbb);
           }
@@ -556,7 +536,7 @@ void CryptoMbQueue::processEcdsaRequests() {
         ECDSA_SIG_free(sig);
       }
     } else {
-      ENVOY_LOG(debug, "Multibuffer ECDSA priv crt req[{}] failure", req_num);
+      ENVOY_LOG(debug, "Multibuffer ECDSA request {} failure", req_num);
       status[req_num] = RequestStatus::Error;
     }
 
@@ -633,12 +613,10 @@ void CryptoMbQueue::processRsaRequests() {
     enum RequestStatus ctx_status;
     if (ipp_->mbxGetSts(rsa_sts, req_num)) {
       if (CRYPTO_memcmp(mb_ctx->in_buf_.get(), rsa_priv_to[req_num], mb_ctx->out_len_) != 0) {
-        ENVOY_LOG(debug, "Multibuffer RSA request {} Lenstra check failure", req_num);
         status[req_num] = RequestStatus::Error;
       }
       // else keep the previous status from the private key operation
     } else {
-      ENVOY_LOG(debug, "Multibuffer RSA validation request {} failure", req_num);
       status[req_num] = RequestStatus::Error;
     }
 
@@ -661,8 +639,7 @@ void CryptoMbPrivateKeyMethodProvider::registerPrivateKeyMethod(
     SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher) {
 
   if (SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex()) != nullptr) {
-    throw EnvoyException("Registering the CryptoMb provider twice for same context "
-                         "is not yet supported.");
+    throw EnvoyException("Not registering the CryptoMb provider twice for same context");
   }
 
   ASSERT(tls_->currentThreadRegistered(), "Current thread needs to be registered.");
