@@ -54,6 +54,7 @@ Bug Fixes
   reverted by setting the ``envoy.reloadable_features.http2_consume_stream_refused_errors`` runtime guard to false.
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
 * http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
+* jwt_authn: unauthorized responses now correctly include a `www-authenticate` header.
 * listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
 * udp: limit each UDP listener to read maxmium 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
