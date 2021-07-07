@@ -74,6 +74,17 @@ TEST_F(CryptoMbConfigTest, CreateRsa1024) {
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
   EXPECT_EQ(true, provider->checkFips());
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
+  EXPECT_NE(nullptr, method);
+
+  ssl_private_key_result_t res;
+
+  res = method->sign(nullptr, nullptr, nullptr, 0, 0, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
+  res = method->decrypt(nullptr, nullptr, nullptr, 0, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
+  res = method->complete(nullptr, nullptr, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
 }
 
 TEST_F(CryptoMbConfigTest, CreateRsa2048) {
@@ -151,6 +162,17 @@ TEST_F(CryptoMbConfigTest, CreateEcdsaP256) {
   Ssl::PrivateKeyMethodProviderSharedPtr provider = createWithConfig(yaml);
   EXPECT_NE(nullptr, provider);
   EXPECT_EQ(true, provider->checkFips());
+  Ssl::BoringSslPrivateKeyMethodSharedPtr method = provider->getBoringSslPrivateKeyMethod();
+  EXPECT_NE(nullptr, method);
+
+  ssl_private_key_result_t res;
+
+  res = method->sign(nullptr, nullptr, nullptr, 0, 0, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
+  res = method->decrypt(nullptr, nullptr, nullptr, 0, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
+  res = method->complete(nullptr, nullptr, nullptr, 0);
+  EXPECT_EQ(res, ssl_private_key_failure);
 }
 
 TEST_F(CryptoMbConfigTest, CreateEcdsaP256Inline) {

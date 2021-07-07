@@ -192,9 +192,11 @@ ssl_private_key_result_t ecdsaPrivateKeySignInternal(CryptoMbPrivateKeyConnectio
 ssl_private_key_result_t ecdsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len,
                                              size_t max_out, uint16_t signature_algorithm,
                                              const uint8_t* in, size_t in_len) {
-  return ecdsaPrivateKeySignInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
-                                         ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
-                                     out, out_len, max_out, signature_algorithm, in, in_len);
+  return ssl == nullptr ? ssl_private_key_failure
+                        : ecdsaPrivateKeySignInternal(
+                              static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                  ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                              out, out_len, max_out, signature_algorithm, in, in_len);
 }
 
 ssl_private_key_result_t ecdsaPrivateKeyDecrypt(SSL*, uint8_t*, size_t*, size_t, const uint8_t*,
@@ -301,9 +303,11 @@ ssl_private_key_result_t rsaPrivateKeySignInternal(CryptoMbPrivateKeyConnection*
 ssl_private_key_result_t rsaPrivateKeySign(SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out,
                                            uint16_t signature_algorithm, const uint8_t* in,
                                            size_t in_len) {
-  return rsaPrivateKeySignInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
-                                       ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
-                                   out, out_len, max_out, signature_algorithm, in, in_len);
+  return ssl == nullptr ? ssl_private_key_failure
+                        : rsaPrivateKeySignInternal(
+                              static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                  ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                              out, out_len, max_out, signature_algorithm, in, in_len);
 }
 
 ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnection* ops,
@@ -353,10 +357,11 @@ ssl_private_key_result_t rsaPrivateKeyDecryptInternal(CryptoMbPrivateKeyConnecti
 
 ssl_private_key_result_t rsaPrivateKeyDecrypt(SSL* ssl, uint8_t* out, size_t* out_len,
                                               size_t max_out, const uint8_t* in, size_t in_len) {
-  return rsaPrivateKeyDecryptInternal(
-      static_cast<CryptoMbPrivateKeyConnection*>(
-          SSL_get_ex_data(ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
-      out, out_len, max_out, in, in_len);
+  return ssl == nullptr ? ssl_private_key_failure
+                        : rsaPrivateKeyDecryptInternal(
+                              static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                  ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                              out, out_len, max_out, in, in_len);
 }
 
 ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection* ops, uint8_t* out,
@@ -393,9 +398,11 @@ ssl_private_key_result_t privateKeyCompleteInternal(CryptoMbPrivateKeyConnection
 
 ssl_private_key_result_t privateKeyComplete(SSL* ssl, uint8_t* out, size_t* out_len,
                                             size_t max_out) {
-  return privateKeyCompleteInternal(static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
-                                        ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
-                                    out, out_len, max_out);
+  return ssl == nullptr ? ssl_private_key_failure
+                        : privateKeyCompleteInternal(
+                              static_cast<CryptoMbPrivateKeyConnection*>(SSL_get_ex_data(
+                                  ssl, CryptoMbPrivateKeyMethodProvider::connectionIndex())),
+                              out, out_len, max_out);
 }
 
 } // namespace
@@ -470,10 +477,6 @@ void CryptoMbQueue::processRequests() {
 }
 
 void CryptoMbQueue::processEcdsaRequests() {
-
-  if (request_queue_.empty()) {
-    return;
-  }
 
   ASSERT(key_size_ == 256);
 
@@ -550,10 +553,6 @@ void CryptoMbQueue::processEcdsaRequests() {
 }
 
 void CryptoMbQueue::processRsaRequests() {
-
-  if (request_queue_.empty()) {
-    return;
-  }
 
   const unsigned char* rsa_priv_from[MULTIBUFF_BATCH] = {nullptr};
   unsigned char* rsa_priv_to[MULTIBUFF_BATCH] = {nullptr};
