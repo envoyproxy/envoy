@@ -63,7 +63,6 @@ envoy_cc_library(
     srcs = ["connection_handler_impl.cc"],
     hdrs = ["connection_handler_impl.h"],
     deps = [
-        "//envoy/runtime:runtime_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -74,6 +73,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/stats:timespan_interface",
