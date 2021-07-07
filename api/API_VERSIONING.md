@@ -67,6 +67,8 @@ experience a backward compatible break on a change. Specifically:
     may be granted for scenarios in which these stricter conditions model behavior already implied
     structurally or by documentation.
 
+* Messages marked as [#alpha:] are excluded from the backwards compatibility guarantees.
+
 An exception to the above policy exists for:
 * Changes made within 14 days of the introduction of a new API field or message.
 * API versions tagged `vNalpha`. Within an alpha major version, arbitrary breaking changes are allowed.
