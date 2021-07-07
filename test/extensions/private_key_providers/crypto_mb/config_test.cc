@@ -17,49 +17,52 @@
 #include "fake_factory.h"
 #include "gtest/gtest.h"
 
+using testing::NiceMock;
+using testing::ReturnRef;
+
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
-inline envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider
+envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider
 parsePrivateKeyProviderFromV3Yaml(const std::string& yaml_string) {
   envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider private_key_provider;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_string), private_key_provider);
   return private_key_provider;
 }
 
-Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml,
-                                                        bool supported_instruction_set = true) {
-  FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(supported_instruction_set);
-  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
-      cryptomb_private_key_method_factory(cryptomb_factory);
+class CryptoMbConfigTest : public Event::TestUsingSimulatedTime, public testing::Test {
+public:
+  CryptoMbConfigTest() : api_(Api::createApiForTest(store_, time_system_)) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_, threadLocal()).WillByDefault(ReturnRef(tls_));
+    ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(context_manager_, privateKeyMethodManager())
+        .WillByDefault(ReturnRef(private_key_method_manager_));
+  }
 
-  Event::SimulatedTimeSystem time_system;
-  Stats::TestUtil::TestStore server_stats_store;
-  Api::ApiPtr server_api = Api::createApiForTest(server_stats_store, time_system);
-  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
-      server_factory_context;
-  testing::NiceMock<ThreadLocal::MockInstance> tls;
-  TransportSockets::Tls::PrivateKeyMethodManagerImpl private_key_method_manager;
-  NiceMock<Ssl::MockContextManager> context_manager;
+  Ssl::PrivateKeyMethodProviderSharedPtr createWithConfig(std::string yaml,
+                                                          bool supported_instruction_set = true) {
+    FakeCryptoMbPrivateKeyMethodFactory cryptomb_factory(supported_instruction_set);
+    Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+        cryptomb_private_key_method_factory(cryptomb_factory);
 
-  ON_CALL(server_factory_context, api()).WillByDefault(testing::ReturnRef(*server_api));
-  ON_CALL(server_factory_context, threadLocal()).WillByDefault(testing::ReturnRef(tls));
-  EXPECT_CALL(server_factory_context, sslContextManager())
-      .WillOnce(testing::ReturnRef(context_manager))
-      .WillRepeatedly(testing::ReturnRef(context_manager));
-  EXPECT_CALL(context_manager, privateKeyMethodManager())
-      .WillOnce(testing::ReturnRef(private_key_method_manager))
-      .WillRepeatedly(testing::ReturnRef(private_key_method_manager));
+    return factory_context_.sslContextManager()
+        .privateKeyMethodManager()
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
+  }
 
-  return server_factory_context.sslContextManager()
-      .privateKeyMethodManager()
-      .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
-                                      server_factory_context);
-}
+  Event::SimulatedTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Stats::IsolatedStoreImpl store_;
+  Api::ApiPtr api_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Ssl::MockContextManager> context_manager_;
+  TransportSockets::Tls::PrivateKeyMethodManagerImpl private_key_method_manager_;
+};
 
-TEST(CryptoMbConfigTest, CreateRsa1024) {
+TEST_F(CryptoMbConfigTest, CreateRsa1024) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -73,7 +76,7 @@ TEST(CryptoMbConfigTest, CreateRsa1024) {
   EXPECT_EQ(true, provider->checkFips());
 }
 
-TEST(CryptoMbConfigTest, CreateRsa2048) {
+TEST_F(CryptoMbConfigTest, CreateRsa2048) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -85,7 +88,7 @@ TEST(CryptoMbConfigTest, CreateRsa2048) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
-TEST(CryptoMbConfigTest, CreateRsa3072) {
+TEST_F(CryptoMbConfigTest, CreateRsa3072) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -97,7 +100,7 @@ TEST(CryptoMbConfigTest, CreateRsa3072) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
-TEST(CryptoMbConfigTest, CreateRsa4096) {
+TEST_F(CryptoMbConfigTest, CreateRsa4096) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -109,7 +112,7 @@ TEST(CryptoMbConfigTest, CreateRsa4096) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
-TEST(CryptoMbConfigTest, CreateRsa512) {
+TEST_F(CryptoMbConfigTest, CreateRsa512) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -122,7 +125,7 @@ TEST(CryptoMbConfigTest, CreateRsa512) {
                             "Only RSA keys of 1024, 2048, 3072, and 4096 bits are supported.");
 }
 
-TEST(CryptoMbConfigTest, CreateEcdsaP256) {
+TEST_F(CryptoMbConfigTest, CreateEcdsaP256) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -136,7 +139,7 @@ TEST(CryptoMbConfigTest, CreateEcdsaP256) {
   EXPECT_EQ(true, provider->checkFips());
 }
 
-TEST(CryptoMbConfigTest, CreateEcdsaP256Inline) {
+TEST_F(CryptoMbConfigTest, CreateEcdsaP256Inline) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -154,7 +157,7 @@ TEST(CryptoMbConfigTest, CreateEcdsaP256Inline) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
-TEST(CryptoMbConfigTest, CreateEcdsaP384) {
+TEST_F(CryptoMbConfigTest, CreateEcdsaP384) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -167,7 +170,7 @@ TEST(CryptoMbConfigTest, CreateEcdsaP384) {
                             "Only P-256 ECDSA keys are supported.");
 }
 
-TEST(CryptoMbConfigTest, CreateMissingPrivateKey) {
+TEST_F(CryptoMbConfigTest, CreateMissingPrivateKey) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -179,7 +182,7 @@ TEST(CryptoMbConfigTest, CreateMissingPrivateKey) {
   EXPECT_THROW(createWithConfig(yaml), EnvoyException);
 }
 
-TEST(CryptoMbConfigTest, CreateMissingKey) {
+TEST_F(CryptoMbConfigTest, CreateMissingKey) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -191,7 +194,7 @@ TEST(CryptoMbConfigTest, CreateMissingKey) {
                             "Unexpected DataSource::specifier_case(): 0");
 }
 
-TEST(CryptoMbConfigTest, CreateMissingPollDelay) {
+TEST_F(CryptoMbConfigTest, CreateMissingPollDelay) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
@@ -202,7 +205,7 @@ TEST(CryptoMbConfigTest, CreateMissingPollDelay) {
   EXPECT_NE(nullptr, createWithConfig(yaml));
 }
 
-TEST(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
+TEST_F(CryptoMbConfigTest, CreateNotSupportedInstructionSet) {
   const std::string yaml = R"EOF(
       provider_name: cryptomb
       typed_config:
