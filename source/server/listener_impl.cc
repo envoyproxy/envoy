@@ -179,7 +179,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket(uint32_t socke
 }
 
 void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
-  if (socket_type_ != Network::Socket::Type::Stream) {
+  if (bind_type_ == ListenerComponentFactory::BindType::NoBind ||
+      socket_type_ != Network::Socket::Type::Stream) {
     return;
   }
 

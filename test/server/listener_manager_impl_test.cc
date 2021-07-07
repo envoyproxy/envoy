@@ -1719,7 +1719,6 @@ address:
     address: 127.0.0.1
     port_value: 1234
 bind_to_port: false
-reuse_port: false
 filter_chains:
 - filters: []
   )EOF";
@@ -1727,17 +1726,17 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType bind_type,
-                           uint32_t socket_index) -> Network::SocketSharedPtr {
-        EXPECT_CALL(server_, hotRestart).Times(0);
-        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
-        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-        return real_listener_factory.createListenSocket(address, socket_type, options, params);
-      }));
+      .WillOnce(Invoke(
+          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::Socket::Type socket_type,
+                                         const Network::Socket::OptionsSharedPtr& options,
+                                         ListenerComponentFactory::BindType bind_type,
+                                         uint32_t socket_index) -> Network::SocketSharedPtr {
+            // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+            EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
+            return real_listener_factory.createListenSocket(address, socket_type, options,
+                                                            bind_type, socket_index);
+          }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
@@ -1759,27 +1758,28 @@ address:
     address: 127.0.0.1
     port_value: 1234
 bind_to_port: false
-reuse_port: false
 filter_chains:
 - filters: []
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
-      .WillOnce(Invoke([this, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
-        EXPECT_CALL(server_, hotRestart).Times(0);
-        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
-        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-        return real_listener_factory.createListenSocket(address, socket_type, options, params);
-      }));
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0))
+      .WillOnce(Invoke(
+          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::Socket::Type socket_type,
+                                         const Network::Socket::OptionsSharedPtr& options,
+                                         ListenerComponentFactory::BindType bind_type,
+                                         uint32_t socket_index) -> Network::SocketSharedPtr {
+            // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+            EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
+            return real_listener_factory.createListenSocket(address, socket_type, options,
+                                                            bind_type, socket_index);
+          }));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
 
-  worker_->callAddCompletion(true);
+  worker_->callAddCompletion();
 
   EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
