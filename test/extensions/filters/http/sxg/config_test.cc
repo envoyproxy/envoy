@@ -52,7 +52,7 @@ validity_url: "/.sxg/validity.msg"
 
 } // namespace
 
-TEST(ConfigTest, CreateFilter) {
+TEST(ConfigTest, CreateFilterStaticSecretProvider) {
   const std::string yaml = R"YAML(
 cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
@@ -67,6 +67,44 @@ validity_url: "/.sxg/validity.msg"
   // This returns non-nullptr for certificate and private_key.
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
   ON_CALL(secret_manager, findStaticGenericSecretProvider(_))
+      .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
+          envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
+
+  EXPECT_CALL(context, messageValidationVisitor());
+  EXPECT_CALL(context, clusterManager());
+  EXPECT_CALL(context, scope());
+  EXPECT_CALL(context, timeSource());
+  EXPECT_CALL(context, api());
+  EXPECT_CALL(context, getTransportSocketFactoryContext());
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(ConfigTest, CreateFilterHasSdsSecret) {
+  const std::string yaml = R"YAML(
+certificate:
+  name: certificate
+  sds_config:
+    path: /etc/envoy/certificate_sds_secret.yaml
+private_key:
+  name: private_key
+  sds_config:
+    path: /etc/envoy/certificate_sds_secret.yaml
+cbor_url: "/.sxg/cert.cbor"
+validity_url: "/.sxg/validity.msg"
+)YAML";
+
+  FilterFactory factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  Server::Configuration::MockFactoryContext context;
+  context.cluster_manager_.initializeClusters({"foo"}, {});
+
+  // This returns non-nullptr for certificate and private_key.
+  auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
+  ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _))
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 

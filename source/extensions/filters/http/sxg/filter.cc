@@ -265,9 +265,7 @@ uint64_t Filter::getTimestamp() {
 X509* Filter::loadX09Cert() {
   const std::string cert_str = config_->certificate();
   BIO* bio = BIO_new(BIO_s_mem());
-  if (!bio) {
-    return nullptr;
-  }
+  RELEASE_ASSERT(bio != nullptr, "");
   if (BIO_puts(bio, cert_str.c_str()) < 0) {
     BIO_vfree(bio);
     return nullptr;
@@ -282,9 +280,7 @@ X509* Filter::loadX09Cert() {
 EVP_PKEY* Filter::loadPrivateKey() {
   const std::string pri_key_str = config_->privateKey();
   BIO* bio = BIO_new(BIO_s_mem());
-  if (!bio) {
-    return nullptr;
-  }
+  RELEASE_ASSERT(bio != nullptr, "");
   if (BIO_puts(bio, pri_key_str.c_str()) < 0) {
     BIO_vfree(bio);
     return nullptr;
