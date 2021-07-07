@@ -81,7 +81,7 @@ public:
   Socket::Type socketType() const override { return T::type; }
 
   // These four overrides are introduced to perform check. A null io handle is possible only if the
-  // io handle is listener side.
+  // the owner socket is a listen socket that does not bind to port.
   IoHandle& ioHandle() override {
     ASSERT(io_handle_ != nullptr);
     return *io_handle_;
@@ -105,7 +105,7 @@ public:
 protected:
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
-    // on Linux and later BSD socket stacks
+    // on Linux and later BSD socket stacks.
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
