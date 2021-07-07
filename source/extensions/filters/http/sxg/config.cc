@@ -43,12 +43,12 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
   auto secret_provider_certificate =
       secretsProvider(certificate, secret_manager, transport_socket_factory);
   if (secret_provider_certificate == nullptr) {
-    throw EnvoyException("invalid token secret configuration");
+    throw EnvoyException("invalid certificate secret configuration");
   }
   auto secret_provider_private_key =
       secretsProvider(private_key, secret_manager, transport_socket_factory);
   if (secret_provider_private_key == nullptr) {
-    throw EnvoyException("invalid HMAC secret configuration");
+    throw EnvoyException("invalid private_key secret configuration");
   }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
@@ -60,7 +60,6 @@ Http::FilterFactoryCb FilterFactory::createFilterFactoryFromProtoTyped(
     callbacks.addStreamFilter(std::make_shared<Filter>(config));
   };
 }
-// };
 
 REGISTER_FACTORY(FilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 

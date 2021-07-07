@@ -7,6 +7,8 @@
 
 #include "source/common/config/datasource.h"
 
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
 #include "libsxg.h"
 
 namespace Envoy {
@@ -129,26 +131,18 @@ struct StringCmp {
  * thingy
  *
  */
-class Filter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::filter> {
+class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
-  ~Filter() override = default;
-
-  // Http::StreamFilterBase
-  void onDestroy() override;
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override;
-  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override;
 
   // Http::StreamEncodeFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
-  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
 private:

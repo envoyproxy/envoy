@@ -160,6 +160,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
                            Http::TestResponseHeaderMapImpl& response_headers,
                            Http::TestResponseTrailerMapImpl* response_trailers) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
     Buffer::OwnedImpl data("<html><body>hi!</body></html>\n");
 
     auto on_modify_encoding_buffer = [&data](std::function<void(Buffer::Instance&)> cb) {
@@ -839,6 +840,29 @@ TEST_F(FilterTest, ExtraHeaders) {
   EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_succeeded").value());
   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_failed").value());
 }
+
+// TEST_F(FilterTest, GetEncodedResponseFailure) {
+//   setConfiguration();
+//   Http::TestRequestHeaderMapImpl request_headers{
+//       {"host", "example.org"},
+//       {"accept", "application/signed-exchange;v=b3;q=0.9,text/html;q=0.8"},
+//       {":path", "/hello.html"}};
+//   Http::TestResponseHeaderMapImpl response_headers{
+//       {"content-type", "text/html"}, {":status", "200"}, {"x-should-encode-sxg", "true"}};
+//   EXPECT_CALL(*filter_, getEncodedResponse).WillRepeatedly(Return(false));
+//   testFallbackToHtml(request_headers, response_headers);
+//   const Envoy::Http::LowerCaseString x_pinterest_client_can_accept_sxg_key(
+//       "x-client-can-accept-sxg");
+//   EXPECT_FALSE(request_headers.get(x_pinterest_client_can_accept_sxg_key).empty());
+//   EXPECT_EQ("true",
+//             request_headers.get(x_pinterest_client_can_accept_sxg_key)[0]->value().getStringView());
+//   EXPECT_EQ(1UL, scope_.counter("sxg.total_client_can_accept_sxg").value());
+//   EXPECT_EQ(1UL, scope_.counter("sxg.total_should_sign").value());
+//   EXPECT_EQ(0UL, scope_.counter("sxg.total_exceeded_max_payload_size").value());
+//   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_attempts").value());
+//   EXPECT_EQ(0UL, scope_.counter("sxg.total_signed_succeeded").value());
+//   EXPECT_EQ(1UL, scope_.counter("sxg.total_signed_failed").value());
+// }
 
 // MyCombinedCertKeyId
 TEST_F(FilterTest, CombiedCertificateId) {

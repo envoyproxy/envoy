@@ -56,8 +56,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::sxg::v3alpha:
       header_prefix_filters_(initializeHeaderPrefixFilters(proto_config.header_prefix_filters())),
       time_source_(time_source), secret_reader_(secret_reader) {}
 
-void Filter::onDestroy() {}
-
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   ENVOY_LOG(debug, "sxg filter from decodeHeaders: {}", headers);
   if (headers.Host() && headers.Path() && clientAcceptSXG(headers)) {
@@ -70,20 +68,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool) {
-  return Http::FilterDataStatus::Continue;
-}
-
-Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
-  return Http::FilterTrailersStatus::Continue;
-}
-
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-}
-
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
@@ -131,10 +117,6 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
-  return Http::FilterMetadataStatus::Continue;
-}
-
 constexpr uint64_t ONE_DAY_IN_SECONDS = 86400L;
 
 void Filter::doSxg() {
@@ -147,7 +129,9 @@ void Filter::doSxg() {
     config_->stats().total_signed_attempts_.inc();
 
     sxg_encoded_response_t encoded = sxg_empty_encoded_response();
+    std::cout << "errp\n";
     if (!getEncodedResponse(enc_buf, &encoded)) {
+      std::cout << "derp\n";
       sxg_encoded_response_release(&encoded);
       config_->stats().total_signed_failed_.inc();
       return;
@@ -226,9 +210,9 @@ bool Filter::clientAcceptSXG(const Http::RequestHeaderMap& headers) {
       }
     }
 
-    if (type == "application/signed-exchange" && version == "b3") {
+    if (type == sxgContentTypeUnversioned() && version == acceptedSxgVersion()) {
       sxg_q_value = q_value;
-    } else if (type == "text/html") {
+    } else if (type == htmlContentType()) {
       html_q_value = q_value;
     }
   }
@@ -350,6 +334,7 @@ bool Filter::loadContent(Buffer::Instance& data, sxg_buffer_t* buf) {
 }
 
 bool Filter::getEncodedResponse(Buffer::Instance& data, sxg_encoded_response_t* encoded) {
+  std::cout << "wat!\n";
   sxg_raw_response_t raw = sxg_empty_raw_response();
   bool retval = true;
   if (!loadContent(data, &raw.payload)) {
