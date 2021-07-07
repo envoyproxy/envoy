@@ -820,8 +820,6 @@ TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
   listener_callbacks1->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_EQ(1UL, handler_->numConnections());
 
-  // Add negative test case check
-
   EXPECT_CALL(*listener3, onDestroy());
   EXPECT_CALL(*listener2, onDestroy());
   EXPECT_CALL(*listener1, onDestroy());
