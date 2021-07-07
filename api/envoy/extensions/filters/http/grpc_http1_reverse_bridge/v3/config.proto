@@ -29,14 +29,14 @@ message FilterConfig {
   // strip the gRPC frame from the request, and add it back in to the response. This will
   // hide the gRPC semantics from the upstream, allowing it to receive and respond with a
   // simple binary encoded protobuf. In order to calculate the `Content-Length` header value, Envoy
-  // will buffer the upstream response unless
-  // :ref:`envoy_api_field_extensions.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header`
+  // will buffer the upstream response unless :ref:`response_size_header
+  // <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>`
   // is set, in which case Envoy will use the value of an upstream header to calculate the content
   // length.
   bool withhold_grpc_frames = 2;
 
-  // When
-  // :ref:`envoy_api_field_extensions.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames`
+  // When :ref:`withhold_grpc_frames
+  // <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.withhold_grpc_frames>`
   // is true, this option controls how Envoy calculates the `Content-Length`. When
   // *response_size_header* is empty, Envoy will buffer the upstream response to calculate its
   // size. When *response_size_header* is set to a non-empty string, Envoy will stream the response
