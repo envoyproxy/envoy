@@ -17,7 +17,8 @@ namespace Envoy {
 namespace Config {
 
 namespace {
-struct AllMuxesState {
+class AllMuxesState {
+public:
   void insert(NewGrpcMuxImpl* mux) {
     absl::WriterMutexLock locker(&lock_);
     muxes_.insert(mux);
@@ -28,7 +29,15 @@ struct AllMuxesState {
     muxes_.erase(mux);
   }
 
-  absl::flat_hash_set<NewGrpcMuxImpl*> muxes_;
+  void shutdownAll() {
+    absl::WriterMutexLock locker(&lock_);
+    for (auto& mux : muxes_) {
+      mux->shutdown();
+    }
+  }
+
+private:
+  absl::flat_hash_set<NewGrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
   absl::Mutex lock_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
@@ -54,13 +63,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
 
 NewGrpcMuxImpl::~NewGrpcMuxImpl() { AllMuxes::get().erase(this); }
 
-void NewGrpcMuxImpl::shutdownAll() {
-  auto& state = AllMuxes::get();
-  absl::WriterMutexLock locker(&state.lock_);
-  for (auto& mux : state.muxes_) {
-    mux->shutdown_ = true;
-  }
-}
+void NewGrpcMuxImpl::shutdownAll() { AllMuxes::get().shutdownAll(); }
 
 void NewGrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   auto sub = subscriptions_.find(resource_type_url);

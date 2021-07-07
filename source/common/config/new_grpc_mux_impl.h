@@ -46,6 +46,8 @@ public:
   // would then cause all `NewGrpcMuxImpl` to be destructed.
   static void shutdownAll();
 
+  void shutdown() { shutdown_ = true; }
+
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
@@ -181,7 +183,7 @@ private:
 
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
-  bool shutdown_{false};
+  std::atomic<bool> shutdown_{false};
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

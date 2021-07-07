@@ -15,7 +15,8 @@ namespace Envoy {
 namespace Config {
 
 namespace {
-struct AllMuxesState {
+class AllMuxesState {
+public:
   void insert(GrpcMuxImpl* mux) {
     absl::WriterMutexLock locker(&lock_);
     muxes_.insert(mux);
@@ -26,7 +27,15 @@ struct AllMuxesState {
     muxes_.erase(mux);
   }
 
-  absl::flat_hash_set<GrpcMuxImpl*> muxes_;
+  void shutdownAll() {
+    absl::WriterMutexLock locker(&lock_);
+    for (auto& mux : muxes_) {
+      mux->shutdown();
+    }
+  }
+
+private:
+  absl::flat_hash_set<GrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
   absl::Mutex lock_;
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
@@ -53,13 +62,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
 
 GrpcMuxImpl::~GrpcMuxImpl() { AllMuxes::get().erase(this); }
 
-void GrpcMuxImpl::shutdownAll() {
-  auto& state = AllMuxes::get();
-  absl::WriterMutexLock locker(&state.lock_);
-  for (auto& mux : state.muxes_) {
-    mux->shutdown_ = true;
-  }
-}
+void GrpcMuxImpl::shutdownAll() { AllMuxes::get().shutdownAll(); }
 
 void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   auto api_state = api_state_.find(resource_type_url);
