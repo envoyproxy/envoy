@@ -112,6 +112,9 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.upstream_http2_flood_checks",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
+    // When matching active listeners and wildcard matching is used, pick the listener
+    // with the same IP family type as the socket address
+    "envoy.reloadable_features.listener_wildcard_match_ip_family",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
