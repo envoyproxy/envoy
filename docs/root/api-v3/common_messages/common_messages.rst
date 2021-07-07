@@ -5,6 +5,7 @@ Common messages
   :glob:
   :maxdepth: 2
 
+  ../config/common/matcher/generic/v3/matcher.proto
   ../config/core/v3/base.proto
   ../config/core/v3/extension.proto
   ../config/core/v3/address.proto
