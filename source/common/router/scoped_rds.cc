@@ -393,6 +393,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
+  stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
@@ -520,7 +521,8 @@ ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription)
     : MutableConfigProviderCommonBase(std::move(subscription), ConfigProvider::ApiType::Delta) {}
 
-ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const {
+ProtobufTypes::MessagePtr
+ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& name_matcher) const {
   auto config_dump = std::make_unique<envoy::admin::v3::ScopedRoutesConfigDump>();
   for (const auto& element : configSubscriptions()) {
     auto subscription = element.second.lock();
@@ -534,6 +536,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
+        if (!name_matcher.match(it.second->configProto().name())) {
+          continue;
+        }
         dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
             API_RECOVER_ORIGINAL(it.second->configProto()));
       }
@@ -549,6 +554,9 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
+      if (!name_matcher.match(config_proto->name())) {
+        continue;
+      }
       inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
           API_RECOVER_ORIGINAL(*config_proto));
     }

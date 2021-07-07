@@ -1021,7 +1021,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.typed_per_filter_config(),
                           cluster.hidden_envoy_deprecated_per_filter_config(),
-                          optional_http_filters, factory_context, validator) {
+                          optional_http_filters, factory_context, validator),
+      host_rewrite_(cluster.host_rewrite_literal()) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

@@ -46,9 +46,9 @@ gitdb==4.0.7 \
     # via
     #   -r tools/docs/requirements.txt
     #   gitpython
-gitpython==3.1.17 \
-    --hash=sha256:29fe82050709760081f588dd50ce83504feddbebdc4da6956d02351552b1c135 \
-    --hash=sha256:ee24bdc93dce357630764db659edaf6b8d664d4ff5447ccfeedd2dc5c253f41e
+gitpython==3.1.18 \
+    --hash=sha256:fce760879cd2aebd2991b3542876dc5c4a909b30c9d69dfc488e504a8db37ee8 \
+    --hash=sha256:b838a895977b45ab6f0cc926a9045c8d1c44e2b653c1fcc39fe91f42c6e8f05b
     # via -r tools/docs/requirements.txt
 idna==2.10 \
     --hash=sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6 \
@@ -186,17 +186,17 @@ snowballstemmer==2.1.0 \
     # via
     #   -r tools/docs/requirements.txt
     #   sphinx
-sphinx-copybutton==0.3.1 \
-    --hash=sha256:0e0461df394515284e3907e3f418a0c60ef6ab6c9a27a800c8552772d0a402a2 \
-    --hash=sha256:5125c718e763596e6e52d92e15ee0d6f4800ad3817939be6dee51218870b3e3d
+sphinx-copybutton==0.3.3 \
+    --hash=sha256:19850e9c1ed09c899f136ce3cfa304cb3b6d2f508528c19d8f512ccc8c66b0d4 \
+    --hash=sha256:3695987d5e98e3b223471aaed8aa7491e03e9bfc48ed655a91446fd5e30b6c25
     # via -r tools/docs/requirements.txt
 sphinx-rtd-theme==0.5.2 \
     --hash=sha256:32bd3b5d13dc8186d7a42fc816a23d32e83a4827d7d9882948e7b837c232da5a \
     --hash=sha256:4a05bdbe8b1446d77a01e20a23ebc6777c74f43237035e76be89699308987d6f
     # via -r tools/docs/requirements.txt
-sphinx-tabs==3.0.0 \
-    --hash=sha256:2abbcaaa3b8a857de06f3db31762a7bdd17aba1b8979d000f193debe6f917c2c \
-    --hash=sha256:3f766762fffacc99828cb877a9e4cb8ac0ba3582f2a054ea68248e5e026e5612
+sphinx-tabs==3.1.0 \
+    --hash=sha256:63df94e84bc05eb8598419a313ffc24455a14d1a580d174bb748404063958a67 \
+    --hash=sha256:5eee2a869b1226e1f618f0c7ed267e5e3c24425565e6313cad80d00a7119694f
     # via -r tools/docs/requirements.txt
 sphinx==4.0.2 \
     --hash=sha256:b5c2ae4120bf00c799ba9b3699bc895816d272d120080fbc967292f29b52b48c \

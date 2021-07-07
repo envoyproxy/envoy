@@ -75,9 +75,9 @@ using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
-  InstancePtr create(std::function<void()> below_low_watermark,
-                     std::function<void()> above_high_watermark,
-                     std::function<void()> above_overflow_watermark) override {
+  InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                           std::function<void()> above_high_watermark,
+                           std::function<void()> above_overflow_watermark) override {
     return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
                                              above_overflow_watermark);
   }
