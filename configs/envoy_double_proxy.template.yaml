@@ -60,7 +60,6 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
             max_request_bytes: 5242880
         - name: envoy.filters.http.router
-          typed_config: {}
         {% if tracing %}
         tracing:
           provider:

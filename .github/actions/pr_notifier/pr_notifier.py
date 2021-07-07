@@ -13,6 +13,7 @@ from slack_sdk.errors import SlackApiError
 
 MAINTAINERS = {
     'alyssawilk': 'U78RP48V9',
+    'dio': 'U79S2DFV1',
     'mattklein123': 'U5CALEVSL',
     'lizan': 'U79E51EQ6',
     'snowp': 'U93KTPQP6',
@@ -51,6 +52,7 @@ def is_waiting(labels):
     return False
 
 
+# Return true if the PR has an API tag, false otherwise.
 def is_api(labels):
     for label in labels:
         if label.name == 'api':
@@ -68,24 +70,31 @@ def pr_message(pr_age, pr_url, pr_title, delta_days, delta_hours):
             pr_url, pr_title, delta_days, delta_hours)
 
 
-# Adds reminder lines to the appropriate maintainer to review the assigned PRs
-def add_reminders(assignees, maintainers_and_prs, message, maintainers_map):
-    has_maintainer_assignee = False
+# Adds reminder lines to the appropriate assignee to review the assigned PRs
+# Returns true if one of the assignees is in the known_assignee_map, false otherwise.
+def add_reminders(assignees, assignees_and_prs, message, known_assignee_map):
+    has_known_assignee = False
     for assignee_info in assignees:
         assignee = assignee_info.login
-        if assignee not in maintainers_map:
+        if assignee not in known_assignee_map:
             continue
-        has_maintainer_assignee = True
-        if assignee not in maintainers_and_prs.keys():
-            maintainers_and_prs[
+        has_known_assignee = True
+        if assignee not in assignees_and_prs.keys():
+            assignees_and_prs[
                 assignee] = "Hello, %s, here are your PR reminders for the day \n" % assignee
-        maintainers_and_prs[assignee] = maintainers_and_prs[assignee] + message
-    return has_maintainer_assignee
+        assignees_and_prs[assignee] = assignees_and_prs[assignee] + message
+    return has_known_assignee
 
 
+# Returns true if the PR needs an LGTM from an API shephard.
 def needs_api_review(labels, repo, pr_info):
+    # API reviews should always have the label, so don't bother doing an RPC if
+    # it's not tagged (this helps avoid github rate limiting)
     if not (is_api(labels)):
         return False
+    # repokitten tags each commit as pending unless there has been an API LGTM
+    # since the latest API changes. If this PR is tagged pendding it needs an
+    # API review, otherwise it's set.
     headers, data = repo._requester.requestJsonAndCheck(
         "GET",
         ("https://api.github.com/repos/envoyproxy/envoy/statuses/" + pr_info.head.sha),
@@ -105,6 +114,7 @@ def track_prs():
     maintainers_and_prs = {}
     # A placeholder for unassigned PRs, to be sent to #maintainers eventually
     maintainers_and_prs['unassigned'] = ""
+    # A dict of shephard : outstanding_pr_string to be sent to slack
     api_review_and_prs = {}
     # Out-SLO PRs to be sent to #envoy-maintainer-oncall
     stalled_prs = ""
@@ -144,7 +154,9 @@ def track_prs():
         if not has_maintainer_assignee:
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
-    # Return the dict of {maintainers : PR notifications}, and stalled PRs
+    # Return the dict of {maintainers : PR notifications},
+    # the dict of {api-shephards-who-are-not-maintainers: PR notifications},
+    # and stalled PRs
     return maintainers_and_prs, api_review_and_prs, stalled_prs
 
 
@@ -153,7 +165,7 @@ def post_to_assignee(client, assignees_and_messages, assignees_map):
     for key in assignees_and_messages:
         message = assignees_and_messages[key]
 
-        # Only send messages if we have the maintainer UID
+        # Only send messages if we have the slack UID
         if key not in assignees_map:
             continue
         uid = assignees_map[key]

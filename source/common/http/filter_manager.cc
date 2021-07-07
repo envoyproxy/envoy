@@ -298,7 +298,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
-  auto buffer = dispatcher().getWatermarkFactory().create(
+  auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->requestDataDrained(); },
       [this]() -> void { this->requestDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -1459,7 +1459,7 @@ absl::optional<Router::ConfigConstSharedPtr> ActiveStreamDecoderFilter::routeCon
 }
 
 Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
-  auto buffer = dispatcher().getWatermarkFactory().create(
+  auto buffer = dispatcher().getWatermarkFactory().createBuffer(
       [this]() -> void { this->responseDataDrained(); },
       [this]() -> void { this->responseDataTooLarge(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
