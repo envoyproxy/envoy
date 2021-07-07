@@ -240,7 +240,20 @@ private:
   using SourceIPsTrie = Network::LcTrie::LcTrie<SourcePortsMapSharedPtr>;
   using SourceIPsTriePtr = std::unique_ptr<SourceIPsTrie>;
   using SourceTypesArray = std::array<std::pair<SourceIPsMap, SourceIPsTriePtr>, 3>;
-  using ApplicationProtocolsMap = absl::flat_hash_map<std::string, SourceTypesArray>;
+  using SourceTypesArraySharedPtr = std::shared_ptr<SourceTypesArray>;
+  using DirectSourceIPsMap = absl::flat_hash_map<std::string, SourceTypesArraySharedPtr>;
+  using DirectSourceIPsTrie = Network::LcTrie::LcTrie<SourceTypesArraySharedPtr>;
+  using DirectSourceIPsTriePtr = std::unique_ptr<DirectSourceIPsTrie>;
+
+  // This would nominally be a `std::pair`, but that version crashes the Windows clang_cl compiler
+  // for unknown reasons. This variation, which is equivalent, does not crash the compiler.
+  // The `std::pair` version was confirmed to crash both clang 11 and clang 12.
+  struct DirectSourceIPsPair {
+    DirectSourceIPsMap first;
+    DirectSourceIPsTriePtr second;
+  };
+
+  using ApplicationProtocolsMap = absl::flat_hash_map<std::string, DirectSourceIPsPair>;
   using TransportProtocolsMap = absl::flat_hash_map<std::string, ApplicationProtocolsMap>;
   // Both exact server names and wildcard domains are part of the same map, in which wildcard
   // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
@@ -258,6 +271,7 @@ private:
       const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
@@ -266,6 +280,7 @@ private:
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
@@ -274,6 +289,7 @@ private:
       ServerNamesMapSharedPtr& server_names_map_ptr,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
@@ -281,12 +297,19 @@ private:
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
+      const std::vector<std::string>& direct_source_ips,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
+      const std::vector<std::string>& source_ips,
+      const absl::Span<const Protobuf::uint32> source_ports,
+      const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForDirectSourceIPs(
+      DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
-      SourceTypesArray& source_types_array,
+      SourceTypesArraySharedPtr& source_types_array_ptr,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
@@ -310,6 +333,9 @@ private:
   const Network::FilterChain*
   findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
                                          const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForDirectSourceIP(const DirectSourceIPsTrie& direct_source_ips_trie,
+                                   const Network::ConnectionSocket& socket) const;
   const Network::FilterChain*
   findFilterChainForSourceTypes(const SourceTypesArray& source_types,
                                 const Network::ConnectionSocket& socket) const;
