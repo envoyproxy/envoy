@@ -71,8 +71,8 @@ to be correlated.
 
 .. attention::
 
-  The sampling policy for Envoy is determined by the value of x-request-id by default.
-  However, such a sampling policy is only valid for the fleet of Envoys. If a service proxy
+  The sampling policy for Envoy is determined by the value of :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` by default.
+  However, such a sampling policy is only valid for a fleet of Envoys. If a service proxy
   that is not Envoy is present in the fleet, sampling is performed without considering the policy of that proxy.
   For meshes consisting of multiple service proxies such as this, it is more effective to
   bypass Envoy's sampling policy and sample based on the trace provider's sampling policy. This can be achieved by setting
