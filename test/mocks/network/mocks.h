@@ -37,7 +37,7 @@ public:
   ~MockActiveDnsQuery() override;
 
   // Network::ActiveDnsQuery
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (CancelReason reason));
 };
 
 class MockDnsResolver : public DnsResolver {
