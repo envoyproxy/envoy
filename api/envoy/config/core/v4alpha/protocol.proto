@@ -478,3 +478,14 @@ message Http3ProtocolOptions {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_error_on_invalid_http_message>`.
   google.protobuf.BoolValue override_stream_error_on_invalid_http_message = 2;
 }
+
+// A message to control transformations to the :scheme header
+message SchemeHeaderTransformation {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.core.v3.SchemeHeaderTransformation";
+
+  oneof transformation {
+    // Overwrite any Scheme header with the contents of this string.
+    string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
+  }
+}

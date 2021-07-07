@@ -332,6 +332,23 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
+TEST_F(ConnectionManagerUtilityTest, SchemeOverwrite) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
+  TestRequestHeaderMapImpl headers{};
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  // Scheme was present. Do not overwrite anything
+  // Scheme and X-Forwarded-Proto will be overwritten.
+  config_.scheme_ = "https";
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.getSchemeValue());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
+}
+
 // Verify internal request and XFF is set when we are using remote address and the address is
 // internal according to user configuration.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
