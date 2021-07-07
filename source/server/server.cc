@@ -555,7 +555,6 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-  hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
