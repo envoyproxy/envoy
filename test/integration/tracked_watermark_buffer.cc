@@ -266,7 +266,8 @@ void TrackedWatermarkBufferFactory::checkIfExpectedBalancesMet() {
     // This is thread safe since this function should run on the only Envoy worker
     // thread.
     for (auto& acc : account_infos_) {
-      if (acc.first->balance() < expected_balances_->balance_per_account_) {
+      if (static_cast<BufferMemoryAccountImpl*>(acc.first.get())->balance() <
+          expected_balances_->balance_per_account_) {
         return;
       }
     }

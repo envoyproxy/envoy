@@ -157,9 +157,11 @@ void ConnectionImpl::StreamImpl::destroy() {
   parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
 }
 
-ConnectionImpl::ServerStreamImpl::~ServerStreamImpl() {
+void ConnectionImpl::ServerStreamImpl::destroy() {
   // Only the downstream stream should clear the downstream of the
   // memory account.
+  // This occurs in destroy as we want to ensure the Stream does not get
+  // reset called on it from the account.
   //
   // There are cases where a corresponding upstream stream dtor might
   // be called, but the downstream stream isn't going to terminate soon
@@ -167,6 +169,8 @@ ConnectionImpl::ServerStreamImpl::~ServerStreamImpl() {
   if (buffer_memory_account_) {
     buffer_memory_account_->clearDownstream();
   }
+
+  StreamImpl::destroy();
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {

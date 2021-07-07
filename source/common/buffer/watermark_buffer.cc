@@ -184,6 +184,7 @@ WatermarkBufferFactory::~WatermarkBufferFactory() {
 BufferMemoryAccountSharedPtr
 BufferMemoryAccountImpl::createAccount(WatermarkBufferFactory* factory,
                                        Http::StreamResetHandler* reset_handler) {
+  ASSERT(reset_handler != nullptr);
   // We use shared_ptr ctor directly rather than make shared since the
   // constructor being invoked is private as we want users to use this static
   // method to createAccounts.
@@ -205,10 +206,7 @@ int BufferMemoryAccountImpl::balanceToClassIndex() {
   return std::min<int>(class_idx, NUM_MEMORY_CLASSES_ - 1);
 }
 
-void BufferMemoryAccountImpl::credit(uint64_t amount) {
-  ASSERT(buffer_memory_allocated_ >= amount);
-  buffer_memory_allocated_ -= amount;
-
+void BufferMemoryAccountImpl::updateAccountClass() {
   const int new_class = balanceToClassIndex();
   if (shared_this_ && new_class != current_bucket_idx_) {
     factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
@@ -216,16 +214,17 @@ void BufferMemoryAccountImpl::credit(uint64_t amount) {
   }
 }
 
+void BufferMemoryAccountImpl::credit(uint64_t amount) {
+  ASSERT(buffer_memory_allocated_ >= amount);
+  buffer_memory_allocated_ -= amount;
+  updateAccountClass();
+}
+
 void BufferMemoryAccountImpl::charge(uint64_t amount) {
   // Check overflow
   ASSERT(std::numeric_limits<uint64_t>::max() - buffer_memory_allocated_ >= amount);
   buffer_memory_allocated_ += amount;
-
-  const int new_class = balanceToClassIndex();
-  if (shared_this_ && new_class != current_bucket_idx_) {
-    factory_->updateAccountClass(shared_this_, current_bucket_idx_, new_class);
-    current_bucket_idx_ = new_class;
-  }
+  updateAccountClass();
 }
 
 void BufferMemoryAccountImpl::clearDownstream() {
@@ -233,6 +232,7 @@ void BufferMemoryAccountImpl::clearDownstream() {
   reset_handler_ = nullptr;
 
   factory_->unregisterAccount(shared_this_, current_bucket_idx_);
+  current_bucket_idx_ = -1;
   shared_this_ = nullptr;
 }
 

@@ -89,7 +89,10 @@ public:
   // and shared_this_.
   static BufferMemoryAccountSharedPtr createAccount(WatermarkBufferFactory* factory,
                                                     Http::StreamResetHandler* reset_handler);
-  ~BufferMemoryAccountImpl() override { ASSERT(buffer_memory_allocated_ == 0); }
+  ~BufferMemoryAccountImpl() override {
+    ASSERT(buffer_memory_allocated_ == 0);
+    ASSERT(reset_handler_ == nullptr);
+  }
 
   // Make not copyable
   BufferMemoryAccountImpl(const BufferMemoryAccountImpl&) = delete;
@@ -99,15 +102,15 @@ public:
   BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
   BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
 
-  uint64_t balance() const override { return buffer_memory_allocated_; }
+  uint64_t balance() const { return buffer_memory_allocated_; }
   void charge(uint64_t amount) override;
   void credit(uint64_t amount) override;
 
   void clearDownstream() override;
 
-  void resetDownstream(Http::StreamResetReason reason) override {
+  void resetDownstream() override {
     if (reset_handler_ != nullptr) {
-      reset_handler_->resetStream(reason);
+      reset_handler_->resetStream(Http::StreamResetReason::OverloadManager);
     }
   }
 
@@ -123,6 +126,7 @@ private:
   // just modified.
   // Returned class index range is [-1, NUM_MEMORY_CLASSES_).
   int balanceToClassIndex();
+  void updateAccountClass();
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.

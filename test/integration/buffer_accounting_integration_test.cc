@@ -82,7 +82,8 @@ protected:
             // This runs in the context of the worker thread, so we can access
             // the balance.
             stream << "  Account: " << entry.first << '\n';
-            stream << "    Balance:" << entry.first->balance() << '\n';
+            stream << "    Balance:"
+                   << static_cast<BufferMemoryAccountImpl*>(entry.first.get())->balance() << '\n';
             stream << "    Number of associated buffers: " << entry.second.size() << '\n';
           }
         };

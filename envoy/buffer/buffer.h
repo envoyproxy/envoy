@@ -97,10 +97,6 @@ public:
   virtual ~BufferMemoryAccount() = default;
 
   /**
-   *@return the balance of the account.
-   */
-  virtual uint64_t balance() const PURE;
-  /**
    * Charges the account for using the specified amount of memory.
    *
    * @param amount the amount to debit.
@@ -118,16 +114,15 @@ public:
   /**
    * Clears the associated downstream with this account.
    * After this has been called, calls to reset the downstream become no-ops.
+   * Must be called before downstream is deleted.
    */
   virtual void clearDownstream() PURE;
 
   /**
    * Reset the downstream stream associated with this account. Resetting the downstream stream
    * should trigger a reset of the corresponding upstream stream if it exists.
-   *
-   * @param reason the reason for reseting the stream.
    */
-  virtual void resetDownstream(Http::StreamResetReason reason) PURE;
+  virtual void resetDownstream() PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
