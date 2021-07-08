@@ -95,6 +95,8 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = []):
             "@maven//:com_squareup_okhttp3_okhttp",
             "@maven//:com_squareup_okhttp3_mockwebserver",
             "@maven//:com_squareup_okio_okio",
+            "@maven//:org_hamcrest_hamcrest",
+            "@maven//:com_google_truth_truth",
         ],
         manifest = "//bazel:test_manifest.xml",
         custom_package = "io.envoyproxy.envoymobile.tests",

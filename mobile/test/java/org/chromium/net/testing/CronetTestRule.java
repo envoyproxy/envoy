@@ -15,10 +15,9 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Field;
 import java.net.URL;
-import java.net.URLStreamHandler;
 import java.net.URLStreamHandlerFactory;
-import java.util.concurrent.atomic.AtomicReference;
 import org.chromium.net.ApiVersion;
 import org.chromium.net.CronetEngine;
 import org.chromium.net.ExperimentalCronetEngine;
@@ -35,7 +34,7 @@ import org.junit.runners.model.Statement;
 /**
  * Custom TestRule for Cronet instrumentation tests.
  */
-public class CronetTestRule implements TestRule {
+public final class CronetTestRule implements TestRule {
   private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "cronet_test";
 
   private CronetTestFramework mCronetTestFramework;
@@ -44,8 +43,7 @@ public class CronetTestRule implements TestRule {
   private boolean mTestingSystemHttpURLConnection;
   private boolean mTestingJavaImpl;
   private StrictMode.VmPolicy mOldVmPolicy;
-  private final AtomicReference<CronetEngine> mUrlConnectionCronetEngine = new AtomicReference<>();
-  private static AtomicReference<CronetTestRule> mCurrentCronetTestRule = new AtomicReference<>();
+  private CronetEngine mUrlConnectionCronetEngine;
   private static Context mContext;
 
   /**
@@ -101,9 +99,12 @@ public class CronetTestRule implements TestRule {
     return new Statement() {
       @Override
       public void evaluate() throws Throwable {
-        setUp();
-        runBase(base, desc);
-        tearDown();
+        try {
+          setUp();
+          runBase(base, desc);
+        } finally {
+          tearDown();
+        }
       }
     };
   }
@@ -193,10 +194,14 @@ public class CronetTestRule implements TestRule {
       mCronetTestFramework.mCronetEngine.shutdown();
       mCronetTestFramework = null;
     }
-    CronetEngine urlConnectionCronetEngine = mUrlConnectionCronetEngine.getAndSet(null);
-    if (urlConnectionCronetEngine != null) {
-      urlConnectionCronetEngine.shutdown();
+
+    if (mUrlConnectionCronetEngine != null) {
+      mUrlConnectionCronetEngine.shutdown();
+      mUrlConnectionCronetEngine = null;
     }
+
+    resetURLStreamHandlerFactory();
+
     try {
       // Run GC and finalizers a few times to pick up leaked closeables
       for (int i = 0; i < 10; i++) {
@@ -273,23 +278,25 @@ public class CronetTestRule implements TestRule {
    * during setUp() and is installed by {@code runTest()} as the default when Cronet is tested.
    */
   public void setStreamHandlerFactory(CronetEngine cronetEngine) {
-    if (!mUrlConnectionCronetEngine.compareAndSet(null, cronetEngine)) {
-      throw new IllegalStateException("setStreamHandlerFactory can only be called once.");
-    }
-    if (mCurrentCronetTestRule.getAndSet(this) == null) {
-      URL.setURLStreamHandlerFactory(new TestURLStreamHandlerFactory());
+    mUrlConnectionCronetEngine = cronetEngine;
+    if (testingSystemHttpURLConnection()) {
+      URL.setURLStreamHandlerFactory(null);
+    } else {
+      URL.setURLStreamHandlerFactory(mUrlConnectionCronetEngine.createURLStreamHandlerFactory());
     }
   }
 
-  private static class TestURLStreamHandlerFactory implements URLStreamHandlerFactory {
-    @Override
-    public URLStreamHandler createURLStreamHandler(String s) {
-      return mCurrentCronetTestRule.get().testingSystemHttpURLConnection()
-          ? null
-          : mCurrentCronetTestRule.get()
-                .mUrlConnectionCronetEngine.get()
-                .createURLStreamHandlerFactory()
-                .createURLStreamHandler(s);
+  /**
+   * Clears the {@link URL}'s {@code factory} field. This is called
+   * during teardown() so as to start each test with the system's URLStreamHandler.
+   */
+  private void resetURLStreamHandlerFactory() {
+    try {
+      Field factory = URL.class.getDeclaredField("factory");
+      factory.setAccessible(true);
+      factory.set(null, null);
+    } catch (IllegalAccessException | NoSuchFieldException e) {
+      throw new RuntimeException("CronetTestRule#shutdown: factory could not be reset", e);
     }
   }
 

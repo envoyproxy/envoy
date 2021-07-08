@@ -68,4 +68,9 @@ public final class MockUrlRequestJobFactory {
    * Constructs a mock URL that will fail with an SSL certificate error.
    */
   public static String getMockUrlForSSLCertificateError() { return "To be implemented"; }
+
+  /**
+   * Constructs a mock URL that will hang when try to read response body from the remote.
+   */
+  public static String getMockUrlForHangingRead() { return "To be implemented"; }
 }

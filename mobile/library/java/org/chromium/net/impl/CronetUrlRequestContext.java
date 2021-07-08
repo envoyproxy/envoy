@@ -33,6 +33,8 @@ import org.chromium.net.NetworkQualityThroughputListener;
 import org.chromium.net.RequestFinishedInfo;
 import org.chromium.net.UrlRequest;
 import org.chromium.net.impl.VersionSafeCallbacks.RequestFinishedInfoListener;
+import org.chromium.net.urlconnection.CronetHttpURLConnection;
+import org.chromium.net.urlconnection.CronetURLStreamHandlerFactory;
 
 /**
  * Cronvoy engine shim.
@@ -76,7 +78,7 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
   private final Map<RequestFinishedInfo.Listener, VersionSafeCallbacks.RequestFinishedInfoListener>
       mFinishedListenerMap = new HashMap<>();
 
-  CronetUrlRequestContext(CronetEngineBuilderImpl builder) {
+  public CronetUrlRequestContext(CronetEngineBuilderImpl builder) {
     mBuilder = builder;
     // On android, all background threads (and all threads that are part
     // of background processes) are put in a cgroup that is allowed to
@@ -272,15 +274,20 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
   }
 
   @Override
-  public URLConnection openConnection(URL url, Proxy proxy) throws IOException {
-    return url.openConnection(proxy);
+  public URLConnection openConnection(URL url, Proxy proxy) {
+    if (proxy.type() != Proxy.Type.DIRECT) {
+      throw new UnsupportedOperationException();
+    }
+    String protocol = url.getProtocol();
+    if ("http".equals(protocol) || "https".equals(protocol)) {
+      return new CronetHttpURLConnection(url, this);
+    }
+    throw new UnsupportedOperationException("Unexpected protocol:" + protocol);
   }
 
   @Override
   public URLStreamHandlerFactory createURLStreamHandlerFactory() {
-    // Returning null causes this factory to pass though, which ends up using the platform's
-    // implementation.
-    return protocol -> null;
+    return new CronetURLStreamHandlerFactory(this);
   }
 
   /**
