@@ -11,6 +11,7 @@ namespace InputMatchers {
 namespace ConsistentHashing {
 
 TEST(ConfigTest, TestConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
@@ -26,12 +27,14 @@ TEST(ConfigTest, TestConfig) {
   auto message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto matcher =
-      factory.createInputMatcherFactoryCb(*message, ProtobufMessage::getStrictValidationVisitor());
+      factory.createInputMatcherFactoryCb(*message, factory_context);
   ASSERT_NE(nullptr, matcher);
   matcher();
 }
 
 TEST(ConfigTest, InvalidConfig) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
   const std::string yaml_string = R"EOF(
     name: hashing
     typed_config:
@@ -47,7 +50,7 @@ TEST(ConfigTest, InvalidConfig) {
   auto message = Config::Utility::translateAnyToFactoryConfig(
       config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createInputMatcherFactoryCb(*message, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createInputMatcherFactoryCb(*message, factory_context),
       EnvoyException, "threshold cannot be greater than modulo: 200 > 100");
 }
 } // namespace ConsistentHashing
