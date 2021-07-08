@@ -1147,8 +1147,7 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
 }
 
 void ClusterImplBase::setTransportFactoryContext(
-    std::unique_ptr<Server::Configuration::TransportSocketFactoryContext>
-        transport_factory_context) {
+    Server::Configuration::TransportSocketFactoryContextPtr transport_factory_context) {
   transport_factory_context_ = std::move(transport_factory_context);
 }
 
