@@ -1700,7 +1700,7 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
-  InSequence s;
+  // InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
   StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
@@ -1737,13 +1737,17 @@ filter_chains:
 
   worker_->callAddCompletion(true);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
+  // grab the child-manager created for the per-filter-chain-factory-context-impl
+  auto& filter_chain_drain_manager = const_cast<MockDrainManager&>(
+      static_cast<const MockDrainManager&>(listener_foo->context_->drainDecision()));
+
+  EXPECT_CALL(filter_chain_drain_manager, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose()).Times(0);
   EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
 
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
-
+  EXPECT_CALL(filter_chain_drain_manager, _startDrainSequence(_));
+  EXPECT_CALL(*listener_foo->drain_manager_, _startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
