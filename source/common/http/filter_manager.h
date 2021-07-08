@@ -621,6 +621,9 @@ public:
   absl::string_view requestedServerName() const override {
     return StreamInfoImpl::downstreamAddressProvider().requestedServerName();
   }
+  absl::optional<uint64_t> connectionID() const override {
+    return StreamInfoImpl::downstreamAddressProvider().connectionID();
+  }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
 
