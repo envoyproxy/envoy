@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 54]
+// [#next-free-field: 55]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -875,6 +875,18 @@ message Cluster {
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   core.v3.DnsResolutionConfig dns_resolution_config = 53;
+
+  // DNS resolver type configuration extension. This extension defines what type of
+  // DNS resolver Envoy is using. This configuration is to replace above dns_resolution_config.
+  // By default envoy supports c-ares DNS or apple DNS resolvers. This extension can be used
+  // to configure other DNS resolver types.
+  // This configuration is optional. In case it is missing, the default behavior is in place,
+  // which means Envoy will either use c-ares DNS library or apple DNS library based on
+  // the compiling flag. When this configuration is in place, Envoy will use the configured
+  // DNS resolver carried in the extension typed_config field.
+  // In case both typed_dns_resolver_config and dns_resolution_config are configured,
+  // typed_dns_resolver_config take precedence.
+  core.v3.TypedExtensionConfig typed_dns_resolver_config = 54;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via

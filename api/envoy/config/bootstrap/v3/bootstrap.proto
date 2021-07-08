@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -261,6 +261,18 @@ message Bootstrap {
   // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
   // is specified.
   core.v3.DnsResolutionConfig dns_resolution_config = 30;
+
+  // DNS resolver type configuration extension. This extension defines what type of
+  // DNS resolver Envoy is using. This configuration is to replace above dns_resolution_config.
+  // By default envoy supports c-ares DNS or apple DNS resolvers. This extension can be used
+  // to configure other DNS resolver types.
+  // This configuration is optional. In case it is missing, the default behavior is in place,
+  // which means Envoy will either use c-ares DNS library or apple DNS library based on
+  // the compiling flag. When this configuration is in place, Envoy will use the configured
+  // DNS resolver carried in the extension typed_config field.
+  // In case both typed_dns_resolver_config and dns_resolution_config are configured,
+  // typed_dns_resolver_config take precedence.
+  core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
   // Each item contains extension specific configuration.
