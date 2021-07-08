@@ -1,5 +1,6 @@
 #include "test/server/admin/admin_instance.h"
 
+using testing::HasSubstr;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -670,7 +671,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
   std::string output = response.toString();
-  EXPECT_THAT(output, testing::HasSubstr("could not be successfully used"));
+  EXPECT_THAT(output, HasSubstr("could not be successfully used"));
 }
 
 // Test that a 404 Not found is returned if a non-existent resource is passed in as the
@@ -741,13 +742,49 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   // `extensions` is a repeated field, and cannot be indexed through in a FieldMask.
   EXPECT_EQ(Http::Code::BadRequest,
             getCallback("/config_dump?mask=bootstrap.node.extensions.name", header_map, response));
-  EXPECT_EQ("FieldMask paths: \"bootstrap.node.extensions.name\"\n could not be "
-            "successfully used.",
+  EXPECT_THAT(response.toString(), HasSubstr("could not be successfully applied to any configs"));
+}
+
+TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  auto bootstrap = admin_.getConfigTracker().add("bootstrap", [](const Matchers::StringMatcher&) {
+    auto msg = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
+    auto* bootstrap = msg->mutable_bootstrap();
+    bootstrap->mutable_node()->add_extensions()->set_name("ext1");
+    bootstrap->mutable_node()->add_extensions()->set_name("ext2");
+    return msg;
+  });
+  auto clusters = admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
+    auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
+    auto* static_cluster = msg->add_static_clusters();
+    envoy::config::cluster::v3::Cluster inner_cluster;
+    inner_cluster.set_name("cluster1");
+    static_cluster->mutable_cluster()->PackFrom(inner_cluster);
+    return msg;
+  });
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?mask=bootstrap", header_map, response));
+  EXPECT_EQ(R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
+   "bootstrap": {
+    "node": {
+     "extensions": [
+      {
+       "name": "ext1"
+      },
+      {
+       "name": "ext2"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}
+)EOF",
             response.toString());
-  EXPECT_EQ(header_map.ContentType()->value().getStringView(),
-            Http::Headers::get().ContentTypeValues.Text);
-  EXPECT_EQ(header_map.get(Http::Headers::get().XContentTypeOptions)[0]->value(),
-            Http::Headers::get().XContentTypeOptionValues.Nosniff);
 }
 
 } // namespace Server

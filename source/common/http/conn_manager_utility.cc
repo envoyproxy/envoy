@@ -287,6 +287,9 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
 
   auto rid_extension = config.requestIDExtension();
+  if (!rid_extension->useRequestIdForTraceSampling()) {
+    return Tracing::Reason::Sampling;
+  }
   const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {

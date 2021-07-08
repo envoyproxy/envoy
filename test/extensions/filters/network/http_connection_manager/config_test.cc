@@ -1733,7 +1733,7 @@ public:
     return Tracing::Reason::Sampling;
   }
   void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
-
+  bool useRequestIdForTraceSampling() const override { return true; }
   std::string testField() { return config_.test_field(); }
 
 private:
@@ -1848,6 +1848,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_TRUE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), true);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
@@ -1859,6 +1860,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
       pack_trace_reason: false
+      use_request_id_for_trace_sampling: false
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1871,6 +1873,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), false);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
