@@ -30,10 +30,10 @@ const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 class DeltaSubscriptionStateTestBase : public testing::Test {
 protected:
   DeltaSubscriptionStateTestBase(
-      const std::string& type_url, const bool wildcard,
+      const std::string& type_url,
       const absl::flat_hash_set<std::string> initial_resources = {"name1", "name2", "name3"})
       : timer_(new Event::MockTimer(&dispatcher_)),
-        state_(type_url, callbacks_, local_info_, dispatcher_, wildcard) {
+        state_(type_url, callbacks_, local_info_, dispatcher_) {
     state_.updateSubscriptionInterest(initial_resources, {});
     envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request =
         state_.getNextRequestAckless();
@@ -98,13 +98,13 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 
 class DeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
-  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, false) {}
+  DeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl) {}
 };
 
 // Delta subscription state of a wildcard subscription request.
 class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
-  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, true, {}) {}
+  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, {}) {}
 };
 
 // Basic gaining/losing interest in resources should lead to subscription updates.
@@ -418,14 +418,14 @@ TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   EXPECT_CALL(*timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  state_.updateSubscriptionInterest({"name3"}, {"name1"});
+  state_.updateSubscriptionInterest({"name3"}, {});
   state_.markStreamFresh(); // simulate a stream reconnection
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
-  // name1: do not include: we lost interest.
+  // name1: do not include: see below
   // name2: do not include: we are implicitly interested, but for wildcard it shouldn't be provided.
   // name3: yes do include: we are explicitly interested.
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("*", "name3"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre(Wildcard, "name3"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -439,17 +439,18 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscriptio
   EXPECT_CALL(*timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  state_.updateSubscriptionInterest({"name3"}, {"name1", Wildcard});
+  state_.updateSubscriptionInterest({"name3"}, {Wildcard});
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", Wildcard));
+  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
   state_.markStreamFresh(); // simulate a stream reconnection
   // Regarding the resource_names_subscribe field:
-  // name1: do not include: we lost interest.
-  // name2: yes do include: we are interested, and it's not wildcard.
-  // name3: yes do include: we are interested, and it's not wildcard.
+  // name1: do not include, see below
+  // name2: do not include: it came from wildcard subscription we lost interest in, so we are not
+  //        interested in name2 too
+  // name3: yes do include: we are interested
   cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name2", "name3"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -468,19 +469,18 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscriptio
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
 
   // cancel wildcard subscription
-  state_.updateSubscriptionInterest({"name4"}, {"name1", "*"});
+  state_.updateSubscriptionInterest({"name4"}, {Wildcard});
   cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
-  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "*"));
+  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
   state_.markStreamFresh(); // simulate a stream reconnection
   // Regarding the resource_names_subscribe field:
-  // name1: do not include: we lost interest.
-  // name2: yes do include: we are interested, and it's not wildcard.
-  // name3: yes do include: we are interested, and it's not wildcard.
+  // name1: do not include: see name2
+  // name2: do not include: it came as a part of wildcard subscription we cancelled, so we are not
+  // interested in this resource name3: yes do include: we are interested, and it's not wildcard.
   // name4: yes do include: we are interested, and it's not wildcard.
   cur_request = state_.getNextRequestAckless();
-  EXPECT_THAT(cur_request.resource_names_subscribe(),
-              UnorderedElementsAre("name2", "name3", "name4"));
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3", "name4"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
@@ -673,7 +673,7 @@ TEST_F(DeltaSubscriptionStateTest, ResourceTTL) {
 class VhdsDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
   VhdsDeltaSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost", false) {}
+      : DeltaSubscriptionStateTestBase("envoy.config.route.v3.VirtualHost") {}
 };
 
 TEST_F(VhdsDeltaSubscriptionStateTest, ResourceTTL) {

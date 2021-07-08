@@ -26,8 +26,7 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                         const bool wildcard);
+                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -59,36 +58,15 @@ private:
   void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
-  // This enumeration describes the resource type, which is only relevant for wildcard
-  // subscriptions. Depending on its type, the resource will or will not be resent on the initial
-  // wildcard subscription.
-  enum class ResourceType {
-    // Explicitly requested resource type means that we have asked about the resource by updating
-    // the subscription interest. Such resources are resent on the initial wildcard request.
-    ExplicitlyRequested,
-    // Received from server resources are resources that the state knows about only from the server
-    // response. Such resources are not resent on the initial wildcard request.
-    ReceivedFromServer,
-  };
-
-  // Determines the effective resource type. Explicitly requested type overrides the received from
-  // server type.
-  ResourceType effectiveResourceType(ResourceType old_type, ResourceType new_type) {
-    return (old_type == ResourceType::ReceivedFromServer) ? new_type : old_type;
-  }
-
   class ResourceState {
   public:
-    ResourceState(absl::optional<std::string> version, ResourceType type)
-        : version_(std::move(version)), type_(type) {}
+    ResourceState(absl::optional<std::string> version) : version_(std::move(version)) {}
 
-    ResourceState(const envoy::service::discovery::v3::Resource& resource, ResourceType type)
-        : ResourceState(resource.version(), type) {}
+    ResourceState(const envoy::service::discovery::v3::Resource& resource)
+        : ResourceState(resource.version()) {}
 
     // Builds a ResourceState in the waitingForServer state.
-    ResourceState(ResourceType type) : ResourceState(absl::nullopt, type) {}
-
-    ResourceType type() const { return type_; }
+    ResourceState() : ResourceState(absl::nullopt) {}
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
@@ -104,30 +82,19 @@ private:
 
   private:
     absl::optional<std::string> version_;
-    ResourceType type_;
-  };
-
-  // Describes the wildcard mode the subscription is in.
-  enum class WildcardMode {
-    // This mode is being expressed by sending a wildcard subscription request with an empty
-    // resource subscription list.
-    Implicit,
-    // This mode is being expressed by sending a wildcard subscription request that contains "*"
-    // special name in the resource subscription list.
-    Explicit,
-    // This mode is means no wildcard subscription.
-    Disabled,
   };
 
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
-  OptRef<ResourceState> getResourceState(const std::string& resource_name);
-  void removeResourceState(const std::string& resource_name);
+  OptRef<ResourceState> getRequestedResourceState(const std::string& resource_name);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
-  absl::node_hash_map<std::string, ResourceState> resource_state_;
+  absl::node_hash_map<std::string, ResourceState> requested_resource_state_;
+  // A map from resource name to per-resource version. The keys of this map are resource names we
+  // have received as a part of the wildcard subscription.
+  absl::node_hash_map<std::string, std::string> wildcard_resource_state_;
 
   // Not all xDS resources supports heartbeats due to there being specific information encoded in
   // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
@@ -136,7 +103,6 @@ private:
   TtlManager ttl_;
 
   const std::string type_url_;
-  WildcardMode mode_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
@@ -144,6 +110,7 @@ private:
 
   bool any_request_sent_yet_in_current_stream_{};
   bool must_send_discovery_request_{};
+  bool is_legacy_wildcard_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.
