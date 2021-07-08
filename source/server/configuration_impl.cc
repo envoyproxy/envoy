@@ -193,7 +193,7 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
 }
 
 InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options, Instance&)
+                         const Options& options)
     : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
   const auto& admin = bootstrap.admin();
 
@@ -231,7 +231,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
   }
 }
 
-void InitialImpl::initAccesslog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+void InitialImpl::initAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                 Instance& server) {
   const auto& admin = bootstrap.admin();
 
