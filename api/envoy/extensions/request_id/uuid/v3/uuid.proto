@@ -43,6 +43,6 @@ message UuidRequestIdConfig {
 
   // Set whether to use :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` for sampling or not.
   // This defaults to true. See the :ref:`context propagation <arch_overview_tracing_context_propagation>`
-  // for more information.
+  // overview for more information.
   google.protobuf.BoolValue use_request_id_for_trace_sampling = 2;
 }
