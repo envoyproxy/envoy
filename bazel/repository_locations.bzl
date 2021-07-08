@@ -221,7 +221,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/libsxg/archive/{version}.tar.gz"],
         use_category = ["other"],
         extensions = ["envoy.filters.http.sxg"],
-        release_date = "2021-07-07",
+        release_date = "2021-07-08",
         cpe = "N/A",
     ),
     com_github_google_tcmalloc = dict(
