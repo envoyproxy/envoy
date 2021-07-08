@@ -42,6 +42,8 @@ def kotlin_dependencies():
             "androidx.test:monitor:1.3.0",
             "androidx.test.ext:junit:1.1.2",
             "org.robolectric:robolectric:4.4",
+            "org.hamcrest:hamcrest:2.2",
+            "com.google.truth:truth:1.1",
         ],
         repositories = [
             "https://repo1.maven.org/maven2",
