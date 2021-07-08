@@ -104,7 +104,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory, hooks);
+    initialize(options, std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -333,7 +333,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, ListenerHooks& hooks) {
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
