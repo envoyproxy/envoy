@@ -95,6 +95,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  // TODO(soulxu): generate the connection id inside the addressProvider directly,
+  // then we don't need a setter or any of the optional stuff.
+  socket_->addressProvider().setConnectionID(id());
 }
 
 ConnectionImpl::~ConnectionImpl() {

@@ -293,7 +293,6 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithDecoderPause) {
 // When create new stream, the stream info will be populated from the connection.
 TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   setup(true, "", false);
-  EXPECT_CALL(filter_callbacks_.connection_, id()).WillRepeatedly(Return(1234));
 
   // Set up the codec.
   Buffer::OwnedImpl fake_input("input");
@@ -303,7 +302,8 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
 
   EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamSslConnection());
-  EXPECT_EQ(1234U, decoder_->streamInfo().connectionID());
+  EXPECT_EQ(filter_callbacks_.connection_.id_,
+            decoder_->streamInfo().downstreamAddressProvider().connectionID());
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
 
   // Clean up.
