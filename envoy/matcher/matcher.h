@@ -156,7 +156,7 @@ class InputMatcherFactory : public Config::TypedFactory {
 public:
   virtual InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
-  Server::Configuration::ServerFactoryContext& factory_context) PURE;
+                              Server::Configuration::ServerFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
