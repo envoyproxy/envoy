@@ -84,11 +84,6 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
 
-  // Http::StreamDecoderFilterCallbacks
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
   void sendData(Buffer::Instance& data, bool end_stream) override;
@@ -436,6 +431,10 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {
