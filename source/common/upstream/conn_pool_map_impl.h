@@ -68,6 +68,7 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::erasePool(const KEY_TYPE& key) {
   if (pool_iter != active_pools_.end()) {
     thread_local_dispatcher_.deferredDelete(std::move(pool_iter->second));
     active_pools_.erase(pool_iter);
+    host_->cluster().resourceManager(priority_).connectionPools().dec();
     return true;
   } else {
     return false;
