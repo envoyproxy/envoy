@@ -271,12 +271,12 @@ message RemoteJwks {
   //     num_retries:1
   //
   // uses the default :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
-  // with he default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.
+  // with the default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.
   //
-  // on other hand if num_retries is omitted, the default is to allow only one retry.
+  // if num_retries is omitted, the default is to allow only one retry.
   //
   //
-  // If this feature is enabled, no matter if Jwks are fetched on demand or asynchronously in background.
+  // If enabled, the retry policy will apply to all Jwks fetching approaches, e.g. on demand or asynchronously in background.
   //
   //
   config.core.v4alpha.RetryPolicy retry_policy = 4;
