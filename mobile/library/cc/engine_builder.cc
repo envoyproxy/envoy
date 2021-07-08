@@ -1,5 +1,8 @@
 #include "engine_builder.h"
 
+#include <sstream>
+
+#include "fmt/core.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -51,6 +54,11 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addVirtualClusters(const std::string& virtual_clusters) {
+  this->virtual_clusters_ = virtual_clusters;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setAppVersion(const std::string& app_version) {
   this->app_version_ = app_version;
   return *this;
@@ -61,52 +69,47 @@ EngineBuilder& EngineBuilder::setAppId(const std::string& app_id) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualClusters(const std::string& virtual_clusters) {
-  this->virtual_clusters_ = virtual_clusters;
+EngineBuilder& EngineBuilder::setDeviceOs(const std::string& device_os) {
+  this->device_os_ = device_os;
   return *this;
 }
 
-EngineSharedPtr EngineBuilder::build() {
+std::string EngineBuilder::generateConfigStr() {
   std::vector<std::pair<std::string, std::string>> replacements{
-      {"{{ app_id }}", this->app_id_},
-      {"{{ app_version }}", this->app_version_},
-      {"{{ connect_timeout_seconds }}", std::to_string(this->connect_timeout_seconds_)},
-      {"{{ device_os }}", "python"},
-      {"{{ dns_failure_refresh_rate_seconds_base }}",
-       std::to_string(this->dns_failure_refresh_seconds_base_)},
-      {"{{ dns_failure_refresh_rate_seconds_max }}",
-       std::to_string(this->dns_failure_refresh_seconds_max_)},
-      {"{{ dns_refresh_rate_seconds }}", std::to_string(this->dns_refresh_seconds_)},
-      {"{{ dns_preresolve_hostnames }}", this->dns_preresolve_hostnames_},
-      {"{{ native_filter_chain }}", ""},
-      {"{{ platform_filter_chain }}", ""},
-      {"{{ stats_domain }}", this->stats_domain_},
-      {"{{ stats_flush_interval_seconds }}", std::to_string(this->stats_flush_seconds_)},
-      {"{{ virtual_clusters }}", this->virtual_clusters_},
-      {"{{ stream_idle_timeout_seconds }}", std::to_string(this->stream_idle_timeout_seconds_)},
-      // TODO(crockeo): expose an API to these configuration options
-      {"{{ fake_remote_listener }}", ""},
-      {"{{ fake_cluster_matchers }}", ""},
-      {"{{ route_reset_filter }}", ""},
-      {"{{ fake_remote_cluster }}", ""},
-      {"{{ stats_sink }}", ""},
+      {"connect_timeout", fmt::format("{}s", this->connect_timeout_seconds_)},
+      {"dns_fail_base_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_base_)},
+      {"dns_fail_max_interval", fmt::format("{}s", this->dns_failure_refresh_seconds_max_)},
+      {"dns_preresolve_hostnames", this->dns_preresolve_hostnames_},
+      {"dns_refresh_rate", fmt::format("{}s", this->dns_refresh_seconds_)},
+      {
+          "metadata",
+          fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", this->device_os_,
+                      this->app_version_, this->app_id_),
+      },
+      {"stats_domain", this->stats_domain_},
+      {"stats_flush_interval", fmt::format("{}s", this->stats_flush_seconds_)},
+      {"stream_idle_timeout", fmt::format("{}s", this->stream_idle_timeout_seconds_)},
+      {"virtual_clusters", this->virtual_clusters_},
   };
 
-  std::string config_str = this->config_template_;
-  for (const auto& pair : replacements) {
-    const auto& key = pair.first;
-    const auto& value = pair.second;
-
-    size_t idx = 0;
-    while ((idx = config_str.find(key, idx)) != std::string::npos) {
-      config_str.replace(idx, key.size(), value);
-    }
+  // NOTE: this does not include support for custom filters
+  // which are not yet supported in the C++ platform implementation
+  std::ostringstream config_builder;
+  config_builder << "!ignore platform_defs:" << std::endl;
+  for (const auto& [key, value] : replacements) {
+    config_builder << "- &" << key << " " << value << std::endl;
   }
+  config_builder << config_template_;
 
+  auto config_str = config_builder.str();
   if (config_str.find("{{") != std::string::npos) {
-    throw std::runtime_error("could not resolve all template keys in config:\n" + config_str);
+    throw std::runtime_error("could not resolve all template keys in config");
   }
+  return config_str;
+}
 
+EngineSharedPtr EngineBuilder::build() {
+  auto config_str = this->generateConfigStr();
   envoy_logger null_logger{
       .log = nullptr,
       .release = envoy_noop_const_release,
