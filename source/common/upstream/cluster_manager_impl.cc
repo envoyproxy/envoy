@@ -1015,39 +1015,15 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 }
 
 void ClusterManagerImpl::postThreadLocalHostMapUpdate(ClusterManagerCluster& cm_cluster) {
-  bool add_or_update_cluster = false;
-  if (!cm_cluster.addedOrUpdated()) {
-    add_or_update_cluster = true;
-    cm_cluster.setAddedOrUpdated();
-  }
-  LoadBalancerFactorySharedPtr load_balancer_factory;
-  if (add_or_update_cluster) {
-    load_balancer_factory = cm_cluster.loadBalancerFactory();
-  }
-
-  tls_.runOnAllThreads([info = cm_cluster.cluster().info(), add_or_update_cluster,
-                        load_balancer_factory,
+  tls_.runOnAllThreads([info = cm_cluster.cluster().info(),
                         host_map = cm_cluster.cluster().prioritySet().readOnlyHostMap()](
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    ThreadLocalClusterManagerImpl::ClusterEntry* cluster_entry = nullptr;
-    if (add_or_update_cluster) {
-      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
-        ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
-      } else {
-        ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
-      }
-      cluster_entry = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                      load_balancer_factory);
-      cluster_manager->thread_local_clusters_[info->name()].reset(cluster_entry);
-
-      for (auto& cb : cluster_manager->update_callbacks_) {
-        cb->onClusterAddOrUpdate(*cluster_entry);
-      }
-    } else {
-      ASSERT(cluster_manager->thread_local_clusters_.find(info->name()) !=
-             cluster_manager->thread_local_clusters_.end());
-      cluster_entry = cluster_manager->thread_local_clusters_[info->name()].get();
-    }
+    // 'postThreadLocalHostMapUpdate' will only be executed after the first
+    // 'postThreadLocalClusterUpdate' is executed, so it can be considered that the thread local
+    // cluster must have been created.
+    ASSERT(cluster_manager->thread_local_clusters_.find(info->name()) !=
+           cluster_manager->thread_local_clusters_.end());
+    auto* cluster_entry = cluster_manager->thread_local_clusters_[info->name()].get();
 
     ASSERT(cluster_entry != nullptr);
     cluster_entry->priority_set_.setReadOnlyHostMap(host_map);
