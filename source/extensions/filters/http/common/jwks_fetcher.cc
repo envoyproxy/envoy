@@ -16,6 +16,60 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace {
+// Parameters of the jittered backoff strategy.
+static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
+
+/**
+ * @details construct an envoy.config.route.v3.RetryPolicy protobuf message
+ *          from a less feature rich envoy.config.core.v3.RetryPolicy one.
+ *
+ *          this is about limiting the user's possibilities.
+ *          just doing truncated exponential backoff
+ *
+ *          the upstream.use_retry feature flag will need to be turned on (default)
+ *          for this to work.
+ *
+ * @param retry policy from the RemoteJwks proto
+ * @return a retry policy usable by the http async client.
+ */
+envoy::config::route::v3::RetryPolicy
+adaptRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy) {
+  envoy::config::route::v3::RetryPolicy route_retry_policy;
+
+  uint64_t base_interval_ms = RetryInitialDelayMilliseconds;
+  uint64_t max_interval_ms = RetryMaxDelayMilliseconds;
+
+  if (core_retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = core_retry_policy.retry_back_off();
+
+    base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+
+  route_retry_policy.mutable_num_retries()->set_value(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(core_retry_policy, num_retries, 1));
+
+  auto* route_mutable_back_off = route_retry_policy.mutable_retry_back_off();
+
+  route_mutable_back_off->mutable_base_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
+  route_mutable_back_off->mutable_max_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
+
+  // set all the other fields with appropriate values.
+  route_retry_policy.set_retry_on("5xx,gateway-error,connect-failure,reset");
+  route_retry_policy.mutable_per_try_timeout()->CopyFrom(
+      route_retry_policy.retry_back_off().max_interval());
+
+  return route_retry_policy;
+}
 
 class JwksFetcherImpl : public JwksFetcher,
                         public Logger::Loggable<Logger::Id::filter>,
@@ -132,59 +186,6 @@ private:
   void reset() {
     request_ = nullptr;
     receiver_ = nullptr;
-  }
-
-  /**
-   * @details construct an envoy.config.route.v3.RetryPolicy protobuf message
-   *          from a less feature rich envoy.config.core.v3.RetryPolicy one.
-   *
-   *          this is about limiting the user's possibilities.
-   *          just doing truncated exponential backoff
-   *
-   *          the upstream.use_retry feature flag will need to be turned on (default)
-   *          for this to work.
-   *
-   * @param retry policy from the RemoteJwks proto
-   * @return a retry policy usable by the http async client.
-   */
-  static envoy::config::route::v3::RetryPolicy
-  adaptRetryPolicy(const envoy::config::core::v3::RetryPolicy& core_retry_policy) {
-    envoy::config::route::v3::RetryPolicy route_retry_policy;
-
-    static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
-    static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
-    uint64_t base_interval_ms = RetryInitialDelayMilliseconds;
-    uint64_t max_interval_ms = RetryMaxDelayMilliseconds;
-
-    if (core_retry_policy.has_retry_back_off()) {
-      const auto& core_back_off = core_retry_policy.retry_back_off();
-
-      base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
-
-      max_interval_ms =
-          PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
-
-      if (max_interval_ms < base_interval_ms) {
-        throw EnvoyException("max_interval must be greater than or equal to the base_interval");
-      }
-    }
-
-    route_retry_policy.mutable_num_retries()->set_value(
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(core_retry_policy, num_retries, 1));
-
-    auto* route_mutable_back_off = route_retry_policy.mutable_retry_back_off();
-
-    route_mutable_back_off->mutable_base_interval()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
-    route_mutable_back_off->mutable_max_interval()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
-
-    // set all the other fields with appropriate values.
-    route_retry_policy.set_retry_on("5xx,gateway-error,connect-failure,reset");
-    route_retry_policy.mutable_per_try_timeout()->CopyFrom(
-        route_retry_policy.retry_back_off().max_interval());
-
-    return route_retry_policy;
   }
 };
 } // namespace
