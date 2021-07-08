@@ -1078,12 +1078,10 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(AccessLogWithFilter)) {
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
-  NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options);
   config.initAccessLog(bootstrap, server_);
-  Network::MockListenSocket socket_mock;
 
-  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+  ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
 
 TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
