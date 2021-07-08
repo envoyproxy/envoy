@@ -62,6 +62,7 @@ TEST_F(StatsMatcherTest, CheckRejectAll) {
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_TRUE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Rejects, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckNotRejectAll) {
@@ -71,6 +72,7 @@ TEST_F(StatsMatcherTest, CheckNotRejectAll) {
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_TRUE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::NoMatch, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
@@ -130,6 +132,8 @@ TEST_F(StatsMatcherTest, CheckIncludePrefixDot) {
       {"abcfoo", "ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Matches,
+            stats_matcher_impl_->fastRejects(pool_.add("abc.foo")));
 }
 
 TEST_F(StatsMatcherTest, CheckExcludePrefix) {

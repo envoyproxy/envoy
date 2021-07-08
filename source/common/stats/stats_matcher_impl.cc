@@ -70,7 +70,7 @@ void StatsMatcherImpl::optimizeLastMatcher() {
 
 StatsMatcher::FastResult StatsMatcherImpl::fastRejects(StatName stat_name) const {
   if (rejectsAll()) {
-    return FastResult::NoMatch;
+    return FastResult::Rejects;
   }
   bool matches = fastRejectMatch(stat_name);
   if ((is_inclusive_ || matchers_.empty()) && matches == is_inclusive_) {
