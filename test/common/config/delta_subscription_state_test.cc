@@ -346,8 +346,8 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
-// Check that subscribing to the wildcard resource affects the initial request (so resources
-// received from server from the wildcard subscription are not resent).
+// Check that switching into wildcard subscription after initial
+// request switches us into the explicit wildcard mode.
 TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
@@ -355,7 +355,7 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   EXPECT_CALL(*timer_, disableTimer()).Times(2);
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  // Add a wildcard subscription.
+  // switch into wildcard mode
   state_.updateSubscriptionInterest({"name4", Wildcard}, {"name1"});
   state_.markStreamFresh(); // simulate a stream reconnection
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
@@ -369,9 +369,6 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
               UnorderedElementsAre("name2", "name3", "name4", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
-  // Here we will receive the resource name5, which is not a resource we are explicitly interested
-  // in, thus it came in response to wildcard subscription. As such, it should not appear later in
-  // the initial request after a reset.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add4_5 =
       populateRepeatedResource({{"name4", "version4A"}, {"name5", "version5A"}});
   deliverDiscoveryResponse(add4_5, {}, "debugversion1");
@@ -393,9 +390,8 @@ TEST_F(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
 
 // For wildcard subscription, upon a reconnection, the server is supposed to assume a blank slate
 // for the Envoy's state (hence the need for initial_resource_versions), and the
-// resource_names_subscribe should contain only an asterisk and resource_names_unsubscribe must be
-// empty if we haven't gained any new explicit interest in a resource. In such case, the client
-// should send a request with only a wildcard subscription.
+// resource_names_subscribe and resource_names_unsubscribe must be empty if we haven't gained any
+// new explicit interest in a resource. In such case, the client should send an empty request.
 TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
@@ -412,17 +408,38 @@ TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
-// Check the contents of the requests after cancelling the wildcard
-// subscription and then reconnection. The second request should look
-// like a non-wildcard request, so mention all the known resources in
-// the initial request.
-TEST_F(WildcardDeltaSubscriptionStateTest, CancellingWildcardSubscription) {
+// For wildcard subscription, upon a reconnection, the server is supposed to assume a blank slate
+// for the Envoy's state (hence the need for initial_resource_versions). The
+// resource_names_unsubscribe must be empty (as is expected of every wildcard first message). The
+// resource_names_subscribe should contain all the resources we are explicitly interested in and a
+// special resource denoting a wildcard subscription.
+TEST_F(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnectExplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  // Cancel the wildcard subscription.
+  state_.updateSubscriptionInterest({"name3"}, {"name1"});
+  state_.markStreamFresh(); // simulate a stream reconnection
+  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: we lost interest.
+  // name2: do not include: we are implicitly interested, but for wildcard it shouldn't be provided.
+  // name3: yes do include: we are explicitly interested.
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("*", "name3"));
+  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+}
+
+// Check the contents of the requests after cancelling the wildcard
+// subscription and then reconnection. The second request should look
+// like a non-wildcard request, so mention all the known resources in
+// the initial request.
+TEST_F(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscription) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+
   state_.updateSubscriptionInterest({"name3"}, {"name1", Wildcard});
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
@@ -437,6 +454,37 @@ TEST_F(WildcardDeltaSubscriptionStateTest, CancellingWildcardSubscription) {
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
 
+// Check the contents of the requests after cancelling the wildcard
+// subscription and then reconnection. The second request should look
+// like a non-wildcard request, so mention all the known resources in
+// the initial request.
+TEST_F(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscription) {
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2 =
+      populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
+  EXPECT_CALL(*timer_, disableTimer());
+  deliverDiscoveryResponse(add1_2, {}, "debugversion1");
+  // switch to explicit wildcard subscription
+  state_.updateSubscriptionInterest({"name3"}, {});
+  envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
+
+  // cancel wildcard subscription
+  state_.updateSubscriptionInterest({"name4"}, {"name1", "*"});
+  cur_request = state_.getNextRequestAckless();
+  EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
+  EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "*"));
+  state_.markStreamFresh(); // simulate a stream reconnection
+  // Regarding the resource_names_subscribe field:
+  // name1: do not include: we lost interest.
+  // name2: yes do include: we are interested, and it's not wildcard.
+  // name3: yes do include: we are interested, and it's not wildcard.
+  // name4: yes do include: we are interested, and it's not wildcard.
+  cur_request = state_.getNextRequestAckless();
+  EXPECT_THAT(cur_request.resource_names_subscribe(),
+              UnorderedElementsAre("name2", "name3", "name4"));
+  EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
+}
+
 // Check that resource changes from being interested in implicitly to explicitly when we update the
 // subscription interest. Such resources will show up in the initial wildcard requests
 // too. Receiving the update on such resource will not change their interest mode.
@@ -446,27 +494,29 @@ TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   EXPECT_CALL(*timer_, disableTimer()).Times(2);
   deliverDiscoveryResponse(add1_2_a, {}, "debugversion1");
 
-  // Verify that neither name1 nor name2 appears in the initial request (they are of implicit
+  // verify that neither name1 nor name2 appears in the initial request (they are of implicit
   // interest and initial wildcard request should not contain those).
   state_.markStreamFresh(); // simulate a stream reconnection
   envoy::service::discovery::v3::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre(Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
-  // Express the interest in name1 explicitly and verify that the follow-up request will contain it.
+  // express the interest in name1 explicitly and verify that the follow-up request will contain it
+  // (this also switches the wildcard mode to explicit, but we won't see * in resource names,
+  // because we already are in wildcard mode).
   state_.updateSubscriptionInterest({"name1"}, {});
   cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
-  // Verify that name1 and * appear in the initial request (name1 is of explicit interest and we
-  // have a wildcard subscription).
+  // verify that name1 and * appear in the initial request (name1 is of explicit interest and we are
+  // in explicit wildcard mode).
   state_.markStreamFresh(); // simulate a stream reconnection
   cur_request = state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1", Wildcard));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 
-  // Verify that getting an update on name1 will keep name1 in the explicit interest mode
+  // verify that getting an update on name1 will keep name1 in the explicit interest mode
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_b =
       populateRepeatedResource({{"name1", "version1B"}, {"name2", "version2B"}});
   deliverDiscoveryResponse(add1_2_b, {}, "debugversion1");

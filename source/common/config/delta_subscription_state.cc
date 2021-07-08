@@ -193,12 +193,17 @@ DeltaSubscriptionState::getNextRequestAckless() {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // Add resource names to resource_names_subscribe only if this is not a wildcard subscription
-      // request or if we requested this resource explicitly.
+      // request or if we requested this resource explicitly (so we are actually in explicit
+      // wildcard mode).
       if (!has_wildcard_subscription_ ||
           resource_state.type() == ResourceType::ExplicitlyRequested) {
         names_added_.insert(resource_name);
       }
     }
+    // We are not clearing the names_added_ set. If we are in implicit wildcard subscription mode,
+    // then the set should already be empty. If we are in explicit wildcard mode then the set will
+    // contain the names we explicitly requested, but we need to add * to the list to make sure it's
+    // sent too.
     if (has_wildcard_subscription_) {
       names_added_.insert(Wildcard);
     }
