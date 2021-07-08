@@ -33,8 +33,8 @@ const char* getRawData(const Buffer::Instance& buffer);
 // 4. verify that data pointer moved correct amount,
 // 5. feed testee more data,
 // 6. verify that nothing more was consumed (because the testee has been ready since step 3).
-template <typename BT, typename AT>
-void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
+template <typename BT>
+void serializeThenDeserializeAndCheckEqualityInOneGo(const typename BT::result_type expected) {
   // given
   BT testee{};
 
@@ -68,8 +68,8 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
 // Does the same thing as the above test, but instead of providing whole data at one, it provides
 // it in N one-byte chunks.
 // This verifies if deserializer keeps state properly (no overwrites etc.).
-template <typename BT, typename AT>
-void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
+template <typename BT>
+void serializeThenDeserializeAndCheckEqualityWithChunks(const typename BT::result_type expected) {
   // given
   BT testee{};
 
@@ -109,9 +109,11 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   ASSERT_EQ(more_data.size(), garbage_size);
 }
 
-// Deserialization of compact type only (for data types where we do not implement serializiation).
-template <typename BT, typename AT>
-void deserializeCompactAndCheckEqualityInOneGo(Buffer::Instance& buffer, const AT expected) {
+// Deserialization (only) of compact-encoded data (for data types where we do not need serializer
+// code).
+template <typename BT>
+void deserializeCompactAndCheckEqualityInOneGo(Buffer::Instance& buffer,
+                                               const typename BT::result_type expected) {
   // given
   BT testee{};
 
@@ -145,8 +147,9 @@ void deserializeCompactAndCheckEqualityInOneGo(Buffer::Instance& buffer, const A
 // Does the same thing as the above test, but instead of providing whole data at one, it provides
 // it in N one-byte chunks.
 // This verifies if deserializer keeps state properly (no overwrites etc.).
-template <typename BT, typename AT>
-void deserializeCompactAndCheckEqualityWithChunks(Buffer::Instance& buffer, AT expected) {
+template <typename BT>
+void deserializeCompactAndCheckEqualityWithChunks(Buffer::Instance& buffer,
+                                                  const typename BT::result_type expected) {
   // given
   BT testee{};
 
@@ -189,8 +192,9 @@ void deserializeCompactAndCheckEqualityWithChunks(Buffer::Instance& buffer, AT e
 }
 
 // Same thing as 'serializeThenDeserializeAndCheckEqualityInOneGo', just uses compact encoding.
-template <typename BT, typename AT>
-void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
+template <typename BT>
+void serializeCompactThenDeserializeAndCheckEqualityInOneGo(
+    const typename BT::result_type expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const uint32_t expected_written_size = encoder.computeCompactSize(expected);
@@ -200,8 +204,9 @@ void serializeCompactThenDeserializeAndCheckEqualityInOneGo(AT expected) {
 }
 
 // Same thing as 'serializeThenDeserializeAndCheckEqualityWithChunks', just uses compact encoding.
-template <typename BT, typename AT>
-void serializeCompactThenDeserializeAndCheckEqualityWithChunks(AT expected) {
+template <typename BT>
+void serializeCompactThenDeserializeAndCheckEqualityWithChunks(
+    const typename BT::result_type expected) {
   // given
   BT testee{};
 
@@ -247,14 +252,15 @@ void serializeCompactThenDeserializeAndCheckEqualityWithChunks(AT expected) {
 }
 
 // Wrapper to run both tests for normal serialization.
-template <typename BT, typename AT> void serializeThenDeserializeAndCheckEquality(AT expected) {
+template <typename BT>
+void serializeThenDeserializeAndCheckEquality(const typename BT::result_type expected) {
   serializeThenDeserializeAndCheckEqualityInOneGo<BT>(expected);
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
 
 // Wrapper to run both tests for compact serialization.
-template <typename BT, typename AT>
-void serializeCompactThenDeserializeAndCheckEquality(AT expected) {
+template <typename BT>
+void serializeCompactThenDeserializeAndCheckEquality(const typename BT::result_type expected) {
   serializeCompactThenDeserializeAndCheckEqualityInOneGo<BT>(expected);
   serializeCompactThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
@@ -262,7 +268,7 @@ void serializeCompactThenDeserializeAndCheckEquality(AT expected) {
 // Wrapper to run both tests for compact deserialization (for non-serializable types).
 template <typename BT>
 void deserializeCompactAndCheckEquality(Buffer::Instance& buffer,
-                                        typename BT::result_type expected) {
+                                        const typename BT::result_type expected) {
   Buffer::OwnedImpl
       copy_for_chunking_test; // Tests modify input buffers, so let's just make a copy.
   copy_for_chunking_test.add(getRawData(buffer), buffer.length());
