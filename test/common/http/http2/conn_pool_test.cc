@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -1181,7 +1182,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);

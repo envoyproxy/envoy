@@ -25,6 +25,7 @@
 
 using testing::_;
 using testing::AnyNumber;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -985,7 +986,7 @@ TEST_P(TcpConnPoolImplTest, DrainCallback) {
   c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   c1.releaseConn();
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
@@ -1011,7 +1012,7 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
     // pending requests.
-    EXPECT_CALL(drained, ready());
+    EXPECT_CALL(drained, ready()).Times(AtLeast(1));
     handle->cancel(ConnectionPool::CancelPolicy::Default);
   } else {
     handle->cancel(ConnectionPool::CancelPolicy::Default);
@@ -1036,7 +1037,7 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(Network::ConnectionEvent::RemoteClose, event);

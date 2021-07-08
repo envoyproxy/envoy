@@ -31,6 +31,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -956,7 +957,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   conn_pool_->expectEnableUpstreamReady();
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   r1.startRequest();
 
   r1.completeResponse(false);
@@ -980,7 +981,7 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   conn_pool_->startDrain();
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());
