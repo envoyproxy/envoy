@@ -40,6 +40,15 @@ public:
   MOCK_METHOD(void, cancel, ());
 };
 
+class MockFilterManager : public FilterManager {
+public:
+  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
+  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(bool, initializeReadFilters, ());
+};
+
 class MockDnsResolver : public DnsResolver {
 public:
   MockDnsResolver();

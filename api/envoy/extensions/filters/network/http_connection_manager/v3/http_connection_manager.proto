@@ -1001,6 +1001,8 @@ message RequestIDExtension {
   google.protobuf.Any typed_config = 1;
 }
 
+// [#protodoc-title: Envoy Mobile HTTP connection manager]
+// HTTP connection manager for use in Envoy mobile.
 message EnvoyMobileHttpConnectionManager {
   HttpConnectionManager config = 1;
 }

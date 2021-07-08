@@ -64,8 +64,8 @@ DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
  */
 class MobileHttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<
-          envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager> {
+      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
+                                     EnvoyMobileHttpConnectionManager> {
 public:
   MobileHttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
