@@ -113,13 +113,10 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
-  // Empty list of subscribed names means a wildcard subscription, so
-  // we will expect an asterisk in sent message.
   auto bar_sub = grpc_mux_->addWatch("bar", {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, {});
-  // This is a wildcard subscription, thus expect the wildcard symbol.
-  expectSendMessage("bar", {Wildcard}, {});
+  expectSendMessage("bar", {}, {});
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
   local_info_.context_provider_.update_cb_handler_.runCallbacks("baz");
@@ -129,7 +126,6 @@ TEST_F(NewGrpcMuxImplTest, DynamicContextParameters) {
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, {});
   local_info_.context_provider_.update_cb_handler_.runCallbacks("bar");
-  expectSendMessage("bar", {}, {Wildcard});
   expectSendMessage("foo", {}, {"x", "y"});
 }
 
@@ -199,7 +195,7 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send a wildcard request on new connection.
-  expectSendMessage(type_url, {Wildcard}, {});
+  expectSendMessage(type_url, {}, {});
   grpc_mux_->start();
 
   // An helper function to create a response with a single load_assignment resource
@@ -258,13 +254,12 @@ TEST_F(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
   EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  // initial_resource_versions should contain client side all resource:version info, and an asterisk
-  // because this is a wildcard request.
-  expectSendMessage(type_url, {Wildcard}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+  // initial_resource_versions should contain client side all resource:version info, and no
+  // added resources because this is a wildcard request.
+  expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     {{"x", "1000"}, {"y", "2000"}});
   grpc_mux_->grpcStreamForTest().onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
-  // Destruction of wildcard will issue an unsubscribe request for the resources.
-  expectSendMessage(type_url, {}, {Wildcard});
+  // Destruction of wildcard will not issue unsubscribe requests for the resources.
 }
 
 // Test that we simply ignore a message for an unknown type_url, with no ill effects.

@@ -52,7 +52,7 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
-  if (update_to_these_names.contains(Wildcard)) {
+  if (update_to_these_names.empty() || update_to_these_names.contains(Wildcard)) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);

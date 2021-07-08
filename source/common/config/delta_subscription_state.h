@@ -26,7 +26,8 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+                         const bool wildcard);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -70,6 +71,12 @@ private:
     ReceivedFromServer,
   };
 
+  // Determines the effective resource type. Explicitly requested type overrides the received from
+  // server type.
+  ResourceType effectiveResourceType(ResourceType old_type, ResourceType new_type) {
+    return (old_type == ResourceType::ReceivedFromServer) ? new_type : old_type;
+  }
+
   class ResourceState {
   public:
     ResourceState(absl::optional<std::string> version, ResourceType type)
@@ -100,6 +107,18 @@ private:
     ResourceType type_;
   };
 
+  // Describes the wildcard mode the subscription is in.
+  enum class WildcardMode {
+    // This mode is being expressed by sending a wildcard subscription request with an empty
+    // resource subscription list.
+    Implicit,
+    // This mode is being expressed by sending a wildcard subscription request that contains "*"
+    // special name in the resource subscription list.
+    Explicit,
+    // This mode is means no wildcard subscription.
+    Disabled,
+  };
+
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
   OptRef<ResourceState> getResourceState(const std::string& resource_name);
   void removeResourceState(const std::string& resource_name);
@@ -117,7 +136,7 @@ private:
   TtlManager ttl_;
 
   const std::string type_url_;
-  bool has_wildcard_subscription_ = false;
+  WildcardMode mode_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
