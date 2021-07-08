@@ -23,14 +23,15 @@ namespace Matcher {
 class MatcherTest : public ::testing::Test {
 public:
   MatcherTest()
-      : inject_action_(action_factory_),
-        factory_(context_, ProtobufMessage::getStrictValidationVisitor(), validation_visitor_) {}
+      : inject_action_(action_factory_), factory_(context_, factory_context_, validation_visitor_) {
+  }
 
   StringActionFactory action_factory_;
   Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action_;
   MockMatchTreeValidationVisitor<TestData> validation_visitor_;
 
   absl::string_view context_ = "";
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   MatchTreeFactory<TestData, absl::string_view> factory_;
 };
 
