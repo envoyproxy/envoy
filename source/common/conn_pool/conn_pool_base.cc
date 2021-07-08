@@ -390,7 +390,7 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
   }
 
   if (isIdleImpl()) {
-    ENVOY_LOG(debug, "invoking drained callbacks - is_draining_={}", is_draining_);
+    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_={}", is_draining_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
