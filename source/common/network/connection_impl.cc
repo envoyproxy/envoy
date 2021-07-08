@@ -144,7 +144,10 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       transport_socket_->doWrite(*write_buffer_, true);
     }
 
-    if (type == ConnectionCloseType::FlushWriteAndDelay && delayed_close_timeout_set) {
+    if (type != ConnectionCloseType::FlushWriteAndDelay && !delayed_close_timeout_set) {
+      closeConnectionImmediately();
+      return;
+    }
       // The socket is being closed and either there is no more data to write or the data can not be
       // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
       // start the delayed close timer if it hasn't been done already by a previous close().
@@ -157,10 +160,9 @@ void ConnectionImpl::close(ConnectionCloseType type) {
         // Monitor for the peer closing the connection.
         ioHandle().enableFileEvents(enable_half_close_ ? 0 : Event::FileReadyType::Closed);
       }
-    } else {
-      closeConnectionImmediately();
-    }
-  } else {
+    return;
+  }
+
     ASSERT(type == ConnectionCloseType::FlushWrite ||
            type == ConnectionCloseType::FlushWriteAndDelay);
 
@@ -199,7 +201,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     ioHandle().enableFileEvents(Event::FileReadyType::Write |
                                 (enable_half_close_ ? 0 : Event::FileReadyType::Closed));
-  }
 }
 
 Connection::State ConnectionImpl::state() const {
@@ -825,6 +826,8 @@ ClientConnectionImpl::ClientConnectionImpl(
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
+    return;
+  }
     if (!Network::Socket::applyOptions(options, *socket_,
                                        envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
@@ -856,7 +859,6 @@ ClientConnectionImpl::ClientConnectionImpl(
         ioHandle().activateFileEvents(Event::FileReadyType::Write);
       }
     }
-  }
 }
 
 void ClientConnectionImpl::connect() {
@@ -866,27 +868,29 @@ void ClientConnectionImpl::connect() {
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
-  } else {
-    ASSERT(SOCKET_FAILURE(result.rc_));
-#ifdef WIN32
-    // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
-    // cannot be completed immediately. We do not check for `EINPROGRESS` as that error is for
-    // blocking operations.
-    if (result.errno_ == SOCKET_ERROR_AGAIN) {
-#else
-    if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
-#endif
-      ASSERT(connecting_);
-      ENVOY_CONN_LOG(debug, "connection in progress", *this);
-    } else {
-      immediate_error_event_ = ConnectionEvent::RemoteClose;
-      connecting_ = false;
-      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
-
-      // Trigger a write event. This is needed on macOS and seems harmless on Linux.
-      ioHandle().activateFileEvents(Event::FileReadyType::Write);
-    }
+    return;
   }
+
+  ASSERT(SOCKET_FAILURE(result.rc_));
+#ifdef WIN32
+  // winsock2 connect returns EWOULDBLOCK if the socket is non-blocking and the connection
+  // cannot be completed immediately. We do not check for `EINPROGRESS` as that error is for
+  // blocking operations.
+  if (result.errno_ == SOCKET_ERROR_AGAIN) {
+#else
+  if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
+#endif
+    ASSERT(connecting_);
+    ENVOY_CONN_LOG(debug, "connection in progress", *this);
+  } else {
+    immediate_error_event_ = ConnectionEvent::RemoteClose;
+    connecting_ = false;
+    ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
+
+    // Trigger a write event. This is needed on macOS and seems harmless on Linux.
+    ioHandle().activateFileEvents(Event::FileReadyType::Write);
+   }
 }
+
 } // namespace Network
 } // namespace Envoy
