@@ -191,7 +191,7 @@ stages:
               AZP_BRANCH: $(Build.SourceBranch)
 
   - stage: linux_x64
-    dependsOn: ["precheck"]
+    dependsOn: []  # "precheck"]
     # For post-submit builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
     jobs:
@@ -203,9 +203,41 @@ stages:
           - template: bazel.yml
             parameters:
               ciTarget: bazel.release
+      - job: package
+        dependsOn: []
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+        - template: bazel.yml
+          parameters:
+            ciTarget: bazel.packaging
+      - job: verify
+        # possibly move this job to verify at the end.
+        dependsOn: ["package"]
+        timeoutInMinutes: 120
+        pool:
+          vmImage: "ubuntu-18.04"
+        steps:
+        - task: DownloadBuildArtifacts@0
+          inputs:
+            buildType: current
+            artifactName: "bazel.packaging"
+            itemPattern: "bazel.packaging/source/exe/envoy/build.x64.tar.gz"
+            downloadType: single
+            targetPath: $(Build.StagingDirectory)
+        - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+          workingDirectory: $(Build.SourcesDirectory)
+          env:
+            AZP_BRANCH: $(Build.SourceBranch)
+            ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+            BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+            BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+            GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          displayName: "Verify packages"
 
   - stage: linux_arm64
-    dependsOn: ["precheck"]
+    dependsOn: []  # "precheck"]
     # For post-submit builds, continue even if precheck fails
     condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
     jobs:
@@ -220,6 +252,41 @@ stages:
               rbe: false
               artifactSuffix: ".arm64"
               bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+      - job: package
+        dependsOn: []
+        timeoutInMinutes: 120
+        pool: "arm-large"
+        steps:
+        - template: bazel.yml
+          parameters:
+            managedAgent: false
+            ciTarget: bazel.packaging
+            rbe: false
+            artifactSuffix: ".arm64"
+            bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+      - job: verify
+        # possibly move this job to verify at the end.
+        dependsOn: ["package"]
+        timeoutInMinutes: 120
+        pool: "arm-large"
+        steps:
+        - task: DownloadBuildArtifacts@0
+          inputs:
+            buildType: current
+            artifactName: "bazel.packaging.arm64"
+            itemPattern: "bazel.packaging.arm64/source/exe/envoy/build.arm64.tar.gz"
+            downloadType: single
+            targetPath: $(Build.StagingDirectory)
+        - script: ci/run_envoy_docker.sh 'ci/do_ci.sh verify_distro'
+          workingDirectory: $(Build.SourcesDirectory)
+          env:
+            AZP_BRANCH: $(Build.SourceBranch)
+            ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
+            BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+            BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
+            GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+          displayName: "Verify packages"
 
   - stage: check
     dependsOn: ["linux_x64"]

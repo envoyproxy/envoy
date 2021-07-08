@@ -6,9 +6,9 @@ set -e
 
 
 build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
+if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "bazel.packaging" || "$1" == "check_repositories" || \
           "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || "$1" == "tooling" || \
-          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+          "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "verify_distro" ]]; then
     build_setup_args="-nofetch"
 fi
 
@@ -191,13 +191,24 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # test/common/stats/stat_test_utility.cc when computing
   # Stats::TestUtil::MemoryTest::mode().
   [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
-
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
 
   echo "bazel release build with tests..."
   bazel_binary_build release
+  exit 0
+elif [[ "$CI_TARGET" == "bazel.packaging" ]]; then
+  setup_clang_toolchain
+  echo "Building distro packages..."
+  mkdir -p "${ENVOY_DELIVERY_DIR}/envoy"
+  if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+      bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //builds:build
+      cp -a bazel-bin/builds/build.tar.gz "${ENVOY_DELIVERY_DIR}/envoy/build.x64.tar.gz"
+  else
+      bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c opt //builds:build
+      cp -a bazel-bin/builds/build.tar.gz "${ENVOY_DELIVERY_DIR}/envoy/build.arm64.tar.gz"
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
   setup_clang_toolchain
@@ -479,6 +490,13 @@ elif [[ "$CI_TARGET" == "tooling" ]]; then
 elif [[ "$CI_TARGET" == "verify_examples" ]]; then
   run_ci_verify "*" wasm-cc
   exit 0
+elif [[ "$CI_TARGET" == "verify_distro" ]]; then
+    if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/distribution:verify /build/bazel.packaging/source/exe/envoy/build.x64.tar.gz
+    else
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/distribution:verify /build/bazel.packaging.arm64/source/exe/envoy/build.arm64.tar.gz
+    fi
+    exit 0
 elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
   run_ci_verify wasm-cc
   exit 0
