@@ -24,6 +24,8 @@ cmake_external(
         "SXG_BUILD_STATIC": "on",
         "SXG_WITH_CERT_CHAIN": "off",
         "RUN_TEST": "off",
+        "CMAKE_INSTALL_LIBDIR": "lib",
+        "DCMAKE_INSTALL_BINDIR": "bin",
     },
     lib_source = "@com_github_google_libsxg//:all",
     static_libraries = ["libsxg.a"],
