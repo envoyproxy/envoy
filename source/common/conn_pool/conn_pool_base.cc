@@ -462,7 +462,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // * When we're not draining, there are no requests/streams, and an otherwise idle connection is
     //   closed (which can leave pool idle). If we were draining, the idle connections would
     //   have already been closed.
-    if (incomplete_stream || (!is_draining_ && event == Network::ConnectionEvent::RemoteClose)) {
+    if (incomplete_stream || !is_draining_) {
       checkForIdleAndCloseIdleConnsIfDraining();
     }
 
