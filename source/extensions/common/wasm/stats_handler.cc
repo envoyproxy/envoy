@@ -69,10 +69,10 @@ std::atomic<int64_t> active_wasms;
 void RuntimeStatsHandler::onEvent(WasmEvent event) {
   switch (event) {
   case WasmEvent::VMShutDown:
-    runtime_stats_.active_.set(active_wasms--);
+    runtime_stats_.active_.set(--active_wasms);
     break;
   case WasmEvent::VMCreated:
-    runtime_stats_.active_.set(active_wasms++);
+    runtime_stats_.active_.set(++active_wasms);
     runtime_stats_.created_.inc();
     break;
   default:
