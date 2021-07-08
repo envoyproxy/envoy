@@ -211,7 +211,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteBadContentType) {
 TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   upstream_protocol_ = FakeHttpConnection::Type::HTTP1;
 
-  initialize(absl::optional("custom-response-size-header"));
+  initialize(absl::make_optional("custom-response-size-header"));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
