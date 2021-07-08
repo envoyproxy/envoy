@@ -39,7 +39,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
 TEST_P(AdminInstanceTest, ConfigDump) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto entry = admin_.getConfigTracker().add("foo", [] {
+  auto entry = admin_.getConfigTracker().add("foo", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("bar");
     return msg;
@@ -60,26 +60,29 @@ TEST_P(AdminInstanceTest, ConfigDump) {
 
 TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   // Add configs in random order and validate config_dump dumps in the order.
-  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("bootstrap_config");
-    return msg;
-  });
-  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+  auto bootstrap_entry =
+      admin_.getConfigTracker().add("bootstrap", [](const Matchers::StringMatcher&) {
+        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        msg->set_value("bootstrap_config");
+        return msg;
+      });
+  auto route_entry = admin_.getConfigTracker().add("routes", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("routes_config");
     return msg;
   });
-  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("listeners_config");
-    return msg;
-  });
-  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("clusters_config");
-    return msg;
-  });
+  auto listener_entry =
+      admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
+        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        msg->set_value("listeners_config");
+        return msg;
+      });
+  auto cluster_entry =
+      admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
+        auto msg = std::make_unique<ProtobufWkt::StringValue>();
+        msg->set_value("clusters_config");
+        return msg;
+      });
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -369,7 +372,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
@@ -394,10 +397,11 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   EXPECT_EQ(expected_json, output);
 }
 
-// Test that using the resource query parameter filters the config dump including EDS.
-// We add both static and dynamic endpoint config to the dump, but expect only
-// dynamic in the JSON with ?resource=dynamic_endpoint_configs.
-TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
+// Test that using the resource and name_regex query parameters filter the config dump including
+// EDS. We add both static and dynamic endpoint config to the dump, but expect only dynamic in the
+// JSON with ?resource=dynamic_endpoint_configs, and only the one named `fake_cluster_2` with
+// ?name_regex=fake_cluster_2.
+TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
@@ -479,6 +483,57 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 }
 )EOF";
   EXPECT_EQ(expected_json, output);
+
+  // Check that endpoints dump uses the name_matcher.
+  Buffer::OwnedImpl response2;
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds=true&name_regex=fake_cluster_2",
+                                        header_map, response2));
+  const std::string expected_json2 = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.EndpointsConfigDump",
+   "static_endpoint_configs": [
+    {
+     "endpoint_config": {
+      "@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "cluster_name": "fake_cluster_2",
+      "endpoints": [
+       {
+        "locality": {},
+        "lb_endpoints": [
+         {
+          "endpoint": {
+           "address": {
+            "socket_address": {
+             "address": "1.2.3.5",
+             "port_value": 8
+            }
+           },
+           "health_check_config": {
+            "port_value": 1,
+            "hostname": "test_hostname_healthcheck"
+           },
+           "hostname": "boo.com"
+          },
+          "health_status": "HEALTHY",
+          "metadata": {},
+          "load_balancing_weight": 3
+         }
+        ],
+        "priority": 4
+       }
+      ],
+      "policy": {
+       "overprovisioning_factor": 140
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(expected_json2, response2.toString());
 }
 
 // Test that using the mask query parameter filters the config dump.
@@ -487,7 +542,7 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResource) {
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
@@ -516,7 +571,49 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   EXPECT_EQ(expected_json, output);
 }
 
-ProtobufTypes::MessagePtr testDumpClustersConfig() {
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByNameRegex) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  auto listeners =
+      admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher& name_matcher) {
+        auto msg = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
+        if (name_matcher.match("bar")) {
+          auto dyn_listener = msg->add_dynamic_listeners();
+          dyn_listener->set_name("bar");
+        }
+        if (name_matcher.match("foo")) {
+          auto dyn_listener = msg->add_dynamic_listeners();
+          dyn_listener->set_name("foo");
+        }
+        return msg;
+      });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v3.ListenersConfigDump",
+   "dynamic_listeners": [
+    {
+     "name": "bar"
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?name_regex=.*a.*", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, InvalidRegexIsBadRequest) {
+  Buffer::OwnedImpl response;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::BadRequest, getCallback("/config_dump?name_regex=[", header_map, response));
+  std::string output = response.toString();
+  EXPECT_THAT(output, testing::HasSubstr("Error while parsing name_regex"));
+}
+
+ProtobufTypes::MessagePtr testDumpClustersConfig(const Matchers::StringMatcher&) {
   auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   auto* static_cluster = msg->add_static_clusters();
   envoy::config::cluster::v3::Cluster inner_cluster;
@@ -581,7 +678,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+  auto listeners = admin_.getConfigTracker().add("listeners", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
     return msg;
@@ -594,7 +691,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
 TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+  auto clusters = admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     msg->set_version_info("foo");
     return msg;
@@ -606,7 +703,7 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
 TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+  auto clusters = admin_.getConfigTracker().add("clusters", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
     auto* static_cluster = msg->add_static_clusters();
     envoy::config::cluster::v3::Cluster inner_cluster;
@@ -633,7 +730,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
 TEST_P(AdminInstanceTest, InvalidFieldMaskWithoutResourceDoesNotCrash) {
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
-  auto bootstrap = admin_.getConfigTracker().add("bootstrap", [] {
+  auto bootstrap = admin_.getConfigTracker().add("bootstrap", [](const Matchers::StringMatcher&) {
     auto msg = std::make_unique<envoy::admin::v3::BootstrapConfigDump>();
     auto* bootstrap = msg->mutable_bootstrap();
     bootstrap->mutable_node()->add_extensions()->set_name("ext1");
