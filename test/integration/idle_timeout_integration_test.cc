@@ -424,8 +424,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
   codec_client_->sendData(*request_encoder_, 1, false);
 
   // Two sleeps should trigger the timer, as each advances time by timeout / 2. However, the data
-  // frame above would have used the filter to reset the timer. Thus, the stream should not be reset
-  // yet.
+  // frame above would have caused the filter to reset the timer. Thus, the stream should not be
+  // reset yet.
   sleep();
 
   EXPECT_FALSE(response->complete());
