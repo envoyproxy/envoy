@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
@@ -488,16 +489,6 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
   std::string actual, expected;
   std::string match_test_type{test_type + "." + ::toString(header)};
   switch (header.header_match_specifier_case()) {
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
-    if (header.string_match().match_pattern_case() !=
-        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
-      goto default_case;
-    }
-    actual =
-        header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
-    expected = header.name() + ": " + header.string_match().exact();
-    reportFailure(actual, expected, match_test_type, !header.invert_match());
-    break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -505,7 +496,16 @@ bool RouterCheckTool::matchHeaderField(const HeaderMap& header_map,
     expected = "has(" + header.name() + "):" + (header.invert_match() ? "false" : "true");
     reportFailure(actual, expected, match_test_type);
     break;
-  default_case:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    if (header.string_match().match_pattern_case() ==
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
+      actual =
+          header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
+      expected = header.name() + ": " + header.string_match().exact();
+      reportFailure(actual, expected, match_test_type, !header.invert_match());
+      break;
+    }
+    FALLTHRU;
   default:
     actual =
         header.name() + ": " + ::toString(header_map.get(Http::LowerCaseString(header.name())));
