@@ -178,7 +178,7 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t socket_index) {
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Socket::Type::Stream ||
@@ -194,7 +194,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
           fmt::format("socket type {} not supported for pipes", toString(socket_type)));
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, socket_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
     Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -209,7 +209,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const std::string addr = absl::StrCat(scheme, address->asString());
 
   if (bind_type != BindType::NoBind) {
-    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, socket_index);
+    const int fd = server_.hotRestart().duplicateParentListenSocket(addr, worker_index);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
@@ -614,15 +614,6 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
                                               ListenerCompletionCallback completion_callback) {
   if (overridden_listener.has_value()) {
     ENVOY_LOG(debug, "replacing existing listener {}", overridden_listener.value());
-    worker.addListener(overridden_listener, listener, [this, completion_callback]() -> void {
-      server_.dispatcher().post([this, completion_callback]() -> void {
-        stats_.listener_create_success_.inc();
-        if (completion_callback) {
-          completion_callback();
-        }
-      });
-    });
-    return;
   }
   worker.addListener(overridden_listener, listener, [this, completion_callback]() -> void {
     // The add listener completion runs on the worker thread. Post back to the main thread to

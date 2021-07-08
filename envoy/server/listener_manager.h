@@ -64,14 +64,14 @@ public:
    * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
    * @param bind_type supplies the bind type of the listen socket.
-   * @param socket_index supplies the socket/worker index of the new socket.
+   * @param worker_index supplies the socket/worker index of the new socket.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
                      Network::Socket::Type socket_type,
                      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-                     uint32_t socket_index) PURE;
+                     uint32_t worker_index) PURE;
 
   /**
    * Creates a list of filter factories.

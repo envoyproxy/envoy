@@ -109,9 +109,9 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   for (const auto& listener : server_->listenerManager().listeners()) {
     Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
     if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
-      if (request.pass_listen_socket().socket_index() < server_->options().concurrency()) {
+      if (request.pass_listen_socket().worker_index() < server_->options().concurrency()) {
         wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-            socket_factory.getListenSocket(request.pass_listen_socket().socket_index())
+            socket_factory.getListenSocket(request.pass_listen_socket().worker_index())
                 ->ioHandle()
                 .fdDoNotUse());
       }

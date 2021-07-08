@@ -14,7 +14,7 @@ public:
   HotRestartingChild(int base_id, int restart_epoch, const std::string& socket_path,
                      mode_t socket_mode);
 
-  int duplicateParentListenSocket(const std::string& address, uint32_t socket_index);
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index);
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   absl::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();

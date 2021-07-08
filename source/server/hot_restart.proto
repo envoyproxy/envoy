@@ -7,7 +7,7 @@ message HotRestartMessage {
   message Request {
     message PassListenSocket {
       string address = 1;
-      uint32 socket_index = 2;
+      uint32 worker_index = 2;
     }
     message ShutdownAdmin {
     }

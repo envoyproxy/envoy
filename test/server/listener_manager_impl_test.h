@@ -220,8 +220,8 @@ protected:
       const envoy::config::core::v3::SocketOption::SocketState& expected_state,
       Network::Socket::Options::size_type expected_num_options,
       ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::ReusePort,
-      uint32_t socket_index = 0) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, socket_index))
+      uint32_t worker_index = 0) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, worker_index))
         .WillOnce(
             Invoke([this, expected_num_options, &expected_state](
                        const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,

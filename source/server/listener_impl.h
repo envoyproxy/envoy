@@ -49,7 +49,7 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
-  Network::SocketSharedPtr getListenSocket(uint32_t socket_index) override;
+  Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
   bool reusePort() const override {
     return bind_type_ == ListenerComponentFactory::BindType::ReusePort;
   }
@@ -71,7 +71,7 @@ private:
                                     Network::Socket::Type socket_type,
                                     const Network::Socket::OptionsSharedPtr& options,
                                     ListenerComponentFactory::BindType bind_type,
-                                    const std::string& listener_name, uint32_t socket_index);
+                                    const std::string& listener_name, uint32_t worker_index);
 
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port

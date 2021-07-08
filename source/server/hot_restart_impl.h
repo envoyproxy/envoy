@@ -102,7 +102,7 @@ public:
 
   // Server::HotRestart
   void drainParentListeners() override;
-  int duplicateParentListenSocket(const std::string& address, uint32_t socket_index) override;
+  int duplicateParentListenSocket(const std::string& address, uint32_t worker_index) override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   absl::optional<AdminShutdownResponse> sendParentAdminShutdownRequest() override;
   void sendParentTerminateRequest() override;

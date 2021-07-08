@@ -98,10 +98,11 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Network::ListenerConfig& config)
     : ActiveUdpListenerBase(worker_index, concurrency, parent, listen_socket, std::move(listener),
                             &config) {
-  // Create the filter chain on creating a new udp listener
+  // Create the filter chain on creating a new udp listener.
   config_->filterChainFactory().createUdpListenerFilterChain(*this, *this);
 
-  // If filter is nullptr, fail the creation of the listener
+  // If filter is nullptr warn that we will be dropping packets. This is an edge case and should
+  // only happen due to a bad factory. It's not worth adding per-worker error handling for this.
   if (read_filter_ == nullptr) {
     ENVOY_LOG(warn, "UDP listener has no filters. Packets will be dropped.");
   }

@@ -131,25 +131,22 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
       listener_name_(factory_to_clone.listener_name_),
       tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
       bind_type_(factory_to_clone.bind_type_) {
-  for (uint32_t i = 0; i < factory_to_clone.sockets_.size(); i++) {
-    if (bind_type_ != ListenerComponentFactory::BindType::ReusePort) {
-      sockets_.push_back(factory_to_clone.sockets_[0]->duplicate());
-    } else {
-      sockets_.push_back(createListenSocketAndApplyOptions(factory_, socket_type_, options_,
-                                                           bind_type_, listener_name_, i));
-    }
+  for (auto& socket : factory_to_clone.sockets_) {
+    // In the cloning case we always duplicate() the socket. This makes sure that during listener
+    // update/drain we don't lose any incoming connections when using reuse port.
+    sockets_.push_back(socket->duplicate());
   }
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions(
     ListenerComponentFactory& factory, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType bind_type,
-    const std::string& listener_name, uint32_t socket_index) {
+    const std::string& listener_name, uint32_t worker_index) {
   // Socket might be nullptr when doing server validation.
   // TODO(mattklein123): See the comment in the validation code. Make that code not return nullptr
   // so this code can be simpler.
   Network::SocketSharedPtr socket =
-      factory.createListenSocket(local_address_, socket_type, options, bind_type, socket_index);
+      factory.createListenSocket(local_address_, socket_type, options, bind_type, worker_index);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name,
@@ -173,9 +170,9 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
   return socket;
 }
 
-Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket(uint32_t socket_index) {
-  ASSERT(socket_index < sockets_.size() && sockets_[socket_index] != nullptr);
-  return sockets_[socket_index];
+Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket(uint32_t worker_index) {
+  ASSERT(worker_index < sockets_.size() && sockets_[worker_index] != nullptr);
+  return sockets_[worker_index];
 }
 
 void ListenSocketFactoryImpl::doFinalPreWorkerInit() {

@@ -144,6 +144,9 @@ MockListenSocket::MockListenSocket()
   }));
   ON_CALL(*this, ipVersion())
       .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+  ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
+    return std::make_unique<NiceMock<MockListenSocket>>();
+  }));
 }
 
 MockSocketOption::MockSocketOption() {
