@@ -177,6 +177,7 @@ private:
  * Impl note:
  * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
  * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
+ * Reference: org.apache.kafka.common.utils.ByteUtils.readUnsignedVarint
  */
 class VarUInt32Deserializer : public Deserializer<uint32_t> {
 public:
@@ -224,6 +225,15 @@ private:
   bool ready_ = false;
 };
 
+/**
+ * Deserializer for Kafka 'varint' type.
+ * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ *
+ * Impl note:
+ * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 5-byte
+ * inputs, the data at bits 5-7 in 5th byte are *ignored* (as long as 8th bit is unset).
+ * Reference: org.apache.kafka.common.utils.ByteUtils.readVarint
+ */
 class VarInt32Deserializer : public Deserializer<int32_t> {
 public:
   VarInt32Deserializer() = default;
@@ -241,6 +251,15 @@ private:
   VarUInt32Deserializer varuint32_deserializer_;
 };
 
+/**
+ * Deserializer for Kafka 'varlong' type.
+ * Encoding documentation: https://kafka.apache.org/24/protocol.html#protocol_types
+ *
+ * Impl note:
+ * This implementation is equivalent to the one present in Kafka 2.4.0, what means that for 10-byte
+ * inputs, the data at bits 3-7 in 10th byte are *ignored* (as long as 8th bit is unset).
+ * Reference: org.apache.kafka.common.utils.ByteUtils.readVarlong
+ */
 class VarInt64Deserializer : public Deserializer<int64_t> {
 public:
   VarInt64Deserializer() = default;
@@ -257,7 +276,7 @@ public:
 
       // Put the 7 bits where they should have been.
       // Impl note: the cast is done to avoid undefined behaviour when offset_ >= 63 and some bits
-      // at positions 2-7 are set (we would have left shift of signed value that does not fit in
+      // at positions 3-7 are set (we would have left shift of signed value that does not fit in
       // data type).
       bytes_ |= ((static_cast<uint64_t>(el) & 0x7f) << offset_);
       if ((el & 0x80) == 0) {
@@ -267,7 +286,7 @@ public:
       } else {
         // Otherwise, we need to read next byte.
         offset_ += 7;
-        // Valid input can have at most 5 bytes.
+        // Valid input can have at most 10 bytes.
         if (offset_ >= 10 * 7) {
           ExceptionUtil::throwEnvoyException(
               "VarInt64 is too long (10th byte has highest bit set)");
