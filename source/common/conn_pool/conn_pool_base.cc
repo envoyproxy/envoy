@@ -28,19 +28,13 @@ ConnPoolImplBase::ConnPoolImplBase(
       upstream_ready_cb_(dispatcher_.createSchedulableCallback([this]() { onUpstreamReady(); })) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
-  ASSERT(pending_streams_.empty());
-  ASSERT(ready_clients_.empty());
-  ASSERT(busy_clients_.empty());
-  ASSERT(connecting_clients_.empty());
+  ASSERT(isIdleImpl());
   ASSERT(connecting_stream_capacity_ == 0);
 }
 
 void ConnPoolImplBase::deleteIsPendingImpl() {
   deferred_deleting_ = true;
-  ASSERT(pending_streams_.empty());
-  ASSERT(ready_clients_.empty());
-  ASSERT(busy_clients_.empty());
-  ASSERT(connecting_clients_.empty());
+  ASSERT(isIdleImpl());
   ASSERT(connecting_stream_capacity_ == 0);
 }
 
