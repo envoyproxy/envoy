@@ -412,6 +412,10 @@ private:
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
 
+      void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
+                              const std::vector<uint8_t>& hash_key);
+      void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
+
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
