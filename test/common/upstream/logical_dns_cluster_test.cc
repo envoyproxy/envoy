@@ -188,7 +188,7 @@ protected:
     logical_host->createConnection(dispatcher_, nullptr, nullptr);
 
     // Make sure we cancel.
-    EXPECT_CALL(active_dns_query_, cancel());
+    EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
 
