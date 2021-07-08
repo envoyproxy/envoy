@@ -251,11 +251,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "libipp-crypto",
         project_desc = "Intel® Integrated Performance Primitives Cryptography",
         project_url = "https://github.com/intel/ipp-crypto",
-        version = "2021.2",
-        sha256 = "d358e2665d100935f036d84eba70724a12b9e3e5b597ba850d79064a42e6ed5d",
-        strip_prefix = "ipp-crypto-ippcp_{version}",
-        urls = ["https://github.com/intel/ipp-crypto/archive/ippcp_{version}.tar.gz"],
-        release_date = "2021-04-19",
+        # The required BoringSSL compatibility patches are present in the
+        # "development" branch, but not yet in the release branch. The target
+        # release for the patches is 2021.4.
+        version = "4048dac1617bf33ff85d37a4b8f68f21342263b7",
+        sha256 = "4316589a7c0afa5788b84b04510283dab0979bf6d3b0aa0e4ef0fe540675af5e",
+        strip_prefix = "ipp-crypto-{version}",
+        urls = ["https://github.com/intel/ipp-crypto/archive/{version}.tar.gz"],
+        release_date = "2021-07-07",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "N/A",

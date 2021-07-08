@@ -317,14 +317,6 @@ def _com_github_intel_ipp_crypto_crypto_mb():
     external_http_archive(
         name = "com_github_intel_ipp_crypto_crypto_mb",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel/foreign_cc:0001-BoringSSL-compatibility-fix.patch",
-            "@envoy//bazel/foreign_cc:0002-Remove-OpenSSL-version-check.patch",
-            "@envoy//bazel/foreign_cc:0003-Allow-overriding-FORTIFY_SOURCE.patch",
-            "@envoy//bazel/foreign_cc:0004-Always-install-the-static-library.patch",
-            "@envoy//bazel/foreign_cc:0005-Set-default-CMAKE_BUILD_TYPE-to-Release.patch",
-        ],
     )
 
 def _com_github_jbeder_yaml_cpp():
