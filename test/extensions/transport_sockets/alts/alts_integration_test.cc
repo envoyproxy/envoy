@@ -125,8 +125,6 @@ public:
 
           header->mutable_header()->set_value(
               R"EOF(%DYNAMIC_METADATA(["envoy.transport_sockets.alts", "peer_name"])%)EOF");
-          // Actually start time can get in to the request header keyed by tsi_peer.
-          // header->mutable_header()->set_value("%START_TIME(%s.%3f)%");
         });
 
     HttpIntegrationTest::initialize();
