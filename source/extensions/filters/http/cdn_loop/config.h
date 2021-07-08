@@ -8,7 +8,6 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +18,7 @@ class CdnLoopFilterFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::http::cdn_loop::v3alpha::CdnLoopConfig> {
 public:
-  CdnLoopFilterFactory() : FactoryBase(HttpFilterNames::get().CdnLoop) {}
+  CdnLoopFilterFactory() : FactoryBase("envoy.filters.http.cdn_loop") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

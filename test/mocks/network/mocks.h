@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <list>
 #include <ostream>
@@ -19,6 +20,7 @@
 
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/network/socket_interface_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -37,7 +39,7 @@ public:
   ~MockActiveDnsQuery() override;
 
   // Network::ActiveDnsQuery
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (CancelReason reason));
 };
 
 class MockDnsResolver : public DnsResolver {
@@ -162,6 +164,7 @@ public:
   ~MockDrainDecision() override;
 
   MOCK_METHOD(bool, drainClose, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {
@@ -321,7 +324,7 @@ public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
   bool is_closed_;
 };
 
@@ -587,5 +590,32 @@ public:
   ~MockListenerFilterMatcher() override;
   MOCK_METHOD(bool, matches, (Network::ListenerFilterCallbacks & cb), (const));
 };
+
+class MockUdpPacketProcessor : public UdpPacketProcessor {
+public:
+  MOCK_METHOD(void, processPacket,
+              (Address::InstanceConstSharedPtr local_address,
+               Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
+               MonotonicTime receive_time));
+  MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
+  MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+};
+
+class MockSocketInterface : public SocketInterfaceImpl {
+public:
+  explicit MockSocketInterface(const std::vector<Address::IpVersion>& versions)
+      : versions_(versions.begin(), versions.end()) {}
+  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
+              (const));
+  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
+  bool ipFamilySupported(int domain) override {
+    const auto to_version = domain == AF_INET ? Address::IpVersion::v4 : Address::IpVersion::v6;
+    return std::any_of(versions_.begin(), versions_.end(),
+                       [to_version](auto version) { return to_version == version; });
+  }
+  const std::vector<Address::IpVersion> versions_;
+};
+
 } // namespace Network
 } // namespace Envoy

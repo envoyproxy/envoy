@@ -11,6 +11,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -138,8 +139,10 @@ public:
                   .value());
   }
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
+  void checkConfigDump(
+      const std::string& expected_dump_yaml,
+      const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
+    auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"](name_matcher);
     const auto& clusters_config_dump =
         dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 
@@ -280,6 +283,15 @@ static_clusters:
 dynamic_active_clusters:
 dynamic_warming_clusters:
 )EOF");
+
+  Matchers::MockStringMatcher mock_matcher;
+  EXPECT_CALL(mock_matcher, match("http12_cluster")).WillOnce(Return(false));
+  checkConfigDump(R"EOF(
+static_clusters:
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF",
+                  mock_matcher);
 }
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
@@ -3420,6 +3432,27 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
   EXPECT_TRUE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(pool_mock));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
+  ASSERT_TRUE(opt_cp.has_value());
+
+  EXPECT_CALL(*pool_mock, hasActiveConnections()).WillOnce(Return(true));
+  opt_cp.value().hasActiveConnections();
+
+  ConnectionPool::Instance::DrainedCb drained_cb = []() {};
+  EXPECT_CALL(*pool_mock, addDrainedCallback(_));
+  opt_cp.value().addDrainedCallback(drained_cb);
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {

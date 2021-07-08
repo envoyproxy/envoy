@@ -46,6 +46,8 @@ private:
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
+ * TODO(soulxu): Since there are more than address information inside the provider, this will be
+ * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
 class SocketAddressProvider {
 public:
@@ -72,6 +74,16 @@ public:
    *         connected peer, and cannot be modified by listener filters.
    */
   virtual const Address::InstanceConstSharedPtr& directRemoteAddress() const PURE;
+
+  /**
+   * @return SNI value for downstream host.
+   */
+  virtual absl::string_view requestedServerName() const PURE;
+
+  /**
+   * @return Connection ID of the downstream connection, or unset if not available.
+   **/
+  virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
    * Dumps the state of the SocketAddressProvider to the given ostream.
@@ -109,6 +121,16 @@ public:
    * Set the remote address of the socket.
    */
   virtual void setRemoteAddress(const Address::InstanceConstSharedPtr& remote_address) PURE;
+
+  /**
+   * @param SNI value requested.
+   */
+  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
+
+  /**
+   * @param id Connection ID of the downstream connection.
+   **/
+  virtual void setConnectionID(uint64_t id) PURE;
 };
 
 using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;

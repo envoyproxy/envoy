@@ -15,6 +15,7 @@
 #include "source/common/ssl/tls_certificate_config_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/mocks/server/config_tracker.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/transport_socket_factory_context.h"
@@ -26,18 +27,23 @@
 #include "gtest/gtest.h"
 
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Secret {
 namespace {
+
+using ::Envoy::Matchers::MockStringMatcher;
 
 class SecretManagerImplTest : public testing::Test, public Logger::Loggable<Logger::Id::secret> {
 protected:
   SecretManagerImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = config_tracker_.config_tracker_callbacks_["secrets"]();
+  void checkConfigDump(
+      const std::string& expected_dump_yaml,
+      const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
+    auto message_ptr = config_tracker_.config_tracker_callbacks_["secrets"](name_matcher);
     const auto& secrets_config_dump =
         dynamic_cast<const envoy::admin::v3::SecretsConfigDump&>(*message_ptr);
     envoy::admin::v3::SecretsConfigDump expected_secrets_config_dump;
@@ -498,6 +504,9 @@ dynamic_active_secrets:
         inline_string: "[redacted]"
 )EOF";
   checkConfigDump(expected_secrets_config_dump);
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   // Add a dynamic tls validation context provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
@@ -547,6 +556,9 @@ dynamic_active_secrets:
         inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
 )EOF";
   checkConfigDump(updated_config_dump);
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   // Add a dynamic tls session ticket encryption keys context provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
@@ -609,6 +621,10 @@ dynamic_active_secrets:
         - inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(updated_once_more_config_dump));
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.stek")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   // Add a dynamic generic secret provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
@@ -682,6 +698,11 @@ dynamic_active_secrets:
         inline_string: "[redacted]"
 )EOF";
   checkConfigDump(TestEnvironment::substitute(config_dump_with_generic_secret));
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.stek")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("signing_key")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
@@ -722,6 +743,9 @@ dynamic_warming_secrets:
     name: "abc.com"
   )EOF";
   checkConfigDump(expected_secrets_config_dump);
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
@@ -746,6 +770,9 @@ dynamic_warming_secrets:
     name: "abc.com.validation"
 )EOF";
   checkConfigDump(updated_config_dump);
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto stek_secret_provider = secret_manager->findOrCreateTlsSessionTicketKeysContextProvider(
@@ -777,6 +804,10 @@ dynamic_warming_secrets:
     name: "abc.com.stek"
 )EOF";
   checkConfigDump(updated_once_more_config_dump);
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.stek")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
@@ -815,6 +846,11 @@ dynamic_warming_secrets:
     name: "signing_key"
 )EOF";
   checkConfigDump(config_dump_with_generic_secret);
+  EXPECT_CALL(mock_matcher, match("abc.com")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("abc.com.stek")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("signing_key")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
@@ -889,6 +925,11 @@ static_secrets:
         inline_string: "[redacted]"
 )EOF";
   checkConfigDump(expected_config_dump);
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match(testing::HasSubstr("abc.com")))
+      .Times(2)
+      .WillRepeatedly(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
@@ -934,6 +975,9 @@ static_secrets:
         inline_string: "DUMMY_INLINE_STRING_TRUSTED_CA"
 )EOF";
   checkConfigDump(expected_config_dump);
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("abc.com.validation")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
@@ -983,6 +1027,9 @@ static_secrets:
         - inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(expected_config_dump));
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("abc.com.stek")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticGenericSecret) {
@@ -1009,6 +1056,9 @@ static_secrets:
         inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(expected_config_dump));
+  StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("signing_key")).WillOnce(Return(false));
+  checkConfigDump("{}", mock_matcher);
 }
 
 } // namespace

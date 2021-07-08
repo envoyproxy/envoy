@@ -457,6 +457,40 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   expectSendMessage(type_url, {}, "1");
 }
 
+// Checks that the control plane identifier is logged
+TEST_F(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
+  setup();
+  std::string type_url = "foo";
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "", true);
+  grpc_mux_->start();
+
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    response->mutable_control_plane()->set_identifier("control_plane_ID");
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _));
+    expectSendMessage(type_url, {}, "1");
+    EXPECT_LOG_CONTAINS("debug", "for foo from control_plane_ID",
+                        grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response)));
+  }
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("2");
+    response->mutable_control_plane()->set_identifier("different_ID");
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _));
+    expectSendMessage(type_url, {}, "2");
+    EXPECT_LOG_CONTAINS("debug", "for foo from different_ID",
+                        grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response)));
+  }
+}
+
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
   setup();

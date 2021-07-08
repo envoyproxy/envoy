@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace Wasm {
 class WasmFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::wasm::v3::Wasm> {
 public:
-  WasmFilterConfig() : FactoryBase(HttpFilterNames::get().Wasm) {}
+  WasmFilterConfig() : FactoryBase("envoy.filters.http.wasm") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

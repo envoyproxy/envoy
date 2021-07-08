@@ -37,7 +37,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -140,6 +140,10 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoClusterFound)) {
     common_access_log.mutable_response_flags()->set_no_cluster_found(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
+    common_access_log.mutable_response_flags()->set_overload_manager(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
@@ -167,7 +171,8 @@ void Utility::extractCommonAccessLogProperties(
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
         stream_info.downstreamSslConnection();
 
-    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+    tls_properties->set_tls_sni_hostname(
+        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {

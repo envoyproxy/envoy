@@ -25,6 +25,7 @@
 #include "source/server/watchdog_impl.h"
 
 #include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
 
 namespace Envoy {
 namespace Server {
@@ -216,14 +217,21 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 void GuardDogImpl::start(Api::Api& api) {
   Thread::LockGuard guard(mutex_);
+
+  // Synchronize between calling thread and guarddog thread.
+  absl::Notification guarddog_thread_started;
+
   // See comments in WorkerImpl::start for the naming convention.
   Thread::Options options{absl::StrCat("dog:", dispatcher_->name())};
   thread_ = api.threadFactory().createThread(
-      [this]() -> void {
+      [this, &guarddog_thread_started]() -> void {
         loop_timer_->enableTimer(std::chrono::milliseconds(0));
+        dispatcher_->post([&guarddog_thread_started]() { guarddog_thread_started.Notify(); });
         dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
       },
       options);
+
+  guarddog_thread_started.WaitForNotification();
 }
 
 void GuardDogImpl::stop() {

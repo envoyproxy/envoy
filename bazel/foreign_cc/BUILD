@@ -197,6 +197,8 @@ envoy_cmake_external(
     cache_entries = {
         # Disable both: BUILD and INCLUDE, since some of the INCLUDE
         # targets build code instead of only generating build files.
+        "LLVM_BUILD_BENCHMARKS": "off",
+        "LLVM_INCLUDE_BENCHMARKS": "off",
         "LLVM_BUILD_DOCS": "off",
         "LLVM_INCLUDE_DOCS": "off",
         "LLVM_BUILD_EXAMPLES": "off",
@@ -210,6 +212,7 @@ envoy_cmake_external(
         "LLVM_INCLUDE_TOOLS": "off",
         "LLVM_BUILD_UTILS": "off",
         "LLVM_INCLUDE_UTILS": "off",
+        "LLVM_ENABLE_IDE": "off",
         "LLVM_ENABLE_LIBEDIT": "off",
         "LLVM_ENABLE_LIBXML2": "off",
         "LLVM_ENABLE_TERMINFO": "off",
@@ -312,15 +315,14 @@ envoy_cmake_external(
     name = "wamr",
     cache_entries = {
         "LLVM_DIR": "$EXT_BUILD_DEPS/copy_llvm/llvm/lib/cmake/llvm",
-        "WAMR_BUILD_INTERP": "1",
-        "WAMR_BUILD_JIT": "0",
-        "WAMR_BUILD_AOT": "0",
+        "WAMR_BUILD_INTERP": "0",
+        "WAMR_BUILD_JIT": "1",
+        "WAMR_BUILD_AOT": "1",
         "WAMR_BUILD_SIMD": "0",
         "WAMR_BUILD_MULTI_MODULE": "1",
         "WAMR_BUILD_LIBC_WASI": "0",
         "WAMR_BUILD_TAIL_CALL": "1",
     },
-    defines = ["ENVOY_WASM_WAMR"],
     lib_source = "@com_github_wamr//:all",
     static_libraries = ["libvmlib.a"],
     tags = ["skip_on_windows"],
@@ -339,7 +341,6 @@ envoy_cmake_external(
         # using -l:libstdc++.a.
         "CMAKE_CXX_FLAGS": "-lstdc++ -Wno-unused-command-line-argument",
     },
-    defines = ["ENVOY_WASM_WAVM"],
     env_vars = {
         # Workaround for the -DDEBUG flag added in fastbuild on macOS,
         # which conflicts with DEBUG macro used in LLVM.

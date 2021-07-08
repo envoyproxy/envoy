@@ -1,6 +1,7 @@
 load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("@docs_pip3//:requirements.bzl", "requirement")
+load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,16 +16,6 @@ py_binary(
     ],
 )
 
-genrule(
-    name = "extensions_security_rst",
-    srcs = ["//source/extensions:extensions_metadata.yaml"],
-    outs = ["extensions_security_rst.tar"],
-    cmd = (
-        "$(location generate_extensions_security_rst) $(location //source/extensions:extensions_metadata.yaml) $@"
-    ),
-    tools = [":generate_extensions_security_rst"],
-)
-
 py_binary(
     name = "generate_external_deps_rst",
     srcs = [
@@ -36,16 +27,57 @@ py_binary(
     ],
 )
 
-genrule(
-    name = "external_deps_rst",
+py_binary(
+    name = "generate_api_rst",
     srcs = [
-        "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "generate_api_rst.py",
     ],
-    outs = ["external_deps_rst.tar"],
-    cmd = (
-        "$(location generate_external_deps_rst) $@"
-    ),
-    tools = [":generate_external_deps_rst"],
+)
+
+envoy_py_binary(
+    name = "tools.docs.sphinx_runner",
+    deps = [
+        "//tools/base:runner",
+        requirement("alabaster"),
+        requirement("Babel"),
+        requirement("certifi"),
+        requirement("chardet"),
+        requirement("colorama"),
+        requirement("docutils"),
+        requirement("gitdb"),
+        requirement("GitPython"),
+        requirement("idna"),
+        requirement("imagesize"),
+        requirement("Jinja2"),
+        requirement("MarkupSafe"),
+        requirement("packaging"),
+        requirement("Pygments"),
+        requirement("pyparsing"),
+        requirement("pytz"),
+        requirement("pyyaml"),
+        requirement("requests"),
+        requirement("setuptools"),
+        requirement("six"),
+        requirement("smmap"),
+        requirement("snowballstemmer"),
+        requirement("Sphinx"),
+        requirement("sphinx-copybutton"),
+        requirement("sphinx-rtd-theme"),
+        requirement("sphinx-tabs"),
+        requirement("sphinxcontrib-applehelp"),
+        requirement("sphinxcontrib-devhelp"),
+        requirement("sphinxcontrib-htmlhelp"),
+        requirement("sphinxcontrib-httpdomain"),
+        requirement("sphinxcontrib-jsmath"),
+        requirement("sphinxcontrib-qthelp"),
+        requirement("sphinxext-rediraffe"),
+        requirement("sphinxcontrib-serializinghtml"),
+        requirement("urllib3"),
+    ],
+)
+
+envoy_py_binary(
+    name = "tools.docs.rst_check",
+    data = ["//docs:root/version_history/current.rst"],
+    deps = ["//tools/base:checker"],
 )

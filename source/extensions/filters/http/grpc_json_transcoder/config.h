@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class GrpcJsonTranscoderFilterConfig
     : public Common::FactoryBase<
           envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder> {
 public:
-  GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcJsonTranscoder) {}
+  GrpcJsonTranscoderFilterConfig() : FactoryBase("envoy.filters.http.grpc_json_transcoder") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

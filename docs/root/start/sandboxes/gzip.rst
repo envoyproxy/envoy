@@ -83,3 +83,13 @@ Now, use ``curl`` to make a request for the compressed statistics:
 
     $ curl -si -H "Accept-Encoding: gzip" localhost:9902/stats/prometheus | grep "content-encoding"
     content-encoding: gzip
+
+.. seealso::
+   :ref:`Gzip API <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`
+      API and configuration reference for Envoy's gzip compression.
+
+   :ref:`Compression configuration <config_http_filters_compressor>`
+      Reference documentation for Envoy's compressor filter.
+
+   :ref:`Envoy admin quick start guide <start_quick_start_admin>`
+      Quick start guide to the Envoy admin interface.

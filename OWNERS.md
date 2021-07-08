@@ -40,9 +40,18 @@ routing PRs, questions, etc. to the right place.
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
   * Docs, tooling, CI, containers and sandbox examples
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liason.
+  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
+
+# Senior extension maintainers
+
+The following extension maintainers have final say over the extensions mentioned below. Once they
+approve an extension PR, it will be merged by the maintainer on-call (or any other maintainer)
+without further review.
+
+* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+  * Wasm
 
 # Envoy security team
 

@@ -7,6 +7,7 @@
 
 #include "source/common/event/deferred_task.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/active_tcp_listener.h"
 
 namespace Envoy {
@@ -191,17 +192,33 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
-  listener_it =
-      std::find_if(listeners_.begin(), listeners_.end(),
-                   [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
-                                              ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                     return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                                p.second.typed_listener_) &&
-                            p.second.listener_->listener() != nullptr &&
-                            p.first->type() == Network::Address::Type::Ip &&
-                            p.first->ip()->port() == address.ip()->port() &&
-                            p.first->ip()->isAnyAddress();
-                   });
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
+    listener_it =
+        std::find_if(listeners_.begin(), listeners_.end(),
+                     [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
+                                                ConnectionHandlerImpl::ActiveListenerDetails>& p) {
+                       return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                                  p.second.typed_listener_) &&
+                              p.second.listener_->listener() != nullptr &&
+                              p.first->type() == Network::Address::Type::Ip &&
+                              p.first->ip()->port() == address.ip()->port() &&
+                              p.first->ip()->isAnyAddress() &&
+                              p.first->ip()->version() == address.ip()->version();
+                     });
+  } else {
+    listener_it =
+        std::find_if(listeners_.begin(), listeners_.end(),
+                     [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
+                                                ConnectionHandlerImpl::ActiveListenerDetails>& p) {
+                       return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+                                  p.second.typed_listener_) &&
+                              p.second.listener_->listener() != nullptr &&
+                              p.first->type() == Network::Address::Type::Ip &&
+                              p.first->ip()->port() == address.ip()->port() &&
+                              p.first->ip()->isAnyAddress();
+                     });
+  }
   return (listener_it != listeners_.end())
              ? Network::BalancedConnectionHandlerOptRef(
                    ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(

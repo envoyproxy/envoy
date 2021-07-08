@@ -26,8 +26,9 @@ public:
       data_input_allowlist_ = requirements.data_input_allow_list().type_url();
     }
   }
-  absl::Status performDataInputValidation(const Matcher::DataInput<Envoy::Http::HttpMatchingData>&,
-                                          absl::string_view type_url) override {
+  absl::Status
+  performDataInputValidation(const Matcher::DataInputFactory<Envoy::Http::HttpMatchingData>&,
+                             absl::string_view type_url) override {
     if (!data_input_allowlist_) {
       return absl::OkStatus();
     }
@@ -113,7 +114,7 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
   }
 
   return [filter_factory, match_tree](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree);
+    DelegatingFactoryCallbacks delegated_callbacks(callbacks, match_tree());
 
     return filter_factory(delegated_callbacks);
   };

@@ -245,7 +245,7 @@ public:
       auto state = std::make_unique<GrpcStatsObject>();
       filter_object_ = state.get();
       decoder_callbacks_->streamInfo().filterState()->setData(
-          HttpFilterNames::get().GrpcStats, std::move(state),
+          "envoy.filters.http.grpc_stats", std::move(state),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
