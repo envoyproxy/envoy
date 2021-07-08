@@ -10,7 +10,6 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/config/protobuf_link_hacks.h"
-#include "source/common/config/watch_map.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -145,8 +144,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
 
 void AdsIntegrationTest::testBasicFlow() {
   // Send initial configuration, validate we can process a request.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {Config::Wildcard},
-                                      {Config::Wildcard}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "1");
@@ -158,8 +156,7 @@ void AdsIntegrationTest::testBasicFlow() {
       {buildClusterLoadAssignment("cluster_0")}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {Config::Wildcard},
-                                      {Config::Wildcard}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");

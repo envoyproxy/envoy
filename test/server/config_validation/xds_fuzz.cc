@@ -7,7 +7,6 @@
 #include "envoy/config/route/v3/route.pb.h"
 
 #include "source/common/common/matchers.h"
-#include "source/common/config/watch_map.h"
 
 namespace Envoy {
 
@@ -237,8 +236,7 @@ void XdsFuzzTest::replay() {
   initialize();
 
   // Set up cluster.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {Config::Wildcard},
-                                      {Config::Wildcard}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {buildCluster("cluster_0")},
                                                              {buildCluster("cluster_0")}, {}, "0");

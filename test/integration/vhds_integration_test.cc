@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/protobuf_link_hacks.h"
-#include "source/common/config/watch_map.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -233,8 +232,8 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   RELEASE_ASSERT(result, result.message());
   vhds_stream_->startGrpcStream();
 
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {Config::Wildcard},
-                                           {}, vhds_stream_));
+  EXPECT_TRUE(
+      compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
   sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost,
       {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
@@ -323,8 +322,8 @@ public:
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {Config::Wildcard},
-                                             {}, vhds_stream_));
+    EXPECT_TRUE(
+        compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
     EXPECT_TRUE(
