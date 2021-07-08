@@ -449,7 +449,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -522,6 +522,10 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
+  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
+      component_factory.createRuntime(*this, initial_config));
+  initial_config.initAccessLog(bootstrap_, *this);
+
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
                               initial_config.admin().address(),
@@ -553,8 +557,6 @@ void InstanceImpl::initialize(const Options& options,
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
-  runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
-      component_factory.createRuntime(*this, initial_config));
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
