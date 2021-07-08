@@ -63,7 +63,7 @@ run_log envoy-running "Check envoy is running"
 pgrep envoy
 
 run_log proxy-responds "Check proxy responds"
-curl -s http://localhost:10000 | grep "I'm Feeling Lucky"
+curl -s http://localhost:10000 | grep "Envoy is an open source edge and service proxy, designed for cloud-native applications"
 
 run_log stop-envoy "Stop envoy"
 sudo -u envoy pkill envoy

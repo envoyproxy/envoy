@@ -140,6 +140,7 @@ def envoy_pkg_deb(name = "envoy", version = None, data = ":deb-data.tar.xz", **k
         architecture = arch,
         data = data,
         description = "Envoy built for Debian/Ubuntu",
+        distribution = "buster bullseye impish hirstute",
         homepage = "https://www.envoyproxy.io/",
         maintainer = "Envoy maintainers <envoy-maintainers@googlegroups.com>",
         package = name,
