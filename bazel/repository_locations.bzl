@@ -606,6 +606,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-11-13",
         cpe = "cpe:2.3:a:google:protobuf:*",
     ),
+    com_github_google_rpmpack = dict(
+        project_name = "rpmpack",
+        project_desc = "rpmpack (tar2rpm) package rpms in pure golang or cli",
+        project_url = "https://github.com/google/rpmpack",
+        version = "dc539ef4f2ea1c53ab359280cadc7249f2fb3e61",
+        sha256 = "f370bb7f810fc9db740da9c78ec07825d4ef1460ccb8f2dcf4e23b7ca693dfca",
+        strip_prefix = "rpmpack-{version}",
+        urls = ["https://github.com/google/rpmpack/archive/{version}.tar.gz"],
+        release_date = "2021-05-18",
+        use_category = ["build"],
+    ),
     grpc_httpjson_transcoding = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
