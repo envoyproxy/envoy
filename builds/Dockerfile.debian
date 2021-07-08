@@ -1,0 +1,23 @@
+ARG distro=debian
+ARG tag=buster-slim
+
+FROM $distro:$tag
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG BINARY
+ARG PACKAGE
+ARG DISTRONAME
+
+ADD $BINARY "/tmp/${BINARY}"
+ADD distrotest.sh /tmp/distrotest.sh
+
+RUN chmod +x /tmp/distrotest.sh \
+    && apt-get update \
+    && apt-get install -y -qq --no-install-recommends curl procps sudo
+
+ENV INSTALL_COMMAND="apt-get install -yy -q /tmp/${BINARY}" \
+    UNINSTALL_COMMAND="apt-get remove --purge -y -qq ${PACKAGE}" \
+    PACKAGE=$PACKAGE \
+    DISTRO=$DISTRONAME
+
+CMD ["tail", "-f", "/dev/null"]

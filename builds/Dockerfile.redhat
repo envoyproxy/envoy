@@ -1,0 +1,21 @@
+ARG distro=registry.access.redhat.com/ubi8/ubi
+ARG tag=8.4
+
+FROM $distro:$tag
+
+ARG BINARY
+ARG PACKAGE
+ARG DISTRONAME
+
+ADD $BINARY "/tmp/${BINARY}"
+ADD distrotest.sh /tmp/distrotest.sh
+
+RUN chmod +x /tmp/distrotest.sh \
+    && yum -y install procps sudo
+
+ENV INSTALL_COMMAND="rpm -i --force /tmp/${BINARY}" \
+    UNINSTALL_COMMAND="rpm -e ${PACKAGE}" \
+    PACKAGE=$PACKAGE \
+    DISTRO=$DISTRONAME
+
+CMD ["tail", "-f", "/dev/null"]
