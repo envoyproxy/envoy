@@ -1049,7 +1049,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
 }
 
-TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(AccessLogWithFilter)) {
+TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
   std::string json = R"EOF(
   {
     "admin": {
@@ -1082,6 +1082,57 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(AccessLogWithFilter)) {
   config.initAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
+}
+
+
+TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithFilter)) {
+  std::string json = R"EOF(
+  {
+    "admin": {
+      "access_log": [
+        {
+          "name": "envoy.access_loggers.file",
+          "typed_config": {
+            "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+            "path": "/dev/null"
+          },
+          "filter": {
+            "not_health_check_filter":{
+            }
+          }
+        }
+      ],
+      access_log_path: "/dev/null",
+      "address": {
+        "socket_address": {
+          "address": "1.2.3.4",
+          "port_value": 5678
+        }
+      }
+    }
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  config.initAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 2);
+}
+
+TEST_F(ConfigurationImplTest, EmptyAdmin) {
+  std::string json = R"EOF(
+  {
+    "admin": {}
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  NiceMock<MockOptions> options;
+  InitialImpl config(bootstrap, options);
+  config.initAccessLog(bootstrap, server_);
+
+  ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
 
 TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) {
