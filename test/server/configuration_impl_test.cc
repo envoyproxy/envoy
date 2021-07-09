@@ -1125,6 +1125,7 @@ TEST_F(ConfigurationImplTest, EmptyAdmin) {
   std::string json = R"EOF(
   {
     "admin": {}
+  }
   )EOF";
 
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
