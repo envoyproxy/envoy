@@ -432,6 +432,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutResetFromFilter) {
 
   sleep();
 
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
+
   // Now the timer should have triggered.
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().getStatusValue());
