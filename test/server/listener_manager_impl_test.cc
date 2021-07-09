@@ -20,6 +20,7 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
@@ -268,42 +269,6 @@ filter_chains:
           verify_subject_alt_name:
             - localhost
             - 127.0.0.1
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
-  manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
-  ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
-}
-
-TEST_F(ListenerManagerImplWithRealFiltersTest, DEPRECATED_FEATURE_TEST(TlsContext)) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-address:
-  socket_address:
-    address: 127.0.0.1
-    port_value: 1234
-filter_chains:
-- filters: []
-  transport_socket:
-     name: tls
-     typed_config:
-       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-       common_tls_context:
-         tls_certificates:
-         - certificate_chain:
-             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
-           private_key:
-             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
-         validation_context:
-           trusted_ca:
-             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-           match_subject_alt_names:
-             exact: localhost
-             exact: 127.0.0.1
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -1662,6 +1627,10 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
+  auto mock_interface = std::make_unique<Network::MockSocketInterface>(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
+  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
@@ -1672,29 +1641,80 @@ address:
     address: 127.0.0.1
     port_value: 1234
 bind_to_port: false
+reuse_port: false
 filter_chains:
 - filters: []
   )EOF";
 
-  auto syscall_result = os_sys_calls_actual_.socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_TRUE(SOCKET_VALID(syscall_result.rc_));
-
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
+      .WillOnce(Invoke([this, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
                            Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
-        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
-        // fd through hot restart.
-        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
         return real_listener_factory.createListenSocket(address, socket_type, options, params);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+}
+
+TEST_F(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
+  InSequence s;
+  auto mock_interface = std::make_unique<Network::MockSocketInterface>(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
+  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+
+  ProdListenerComponentFactory real_listener_factory(server_);
+  EXPECT_CALL(*worker_, start(_, _));
+  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  const std::string listener_foo_yaml = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+bind_to_port: false
+reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, ListenSocketCreationParams(false)))
+      .WillOnce(Invoke([this, &real_listener_factory](
+                           const Network::Address::InstanceConstSharedPtr& address,
+                           Network::Socket::Type socket_type,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           const ListenSocketCreationParams& params) -> Network::SocketSharedPtr {
+        EXPECT_CALL(server_, hotRestart).Times(0);
+        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
+        return real_listener_factory.createListenSocket(address, socket_type, options, params);
+      }));
+  EXPECT_CALL(*worker_, addListener(_, _, _));
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
+
+  worker_->callAddCompletion(true);
+
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+
+  EXPECT_CALL(*worker_, stopListener(_, _));
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
+
+  EXPECT_TRUE(manager_->removeListener("foo"));
+
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
 }
 
 TEST_F(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqualToFalse)) {

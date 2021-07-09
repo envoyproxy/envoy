@@ -90,7 +90,7 @@ private:
     ~PendingResolution();
 
     // Network::ActiveDnsQuery
-    void cancel() override;
+    void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
     // Wrapper for the API call.

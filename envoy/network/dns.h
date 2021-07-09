@@ -19,10 +19,20 @@ class ActiveDnsQuery {
 public:
   virtual ~ActiveDnsQuery() = default;
 
+  enum class CancelReason {
+    // The caller no longer needs the answer to the query.
+    QueryAbandoned,
+    // The query timed out from the perspective of the caller. The DNS implementation may take
+    // a different action in this case (e.g., destroying existing DNS connections) in an effort
+    // to get an answer to future queries.
+    Timeout
+  };
+
   /**
    * Cancel an outstanding DNS request.
+   * @param reason supplies the cancel reason.
    */
-  virtual void cancel() PURE;
+  virtual void cancel(CancelReason reason) PURE;
 };
 
 /**

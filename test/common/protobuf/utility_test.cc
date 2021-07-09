@@ -986,6 +986,19 @@ type_url: type.googleapis.com/envoy.test.Sensitive
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+value:
+  sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
   udpa::type::v1::TypedStruct actual;
@@ -998,6 +1011,20 @@ value:
 
   udpa::type::v1::TypedStruct expected = actual;
   MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
+  ProtobufWkt::Any actual;
+  MessageUtil::redact(actual);
+  ProtobufWkt::Any expected = actual;
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 

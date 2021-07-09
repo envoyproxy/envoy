@@ -449,6 +449,7 @@ TEST(Context, ConnectionAttributes) {
   EXPECT_CALL(info, upstreamTransportFailureReason())
       .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+  info.downstream_address_provider_->setConnectionID(123);
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));

@@ -11,7 +11,7 @@ namespace InputMatchers {
 namespace IP {
 
 TEST(ConfigTest, TestConfig) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const std::string yaml_string = R"EOF(
     name: ip
@@ -34,7 +34,7 @@ TEST(ConfigTest, TestConfig) {
 }
 
 TEST(ConfigTest, InvalidConfigIP) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const std::string yaml_string = R"EOF(
     name: ip
@@ -57,7 +57,7 @@ TEST(ConfigTest, InvalidConfigIP) {
 }
 
 TEST(ConfigTest, InvalidConfigStats) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   const std::string yaml_string = R"EOF(
     name: ip
