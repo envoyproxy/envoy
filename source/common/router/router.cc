@@ -1271,11 +1271,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        const bool exclude_http_code_stats = grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
-                                           config_.stats_.stat_names_.retry_,
-                                           static_cast<Http::Code>(response_code), 
-                                           exclude_http_code_stats);
+        const bool exclude_http_code_stats =
+            grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
+        code_stats.chargeBasicResponseStat(
+            cluster_->statsScope(), config_.stats_.stat_names_.retry_,
+            static_cast<Http::Code>(response_code), exclude_http_code_stats);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
