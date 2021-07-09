@@ -44,8 +44,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "xDS API Working Group (xDS-WG)",
         project_url = "https://github.com/cncf/xds",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "b88cc788a63e5b38ee334a2e702c67901355ae2c",
-        sha256 = "3220df8564f217665b6e17776569c5f748178c2b9cbf83bb55a13ddc0a3738f0",
+        version = "2e5c007c8982836cda87a125fb95fc0b5057fe3a",
+        sha256 = "e9c751599f69549027aacd8cdc30c0e7b55d9b61ba351739abed705ed667d2b1",
         release_date = "2021-03-23",
         strip_prefix = "xds-{version}",
         urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],

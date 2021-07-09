@@ -233,8 +233,8 @@ private:
     const CommonProtocolInputPtr common_protocol_input_;
   };
 
-  DataInputFactoryCb<DataType>
-  createDataInput(const envoy::config::core::v3::TypedExtensionConfig& config) {
+  template <class TypedExtensionConfigType>
+  DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
     auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
     if (factory != nullptr) {
       validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
@@ -264,7 +264,8 @@ private:
     switch (predicate.matcher_case()) {
     case SinglePredicateType::kValueMatch:
       return [value_match = predicate.value_match()]() {
-        return std::make_unique<StringInputMatcher>(value_match);
+        return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
+            value_match);
       };
     case SinglePredicateType::kCustomMatch: {
       auto& factory =

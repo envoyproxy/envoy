@@ -7,10 +7,9 @@
 namespace Envoy {
 namespace Matcher {
 
-class StringInputMatcher : public InputMatcher {
+template <class StringMatcherType> class StringInputMatcher : public InputMatcher {
 public:
-  explicit StringInputMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
-      : matcher_(matcher) {}
+  explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
 
   bool match(absl::optional<absl::string_view> input) override {
     if (!input) {
@@ -21,7 +20,7 @@ public:
   }
 
 private:
-  const Matchers::StringMatcherImpl matcher_;
+  const Matchers::StringMatcherImpl<StringMatcherType> matcher_;
 };
 
 } // namespace Matcher

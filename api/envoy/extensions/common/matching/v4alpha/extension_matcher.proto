@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.common.matching.v4alpha;
 
-import "envoy/config/common/matcher/generic/v4alpha/matcher.proto";
 import "envoy/config/core/v4alpha/extension.proto";
+
+import "udpa/type/matcher/v1/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -30,7 +31,7 @@ message ExtensionWithMatcher {
   reserved "matcher";
 
   // The associated matcher.
-  config.common.matcher.generic.v4alpha.Matcher matcher_tree = 3;
+  udpa.type.matcher.v1.Matcher udpa_matcher = 3;
 
   // The underlying extension config.
   config.core.v4alpha.TypedExtensionConfig extension_config = 2

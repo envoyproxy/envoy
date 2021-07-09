@@ -13,7 +13,6 @@ proto_library(
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/bootstrap/v3:pkg",
         "//envoy/config/cluster/v3:pkg",
-        "//envoy/config/common/matcher/generic/v3:pkg",
         "//envoy/config/common/matcher/v3:pkg",
         "//envoy/config/core/v3:pkg",
         "//envoy/config/endpoint/v3:pkg",

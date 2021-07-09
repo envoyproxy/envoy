@@ -109,8 +109,8 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
                             Envoy::Http::Matching::HttpFilterActionContext>
       matcher_factory(action_context, context.getServerFactoryContext(), validation_visitor);
   Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> factory_cb;
-  if (proto_config.has_matcher_tree()) {
-    factory_cb = matcher_factory.create(proto_config.matcher_tree());
+  if (proto_config.has_udpa_matcher()) {
+    factory_cb = matcher_factory.create(proto_config.udpa_matcher());
   } else if (proto_config.has_matcher()) {
     factory_cb = matcher_factory.create(proto_config.matcher());
   } else {
