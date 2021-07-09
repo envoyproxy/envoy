@@ -374,8 +374,7 @@ private:
 
   // Configure a tap transport socket for a cluster/filter chain.
   void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket,
-                             const Protobuf::Message* tls_config);
+                             envoy::config::core::v3::TransportSocket& transport_socket);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
