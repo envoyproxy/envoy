@@ -894,13 +894,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   // if necessary.
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
-    if (config.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name("envoy.transport_sockets.tls");
-      transport_socket.mutable_typed_config()->PackFrom(
-          config.hidden_envoy_deprecated_tls_context());
-    } else {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-    }
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
@@ -944,6 +938,7 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api, TimeSource& time_source)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       time_source_(time_source),
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),

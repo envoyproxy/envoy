@@ -182,8 +182,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     }
 
     // Proceed with resolution after establishing that the resolver has a live main_sd_ref_.
-    std::unique_ptr<PendingResolution> pending_resolution(
-        new PendingResolution(*this, callback, dispatcher_, main_sd_ref_, dns_name));
+    auto pending_resolution =
+        std::make_unique<PendingResolution>(*this, callback, dispatcher_, main_sd_ref_, dns_name);
 
     DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
     if (error != kDNSServiceErr_NoError) {
@@ -265,7 +265,9 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   }
 }
 
-void AppleDnsResolverImpl::PendingResolution::cancel() {
+void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::CancelReason) {
+  // TODO(mattklein123): If cancel reason is timeout, do something more aggressive about destroying
+  // and recreating the DNS system to maximize the chance of success in following queries.
   ENVOY_LOG(debug, "Cancelling PendingResolution for {}", dns_name_);
   ASSERT(owned_);
   if (pending_cb_) {

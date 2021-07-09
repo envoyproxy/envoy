@@ -29,6 +29,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
@@ -364,7 +366,8 @@ void InstanceImpl::initialize(const Options& options,
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
-  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setStatsMatcher(
+      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
@@ -530,8 +533,8 @@ void InstanceImpl::initialize(const Options& options,
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+  config_tracker_entry_ = admin_->getConfigTracker().add(
+      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
@@ -824,6 +827,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();
