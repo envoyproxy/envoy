@@ -4,10 +4,8 @@ load(
     "envoy_cc_library",
     "envoy_extension_package",
 )
-load(
-    "@rules_foreign_cc//tools/build_defs:cmake.bzl",
-    "cmake_external",
-)
+
+load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 
 licenses(["notice"])  # Apache 2
 
@@ -15,29 +13,12 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-cmake_external(
-    name = "libsxg",
-    cache_entries = {
-        "CMAKE_BUILD_TYPE": "Release",
-        "SXG_BUILD_EXECUTABLES": "off",
-        "SXG_BUILD_SHARED": "off",
-        "SXG_BUILD_STATIC": "on",
-        "SXG_WITH_CERT_CHAIN": "off",
-        "RUN_TEST": "off",
-        "CMAKE_INSTALL_LIBDIR": "lib",
-        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-    },
-    lib_source = "@com_github_google_libsxg//:all",
-    static_libraries = ["libsxg.a"],
-    deps = ["@boringssl//:ssl"],
-)
-
 envoy_cc_library(
     name = "sxg_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        "libsxg",
+        envoy_external_dep_path("libsxg"),
         "//envoy/server:filter_config_interface",
         "//source/common/config:datasource_lib",
         "//source/common/http:codes_lib",

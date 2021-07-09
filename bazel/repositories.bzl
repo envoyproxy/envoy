@@ -319,6 +319,12 @@ def _com_github_google_libsxg():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+    native.bind(
+        name = "libsxg",
+        actual = "@envoy//bazel/foreign_cc:libsxg",
+    )
+
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
