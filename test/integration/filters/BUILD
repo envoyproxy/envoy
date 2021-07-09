@@ -418,7 +418,6 @@ envoy_cc_test_library(
     ],
     deps = [
         ":common_lib",
-        "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",

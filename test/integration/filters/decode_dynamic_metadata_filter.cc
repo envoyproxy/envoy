@@ -3,8 +3,6 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
-#include "gtest/gtest.h"
-
 namespace Envoy {
 
 // A filter that only allows decodeData() to be called once with fixed data length.
