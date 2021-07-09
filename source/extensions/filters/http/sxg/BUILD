@@ -4,7 +4,6 @@ load(
     "envoy_cc_library",
     "envoy_extension_package",
 )
-
 load("//bazel:envoy_internal.bzl", "envoy_external_dep_path")
 
 licenses(["notice"])  # Apache 2

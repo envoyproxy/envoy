@@ -90,10 +90,9 @@ envoy_cmake_external(
     },
     lib_source = "@com_github_google_libsxg//:all",
     static_libraries = ["libsxg.a"],
-    deps = ["@boringssl//:ssl"],
     tags = ["skip_on_windows"],
+    deps = ["@boringssl//:ssl"],
 )
-
 
 envoy_cmake_external(
     name = "ares",
