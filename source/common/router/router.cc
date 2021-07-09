@@ -603,15 +603,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Inject the active span's tracing context into the request headers.
   callbacks_->activeSpan().injectContext(headers);
 
-  // Merge dynamic metadata in connection level to dynamic metadata in stream level.
-  if (callbacks_->connection()) {
-    const auto& connection_dynamic_metafata =
-        callbacks_->connection()->streamInfo().dynamicMetadata().filter_metadata();
-    for (auto const& [key, val] : connection_dynamic_metafata) {
-      callbacks_->streamInfo().setDynamicMetadata(key, val);
-    }
-  }
-
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
 

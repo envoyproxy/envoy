@@ -118,7 +118,7 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       ProtobufWkt::Struct dynamic_metadata;
       ProtobufWkt::Value val;
       val.set_string_value(tsi_info.name_);
-      dynamic_metadata.mutable_fields()->insert({std::string("peer_name"), val});
+      dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata("envoy.transport_sockets.alts",
                                                                dynamic_metadata);
       ENVOY_CONN_LOG(debug, "TSI hanshake with peer: {}", callbacks_->connection(), tsi_info.name_);

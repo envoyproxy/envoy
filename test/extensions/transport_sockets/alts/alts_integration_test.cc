@@ -115,17 +115,11 @@ public:
       transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
 
-    config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
-          envoy::config::core::v3::HeaderValueOption* header =
-              hcm.mutable_route_config()->mutable_request_headers_to_add()->Add();
-
-          header->mutable_header()->set_key("tsi_peer");
-
-          header->mutable_header()->set_value(
-              R"EOF(%DYNAMIC_METADATA(["envoy.transport_sockets.alts", "peer_name"])%)EOF");
-        });
+    config_helper_.addFilter(R"EOF(
+    name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Empty
+    )EOF");
 
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
@@ -264,7 +258,8 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
   upstream_request.iterate(
       [&contain_peer_name](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
         const std::string key{header.key().getStringView()};
-        if (key == "tsi_peer") {
+        const std::string value{header.value().getStringView()};
+        if (key == "envoy.transport_sockets.alts.peer_identity" && value == "peer_identity") {
           contain_peer_name = true;
         }
         return Http::HeaderMap::Iterate::Continue;
