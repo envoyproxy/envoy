@@ -106,6 +106,8 @@ public:
   void charge(uint64_t amount) override;
   void credit(uint64_t amount) override;
 
+  // Clear the associated downstream, preparing the account to be destroyed.
+  // This is idempotent.
   void clearDownstream() override;
 
   void resetDownstream() override {

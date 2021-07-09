@@ -65,18 +65,6 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
           stats, http3_options),
       headers_with_underscores_action_(headers_with_underscores_action) {}
 
-EnvoyQuicServerStream::~EnvoyQuicServerStream() {
-  // Only the downstream stream should clear the downstream of the
-  // memory account.
-  //
-  // There are cases where a corresponding upstream stream dtor might
-  // be called, but the downstream stream isn't going to terminate soon
-  // such as StreamDecoderFilterCallbacks::recreateStream().
-  if (buffer_memory_account_) {
-    buffer_memory_account_->clearDownstream();
-  }
-}
-
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
   encodeHeaders(headers, false);
@@ -139,6 +127,9 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
+  }
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
   }
 }
 
@@ -302,6 +293,22 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
                           : quicErrorCodeToEnvoyRemoteResetReason(error));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(error, source);
+}
+
+void EnvoyQuicServerStream::CloseWriteSide() {
+  quic::QuicSpdyServerStreamBase::CloseWriteSide();
+
+  // Clear the downstream since the stream should not write additional data
+  // after this is called, e.g. cannot reset the stream.
+  // Only the downstream stream should clear the downstream of the
+  // memory account.
+  //
+  // There are cases where a corresponding upstream stream dtor might
+  // be called, but the downstream stream isn't going to terminate soon
+  // such as StreamDecoderFilterCallbacks::recreateStream().
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
 }
 
 void EnvoyQuicServerStream::OnClose() {

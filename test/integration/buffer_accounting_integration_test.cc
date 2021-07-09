@@ -30,6 +30,34 @@ std::string protocolTestParamsAndBoolToString(
                      std::get<1>(params.param) ? "with_per_stream_buffer_accounting"
                                                : "without_per_stream_buffer_accounting");
 }
+
+void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
+  absl::Notification done_notification;
+  ThreadLocal::TypedSlotPtr<> slot;
+  Envoy::Thread::ThreadId main_tid;
+  server.dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server.threadLocal());
+    slot->set(
+        [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
+          return nullptr;
+        });
+
+    main_tid = server.api().threadFactory().currentThreadId();
+
+    slot->runOnAllThreads(
+        [main_tid, &server, &func](OptRef<ThreadLocal::ThreadLocalObject>) {
+          // Run on the worker thread.
+          if (server.api().threadFactory().currentThreadId() != main_tid) {
+            func();
+          }
+        },
+        [&slot, &done_notification] {
+          slot.reset(nullptr);
+          done_notification.Notify();
+        });
+  });
+  done_notification.WaitForNotification();
+}
 } // namespace
 
 class Http2BufferWatermarksTest
@@ -83,7 +111,8 @@ protected:
             // the balance.
             stream << "  Account: " << entry.first << '\n';
             stream << "    Balance:"
-                   << static_cast<BufferMemoryAccountImpl*>(entry.first.get())->balance() << '\n';
+                   << static_cast<Buffer::BufferMemoryAccountImpl*>(entry.first.get())->balance()
+                   << '\n';
             stream << "    Number of associated buffers: " << entry.second.size() << '\n';
           }
         };
@@ -288,6 +317,71 @@ TEST_P(ProtocolsBufferWatermarksTest, AccountShouldBeRegisteredAndUnregisteredOn
   upstream_request1->encodeData(1000, true);
   ASSERT_TRUE(response1->waitForEndStream());
   ASSERT_TRUE(upstream_request1->complete());
+
+  // Check single call to unregister if stream account, 0 otherwise
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(1));
+  } else {
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
+  }
+}
+
+TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
+  FakeStreamPtr upstream_request1;
+  default_request_headers_.setContentLength(1000);
+  // H1 on RST ends up leveraging idle timeout if no active stream on the
+  // connection.
+  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends the first request.
+  auto response1 = codec_client_->makeRequestWithBody(default_request_headers_, 1000);
+  waitForNextUpstreamRequest();
+  upstream_request1 = std::move(upstream_request_);
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1);
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+  }
+
+  if (streamBufferAccounting()) {
+    // Reset the downstream via the account interface on the worker thread.
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1);
+    Buffer::BufferMemoryAccountSharedPtr account;
+    auto& server = test_server_->server();
+
+    // Get access to the account.
+    buffer_factory_->inspectAccounts(
+        [&account](Buffer::TrackedWatermarkBufferFactory::AccountToBoundBuffersMap& map) {
+          for (auto& [acct, _] : map) {
+            account = acct;
+          }
+        },
+        server);
+
+    // Reset the stream from the worker.
+    runOnWorkerThreadsAndWaitforCompletion(server, [&account]() { account->resetDownstream(); });
+
+    if (std::get<0>(GetParam()).downstream_protocol == Http::CodecType::HTTP1) {
+      // For H1, we use idleTimeouts to cancel streams unless there was an
+      // explicit protocol error prior to sending a response to the downstream.
+      // Since that's not the case, the reset will fire twice, once due to
+      // overload manager, and once due to timeout which will close the
+      // connection.
+      ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+    } else {
+      ASSERT_TRUE(response1->waitForReset());
+      EXPECT_EQ(response1->resetReason(), Http::StreamResetReason::RemoteReset);
+    }
+  } else {
+    upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request1->encodeData(1000, true);
+    ASSERT_TRUE(response1->waitForEndStream());
+    ASSERT_TRUE(upstream_request1->complete());
+  }
 
   // Check single call to unregister if stream account, 0 otherwise
   if (streamBufferAccounting()) {

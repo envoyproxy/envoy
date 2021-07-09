@@ -228,12 +228,12 @@ void BufferMemoryAccountImpl::charge(uint64_t amount) {
 }
 
 void BufferMemoryAccountImpl::clearDownstream() {
-  ASSERT(reset_handler_ != nullptr);
-  reset_handler_ = nullptr;
-
-  factory_->unregisterAccount(shared_this_, current_bucket_idx_);
-  current_bucket_idx_ = -1;
-  shared_this_ = nullptr;
+  if (reset_handler_) {
+    reset_handler_ = nullptr;
+    factory_->unregisterAccount(shared_this_, current_bucket_idx_);
+    current_bucket_idx_ = -1;
+    shared_this_ = nullptr;
+  }
 }
 
 } // namespace Buffer

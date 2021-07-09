@@ -408,6 +408,7 @@ protected:
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
     void createPendingFlushTimer() override;
+    void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;

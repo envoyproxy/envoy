@@ -33,7 +33,6 @@ public:
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
-  ~EnvoyQuicServerStream() override;
 
   void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
 
@@ -65,6 +64,7 @@ public:
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
   void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void CloseWriteSide() override;
 
   void clearWatermarkBuffer();
 

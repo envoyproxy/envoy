@@ -162,6 +162,9 @@ public:
     return stream_error_on_invalid_http_message_;
   }
 
+  // Http1::StreamEncoderImpl
+  void resetStream(StreamResetReason reason) override;
+
 private:
   bool started_response_{};
   const bool stream_error_on_invalid_http_message_;

@@ -1509,6 +1509,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
   //       3) The codec RX a reset
+  //       4) The overload manager reset the stream
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
   ENVOY_STREAM_LOG(debug, "stream reset", *this);
   connection_manager_.stats_.named_.downstream_rq_rx_reset_.inc();
@@ -1521,6 +1522,14 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   }
   if (!encoder_details.empty()) {
     filter_manager_.streamInfo().setResponseCodeDetails(encoder_details);
+  }
+
+  // Check if we're in the overload manager reset case.
+  // encoder_details should be empty in this case as we don't have a codec error.
+  if (encoder_details.empty() && reset_reason == StreamResetReason::OverloadManager) {
+    filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
+    filter_manager_.streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().Overload);
   }
 
   connection_manager_.doDeferredStreamDestroy(*this);
