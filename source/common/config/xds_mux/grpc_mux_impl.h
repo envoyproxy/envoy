@@ -19,16 +19,16 @@
 #include "source/common/config/api_version.h"
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/pausable_ack_queue.h"
-#include "source/common/config/unified_mux/delta_subscription_state.h"
-#include "source/common/config/unified_mux/sotw_subscription_state.h"
 #include "source/common/config/watch_map.h"
+#include "source/common/config/xds_mux/delta_subscription_state.h"
+#include "source/common/config/xds_mux/sotw_subscription_state.h"
 #include "source/common/grpc/common.h"
 
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 // Manages subscriptions to one or more type of resource. The logical protocol
 // state of those subscription(s) is handled by SubscriptionState.
@@ -38,13 +38,12 @@ namespace UnifiedMux {
 template <class S, class F, class RQ, class RS>
 class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-              bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info,
+  GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
+              const LocalInfo::LocalInfo& local_info,
               envoy::config::core::v3::ApiVersion transport_api_version);
 
   Watch* addWatch(const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                   SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                  std::chrono::milliseconds init_fetch_timeout,
                   const bool use_namespace_matching = false) override;
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
@@ -55,15 +54,14 @@ public:
   ScopedResume pause(const std::vector<std::string> type_urls) override;
   bool paused(const std::string& type_url) const override;
   void start() override;
-  void disableInitFetchTimeoutTimer() override;
-  const absl::flat_hash_map<std::string, std::unique_ptr<S>>&
-  subscriptions() const {
+  const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
   }
 
   // legacy mux interface not implemented by unified mux.
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&, const SubscriptionOptions&) override {
+                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           const SubscriptionOptions&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -155,7 +153,9 @@ private:
 };
 
 class GrpcMuxDelta
-    : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory, envoy::service::discovery::v3::DeltaDiscoveryRequest, envoy::service::discovery::v3::DeltaDiscoveryResponse>,
+    : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
+                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                         envoy::service::discovery::v3::DeltaDiscoveryResponse>,
       public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
@@ -177,7 +177,8 @@ public:
 
 protected:
   void establishGrpcStream() override;
-  void sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto, DeltaSubscriptionState& sub_state) override;
+  void sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto,
+                       DeltaSubscriptionState& sub_state) override;
   void maybeUpdateQueueSizeStat(uint64_t size) override;
   bool grpcStreamAvailable() const override;
   bool rateLimitAllowsDrain() override;
@@ -188,7 +189,9 @@ private:
       grpc_stream_;
 };
 
-class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory, envoy::service::discovery::v3::DiscoveryRequest, envoy::service::discovery::v3::DiscoveryResponse>,
+class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
+                                       envoy::service::discovery::v3::DiscoveryRequest,
+                                       envoy::service::discovery::v3::DiscoveryResponse>,
                     public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
@@ -216,7 +219,8 @@ public:
 
 protected:
   void establishGrpcStream() override;
-  void sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto, SotwSubscriptionState& sub_state) override;
+  void sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto,
+                       SotwSubscriptionState& sub_state) override;
   void maybeUpdateQueueSizeStat(uint64_t size) override;
   bool grpcStreamAvailable() const override;
   bool rateLimitAllowsDrain() override;
@@ -241,15 +245,15 @@ public:
   void disableInitFetchTimeoutTimer() override {}
 
   Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                  SubscriptionCallbacks&, OpaqueResourceDecoder&, std::chrono::milliseconds,
-                  const bool) override;
+                  SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) override;
   void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
                    const bool) override;
   void removeWatch(const std::string&, Watch*) override;
 
   // legacy mux interface not implemented by unified mux.
   GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&, const SubscriptionOptions&) override {
+                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                           const SubscriptionOptions&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -258,6 +262,6 @@ public:
   }
 };
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

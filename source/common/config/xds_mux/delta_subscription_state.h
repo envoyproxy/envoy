@@ -95,15 +95,14 @@ private:
 
 class DeltaSubscriptionStateFactory : public SubscriptionStateFactory<DeltaSubscriptionState> {
 public:
-  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {}
+  DeltaSubscriptionStateFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
   ~DeltaSubscriptionStateFactory() override = default;
-  std::unique_ptr<DeltaSubscriptionState> makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        std::chrono::milliseconds init_fetch_timeout, OpaqueResourceDecoder&, const bool wildcard) override {
-    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, init_fetch_timeout,
-                                                  dispatcher_, wildcard);
-
+  std::unique_ptr<DeltaSubscriptionState>
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        OpaqueResourceDecoder&, const bool wildcard) override {
+    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_, wildcard);
   }
+
 private:
   Event::Dispatcher& dispatcher_;
 };

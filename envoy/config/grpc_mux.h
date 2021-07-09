@@ -31,8 +31,9 @@ struct ControlPlaneStats {
                           GENERATE_TEXT_READOUT_STRUCT)
 };
 
-// TODO (dmitri-d) This forward declaration is needed in order for the unified mux to fulfill legacy mux interface.
-// It should be removed together with the rest of legacy mux code when the switch to unified mux has been finalized.
+// TODO (dmitri-d) This forward declaration is needed in order for the unified mux to fulfill legacy
+// mux interface. It should be removed together with the rest of legacy mux code when the switch to
+// unified mux has been finalized.
 struct Watch;
 
 /**
@@ -129,7 +130,6 @@ public:
   virtual Watch* addWatch(const std::string& type_url,
                           const absl::flat_hash_set<std::string>& resources,
                           SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                          std::chrono::milliseconds init_fetch_timeout,
                           const bool use_namespace_matching) PURE;
 
   // Updates the list of resource names watched by the given watch. If an added name is new across

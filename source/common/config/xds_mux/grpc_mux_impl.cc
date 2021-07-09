@@ -1,4 +1,4 @@
-#include "source/common/config/unified_mux/grpc_mux_impl.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -15,12 +15,13 @@
 
 namespace Envoy {
 namespace Config {
-namespace UnifiedMux {
+namespace XdsMux {
 
 template <class S, class F, class RQ, class RS>
 GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory,
-                         bool skip_subsequent_node, const LocalInfo::LocalInfo& local_info,
-                         envoy::config::core::v3::ApiVersion transport_api_version)
+                                       bool skip_subsequent_node,
+                                       const LocalInfo::LocalInfo& local_info,
+                                       envoy::config::core::v3::ApiVersion transport_api_version)
     : subscription_state_factory_(std::move(subscription_state_factory)),
       skip_subsequent_node_(skip_subsequent_node), local_info_(local_info),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -44,18 +45,18 @@ void GrpcMuxImpl<S, F, RQ, RS>::onDynamicContextUpdate(absl::string_view resourc
 
 template <class S, class F, class RQ, class RS>
 Watch* GrpcMuxImpl<S, F, RQ, RS>::addWatch(const std::string& type_url,
-                             const absl::flat_hash_set<std::string>& resources,
-                             SubscriptionCallbacks& callbacks,
-                             OpaqueResourceDecoder& resource_decoder,
-                             std::chrono::milliseconds init_fetch_timeout,
-                             const bool use_namespace_matching) {
+                                           const absl::flat_hash_set<std::string>& resources,
+                                           SubscriptionCallbacks& callbacks,
+                                           OpaqueResourceDecoder& resource_decoder,
+                                           const bool use_namespace_matching) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     watch_map =
         watch_maps_.emplace(type_url, std::make_unique<WatchMap>(use_namespace_matching)).first;
-    subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
-                                         type_url, *watch_maps_[type_url], init_fetch_timeout, resource_decoder, use_namespace_matching));
+    subscriptions_.emplace(
+        type_url, subscription_state_factory_->makeSubscriptionState(
+                      type_url, *watch_maps_[type_url], resource_decoder, use_namespace_matching));
     subscription_ordering_.emplace_back(type_url);
   }
 
@@ -70,8 +71,8 @@ Watch* GrpcMuxImpl<S, F, RQ, RS>::addWatch(const std::string& type_url,
 // subscription will enqueue and attempt to send an appropriate discovery request.
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* watch,
-                              const absl::flat_hash_set<std::string>& resources,
-                              const bool creating_namespace_watch) {
+                                            const absl::flat_hash_set<std::string>& resources,
+                                            const bool creating_namespace_watch) {
   ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
   ASSERT(watch != nullptr);
   auto& sub = subscriptionStateFor(type_url);
@@ -147,7 +148,7 @@ bool GrpcMuxImpl<S, F, RQ, RS>::paused(const std::string& type_url) const {
 
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_url,
-                                        const RS& response_proto) {
+                                                      const RS& response_proto) {
   auto sub = subscriptions_.find(type_url);
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -161,8 +162,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
   Memory::Utils::tryShrinkHeap();
 }
 
-template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::start() {
+template <class S, class F, class RQ, class RS> void GrpcMuxImpl<S, F, RQ, RS>::start() {
   ENVOY_LOG(debug, "GrpcMuxImpl now trying to establish a stream");
   establishGrpcStream();
 }
@@ -177,13 +177,6 @@ void GrpcMuxImpl<S, F, RQ, RS>::handleEstablishedStream() {
   maybeUpdateQueueSizeStat(0);
   pausable_ack_queue_.clear();
   trySendDiscoveryRequests();
-}
-
-template <class S, class F, class RQ, class RS>
-void GrpcMuxImpl<S, F, RQ, RS>::disableInitFetchTimeoutTimer() {
-  for (auto& [type_url, subscription_state] : subscriptions_) {
-    subscription_state->disableInitFetchTimeoutTimer();
-  }
 }
 
 template <class S, class F, class RQ, class RS>
@@ -306,8 +299,12 @@ absl::optional<std::string> GrpcMuxImpl<S, F, RQ, RS>::whoWantsToSendDiscoveryRe
   return absl::nullopt;
 }
 
-template class GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory, envoy::service::discovery::v3::DeltaDiscoveryRequest, envoy::service::discovery::v3::DeltaDiscoveryResponse>;
-template class GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory, envoy::service::discovery::v3::DiscoveryRequest, envoy::service::discovery::v3::DiscoveryResponse>;
+template class GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
+                           envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                           envoy::service::discovery::v3::DeltaDiscoveryResponse>;
+template class GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
+                           envoy::service::discovery::v3::DiscoveryRequest,
+                           envoy::service::discovery::v3::DiscoveryResponse>;
 
 // Delta- and SotW-specific concrete subclasses:
 GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
@@ -332,10 +329,11 @@ void GrpcMuxDelta::onDiscoveryResponse(
 }
 
 void GrpcMuxDelta::establishGrpcStream() { grpc_stream_.establishNewStream(); }
-void GrpcMuxDelta::sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto, DeltaSubscriptionState& sub_state) {
+void GrpcMuxDelta::sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto,
+                                   DeltaSubscriptionState& sub_state) {
   if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
       !skipSubsequentNode()) {
-    msg_proto.mutable_node()->MergeFrom(localInfo().node());
+    msg_proto.mutable_node()->CopyFrom(localInfo().node());
   }
   VersionConverter::prepareMessageForGrpcWire(msg_proto, transportApiVersion());
   grpc_stream_.sendMessage(msg_proto);
@@ -384,7 +382,8 @@ void GrpcMuxSotw::onDiscoveryResponse(
 
 void GrpcMuxSotw::establishGrpcStream() { grpc_stream_.establishNewStream(); }
 
-void GrpcMuxSotw::sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto, SotwSubscriptionState& sub_state) {
+void GrpcMuxSotw::sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto,
+                                  SotwSubscriptionState& sub_state) {
   if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
       !skipSubsequentNode()) {
     msg_proto.mutable_node()->MergeFrom(localInfo().node());
@@ -403,8 +402,7 @@ bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAv
 bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
 Watch* NullGrpcMuxImpl::addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                                 SubscriptionCallbacks&, OpaqueResourceDecoder&,
-                                 std::chrono::milliseconds, const bool) {
+                                 SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 
@@ -417,6 +415,6 @@ void NullGrpcMuxImpl::removeWatch(const std::string&, Watch*) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 
-} // namespace UnifiedMux
+} // namespace XdsMux
 } // namespace Config
 } // namespace Envoy

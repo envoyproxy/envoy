@@ -64,15 +64,15 @@ private:
 
 class SotwSubscriptionStateFactory : public SubscriptionStateFactory<SotwSubscriptionState> {
 public:
-  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher)
-    : dispatcher_(dispatcher) {}
+  SotwSubscriptionStateFactory(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
   ~SotwSubscriptionStateFactory() override = default;
-  std::unique_ptr<SotwSubscriptionState> makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        std::chrono::milliseconds init_fetch_timeout, OpaqueResourceDecoder& resource_decoder, const bool) override {
-    return std::make_unique<SotwSubscriptionState>(type_url, callbacks, init_fetch_timeout,
-                                                  dispatcher_, resource_decoder);
-
+  std::unique_ptr<SotwSubscriptionState>
+  makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
+                        OpaqueResourceDecoder& resource_decoder, const bool) override {
+    return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
+                                                   resource_decoder);
   }
+
 private:
   Event::Dispatcher& dispatcher_;
 };
