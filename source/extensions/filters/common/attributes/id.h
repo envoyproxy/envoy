@@ -34,13 +34,6 @@ namespace Filters {
 namespace Common {
 namespace Attributes {
 
-// #define WASM_ROOT_TOKENS(_f)                                                                            \
-//   _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(NODE) _f(SOURCE)            \
-//       _f(DESTINATION) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME)                \
-//           _f(CLUSTER_METADATA) _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME)                   \
-//               _f(UPSTREAM_HOST_METADATA) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)     \
-//                   _f(FILTER_STATE)
-
 #define ROOT_TOKENS(_f)                                                                            \
   _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(SOURCE) _f(DESTINATION)     \
       _f(FILTER_STATE)
@@ -67,7 +60,7 @@ namespace Attributes {
       _f(DNS_SAN_LOCAL_CERTIFICATE) _f(DNS_SAN_PEER_CERTIFICATE) _f(URI_SAN_LOCAL_CERTIFICATE)     \
           _f(URI_SAN_PEER_CERTIFICATE) _f(LOCAL_ADDRESS) _f(TRANSPORT_FAILURE_REASON)
 
-static inline absl::string_view downCase(std::string s) {
+static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
   return s;
 }
@@ -83,76 +76,71 @@ enum class UpstreamToken { UPSTREAM_TOKENS(_DECLARE) };
 #undef _DECLARE
 
 #define _PAIR(_t) {downCase(#_t), RootToken::_t},
-static absl::flat_hash_map<absl::string_view, RootToken> root_tokens = {ROOT_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, RootToken> root_tokens = {ROOT_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {RootToken::_t, downCase(#_t)},
-static absl::flat_hash_map<RootToken, absl::string_view> root_tokens_inv = {ROOT_TOKENS(_PAIR)};
+static absl::flat_hash_map<RootToken, std::string> root_tokens_inv = {ROOT_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), RequestToken::_t},
-static absl::flat_hash_map<absl::string_view, RequestToken> request_tokens = {
-    REQUEST_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, RequestToken> request_tokens = {REQUEST_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {RequestToken::_t, downCase(#_t)},
-static absl::flat_hash_map<RequestToken, absl::string_view> request_tokens_inv = {
-    REQUEST_TOKENS(_PAIR)};
+static absl::flat_hash_map<RequestToken, std::string> request_tokens_inv = {REQUEST_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), ResponseToken::_t},
-static absl::flat_hash_map<absl::string_view, ResponseToken> response_tokens = {
-    RESPONSE_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, ResponseToken> response_tokens = {RESPONSE_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {ResponseToken::_t, downCase(#_t)},
-static absl::flat_hash_map<ResponseToken, absl::string_view> response_tokens_inv = {
+static absl::flat_hash_map<ResponseToken, std::string> response_tokens_inv = {
     RESPONSE_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), SourceToken::_t},
-static absl::flat_hash_map<absl::string_view, SourceToken> source_tokens = {SOURCE_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, SourceToken> source_tokens = {SOURCE_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {SourceToken::_t, downCase(#_t)},
-static absl::flat_hash_map<SourceToken, absl::string_view> source_tokens_inv = {
-    SOURCE_TOKENS(_PAIR)};
+static absl::flat_hash_map<SourceToken, std::string> source_tokens_inv = {SOURCE_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), DestinationToken::_t},
-static absl::flat_hash_map<absl::string_view, DestinationToken> destination_tokens = {
+static absl::flat_hash_map<std::string, DestinationToken> destination_tokens = {
     DESTINATION_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {DestinationToken::_t, downCase(#_t)},
-static absl::flat_hash_map<DestinationToken, absl::string_view> destination_tokens_inv = {
+static absl::flat_hash_map<DestinationToken, std::string> destination_tokens_inv = {
     DESTINATION_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), ConnectionToken::_t},
-static absl::flat_hash_map<absl::string_view, ConnectionToken> connection_tokens = {
+static absl::flat_hash_map<std::string, ConnectionToken> connection_tokens = {
     CONNECTION_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {ConnectionToken::_t, downCase(#_t)},
-static absl::flat_hash_map<ConnectionToken, absl::string_view> connection_tokens_inv = {
+static absl::flat_hash_map<ConnectionToken, std::string> connection_tokens_inv = {
     CONNECTION_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {downCase(#_t), UpstreamToken::_t},
-static absl::flat_hash_map<absl::string_view, UpstreamToken> upstream_tokens = {
-    UPSTREAM_TOKENS(_PAIR)};
+static absl::flat_hash_map<std::string, UpstreamToken> upstream_tokens = {UPSTREAM_TOKENS(_PAIR)};
 #undef _PAIR
 
 #define _PAIR(_t) {UpstreamToken::_t, downCase(#_t)},
-static absl::flat_hash_map<UpstreamToken, absl::string_view> upstream_tokens_inv = {
+static absl::flat_hash_map<UpstreamToken, std::string> upstream_tokens_inv = {
     UPSTREAM_TOKENS(_PAIR)};
 #undef _PAIR
 
 using SubToken = absl::variant<RequestToken, ResponseToken, SourceToken, DestinationToken,
                                ConnectionToken, UpstreamToken>;
 
-class AttributeId {
+class AttributeId : protected Logger::Loggable<Envoy::Logger::Id::testing> {
 public:
   AttributeId(RootToken root, absl::optional<SubToken> sub) : root_token_(root), sub_token_(sub){};
   RootToken root() { return root_token_; };
