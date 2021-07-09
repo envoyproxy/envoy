@@ -743,6 +743,28 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   envoy::config::metrics::v3::StatsConfig stats_config_;
+
+  ~StatsMatcherTLSTest() override {
+    tls_.shutdownGlobalThreading();
+    store_->shutdownThreading();
+  }
+
+  // Adds counters for 1000 clusters and returns the amount of memory consumed.
+  uint64_t memoryConsumedAddingClusterStats() {
+    StatNamePool pool(symbol_table_);
+    std::vector<StatName> stat_names;
+    Stats::TestUtil::forEachSampleStat(1000, false, [&pool, &stat_names](absl::string_view name) {
+      stat_names.push_back(pool.add(name));
+    });
+
+    {
+      TestUtil::MemoryTest memory_test;
+      for (StatName stat_name : stat_names) {
+        store_->counterFromStatName(stat_name);
+      }
+      return memory_test.consumedBytes();
+    }
+  }
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -750,7 +772,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "noop");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   // Testing No-op counters, gauges, histograms which match the prefix "noop".
 
@@ -815,9 +837,6 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Histogram& noop_histogram_2 =
       store_->histogramFromString("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
-
-  tls_.shutdownGlobalThreading();
-  store_->shutdownThreading();
 }
 
 // We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
@@ -830,7 +849,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->MergeFrom(
       TestUtility::createRegexMatcher(".*[A-Z].*"));
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = store_->counterFromString("lowercase_counter");
@@ -875,7 +894,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // the string "invalid".
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "invalid");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
 
   Counter& valid_counter = store_->counterFromString("valid_counter");
   valid_counter.inc();
@@ -927,10 +946,40 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   TextReadout& invalid_string_2 = store_->textReadoutFromString("also_INVLD_string");
   invalid_string_2.set("still no");
   EXPECT_EQ("", invalid_string_2.value());
+}
 
-  // Expected to free lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
-  tls_.shutdownGlobalThreading();
-  store_->shutdownThreading();
+// Rejecting stats of the form "cluster." enables an optimization in the matcher
+// infrastructure that performs the rejection without converting from StatName
+// to string, obviating the need to memoize the rejection in a set. This saves
+// a ton of memory, allowing us to reject thousands of stats without consuming
+// memory. Note that the trailing "." is critical so we can compare symbolically.
+TEST_F(StatsMatcherTLSTest, RejectPrefixDot) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster."); // Prefix match can be executed symbolically.
+  store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+  uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+
+  // No memory is consumed at all while rejecting stats from "prefix."
+  EXPECT_MEMORY_EQ(mem_consumed, 0);
+  EXPECT_MEMORY_LE(mem_consumed, 0);
+}
+
+// Repeating the same test but retaining the dot means that the StatsMatcher
+// infrastructure requires us remember the rejected StatNames in an ever-growing
+// map. That map is needed to avoid taking locks while re-rejecting stats we've
+// rejected in the past.
+TEST_F(StatsMatcherTLSTest, RejectPrefixNoDot) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "cluster"); // No dot at the end means we have to compare as strings.
+  store_->setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+  uint64_t mem_consumed = memoryConsumedAddingClusterStats();
+
+  // Memory is consumed at all while rejecting stats from "prefix" in proportion
+  // to the number of stat instantiations attempted.
+  EXPECT_MEMORY_EQ(mem_consumed, 2936480);
+  EXPECT_MEMORY_LE(mem_consumed, 3500000);
 }
 
 // Tests the logic for caching the stats-matcher results, and in particular the
@@ -966,11 +1015,21 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
-    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
-    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
-
+    StatNamePool pool(symbol_table_);
+    StatsMatcher::FastResult no_fast_rejection = StatsMatcher::FastResult::NoMatch;
     for (int j = 0; j < 5; ++j) {
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.reject")))
+          .WillOnce(Return(no_fast_rejection));
+      if (j == 0) {
+        EXPECT_CALL(*matcher, slowRejects(no_fast_rejection, pool.add("scope.reject")))
+            .WillOnce(Return(true));
+      }
       EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(no_fast_rejection));
+      if (j == 0) {
+        EXPECT_CALL(*matcher, slowRejects(no_fast_rejection, pool.add("scope.ok")))
+            .WillOnce(Return(false));
+      }
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
   }
@@ -985,8 +1044,10 @@ public:
 
     ScopePtr scope = store_.createScope("scope.");
 
+    StatNamePool pool(symbol_table_);
     for (int j = 0; j < 5; ++j) {
-      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      // Note: zero calls to fastReject() or slowReject() are made, as
+      // reject-all should short-circuit.
       EXPECT_EQ("", lookup_stat("reject"));
     }
   }
@@ -998,9 +1059,12 @@ public:
     matcher->accepts_all_ = true;
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
+    StatNamePool pool(symbol_table_);
 
+    StatsMatcher::FastResult no_fast_rejection = StatsMatcher::FastResult::NoMatch;
     for (int j = 0; j < 5; ++j) {
-      // Note: zero calls to reject() are made, as accept-all should short-circuit.
+      EXPECT_CALL(*matcher, fastRejects(pool.add("scope.ok"))).WillOnce(Return(no_fast_rejection));
+      // Note: zero calls to slowReject() are made, as accept-all should short-circuit.
       EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
   }
@@ -1109,7 +1173,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   envoy::config::metrics::v3::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
 
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
@@ -1183,7 +1247,7 @@ protected:
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
+      100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
 }
@@ -1192,7 +1256,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   initThreading();
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
-      100, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
+      100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
 }

@@ -14,6 +14,10 @@ namespace Tracing {
  * Protocol-independent abstraction for traceable stream. It hides the differences between different
  * protocol and provides tracer driver with common methods for obtaining and setting the tracing
  * context.
+ *
+ * TODO(wbpcode): A new interface should be added to obtain general traceable stream information,
+ * such as host, RPC method, protocol identification, etc. At the same time, a new interface needs
+ * to be added to support traversal of all trace contexts.
  */
 class TraceContext {
 public:
