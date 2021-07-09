@@ -275,6 +275,7 @@ message Bootstrap {
   // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // when *typed_dns_resolver_config* is missing, the default behavior is in place. Envoy will either use
   // c-ares DNS library or apple DNS library based on the compiling flag.
+  // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.

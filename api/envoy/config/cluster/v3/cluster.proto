@@ -879,7 +879,6 @@ message Cluster {
   // is fully supported.
   core.v3.DnsResolutionConfig dns_resolution_config = 53;
 
-  // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters. When c-ares DNS is configured,
   // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
@@ -890,7 +889,7 @@ message Cluster {
   // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // when *typed_dns_resolver_config* is missing, the default behavior is in place. Envoy will either use
   // c-ares DNS library or apple DNS library based on the compiling flag.
-
+  // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
