@@ -41,7 +41,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Router {
@@ -313,7 +312,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                            is_canary};
 
     Http::CodeStats& code_stats = httpContext().codeStats();
-    code_stats.chargeResponseStat(info);
+    code_stats.chargeResponseStat(info, exclude_http_code_stats_);
 
     if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
@@ -326,7 +325,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                                  config_.zone_name_,
                                                  upstream_zone,
                                                  is_canary};
-      code_stats.chargeResponseStat(alt_info);
+      code_stats.chargeResponseStat(alt_info, exclude_http_code_stats_);
     }
 
     if (dropped) {
@@ -361,6 +360,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
+  exclude_http_code_stats_ = grpc_request_ && config_.suppress_grpc_request_failure_code_stats_;
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
@@ -1143,6 +1143,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   case Http::StreamResetReason::ProtocolError:
     return StreamInfo::ResponseFlag::UpstreamProtocolError;
+  case Http::StreamResetReason::OverloadManager:
+    return StreamInfo::ResponseFlag::OverloadManager;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1268,9 +1270,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         pending_retries_++;
         upstream_request.upstreamHost()->stats().rq_error_.inc();
         Http::CodeStats& code_stats = httpContext().codeStats();
-        code_stats.chargeBasicResponseStat(cluster_->statsScope(),
-                                           config_.stats_.stat_names_.retry_,
-                                           static_cast<Http::Code>(response_code));
+        code_stats.chargeBasicResponseStat(
+            cluster_->statsScope(), config_.stats_.stat_names_.retry_,
+            static_cast<Http::Code>(response_code), exclude_http_code_stats_);
 
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();

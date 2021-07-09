@@ -610,9 +610,6 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    RELEASE_ASSERT(
-        cluster->hidden_envoy_deprecated_hosts().empty(),
-        "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
       auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -696,8 +693,10 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
-  addConfigModifier([use_alpn, http3](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
+                                        bool use_alternate_protocols_cache) {
+  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -726,6 +725,11 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3) {
       if (http3 || old_protocol_options.explicit_http_config().has_http3_protocol_options()) {
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
+      }
+      if (use_alternate_protocols_cache) {
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->set_name("default_alternate_protocols_cache");
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -803,14 +807,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     for (int j = 0; j < listener->filter_chains_size(); ++j) {
       if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
-        const bool has_tls = filter_chain->has_hidden_envoy_deprecated_tls_context();
-        const Protobuf::Message* tls_config = nullptr;
-        if (has_tls) {
-          tls_config = &filter_chain->hidden_envoy_deprecated_tls_context();
-          filter_chain->clear_hidden_envoy_deprecated_tls_context();
-        }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
-                              *filter_chain->mutable_transport_socket(), tls_config);
+                              *filter_chain->mutable_transport_socket());
       }
     }
   }
@@ -824,9 +822,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.
-      RELEASE_ASSERT(
-          cluster->hidden_envoy_deprecated_hosts().empty(),
-          "Hosts should be specified via load_assignment() in the integration test framework.");
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -848,14 +843,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     }
 
     if (tap_path) {
-      const bool has_tls = cluster->has_hidden_envoy_deprecated_tls_context();
-      const Protobuf::Message* tls_config = nullptr;
-      if (has_tls) {
-        tls_config = &cluster->hidden_envoy_deprecated_tls_context();
-        cluster->clear_hidden_envoy_deprecated_tls_context();
-      }
       setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
-                            *cluster->mutable_transport_socket(), tls_config);
+                            *cluster->mutable_transport_socket());
     }
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
@@ -875,17 +864,13 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                                         envoy::config::core::v3::TransportSocket& transport_socket,
-                                         const Protobuf::Message* tls_config) {
+void ConfigHelper::setTapTransportSocket(
+    const std::string& tap_path, const std::string& type,
+    envoy::config::core::v3::TransportSocket& transport_socket) {
   // Determine inner transport socket.
   envoy::config::core::v3::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
-    RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
-  } else if (tls_config) {
-    inner_transport_socket.set_name("envoy.transport_sockets.tls");
-    inner_transport_socket.mutable_typed_config()->PackFrom(*tls_config);
   } else {
     inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
@@ -1150,8 +1135,7 @@ bool ConfigHelper::setAccessLog(
     if (!formatters.empty()) {
       for (const auto& formatter : formatters) {
         auto* added_formatter = log_format->add_formatters();
-        added_formatter->set_name(formatter.name());
-        added_formatter->mutable_typed_config()->PackFrom(formatter.typed_config());
+        added_formatter->CopyFrom(formatter);
       }
     }
   }

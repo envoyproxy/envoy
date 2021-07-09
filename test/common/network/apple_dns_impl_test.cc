@@ -137,7 +137,7 @@ TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
 TEST_F(AppleDnsImplTest, DestructPending) {
   ActiveDnsQuery* query = resolveWithUnreferencedParameters("", DnsLookupFamily::V4Only, 0);
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 }
 
 TEST_F(AppleDnsImplTest, LocalLookup) {
@@ -194,7 +194,7 @@ TEST_F(AppleDnsImplTest, Cancel) {
                                              DnsResolver::ResolutionStatus::Success, true));
 
   ASSERT_NE(nullptr, query);
-  query->cancel();
+  query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

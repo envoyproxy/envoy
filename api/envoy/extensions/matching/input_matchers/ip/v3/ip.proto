@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.input_matchers.ip.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.ip.v3";
+option java_outer_classname = "IpProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: IP matcher]
+// [#extension: envoy.matching.input_matchers.ip]
+
+// This input matcher matches IPv4 or IPv6 addresses against a list of CIDR
+// ranges. It returns true if and only if the input IP belongs to at least one
+// of these CIDR ranges. Internally, it uses a Level-Compressed trie, as
+// described in the paper `IP-address lookup using LC-tries
+// <https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/>`_
+// by S. Nilsson and G. Karlsson. For "big" lists of IPs, this matcher is more
+// efficient than multiple single IP matcher, that would have a linear cost.
+message Ip {
+  // Match if the IP belongs to any of these CIDR ranges.
+  repeated config.core.v3.CidrRange cidr_ranges = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // The human readable prefix to use when emitting statistics for the IP input
+  // matcher. Names in the table below are concatenated to this prefix.
+  //
+  // .. csv-table::
+  //    :header: Name, Type, Description
+  //    :widths: 1, 1, 2
+  //
+  //    ip_parsing_failed, Counter, Total number of IP addresses the matcher was unable to parse
+  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
+}

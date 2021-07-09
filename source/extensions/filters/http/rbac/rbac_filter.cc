@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/utility.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 #include "absl/strings/str_join.h"
 
@@ -26,7 +25,7 @@ const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>(HttpFilterNames::get().Rbac, route);
+      RoleBasedAccessControlRouteSpecificFilterConfig>("envoy.filters.http.rbac", route);
 
   if (route_local) {
     return route_local->engine(mode);
@@ -89,7 +88,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     }
 
     *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
-    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
   const auto engine =

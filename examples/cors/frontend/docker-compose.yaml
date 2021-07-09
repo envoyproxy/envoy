@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-      - "8000:8000"
+    - "8000:8000"
 
   frontend-service:
     build:

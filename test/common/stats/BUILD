@@ -282,6 +282,7 @@ envoy_cc_benchmark_binary(
         ":stat_test_utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/test_common:simulated_time_system_lib",

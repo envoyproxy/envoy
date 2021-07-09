@@ -21,7 +21,7 @@ namespace {
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
       socket_options_(options), transport_socket_options_(transport_socket_options),
@@ -561,13 +561,13 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
 
-ActiveClient::~ActiveClient() { releaseResources(); }
+ActiveClient::~ActiveClient() { releaseResourcesBase(); }
 
 void ActiveClient::onEvent(Network::ConnectionEvent event) {
   parent_.onConnectionEvent(*this, "", event);
 }
 
-void ActiveClient::releaseResources() {
+void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
     resources_released_ = true;
 

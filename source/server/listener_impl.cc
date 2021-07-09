@@ -23,7 +23,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 #include "source/server/active_raw_udp_listener_config.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
@@ -40,6 +39,9 @@ namespace Envoy {
 namespace Server {
 
 namespace {
+
+const std::string TlsInspector = "envoy.filters.listener.tls_inspector";
+
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
     std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
@@ -59,13 +61,11 @@ bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
                                   (!matcher.server_names().empty() ||
                                    !matcher.application_protocols().empty()));
                         }) &&
-         !std::any_of(
-             config.listener_filters().begin(), config.listener_filters().end(),
-             [](const auto& filter) {
-               return filter.name() ==
-                          Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector ||
-                      filter.name() == "envoy.listener.tls_inspector";
-             });
+         !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
+                      [](const auto& filter) {
+                        return filter.name() == "envoy.listener.tls_inspector" ||
+                               filter.name() == TlsInspector;
+                      });
 }
 
 bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
@@ -303,12 +303,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
               parent_.server_.clusterManager(), parent_.server_.localInfo(),
               parent_.server_.dispatcher(), parent_.server_.stats(),
               parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options()))
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+              validation_visitor_, parent_.server_.api(), parent_.server_.options())),
+      quic_stat_names_(parent_.quicStatNames()) {
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -376,12 +372,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
                           }),
-      transport_factory_context_(origin.transport_factory_context_)
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+      transport_factory_context_(origin.transport_factory_context_),
+      quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -555,7 +547,7 @@ void ListenerImpl::buildOriginalDstListenerFilter() {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
-            Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
+            "envoy.filters.listener.original_dst");
 
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(),
@@ -571,7 +563,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
   if (usesProxyProto(config_)) {
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
-            Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+            "envoy.filters.listener.proxy_protocol");
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
@@ -592,7 +584,7 @@ void ListenerImpl::buildTlsInspectorListenerFilter() {
 
     auto& factory =
         Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
-            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
+            TlsInspector);
     listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(),
         /*listener_filter_matcher=*/nullptr, *listener_factory_context_));

@@ -431,7 +431,8 @@ public:
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     Stats::SymbolTable& symbol_table);
 
   /**
    * Create HistogramSettings instance.
@@ -450,14 +451,6 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope, bool skip_cluster_check);
-
-  /**
-   * Translate a set of cluster's hosts into a load assignment configuration.
-   * @param hosts cluster's list of hosts.
-   * @return envoy::config::endpoint::v3::ClusterLoadAssignment a load assignment configuration.
-   */
-  static envoy::config::endpoint::v3::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto

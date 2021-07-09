@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace Squash {
 class SquashFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::squash::v3::Squash> {
 public:
-  SquashFilterConfigFactory() : FactoryBase(HttpFilterNames::get().Squash) {}
+  SquashFilterConfigFactory() : FactoryBase("envoy.filters.http.squash") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
