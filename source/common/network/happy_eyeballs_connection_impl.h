@@ -24,11 +24,11 @@ namespace Network {
 class HappyEyeballsConnectionImpl : public ClientConnection {
 public:
   HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
-                              Network::Address::InstanceConstSharedPtr address,
-                              Network::Address::InstanceConstSharedPtr source_address,
-                              Network::TransportSocketFactory& socket_factory,
-                              Network::TransportSocketOptionsSharedPtr transport_socket_options,
-                              const Network::ConnectionSocket::OptionsSharedPtr options);
+                              const std::vector<Address::InstanceConstSharedPtr>& address_list,
+                              Address::InstanceConstSharedPtr source_address,
+                              TransportSocketFactory& socket_factory,
+                              TransportSocketOptionsSharedPtr transport_socket_options,
+                              const ConnectionSocket::OptionsSharedPtr options);
 
   ~HappyEyeballsConnectionImpl() override;
 
@@ -81,6 +81,8 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
+  // ConnectionCallbacks which will be set on an ClientConnection which
+  // sends connection events back to the HappyEyeballsConnectionImpl.
   class ConnectionCallbacksWrapper : public ConnectionCallbacks {
    public:
     ConnectionCallbacksWrapper(HappyEyeballsConnectionImpl& parent,
@@ -99,6 +101,7 @@ private:
       parent_.onBelowWriteBufferLowWatermark(this);
     }
 
+    // Not needed? interesting.
     ClientConnection& connection() { return connection_; }
 
    private:
@@ -106,7 +109,9 @@ private:
     ClientConnection& connection_;
   };
 
-  std::unique_ptr<ClientConnection> createConnection();
+  std::unique_ptr<ClientConnection> createNextConnection();
+  void tryAnotherConnection();
+  void maybeScheduleNextAttempt();
 
   void onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper);
 
@@ -117,27 +122,41 @@ private:
   void onWriteBufferHighWatermark();
   void onWriteBufferLowWatermark();
 
-  struct State {
-    bool detectEarlyCloseWhenReadDisabled_ = false;
-    bool noDelay_ = false;
-    Buffer::InstancePtr write_buffer_;
-    bool end_stream_ = false;
+  void cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper);
+
+  // State which needs to be applie to every connection attempt.
+  struct PerConnectionState {
+    absl::optional<bool> detect_early_close_when_read_disabled_;
+    absl::optional<bool> no_delay_;
   };
 
-  std::unique_ptr<ClientConnection> connection_;
-  std::vector<ConnectionCallbacks*> cbs_;
-  std::vector<ReadFilterSharedPtr> read_filters_;
-  State state_;
-  bool connect_finished_ = false;
-  std::unique_ptr<ConnectionCallbacksWrapper> callbacks_wrapper_;
-  std::unique_ptr<ClientConnection> pending_connection_;
+  // State which needs to be saved and applied only to the final connection
+  // attempt.
+  struct PostConnectState {
+    std::vector<ConnectionCallbacks*> connection_callbacks_;
+    std::vector<ReadFilterSharedPtr> read_filters_;
+    absl::optional<Buffer::InstancePtr> write_buffer_;
+    absl::optional<bool> end_stream_;
+  };
 
   Event::Dispatcher& dispatcher_;
-  Network::Address::InstanceConstSharedPtr address_;
-  Network::Address::InstanceConstSharedPtr source_address_;
-  Network::TransportSocketFactory& socket_factory_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
-  const Network::ConnectionSocket::OptionsSharedPtr options_;
+  const std::vector<Network::Address::InstanceConstSharedPtr>& address_list_;
+  size_t next_address_ = 0;
+  Address::InstanceConstSharedPtr source_address_;
+  TransportSocketFactory& socket_factory_;
+  TransportSocketOptionsSharedPtr transport_socket_options_;
+  const ConnectionSocket::OptionsSharedPtr options_;
+
+  // Set of active connections.
+  std::vector<std::unique_ptr<ClientConnection>> connections_;
+  std::vector<std::unique_ptr<ConnectionCallbacksWrapper>> callbacks_wrappers_;
+
+  // True when connect() has finished, either success or failure.
+  bool connect_finished_ = false;
+  Event::TimerPtr next_attempt_timer_;
+
+  PerConnectionState per_connection_state_;
+  PostConnectState post_connect_state_;
 };
 
 } // namespace Network

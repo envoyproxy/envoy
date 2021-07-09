@@ -339,10 +339,11 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
   ASSERT(!address->envoyInternalAddress());
   Network::ClientConnectionPtr connection =
-
+      /*
     true ?
-     std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
+      std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, addressList(), cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
   :
+      */
     dispatcher.createClientConnection(
         address, cluster.sourceAddress(),
         socket_factory.createTransportSocket(std::move(transport_socket_options)),
