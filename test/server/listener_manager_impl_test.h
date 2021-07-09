@@ -53,6 +53,16 @@ public:
 };
 
 class ListenerManagerImplTest : public testing::Test {
+public:
+  // Reuse port is the default on Linux for TCP. On other platforms even if set it is disabled
+  // and the user is warned. For UDP it's always the default even if not effective.
+  static constexpr ListenerComponentFactory::BindType default_bind_type =
+#ifdef __linux__
+      ListenerComponentFactory::BindType::ReusePort;
+#else
+      ListenerComponentFactory::BindType::NoReusePort;
+#endif
+
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 
@@ -212,10 +222,6 @@ protected:
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
-
-  // fixfix
-  static constexpr ListenerComponentFactory::BindType default_bind_type =
-      ListenerComponentFactory::BindType::NoReusePort;
 
   /**
    * Validate that createListenSocket is called once with the expected options.

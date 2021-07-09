@@ -274,6 +274,8 @@ public:
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
+  static bool initializeReusePort(Server::Instance& server,
+                                  const envoy::config::listener::v3::Listener& config);
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
@@ -364,7 +366,6 @@ private:
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
   void buildTlsInspectorListenerFilter();
-  bool initializeReusePort();
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();

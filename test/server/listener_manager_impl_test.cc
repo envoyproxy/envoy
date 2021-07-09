@@ -42,6 +42,7 @@ namespace Server {
 namespace {
 
 using testing::AtLeast;
+using testing::ByMove;
 using testing::InSequence;
 using testing::Return;
 using testing::ReturnRef;
@@ -122,10 +123,12 @@ public:
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   }
 
-  void expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
-                               ListenerHandle* old_listener_handle) {
-    // TODO before merge: make this expectation work correctly with duplicated sockets.
-    // EXPECT_CALL(*listener_factory_.socket_, duplicate()); fixfix
+  Network::MockListenSocket*
+  expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
+                          ListenerHandle* old_listener_handle, Network::MockListenSocket& socket) {
+    auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+    EXPECT_CALL(socket, duplicate())
+        .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
     EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
@@ -137,14 +140,14 @@ public:
 
     EXPECT_CALL(*old_listener_handle, onDestroy());
     worker_->callRemovalCompletion();
+    return duplicated_socket;
   }
 
   void expectRemove(const envoy::config::listener::v3::Listener& listener_proto,
-                    ListenerHandle* listener_handle) {
+                    ListenerHandle* listener_handle, Network::MockListenSocket& socket) {
 
     EXPECT_CALL(*worker_, stopListener(_, _));
-    // TODO before merge: make this expectation work correctly with duplicated sockets.
-    // EXPECT_CALL(*listener_factory_.socket_, close()); fixfix
+    EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
@@ -1200,7 +1203,9 @@ per_connection_buffer_limit_bytes: 10
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml),
                                             "version2", true));
@@ -1266,6 +1271,7 @@ dynamic_listeners:
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
+  EXPECT_CALL(*duplicated_socket, duplicate());
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(*worker_, stopListener(_, _));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
@@ -5074,7 +5080,9 @@ filter_chains:
   )EOF");
 
   ListenerHandle* listener_foo_update1 = expectListenerOverridden(true, listener_foo);
-  EXPECT_CALL(*listener_factory_.socket_, duplicate());
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(listener_foo_update1_proto, "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
@@ -5095,11 +5103,12 @@ filter_chains:
   listener_foo_update2_proto.set_traffic_direction(
       ::envoy::config::core::v3::TrafficDirection::OUTBOUND);
   ListenerHandle* listener_foo_update2 = expectListenerCreate(false, true);
-  expectUpdateToThenDrain(listener_foo_update2_proto, listener_foo_update1);
+  auto duplicated_socket2 =
+      expectUpdateToThenDrain(listener_foo_update2_proto, listener_foo_update1, *duplicated_socket);
   // Bump modified.
   checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 1);
 
-  expectRemove(listener_foo_update2_proto, listener_foo_update2);
+  expectRemove(listener_foo_update2_proto, listener_foo_update2, *duplicated_socket2);
   // Bump removed and sub active.
   checkStats(__LINE__, 1, 2, 1, 0, 0, 0, 1);
 
@@ -5283,9 +5292,10 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAn
       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+  auto duplicated_socket =
+      expectUpdateToThenDrain(new_listener_proto, listener_foo, *listener_factory_.socket_);
 
-  expectRemove(new_listener_proto, listener_foo_update1);
+  expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
 
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5310,9 +5320,10 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        ->mutable_filter_chain_match()
        ->mutable_application_protocols()
        ->Add() = "alpn";
-  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+  auto duplicated_socket =
+      expectUpdateToThenDrain(new_listener_proto, listener_foo, *listener_factory_.socket_);
 
-  expectRemove(new_listener_proto, listener_foo_update1);
+  expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
 
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5333,8 +5344,9 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
   auto new_listener_proto = listener_proto;
   new_listener_proto.mutable_filter_chains(0)->mutable_use_proxy_proto()->set_value(true);
 
-  expectUpdateToThenDrain(new_listener_proto, listener_foo);
-  expectRemove(new_listener_proto, listener_foo_update1);
+  auto duplicated_socket =
+      expectUpdateToThenDrain(new_listener_proto, listener_foo, *listener_factory_.socket_);
+  expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
@@ -5357,7 +5369,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': no filter chains specified");
 
-  expectRemove(listener_proto, listener_foo);
+  expectRemove(listener_proto, listener_foo, *listener_factory_.socket_);
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
@@ -5376,9 +5388,10 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 
   auto new_listener_proto = listener_proto;
   new_listener_proto.set_traffic_direction(::envoy::config::core::v3::TrafficDirection::INBOUND);
-  expectUpdateToThenDrain(new_listener_proto, listener_foo);
+  auto duplicated_socket =
+      expectUpdateToThenDrain(new_listener_proto, listener_foo, *listener_factory_.socket_);
 
-  expectRemove(new_listener_proto, listener_foo_update1);
+  expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
 
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5436,36 +5449,48 @@ TEST_F(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 }
 
-/*TEST(ListenerEnableReusePortTest, All) {
+TEST(ListenerEnableReusePortTest, All) {
   Server::MockInstance server;
+  const bool expected_reuse_port =
+      ListenerManagerImplTest::default_bind_type == ListenerComponentFactory::BindType::ReusePort;
 
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_enable_reuse_port()->set_value(false);
-    EXPECT_FALSE(ListenerImpl::enableReusePort(server, config));
+    config.mutable_address()->mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
+    EXPECT_FALSE(ListenerImpl::initializeReusePort(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_enable_reuse_port()->set_value(true);
-    EXPECT_TRUE(ListenerImpl::enableReusePort(server, config));
+    config.mutable_address()->mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.set_reuse_port(true);
-    EXPECT_TRUE(ListenerImpl::enableReusePort(server, config));
+    config.mutable_address()->mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_enable_reuse_port()->set_value(false);
     config.set_reuse_port(true);
-    EXPECT_FALSE(ListenerImpl::enableReusePort(server, config));
+    config.mutable_address()->mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
+    EXPECT_FALSE(ListenerImpl::initializeReusePort(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
+    config.mutable_address()->mutable_socket_address()->set_protocol(
+        envoy::config::core::v3::SocketAddress::TCP);
     EXPECT_CALL(server, enableReusePortDefault());
-    EXPECT_TRUE(ListenerImpl::enableReusePort(server, config));
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
   }
-}fixfix*/
+}
 
 } // namespace
 } // namespace Server

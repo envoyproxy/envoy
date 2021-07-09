@@ -300,7 +300,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
-      reuse_port_(initializeReusePort()),
+      reuse_port_(initializeReusePort(parent_.server_, config_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -808,27 +808,36 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
   }
 }
 
-bool ListenerImpl::initializeReusePort() {
-  bool initial_reuse_port_value = [this]() {
+bool ListenerImpl::initializeReusePort(Server::Instance& server,
+                                       const envoy::config::listener::v3::Listener& config) {
+  bool initial_reuse_port_value = [&server, &config]() {
     // If someone set the new field, adhere to it.
-    if (config_.has_enable_reuse_port()) {
-      return config_.enable_reuse_port().value();
+    if (config.has_enable_reuse_port()) {
+      return config.enable_reuse_port().value();
     }
 
     // If someone set the old field to true, adhere to it.
-    if (config_.reuse_port()) {
+    if (config.reuse_port()) {
       return true;
     }
 
     // Otherwise use the server default which depends on hot restart.
-    return parent_.server_.enableReusePortDefault();
+    return server.enableReusePortDefault();
   }();
 
-  // fixfix apple only.
-  const auto socket_type = Network::Utility::protobufAddressSocketType(config_.address());
-  if (socket_type == Network::Socket::Type::Stream) {
+#ifndef __linux__
+  const auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  if (initial_reuse_port_value && socket_type == Network::Socket::Type::Stream) {
+    // Reuse port is the default on Linux for TCP. On other platforms even if set it is disabled
+    // and the user is warned. For UDP it's always the default even if not effective.
+    ENVOY_LOG(warn,
+              "reuse port was configured for TCP listener '{}' and is being force disabled because "
+              "Envoy is not running on Linux. See the documentation for more information.",
+              config.name());
     initial_reuse_port_value = false;
   }
+#endif
+
   return initial_reuse_port_value;
 }
 
