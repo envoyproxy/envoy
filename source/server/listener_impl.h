@@ -17,13 +17,10 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/quic_stat_names.h"
-#endif
 
 namespace Envoy {
 namespace Server {
@@ -57,14 +54,18 @@ public:
   Network::SocketSharedPtr getListenSocket() override;
 
   /**
-   * @return the socket shared by worker threads; otherwise return null.
+   * @return the socket shared by worker threads; otherwise return nullopt.
    */
   Network::SocketOptRef sharedSocket() const override {
+    // If listen socket doesn't bind to port, consider it not shared.
+    if (!bind_to_port_) {
+      return absl::nullopt;
+    }
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
     }
-    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // If reuse_port is true, always return nullopt, even socket_ is created for reserving
     // port number.
     return absl::nullopt;
   }
@@ -132,6 +133,10 @@ public:
   // DrainDecision
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
   Server::DrainManager& drainManager();
 
@@ -427,9 +432,7 @@ private:
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
 
-#ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames& quic_stat_names_;
-#endif
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

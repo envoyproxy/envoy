@@ -198,3 +198,5 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/formatter/req_without_query @dio @tsaarni
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
+# Kafka
+/*/extensions/filters/network/kafka @mattklein123 @adamkotwasinski

@@ -1794,8 +1794,8 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  std::string server_name = "foo.example.com";
-  EXPECT_CALL(stream_info_, requestedServerName()).WillOnce(ReturnRef(server_name));
+  absl::string_view server_name = "foo.example.com";
+  stream_info_.downstream_address_provider_->setRequestedServerName(server_name);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));

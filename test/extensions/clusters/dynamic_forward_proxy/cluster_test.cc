@@ -234,30 +234,6 @@ private:
   Server::MockOptions options_;
 };
 
-// Verify that using 'sni' causes a failure.
-TEST_F(ClusterFactoryTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml_config = TestEnvironment::substitute(R"EOF(
-name: name
-connect_timeout: 0.25s
-cluster_type:
-  name: dynamic_forward_proxy
-  typed_config:
-    "@type": type.googleapis.com/envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig
-    dns_cache_config:
-      name: foo
-tls_context:
-  sni: api.lyft.com
-  common_tls_context:
-    validation_context:
-      trusted_ca:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-)EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(createCluster(yaml_config, false), EnvoyException,
-                            "dynamic_forward_proxy cluster cannot configure 'sni'");
-}
-
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name

@@ -25,6 +25,8 @@ envoy_extension_cc_test(
     ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/filters/http/wasm/test_data:async_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_call_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_stream_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:panic_rust.wasm",

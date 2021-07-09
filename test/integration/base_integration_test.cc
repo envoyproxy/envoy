@@ -323,7 +323,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
   const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
-  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")();
+  ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 }
@@ -428,15 +428,16 @@ size_t entryIndex(const std::string& file, uint32_t entry) {
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry) {
   // Wait a max of 1s for logs to flush to disk.
+  std::string contents;
   for (int i = 0; i < 1000; ++i) {
-    std::string contents = TestEnvironment::readFileToStringForTest(filename);
+    contents = TestEnvironment::readFileToStringForTest(filename);
     size_t index = entryIndex(contents, entry);
     if (contents.length() > index) {
       return contents.substr(index);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: ", contents));
   return "";
 }
 
