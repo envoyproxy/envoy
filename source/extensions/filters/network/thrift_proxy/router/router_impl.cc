@@ -362,13 +362,19 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       case MessageType::Reply:
         incClusterScopeCounter({upstream_resp_reply_});
         if (callbacks_->responseSuccess()) {
+          upstream_request_->upstream_host_->outlierDetector().putResult(
+              Upstream::Outlier::Result::ExtOriginRequestSuccess);
           incClusterScopeCounter({upstream_resp_reply_success_});
         } else {
+          upstream_request_->upstream_host_->outlierDetector().putResult(
+              Upstream::Outlier::Result::ExtOriginRequestFailed);
           incClusterScopeCounter({upstream_resp_reply_error_});
         }
         break;
 
       case MessageType::Exception:
+        upstream_request_->upstream_host_->outlierDetector().putResult(
+            Upstream::Outlier::Result::ExtOriginRequestFailed);
         incClusterScopeCounter({upstream_resp_exception_});
         break;
 
@@ -382,6 +388,8 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     } else if (status == ThriftFilters::ResponseStatus::Reset) {
       // Note: invalid responses are not accounted in the response size histogram.
       ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+      upstream_request_->upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
       upstream_request_->resetStream();
       return;
     }
@@ -498,6 +506,8 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   bool continue_decoding = conn_pool_handle_ != nullptr;
 
   onUpstreamHostSelected(host);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
+
   conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;
@@ -567,12 +577,21 @@ void Router::UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason re
         true);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    upstream_host_->outlierDetector().putResult(
+        Upstream::Outlier::Result::LocalOriginConnectFailed);
     // Should only happen if we closed the connection, due to an error condition, in which case
     // we've already handled any possible downstream response.
     parent_.callbacks_->resetDownstreamConnection();
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
   case ConnectionPool::PoolFailureReason::Timeout:
+    if (reason == ConnectionPool::PoolFailureReason::Timeout) {
+      upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    } else if (reason == ConnectionPool::PoolFailureReason::RemoteConnectionFailure) {
+      upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::LocalOriginConnectFailed);
+    }
+
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
       parent_.callbacks_->sendLocalReply(

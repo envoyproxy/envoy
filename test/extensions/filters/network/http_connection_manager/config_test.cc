@@ -892,6 +892,27 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
             config.serverHeaderTransformation());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    scheme_to_overwrite: http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(config.schemeToSet(), "http");
+}
+
 // Validated that by default we don't normalize paths
 // unless set build flag path_normalization_by_default=true
 TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
@@ -1409,7 +1430,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1439,7 +1459,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1479,7 +1498,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 1024
   custom_settings_parameters: { identifier: 3, value: 2048 }
@@ -1508,7 +1526,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1542,7 +1559,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 8, value: 0 }
@@ -1566,7 +1582,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   allow_connect: true
   )EOF";
@@ -1590,7 +1605,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters: { identifier: 2, value: 1 }
   )EOF";
@@ -1615,7 +1629,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1648,7 +1661,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 10, value: 0 }
@@ -1721,7 +1733,7 @@ public:
     return Tracing::Reason::Sampling;
   }
   void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
-
+  bool useRequestIdForTraceSampling() const override { return true; }
   std::string testField() { return config_.test_field(); }
 
 private:
@@ -1836,6 +1848,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_TRUE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), true);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
@@ -1847,6 +1860,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
       pack_trace_reason: false
+      use_request_id_for_trace_sampling: false
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1859,6 +1873,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), false);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {

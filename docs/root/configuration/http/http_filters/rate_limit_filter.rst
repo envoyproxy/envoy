@@ -88,9 +88,9 @@ will be appended to the descriptor produced by the action and sent to the rateli
 overriding the static service configuration.
 
 The override can be configured to be taken from the :ref:`Dynamic Metadata
-<envoy_v3_api_msg_config.core.v3.Metadata>` under a specified :ref: `key
-<envoy_v3_api_msg_config.type.metadata.v3.MetadataKey>`. If the value is misconfigured
-or key does not exist, the override configuration is ignored.
+<envoy_v3_api_msg_config.core.v3.Metadata>` under a specified
+:ref:`key <envoy_v3_api_msg_type.metadata.v3.MetadataKey>`.
+If the value is misconfigured or key does not exist, the override configuration is ignored.
 
 Example 3
 ^^^^^^^^^

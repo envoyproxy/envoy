@@ -3,6 +3,8 @@
 namespace Envoy {
 namespace Quic {
 
+#ifdef ENVOY_ENABLE_QUIC
+
 // TODO(renjietang): Currently these stats are only available in downstream. Wire it up to upstream
 // QUIC also.
 QuicStatNames::QuicStatNames(Stats::SymbolTable& symbol_table)
@@ -75,6 +77,11 @@ Stats::StatName QuicStatNames::resetStreamErrorStatName(quic::QuicRstStreamError
             "quic_reset_stream_error_code_", QuicRstStreamErrorCodeToString(error_code)));
       }));
 }
+
+#else
+QuicStatNames::QuicStatNames(Stats::SymbolTable& /*symbol_table*/) {}
+
+#endif
 
 } // namespace Quic
 } // namespace Envoy
