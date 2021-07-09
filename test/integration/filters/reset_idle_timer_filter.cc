@@ -21,7 +21,7 @@ public:
 
 class ResetIdleTimerFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  ResetIdleTimerFilterConfig() : EmptyHttpFilterConfig("reset-idle-timer") {}
+  ResetIdleTimerFilterConfig() : EmptyHttpFilterConfig("reset-idle-timer-filter") {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override {
