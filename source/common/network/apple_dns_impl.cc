@@ -233,8 +233,9 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     return;
   }
 
-  // Only add this address to the list if kDNSServiceFlagsAdd is set. Callback targets are only
-  // additive.
+  // dns_sd.h does not callout behavior where callbacks to DNSServiceGetAddrInfoReply
+  // would respond without the flag. However, Envoy's API is solely additive.
+  // Therefore, only add this address to the list if kDNSServiceFlagsAdd is set.
   if (flags & kDNSServiceFlagsAdd) {
     ASSERT(address, "invalid to add null address");
     auto dns_response = buildDnsResponse(address, ttl);

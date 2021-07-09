@@ -67,7 +67,8 @@ public:
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
                                           const DnsLookupFamily lookup_family,
                                           const DnsResolver::ResolutionStatus expected_status,
-                                          const bool expected_results) {
+                                          const bool expected_results,
+                                          const bool exit_dispatcher = true) {
     return resolver_->resolve(
         address, lookup_family,
         [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
@@ -82,7 +83,9 @@ public:
               }
             }
           }
-          dispatcher_->exit();
+          if (exit_dispatcher) {
+            dispatcher_->exit();
+          }
         });
   }
 
@@ -154,6 +157,29 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+// dns_sd is very opaque and does not explicitly callout the state that is kept across queries.
+// The following two tests make sure that two consecutive queries for the same domain result in
+// successful resolution. This is implicitly testing the behavior of kDNSServiceFlagsAdd across
+// queries.
+TEST_F(AppleDnsImplTest, DoubleLookup) {
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(AppleDnsImplTest, DoubleLookupInOneLoop) {
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
+                                             DnsResolver::ResolutionStatus::Success, true, false));
+
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
