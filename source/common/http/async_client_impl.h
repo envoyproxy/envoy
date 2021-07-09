@@ -229,7 +229,7 @@ private:
         retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
             retry_policy.value(), ProtobufMessage::getNullValidationVisitor());
       } else {
-        retry_policy_.reset(new NullRetryPolicy());
+        retry_policy_ = std::make_unique<NullRetryPolicy>();
       }
     }
 
