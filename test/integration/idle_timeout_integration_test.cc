@@ -105,12 +105,25 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
     idle_time_out->set_seconds(seconds.count());
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
+
+    // Set pool limit so that the test can use it's stats to validate that
+    // the pool is deleted.
+    envoy::config::cluster::v3::CircuitBreakers circuit_breakers;
+    auto* threshold = circuit_breakers.mutable_thresholds()->Add();
+    threshold->mutable_max_connection_pools()->set_value(1);
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_circuit_breakers()
+        ->MergeFrom(circuit_breakers);
   });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();
+
+  // Validate that the circuit breaker config is setup as we expect.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 1);
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
@@ -124,6 +137,9 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
   // Do not send any requests and validate if idle time out kicks in.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
+
+  // Validate that the pool is deleted when it becomes idle.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 0);
 }
 
 // Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
