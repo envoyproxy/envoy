@@ -32,7 +32,6 @@ static_resources:
         port_value: 443
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
     # - name: envoy.filters.listener.proxy_protocol
     #   typed_config:

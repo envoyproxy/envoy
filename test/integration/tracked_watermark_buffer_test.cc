@@ -35,15 +35,16 @@ TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
   ReadyWatcher overflow_watermark;
   ReadyWatcher now;
 
-  auto buffer = factory_.create([&]() { low_watermark.ready(); }, [&]() { high_watermark.ready(); },
-                                [&]() { overflow_watermark.ready(); });
+  auto buffer =
+      factory_.createBuffer([&]() { low_watermark.ready(); }, [&]() { high_watermark.ready(); },
+                            [&]() { overflow_watermark.ready(); });
   // Test highWatermarkRange
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(0, 0));
 
   buffer->setWatermarks(100);
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 100));
 
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   EXPECT_THAT(factory_.highWatermarkRange(), Pair(100, 0));
 
   buffer2->setWatermarks(200);
@@ -64,9 +65,9 @@ TEST_F(TrackedWatermarkBufferTest, WatermarkFunctions) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, BufferSizes) {
-  auto buffer = factory_.create([]() {}, []() {}, []() {});
+  auto buffer = factory_.createBuffer([]() {}, []() {}, []() {});
   buffer->setWatermarks(100);
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   EXPECT_EQ(2, factory_.numBuffersCreated());
   EXPECT_EQ(2, factory_.numBuffersActive());
   // Add some bytes to the buffers, and verify max and sum(max).
@@ -109,9 +110,9 @@ TEST_F(TrackedWatermarkBufferTest, BufferSizes) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, WaitUntilTotalBufferedExceeds) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
 
   auto thread1 = Thread::threadFactoryForTest().createThread([&]() { buffer1->add("a"); });
   auto thread2 = Thread::threadFactoryForTest().createThread([&]() { buffer2->add("b"); });
@@ -127,9 +128,9 @@ TEST_F(TrackedWatermarkBufferTest, WaitUntilTotalBufferedExceeds) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
   BufferMemoryAccountSharedPtr account = std::make_shared<BufferMemoryAccountImpl>();
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
@@ -152,9 +153,9 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfBuffersActivelyBound) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer3 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer3 = factory_.createBuffer([]() {}, []() {}, []() {});
   BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
   ASSERT_TRUE(factory_.waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 
@@ -179,8 +180,8 @@ TEST_F(TrackedWatermarkBufferTest, TracksNumberOfAccountsActive) {
 }
 
 TEST_F(TrackedWatermarkBufferTest, WaitForExpectedAccountBalanceShouldReturnTrueWhenConditionsMet) {
-  auto buffer1 = factory_.create([]() {}, []() {}, []() {});
-  auto buffer2 = factory_.create([]() {}, []() {}, []() {});
+  auto buffer1 = factory_.createBuffer([]() {}, []() {}, []() {});
+  auto buffer2 = factory_.createBuffer([]() {}, []() {}, []() {});
   BufferMemoryAccountSharedPtr account1 = std::make_shared<BufferMemoryAccountImpl>();
   BufferMemoryAccountSharedPtr account2 = std::make_shared<BufferMemoryAccountImpl>();
   buffer1->bindAccount(account1);

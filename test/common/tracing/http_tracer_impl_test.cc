@@ -727,6 +727,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
   span_ptr->injectContext(request_headers);
+  span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
@@ -827,6 +828,17 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
 
   HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,
                                           stream_info_, config_);
+}
+
+TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {
+  envoy::type::tracing::v3::CustomTag::Metadata testing_metadata;
+  testing_metadata.mutable_metadata_key()->set_key("key");
+  *testing_metadata.mutable_default_value() = "default_value";
+  MetadataCustomTag tag("testing", testing_metadata);
+  StreamInfo::MockStreamInfo testing_info_;
+  Http::TestRequestHeaderMapImpl header_map_;
+  CustomTagContext context{&header_map_, testing_info_};
+  EXPECT_EQ(tag.value(context), "default_value");
 }
 
 } // namespace
