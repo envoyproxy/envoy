@@ -159,7 +159,7 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 
   // Optional maximum requests for both upstream and downstream connections.
-  // If not specified, there is no limit.
+  // If not specified, there is no limit. It's a soft limit.
   uint32 max_requests_per_connection = 6;
 }
 
