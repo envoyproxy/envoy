@@ -1084,7 +1084,6 @@ TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
 
-
 TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWithFilter)) {
   std::string json = R"EOF(
   {
