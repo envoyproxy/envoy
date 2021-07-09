@@ -760,7 +760,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
         return os_sys_calls_actual_.recv(fd, buf, len, flags);
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
+  EXPECT_CALL(os_sys_calls, recv(_, _, 1, MSG_PEEK))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
+        return os_sys_calls_actual_.recv(fd, buf, len, flags);
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 1, 0))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))

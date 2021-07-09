@@ -85,8 +85,32 @@ void Filter::onRead() {
   }
 }
 
+bool Filter::isTLS(Network::IoHandle& io_handle) {
+  if (is_tls_.has_value()) {
+    return is_tls_.value();
+  }
+
+  uint8_t buf[1];
+  const auto result = io_handle.recv(buf, 1, MSG_PEEK);
+
+  if (!result.ok() && static_cast<uint64_t>(result.rc_) != 1) {
+    is_tls_ = false;
+  } else {
+    is_tls_ = buf[0] == 0x16;
+  }
+
+  return is_tls_.value();
+}
+
 ReadOrParseState Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
+
+  if (isTLS(socket.ioHandle())) {
+    // Release the file event so that we do not interfere with the connection read events.
+    socket.ioHandle().resetFileEvents();
+    cb_->continueFilterChain(true);
+    return ReadOrParseState::Done;
+  }
 
   // We return if a) we do not yet have the header, b) we have the header but not yet all
   // the extension data, or c) a socket error occurred when reading the header or the extension

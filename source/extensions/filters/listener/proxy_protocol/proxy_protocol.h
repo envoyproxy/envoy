@@ -118,6 +118,12 @@ private:
   bool parseV2Header(char* buf);
   absl::optional<size_t> lenV2Address(char* buf);
 
+  /**
+   * Helper function to detects if new connection is TLS.
+   * @return bool true if it is.
+   */
+  bool isTLS(Network::IoHandle& io_handle);
+
   Network::ListenerFilterCallbacks* cb_{};
 
   // The offset in buf_ that has been fully read
@@ -144,6 +150,8 @@ private:
   ConfigSharedPtr config_;
 
   absl::optional<WireHeader> proxy_protocol_header_;
+
+  absl::optional<bool> is_tls_{absl::nullopt};
 };
 
 } // namespace ProxyProtocol
