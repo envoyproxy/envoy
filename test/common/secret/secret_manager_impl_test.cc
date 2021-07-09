@@ -1017,6 +1017,7 @@ static_secrets:
   checkConfigDump(TestEnvironment::substitute(expected_config_dump));
 }
 
+// Test that private key provider definitions inside Secrets can be added dynamically.
 TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
   Server::MockInstance server;
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));

@@ -982,39 +982,27 @@ class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstrea
 public:
   envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    ProtobufWkt::Struct val;
-    (*val.mutable_fields())["private_key_file"].set_string_value(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
-    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
 
-    // check the key type and set the mode accordingly
-    std::string mode;
-    std::string private_key = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+    const std::string yaml =
+        R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_tmpdir }}/root/current/servercert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": "type.googleapis.com/google.protobuf.Struct"
+      value:
+        private_key_file: "{{ test_tmpdir }}/root/current/serverkey.pem"
+        expected_operation: "sign"
+        sync_mode: true
+        mode: "rsa"
+)EOF";
 
-    EXPECT_TRUE(pkey != nullptr);
-
-    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-      mode = "rsa";
-    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
-      mode = "ecdsa";
-    }
-    (*val.mutable_fields())["mode"].set_string_value(mode);
-
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
     secret.set_name(server_cert_rsa_);
-    auto* tls_certificate = secret.mutable_tls_certificate();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::temporaryPath("root/current/servercert.pem"));
-    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
-        "type.googleapis.com/google.protobuf.Struct");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
-    auto* watched_directory = tls_certificate->mutable_watched_directory();
-    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
+
     return secret;
   }
 };
@@ -1055,39 +1043,26 @@ class SdsCdsPrivateKeyIntegrationTest : public SdsCdsIntegrationTest {
 public:
   envoy::extensions::transport_sockets::tls::v3::Secret getCurrentServerPrivateKeyProviderSecret() {
     envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    ProtobufWkt::Struct val;
-    (*val.mutable_fields())["private_key_file"].set_string_value(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    (*val.mutable_fields())["expected_operation"].set_string_value("sign");
-    (*val.mutable_fields())["sync_mode"].set_bool_value(true);
+    const std::string yaml =
+        R"EOF(
+name: "abc.com"
+tls_certificate:
+  certificate_chain:
+    filename: "{{ test_tmpdir }}/root/current/servercert.pem"
+  private_key_provider:
+    provider_name: test
+    typed_config:
+      "@type": "type.googleapis.com/google.protobuf.Struct"
+      value:
+        private_key_file: "{{ test_tmpdir }}/root/current/serverkey.pem"
+        expected_operation: "sign"
+        sync_mode: true
+        mode: "rsa"
+)EOF";
 
-    // check the key type and set the mode accordingly
-    std::string mode;
-    std::string private_key = TestEnvironment::readFileToStringForTest(
-        TestEnvironment::temporaryPath("root/current/serverkey.pem"));
-    bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(private_key.data()), private_key.size()));
-    bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-
-    EXPECT_TRUE(pkey != nullptr);
-
-    if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_RSA) {
-      mode = "rsa";
-    } else if (EVP_PKEY_id(pkey.get()) == EVP_PKEY_EC) {
-      mode = "ecdsa";
-    }
-    (*val.mutable_fields())["mode"].set_string_value(mode);
-
+    TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret);
     secret.set_name(client_cert_);
-    auto* tls_certificate = secret.mutable_tls_certificate();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::temporaryPath("root/current/servercert.pem"));
-    tls_certificate->mutable_private_key_provider()->set_provider_name("test");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->set_type_url(
-        "type.googleapis.com/google.protobuf.Struct");
-    tls_certificate->mutable_private_key_provider()->mutable_typed_config()->PackFrom(val);
-    auto* watched_directory = tls_certificate->mutable_watched_directory();
-    watched_directory->set_path(TestEnvironment::temporaryPath("root"));
+
     return secret;
   }
 };
@@ -1095,6 +1070,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
                          testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
+// Test private key providers in SDS+CDS setup.
 TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   v3_resource_api_ = true;
 
