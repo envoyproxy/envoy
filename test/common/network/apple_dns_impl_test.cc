@@ -161,7 +161,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-// dns_sd is very opaque and does not explicitly callout the state that is kept across queries.
+// dns_sd is very opaque and does not explicitly call out the state that is kept across queries.
 // The following two tests make sure that two consecutive queries for the same domain result in
 // successful resolution. This is implicitly testing the behavior of kDNSServiceFlagsAdd across
 // queries.

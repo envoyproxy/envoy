@@ -235,7 +235,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     return;
   }
 
-  // dns_sd.h does not callout behavior where callbacks to DNSServiceGetAddrInfoReply
+  // dns_sd.h does not call out behavior where callbacks to DNSServiceGetAddrInfoReply
   // would respond without the flag. However, Envoy's API is solely additive.
   // Therefore, only add this address to the list if kDNSServiceFlagsAdd is set.
   if (flags & kDNSServiceFlagsAdd) {
