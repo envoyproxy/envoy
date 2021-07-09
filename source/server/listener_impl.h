@@ -50,9 +50,6 @@ public:
     return local_address_;
   }
   Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
-  bool reusePort() const override {
-    return bind_type_ == ListenerComponentFactory::BindType::ReusePort;
-  }
   Network::ListenSocketFactoryPtr clone() const override {
     return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
   }
@@ -276,8 +273,7 @@ public:
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
-  static bool enableReusePort(Server::Instance& server,
-                              const envoy::config::listener::v3::Listener& config);
+  bool reusePort() const { return reuse_port_; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
@@ -368,6 +364,7 @@ private:
   void buildOriginalDstListenerFilter();
   void buildProxyProtocolListenerFilter();
   void buildTlsInspectorListenerFilter();
+  bool initializeReusePort();
 
   void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
     ensureSocketOptions();
@@ -408,6 +405,7 @@ private:
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
+  const bool reuse_port_;
 
   // Per-listener connection limits are only specified via runtime.
   //

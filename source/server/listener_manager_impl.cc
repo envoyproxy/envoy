@@ -449,8 +449,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
     if (*(*existing_warming_listener)->address() != *new_listener->address()) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener,
-                                    ListenerImpl::enableReusePort(server_, config));
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
     }
@@ -459,8 +458,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (*(*existing_active_listener)->address() != *new_listener->address()) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener,
-                                    ListenerImpl::enableReusePort(server_, config));
+      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
     }
@@ -474,8 +472,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else {
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
-    setNewOrDrainingSocketFactory(name, config.address(), *new_listener,
-                                  ListenerImpl::enableReusePort(server_, config));
+    setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -957,7 +954,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 
 void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
-    ListenerImpl& listener, bool reuse_port) {
+    ListenerImpl& listener) {
   // Typically we catch address issues when we try to bind to the same address multiple times.
   // However, for listeners that do not bind we must check to make sure we are not duplicating. This
   // is an edge case and nothing will explicitly break, but there is no possibility that two
@@ -980,7 +977,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   auto existing_draining_listener = std::find_if(
       draining_listeners_.cbegin(), draining_listeners_.cend(),
       [&listener](const DrainingListener& draining_listener) {
-        return !draining_listener.listener_->listenSocketFactory().reusePort() &&
+        return !draining_listener.listener_->reusePort() &&
                draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
                *listener.address() ==
                    *draining_listener.listener_->listenSocketFactory().localAddress();
@@ -990,23 +987,18 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
   }
 
-  Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
-  listener.setSocketFactory(
-      draining_listen_socket_factory != nullptr
-          ? draining_listen_socket_factory->clone()
-          : createListenSocketFactory(proto_address, listener,
-                                      (socket_type == Network::Socket::Type::Datagram) ||
-                                          reuse_port));
+  listener.setSocketFactory(draining_listen_socket_factory != nullptr
+                                ? draining_listen_socket_factory->clone()
+                                : createListenSocketFactory(proto_address, listener));
 }
 
 Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
-    const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener,
-    bool reuse_port) {
+    const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener) {
   Network::Socket::Type socket_type = Network::Utility::protobufAddressSocketType(proto_address);
   ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::NoBind;
   if (listener.bindToPort()) {
-    bind_type = reuse_port ? ListenerComponentFactory::BindType::ReusePort
-                           : ListenerComponentFactory::BindType::NoReusePort;
+    bind_type = listener.reusePort() ? ListenerComponentFactory::BindType::ReusePort
+                                     : ListenerComponentFactory::BindType::NoReusePort;
   }
   TRY_ASSERT_MAIN_THREAD {
     return std::make_unique<ListenSocketFactoryImpl>(

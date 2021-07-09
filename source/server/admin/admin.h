@@ -326,7 +326,6 @@ private:
       socket_create_ = true;
       return socket_;
     }
-    bool reusePort() const override { return false; }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
     void closeAllSockets() override {}
     void doFinalPreWorkerInit() override {}

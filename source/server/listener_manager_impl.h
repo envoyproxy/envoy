@@ -293,10 +293,10 @@ private:
 
   void setNewOrDrainingSocketFactory(const std::string& name,
                                      const envoy::config::core::v3::Address& proto_address,
-                                     ListenerImpl& listener, bool reuse_port);
+                                     ListenerImpl& listener);
   Network::ListenSocketFactoryPtr
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
-                            ListenerImpl& listener, bool reuse_port);
+                            ListenerImpl& listener);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.

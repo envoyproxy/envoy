@@ -300,6 +300,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
+      reuse_port_(initializeReusePort()),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -378,6 +379,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           origin.listener_factory_context_->listener_factory_context_base_, this, *this)),
       filter_chain_manager_(address_, origin.listener_factory_context_->parentFactoryContext(),
                             initManager(), origin.filter_chain_manager_),
+      reuse_port_(origin.reuse_port_),
       local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
                           [this] {
                             ASSERT(workers_started_);
@@ -412,7 +414,7 @@ void ListenerImpl::buildUdpListenerFactory(Network::Socket::Type socket_type,
   if (socket_type != Network::Socket::Type::Datagram) {
     return;
   }
-  if (!enableReusePort(parent_.server_, config_) && concurrency > 1) {
+  if (!reuse_port_ && concurrency > 1) {
     throw EnvoyException("Listening on UDP when concurrency is > 1 without the SO_REUSEPORT "
                          "socket option results in "
                          "unstable packet proxying. Configure the reuse_port listener option or "
@@ -460,7 +462,7 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (enableReusePort(parent_.server_, config_)) {
+  if (reuse_port_) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
   if (!config_.socket_options().empty()) {
@@ -806,20 +808,28 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
   }
 }
 
-bool ListenerImpl::enableReusePort(Server::Instance& server,
-                                   const envoy::config::listener::v3::Listener& config) {
-  // If someone set the new field, adhere to it.
-  if (config.has_enable_reuse_port()) {
-    return config.enable_reuse_port().value();
-  }
+bool ListenerImpl::initializeReusePort() {
+  bool initial_reuse_port_value = [this]() {
+    // If someone set the new field, adhere to it.
+    if (config_.has_enable_reuse_port()) {
+      return config_.enable_reuse_port().value();
+    }
 
-  // If someone set the old field to true, adhere to it.
-  if (config.reuse_port()) {
-    return true;
-  }
+    // If someone set the old field to true, adhere to it.
+    if (config_.reuse_port()) {
+      return true;
+    }
 
-  // Otherwise use the server default which depends on hot restart.
-  return server.enableReusePortDefault();
+    // Otherwise use the server default which depends on hot restart.
+    return parent_.server_.enableReusePortDefault();
+  }();
+
+  // fixfix apple only.
+  const auto socket_type = Network::Utility::protobufAddressSocketType(config_.address());
+  if (socket_type == Network::Socket::Type::Stream) {
+    initial_reuse_port_value = false;
+  }
+  return initial_reuse_port_value;
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

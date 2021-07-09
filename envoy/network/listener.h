@@ -58,12 +58,6 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return whether the socket reuses the underlying port. If false, the socket is effectively
-   * duplicated on each worker and shared.
-   */
-  virtual bool reusePort() const PURE;
-
-  /**
    * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
    */
   virtual ListenSocketFactoryPtr clone() const PURE;

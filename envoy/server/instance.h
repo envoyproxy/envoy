@@ -261,8 +261,7 @@ public:
    * fixing https://github.com/envoyproxy/envoy/issues/15794. It is required to know what the
    * default was of parent processes during hot restart was, because otherwise switching the
    * default on the fly will break existing deployments.
-   * TODO(mattklein123): This can be removed when the version this was added in is no longer
-   * supported.
+   * TODO(mattklein123): This can be removed when version 1.20.0 is no longer supported.
    */
   virtual bool enableReusePortDefault() PURE;
 };
