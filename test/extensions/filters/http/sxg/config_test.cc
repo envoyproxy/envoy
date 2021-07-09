@@ -87,11 +87,13 @@ TEST(ConfigTest, CreateFilterHasSdsSecret) {
 certificate:
   name: certificate
   sds_config:
-    path: /etc/envoy/certificate_sds_secret.yaml
+    path: "xxxx"
+    resource_api_version: V3
 private_key:
   name: private_key
   sds_config:
-    path: /etc/envoy/certificate_sds_secret.yaml
+    path: "xxxx"
+    resource_api_version: V3
 cbor_url: "/.sxg/cert.cbor"
 validity_url: "/.sxg/validity.msg"
 )YAML";

@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.sxg",
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.sxg",
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
