@@ -11,6 +11,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/mocks/upstream/cluster_real_priority_set.h"
@@ -53,6 +54,8 @@ using ::testing::Return;
 using ::testing::ReturnNew;
 using ::testing::ReturnRef;
 using ::testing::SaveArg;
+
+using namespace std::chrono_literals;
 
 envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV3Yaml(const std::string& yaml,
                                                                  bool avoid_boosting = true) {
@@ -138,8 +141,10 @@ public:
                   .value());
   }
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"]();
+  void checkConfigDump(
+      const std::string& expected_dump_yaml,
+      const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
+    auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"](name_matcher);
     const auto& clusters_config_dump =
         dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 
@@ -280,6 +285,15 @@ static_clusters:
 dynamic_active_clusters:
 dynamic_warming_clusters:
 )EOF");
+
+  Matchers::MockStringMatcher mock_matcher;
+  EXPECT_CALL(mock_matcher, match("http12_cluster")).WillOnce(Return(false));
+  checkConfigDump(R"EOF(
+static_clusters:
+dynamic_active_clusters:
+dynamic_warming_clusters:
+)EOF",
+                  mock_matcher);
 }
 
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
@@ -1626,12 +1640,14 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp));
+  EXPECT_CALL(*cp, addIdleCallback(_));
   EXPECT_EQ(cp, HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->httpConnPool(ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr)));
 
   Tcp::ConnectionPool::MockInstance* cp2 = new Tcp::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
+  EXPECT_CALL(*cp2, addIdleCallback(_));
   EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
                                               ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
@@ -1647,11 +1663,9 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   // Now remove the cluster. This should drain the connection pools, but not affect
   // tcp connections.
-  Http::ConnectionPool::Instance::DrainedCb drained_cb;
-  Tcp::ConnectionPool::Instance::DrainedCb drained_cb2;
   EXPECT_CALL(*callbacks, onClusterRemoval(_));
-  EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  EXPECT_CALL(*cp2, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb2));
+  EXPECT_CALL(*cp, startDrain());
+  EXPECT_CALL(*cp2, startDrain());
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("fake_cluster"));
   EXPECT_EQ(0UL, cluster_manager_->clusters().active_clusters_.size());
@@ -1663,9 +1677,6 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
 
   // Remove an unknown cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("foo"));
-
-  drained_cb();
-  drained_cb2();
 
   checkStats(1 /*added*/, 1 /*modified*/, 1 /*removed*/, 0 /*active*/, 0 /*warming*/);
 
@@ -1766,8 +1777,8 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   Outlier::MockDetector outlier_detector;
   ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
 
-  Http::ConnectionPool::MockInstance* cp1 = new Http::ConnectionPool::MockInstance();
-  Http::ConnectionPool::MockInstance* cp2 = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+  Http::ConnectionPool::MockInstance* cp2 = new NiceMock<Http::ConnectionPool::MockInstance>();
 
   {
     InSequence s;
@@ -1829,8 +1840,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   Outlier::MockDetector outlier_detector;
   ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
 
-  Tcp::ConnectionPool::MockInstance* cp1 = new Tcp::ConnectionPool::MockInstance();
-  Tcp::ConnectionPool::MockInstance* cp2 = new Tcp::ConnectionPool::MockInstance();
+  Tcp::ConnectionPool::MockInstance* cp1 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+  Tcp::ConnectionPool::MockInstance* cp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
 
   {
     InSequence s;
@@ -2060,7 +2071,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(4)
-      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
@@ -2080,14 +2091,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_NE(cp1_high, cp2_high);
   EXPECT_NE(cp1, cp1_high);
 
-  Http::ConnectionPool::Instance::DrainedCb drained_cb;
-  EXPECT_CALL(*cp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  Http::ConnectionPool::Instance::DrainedCb drained_cb_high;
-  EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
-
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(4)
-      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts.
   Tcp::ConnectionPool::MockInstance* tcp1 =
@@ -2107,24 +2113,19 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   EXPECT_NE(tcp1_high, tcp2_high);
   EXPECT_NE(tcp1, tcp1_high);
 
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
-  EXPECT_CALL(*tcp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_high;
-  EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
-
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
-  drained_cb();
-  drained_cb = nullptr;
-  tcp_drained_cb();
-  tcp_drained_cb = nullptr;
-  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(4);
-  drained_cb_high();
-  drained_cb_high = nullptr;
-  tcp_drained_cb_high();
-  tcp_drained_cb_high = nullptr;
+  cp1->idle_cb_();
+  cp1->idle_cb_ = nullptr;
+  tcp1->idle_cb_();
+  tcp1->idle_cb_ = nullptr;
+  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
+  cp1_high->idle_cb_();
+  cp1_high->idle_cb_ = nullptr;
+  tcp1_high->idle_cb_();
+  tcp1_high->idle_cb_ = nullptr;
 
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = HttpPoolDataPeer::getPool(
@@ -2225,7 +2226,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(4)
-      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
@@ -2245,14 +2246,9 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   EXPECT_NE(cp1_high, cp2_high);
   EXPECT_NE(cp1, cp1_high);
 
-  Http::ConnectionPool::Instance::DrainedCb drained_cb;
-  EXPECT_CALL(*cp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  Http::ConnectionPool::Instance::DrainedCb drained_cb_high;
-  EXPECT_CALL(*cp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb_high));
-
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(10)
-      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
   Tcp::ConnectionPool::MockInstance* tcp1 =
@@ -2314,33 +2310,22 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(6);
 
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
-  EXPECT_CALL(*tcp1, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_high;
-  EXPECT_CALL(*tcp1_high, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_high));
-
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_example_com;
-  EXPECT_CALL(*tcp1_example_com, addDrainedCallback(_))
-      .WillOnce(SaveArg<0>(&tcp_drained_cb_example_com));
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb_ibm_com;
-  EXPECT_CALL(*tcp1_ibm_com, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb_ibm_com));
-
   // Remove the first host, this should lead to the first cp being drained.
   dns_timer_->invokeCallback();
   dns_callback(Network::DnsResolver::ResolutionStatus::Success,
                TestUtility::makeDnsResponse({"127.0.0.2"}));
-  drained_cb();
-  drained_cb = nullptr;
-  tcp_drained_cb();
-  tcp_drained_cb = nullptr;
-  drained_cb_high();
-  drained_cb_high = nullptr;
-  tcp_drained_cb_high();
-  tcp_drained_cb_high = nullptr;
-  tcp_drained_cb_example_com();
-  tcp_drained_cb_example_com = nullptr;
-  tcp_drained_cb_ibm_com();
-  tcp_drained_cb_ibm_com = nullptr;
+  cp1->idle_cb_();
+  cp1->idle_cb_ = nullptr;
+  tcp1->idle_cb_();
+  tcp1->idle_cb_ = nullptr;
+  cp1_high->idle_cb_();
+  cp1_high->idle_cb_ = nullptr;
+  tcp1_high->idle_cb_();
+  tcp1_high->idle_cb_ = nullptr;
+  tcp1_example_com->idle_cb_();
+  tcp1_example_com->idle_cb_ = nullptr;
+  tcp1_ibm_com->idle_cb_();
+  tcp1_ibm_com->idle_cb_ = nullptr;
 
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = HttpPoolDataPeer::getPool(
@@ -2801,10 +2786,10 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
-      .WillOnce(ReturnNew<Http::ConnectionPool::MockInstance>());
+      .WillOnce(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .WillOnce(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
+      .WillOnce(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
 
   Http::ConnectionPool::MockInstance* cp = HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -2815,11 +2800,14 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
                                    ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Immediate drain, since this can happen with the HTTP codecs.
-  EXPECT_CALL(*cp, addDrainedCallback(_))
-      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
-
-  EXPECT_CALL(*tcp, addDrainedCallback(_))
-      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  EXPECT_CALL(*cp, startDrain()).WillOnce(Invoke([&]() {
+    cp->idle_cb_();
+    cp->idle_cb_ = nullptr;
+  }));
+  EXPECT_CALL(*tcp, startDrain()).WillOnce(Invoke([&]() {
+    tcp->idle_cb_();
+    tcp->idle_cb_ = nullptr;
+  }));
 
   // Remove the first host, this should lead to the cp being drained, without
   // crash.
@@ -2888,24 +2876,25 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
+  Http::ConnectionPool::Instance::IdleCb drained_cb;
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(mock_cp));
+  EXPECT_CALL(*mock_cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
+  EXPECT_CALL(*mock_cp, startDrain());
 
-  MockTcpConnPoolWithDestroy* mock_tcp = new MockTcpConnPoolWithDestroy();
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(mock_tcp));
+  MockTcpConnPoolWithDestroy* mock_tcp = new NiceMock<MockTcpConnPoolWithDestroy>();
+  Tcp::ConnectionPool::Instance::IdleCb tcp_drained_cb;
+  EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(mock_tcp));
+  EXPECT_CALL(*mock_tcp, addIdleCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
+  EXPECT_CALL(*mock_tcp, startDrain());
 
-  Http::ConnectionPool::MockInstance* cp = HttpPoolDataPeer::getPool(
+  HttpPoolDataPeer::getPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
 
-  Tcp::ConnectionPool::MockInstance* tcp =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+  TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                               ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Remove the first host, this should lead to the cp being drained.
-  Http::ConnectionPool::Instance::DrainedCb drained_cb;
-  EXPECT_CALL(*cp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
-  Tcp::ConnectionPool::Instance::DrainedCb tcp_drained_cb;
-  EXPECT_CALL(*tcp, addDrainedCallback(_)).WillOnce(SaveArg<0>(&tcp_drained_cb));
   dns_timer_->invokeCallback();
   dns_callback(Network::DnsResolver::ResolutionStatus::Success, TestUtility::makeDnsResponse({}));
 
@@ -3343,6 +3332,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
 
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->tcpConnPool(ResourcePriority::Default, &context);
@@ -3353,7 +3343,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;
 
-  Http::ConnectionPool::MockInstance* to_create = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* to_create =
+      new NiceMock<Http::ConnectionPool::MockInstance>();
   Network::Socket::OptionsSharedPtr options_to_return =
       Network::SocketOptionFactory::buildIpTransparentOptions();
 
@@ -3370,8 +3361,10 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   NiceMock<MockLoadBalancerContext> context1;
   NiceMock<MockLoadBalancerContext> context2;
 
-  Http::ConnectionPool::MockInstance* to_create1 = new Http::ConnectionPool::MockInstance();
-  Http::ConnectionPool::MockInstance* to_create2 = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* to_create1 =
+      new NiceMock<Http::ConnectionPool::MockInstance>();
+  Http::ConnectionPool::MockInstance* to_create2 =
+      new NiceMock<Http::ConnectionPool::MockInstance>();
   Network::Socket::OptionsSharedPtr options1 =
       Network::SocketOptionFactory::buildIpTransparentOptions();
   Network::Socket::OptionsSharedPtr options2 =
@@ -3411,7 +3404,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;
 
-  Http::ConnectionPool::MockInstance* to_create = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* to_create =
+      new NiceMock<Http::ConnectionPool::MockInstance>();
   Network::Socket::OptionsSharedPtr options_to_return = nullptr;
 
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
@@ -3430,6 +3424,7 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   Network::Socket::OptionsSharedPtr options_to_return = nullptr;
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(pool_mock));
+  EXPECT_CALL(*pool_mock, addIdleCallback(_));
 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
@@ -3438,9 +3433,9 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   EXPECT_CALL(*pool_mock, hasActiveConnections()).WillOnce(Return(true));
   opt_cp.value().hasActiveConnections();
 
-  ConnectionPool::Instance::DrainedCb drained_cb = []() {};
-  EXPECT_CALL(*pool_mock, addDrainedCallback(_));
-  opt_cp.value().addDrainedCallback(drained_cb);
+  ConnectionPool::Instance::IdleCb drained_cb = []() {};
+  EXPECT_CALL(*pool_mock, addIdleCallback(_));
+  opt_cp.value().addIdleCallback(drained_cb);
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {
@@ -4352,11 +4347,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(3)
-      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(3)
-      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
@@ -4378,17 +4373,22 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(tcp1, tcp2);
 
-  EXPECT_CALL(*cp2, addDrainedCallback(_))
-      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
-
-  EXPECT_CALL(*cp1, addDrainedCallback(_))
-      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
-
-  EXPECT_CALL(*tcp1, addDrainedCallback(_))
-      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
-
-  EXPECT_CALL(*tcp2, addDrainedCallback(_))
-      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  EXPECT_CALL(*cp2, startDrain()).WillOnce(Invoke([&]() {
+    cp2->idle_cb_();
+    cp2->idle_cb_ = nullptr;
+  }));
+  EXPECT_CALL(*cp1, startDrain()).WillOnce(Invoke([&]() {
+    cp1->idle_cb_();
+    cp1->idle_cb_ = nullptr;
+  }));
+  EXPECT_CALL(*tcp1, startDrain()).WillOnce(Invoke([&]() {
+    tcp1->idle_cb_();
+    tcp1->idle_cb_ = nullptr;
+  }));
+  EXPECT_CALL(*tcp2, startDrain()).WillOnce(Invoke([&]() {
+    tcp2->idle_cb_();
+    tcp2->idle_cb_ = nullptr;
+  }));
 
   HostVector hosts_removed;
   hosts_removed.push_back(host2);
@@ -4411,11 +4411,14 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   HostVector hosts_added;
   hosts_added.push_back(host3);
 
-  EXPECT_CALL(*cp1, addDrainedCallback(_))
-      .WillOnce(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
-
-  EXPECT_CALL(*tcp1, addDrainedCallback(_))
-      .WillOnce(Invoke([](Tcp::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  EXPECT_CALL(*cp1, startDrain()).WillOnce(Invoke([&]() {
+    cp1->idle_cb_();
+    cp1->idle_cb_ = nullptr;
+  }));
+  EXPECT_CALL(*tcp1, startDrain()).WillOnce(Invoke([&]() {
+    tcp1->idle_cb_();
+    tcp1->idle_cb_ = nullptr;
+  }));
 
   // Adding host3 should drain connection pool for host1.
   cluster.prioritySet().updateHosts(
@@ -4459,11 +4462,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(1)
-      .WillRepeatedly(ReturnNew<Http::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(1)
-      .WillRepeatedly(ReturnNew<Tcp::ConnectionPool::MockInstance>());
+      .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
 
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
@@ -4486,6 +4489,93 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   cluster.prioritySet().updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr,
       hosts_added, {}, 100);
+}
+
+TEST_F(ClusterManagerImplTest, ConnPoolsIdleDeleted) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+
+  // Set up the HostSet.
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+
+  HostVector hosts{host1};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // Sending non-mergeable updates.
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  {
+    auto* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
+    std::function<void()> idle_callback;
+    EXPECT_CALL(*cp1, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_callback));
+
+    EXPECT_EQ(cp1, HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->httpConnPool(ResourcePriority::Default,
+                                                                Http::Protocol::Http11, nullptr)));
+    // Request the same pool again and verify that it produces the same output
+    EXPECT_EQ(cp1, HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->httpConnPool(ResourcePriority::Default,
+                                                                Http::Protocol::Http11, nullptr)));
+
+    // Trigger the idle callback so we remove the connection pool
+    idle_callback();
+
+    auto* cp2 = new NiceMock<Http::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp2));
+    EXPECT_CALL(*cp2, addIdleCallback(_));
+
+    // This time we expect cp2 since cp1 will have been destroyed
+    EXPECT_EQ(cp2, HttpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->httpConnPool(ResourcePriority::Default,
+                                                                Http::Protocol::Http11, nullptr)));
+  }
+
+  {
+    auto* tcp1 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(tcp1));
+    std::function<void()> idle_callback;
+    EXPECT_CALL(*tcp1, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_callback));
+    EXPECT_EQ(tcp1,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+    // Request the same pool again and verify that it produces the same output
+    EXPECT_EQ(tcp1,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+
+    // Trigger the idle callback so we remove the connection pool
+    idle_callback();
+
+    auto* tcp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(tcp2));
+
+    // This time we expect tcp2 since tcp1 will have been destroyed
+    EXPECT_EQ(tcp2,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+  }
 }
 
 TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {
@@ -4595,6 +4685,7 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
   std::vector<Http::ConnectionPool::MockInstance*> conn_pool_vector;
   for (size_t i = 0; i < 3; ++i) {
     conn_pool_vector.push_back(new Http::ConnectionPool::MockInstance());
+    EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
         .WillOnce(Return(conn_pool_vector.back()));
     EXPECT_CALL(downstream_connection, hashKey)
@@ -4706,7 +4797,7 @@ TEST_F(PreconnectTest, PreconnectOn) {
                          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   http_handle.value().newStream(decoder_, http_callbacks_);
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")

@@ -63,6 +63,12 @@ public:
    * @param status the trace reason that should be set for this request.
    */
   virtual void setTraceReason(Http::RequestHeaderMap& request_headers, Tracing::Reason reason) PURE;
+
+  /**
+   * Get whether to use request_id based sampling policy or not.
+   * @return whether to use request_id based sampling policy or not.
+   */
+  virtual bool useRequestIdForTraceSampling() const PURE;
 };
 
 using RequestIDExtensionSharedPtr = std::shared_ptr<RequestIDExtension>;

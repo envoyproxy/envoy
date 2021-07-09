@@ -30,7 +30,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -114,4 +114,10 @@ message DnsCacheConfig {
   // performance improvement, in the form of cache hits, for hostnames that are going to be
   // resolved during steady state and are known at config load time.
   repeated config.core.v3.SocketAddress preresolve_hostnames = 10;
+
+  // The timeout used for DNS queries. This timeout is independent of any timeout and retry policy
+  // used by the underlying DNS implementation (e.g., c-areas and Apple DNS) which are opaque.
+  // Setting this timeout will ensure that queries succeed or fail within the specified time frame
+  // and are then retried using the standard refresh rates. Defaults to 5s if not set.
+  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
 }
