@@ -970,15 +970,14 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   }
 
   // Search through draining listeners to see if there is a listener that has a socket factory for
-  // the same address we are configured for and doesn't use SO_REUSEPORT. This is an edge case, but
+  // the same address we are configured for. This is an edge case, but
   // may happen if a listener is removed and then added back with a same or different name and
   // intended to listen on the same address. This should work and not fail.
   const Network::ListenSocketFactory* draining_listen_socket_factory = nullptr;
   auto existing_draining_listener = std::find_if(
       draining_listeners_.cbegin(), draining_listeners_.cend(),
       [&listener](const DrainingListener& draining_listener) {
-        return !draining_listener.listener_->reusePort() &&
-               draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
+        return draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
                *listener.address() ==
                    *draining_listener.listener_->listenSocketFactory().localAddress();
       });

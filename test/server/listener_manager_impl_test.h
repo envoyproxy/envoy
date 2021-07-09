@@ -213,14 +213,18 @@ protected:
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
 
+  // fixfix
+  static constexpr ListenerComponentFactory::BindType default_bind_type =
+      ListenerComponentFactory::BindType::NoReusePort;
+
   /**
    * Validate that createListenSocket is called once with the expected options.
    */
-  void expectCreateListenSocket(
-      const envoy::config::core::v3::SocketOption::SocketState& expected_state,
-      Network::Socket::Options::size_type expected_num_options,
-      ListenerComponentFactory::BindType bind_type = ListenerComponentFactory::BindType::ReusePort,
-      uint32_t worker_index = 0) {
+  void
+  expectCreateListenSocket(const envoy::config::core::v3::SocketOption::SocketState& expected_state,
+                           Network::Socket::Options::size_type expected_num_options,
+                           ListenerComponentFactory::BindType bind_type = default_bind_type,
+                           uint32_t worker_index = 0) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, worker_index))
         .WillOnce(
             Invoke([this, expected_num_options, &expected_state](
