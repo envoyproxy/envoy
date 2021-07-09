@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -1089,7 +1090,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
@@ -1125,7 +1127,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1168,7 +1171,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1178,7 +1182,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
@@ -1223,7 +1227,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();

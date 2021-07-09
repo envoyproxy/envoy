@@ -496,7 +496,7 @@ twice. Clients should NACK responses that contain multiple instances of the same
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
 
-In the incremental proocol variants, the server signals the client that a resource should be
+In the incremental protocol variants, the server signals the client that a resource should be
 deleted via the :ref:`removed_resources <envoy_v3_api_field_service.discovery.v3.DeltaDiscoveryResponse.removed_resources>`
 field of the response. This tells the client to remove the resource from its local cache.
 

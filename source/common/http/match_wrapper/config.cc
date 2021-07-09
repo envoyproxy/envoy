@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 
 #include "absl/status/status.h"
@@ -103,9 +104,11 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
 
   MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());
 
-  auto match_tree =
-      Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData>(prefix, context, validation_visitor)
-          .create(proto_config.matcher());
+  Envoy::Http::Matching::HttpFilterActionContext action_context{prefix, context};
+  auto match_tree = Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData,
+                                              Envoy::Http::Matching::HttpFilterActionContext>(
+                        action_context, context.getServerFactoryContext(), validation_visitor)
+                        .create(proto_config.matcher());
 
   if (!validation_visitor.errors().empty()) {
     // TODO(snowp): Output all violations.
