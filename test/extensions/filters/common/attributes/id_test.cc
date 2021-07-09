@@ -21,6 +21,7 @@ namespace Filters {
 namespace Common {
 namespace Attributes {
 namespace {
+
 static inline void verifyPath(absl::string_view path, RootToken root, SubToken sub) {
   auto attr = AttributeId::from_path(path);
   EXPECT_TRUE(attr.has_value());

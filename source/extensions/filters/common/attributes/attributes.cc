@@ -87,11 +87,12 @@ template <class T> Value ValueUtil::objectValue(T val) {
 }
 
 Value Attributes::buildAttributesValue(const std::vector<AttributeId>& attrs) {
-  MapValue map;
+  google::protobuf::Arena a;
+  MapValue* map = google::protobuf::Arena::CreateMessage<MapValue>(&a);
 
   for (auto attr : attrs) {
     RootToken root_token = attr.root();
-    MapValue_Entry* root_entry = ValueUtil::getOrInsert(&map, attr.root_name());
+    MapValue_Entry* root_entry = ValueUtil::getOrInsert(map, attr.root_name());
     if (!attr.sub()) {
       // get the full map
       Value val = full(root_token);
@@ -106,7 +107,7 @@ Value Attributes::buildAttributesValue(const std::vector<AttributeId>& attrs) {
       sub_entry->set_allocated_value(&sub_val);
     }
   }
-  return ValueUtil::mapValue(&map);
+  return ValueUtil::mapValue(map);
 }
 
 Value Attributes::get(AttributeId& attr_id) {
@@ -170,12 +171,13 @@ Value Attributes::full(RootToken tok) {
     return getFilterState();
   }
 }
-// todo(eas): use helpers
 template <class T> Value Attributes::full() {
-  MapValue m;
+  google::protobuf::Arena a;
+  MapValue* m = google::protobuf::Arena::CreateMessage<MapValue>(&a);
+
   for (auto element : request_tokens) {
     Value val = get(element.second);
-    MapValue_Entry* e = m.add_entries();
+    MapValue_Entry* e = m->add_entries();
     auto key = ValueUtil::stringValue(std::string(element.first));
     e->set_allocated_key(&key);
     Value vv;
@@ -185,7 +187,7 @@ template <class T> Value Attributes::full() {
     vv.set_allocated_object_value(a);
     e->set_allocated_value(&vv);
   }
-  return ValueUtil::mapValue(&m);
+  return ValueUtil::mapValue(m);
 }
 
 Value Attributes::get(RequestToken tok) {
