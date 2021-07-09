@@ -66,12 +66,12 @@ udp_listener_config:
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
                            /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
 #else
                            /* expected_num_options */
-                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
 #endif
-  );
+                           ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
