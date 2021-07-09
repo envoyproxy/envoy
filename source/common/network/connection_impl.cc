@@ -144,7 +144,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       transport_socket_->doWrite(*write_buffer_, true);
     }
 
-    if (type != ConnectionCloseType::FlushWriteAndDelay && !delayed_close_timeout_set) {
+    if (type != ConnectionCloseType::FlushWriteAndDelay || !delayed_close_timeout_set) {
       closeConnectionImmediately();
       return;
     }
@@ -825,7 +825,7 @@ ClientConnectionImpl::ClientConnectionImpl(
       stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
-  if (remote_address->ip() != nullptr) {
+  if (remote_address->ip() == nullptr) {
     return;
   }
   if (!Network::Socket::applyOptions(options, *socket_,
