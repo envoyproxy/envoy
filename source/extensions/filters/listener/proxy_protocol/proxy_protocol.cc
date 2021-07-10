@@ -92,12 +92,7 @@ bool Filter::isTLS(Network::IoHandle& io_handle) {
 
   uint8_t buf[1];
   const auto result = io_handle.recv(buf, 1, MSG_PEEK);
-
-  if (!result.ok() && static_cast<uint64_t>(result.rc_) != 1) {
-    is_tls_ = false;
-  } else {
-    is_tls_ = buf[0] == 0x16;
-  }
+  is_tls_ = result.ok() && static_cast<uint64_t>(result.rc_) == 1 && buf[0] == 0x16;
 
   return is_tls_.value();
 }
