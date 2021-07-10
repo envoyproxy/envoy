@@ -123,6 +123,7 @@ private:
    * @return bool true if it is.
    */
   bool isTLS(Network::IoHandle& io_handle);
+  ReadOrParseState resetAndContinue(Network::IoHandle& io_handle);
 
   Network::ListenerFilterCallbacks* cb_{};
 

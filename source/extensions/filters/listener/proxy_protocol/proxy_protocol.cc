@@ -95,14 +95,18 @@ bool Filter::isTLS(Network::IoHandle& io_handle) {
   return is_tls_.value();
 }
 
+ReadOrParseState Filter::resetAndContinue(Network::IoHandle& io_handle) {
+  // Release the file event so that we do not interfere with the connection read events.
+  io_handle.resetFileEvents();
+  cb_->continueFilterChain(true);
+  return ReadOrParseState::Done;
+}
+
 ReadOrParseState Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
   if (isTLS(socket.ioHandle())) {
-    // Release the file event so that we do not interfere with the connection read events.
-    socket.ioHandle().resetFileEvents();
-    cb_->continueFilterChain(true);
-    return ReadOrParseState::Done;
+    return resetAndContinue(socket.ioHandle());
   }
 
   // We return if a) we do not yet have the header, b) we have the header but not yet all
@@ -150,10 +154,7 @@ ReadOrParseState Filter::onReadWorker() {
     socket.addressProvider().setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
 
-  // Release the file event so that we do not interfere with the connection read events.
-  socket.ioHandle().resetFileEvents();
-  cb_->continueFilterChain(true);
-  return ReadOrParseState::Done;
+  return resetAndContinue(socket.ioHandle());
 }
 
 absl::optional<size_t> Filter::lenV2Address(char* buf) {
