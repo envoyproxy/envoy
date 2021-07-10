@@ -86,13 +86,11 @@ void Filter::onRead() {
 }
 
 bool Filter::isTLS(Network::IoHandle& io_handle) {
-  if (is_tls_.has_value()) {
-    return is_tls_.value();
+  if (!is_tls_.has_value()) {
+    uint8_t buf[1];
+    const auto result = io_handle.recv(buf, 1, MSG_PEEK);
+    is_tls_ = result.ok() && static_cast<uint64_t>(result.rc_) == 1 && buf[0] == 0x16;
   }
-
-  uint8_t buf[1];
-  const auto result = io_handle.recv(buf, 1, MSG_PEEK);
-  is_tls_ = result.ok() && static_cast<uint64_t>(result.rc_) == 1 && buf[0] == 0x16;
 
   return is_tls_.value();
 }
