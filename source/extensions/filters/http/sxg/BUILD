@@ -16,8 +16,9 @@ envoy_cc_library(
     name = "sxg_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
+    external_deps = ["libsxg"],
     deps = [
-        envoy_external_dep_path("libsxg"),
+        # envoy_external_dep_path("libsxg"),
         "//envoy/server:filter_config_interface",
         "//source/common/config:datasource_lib",
         "//source/common/http:codes_lib",
