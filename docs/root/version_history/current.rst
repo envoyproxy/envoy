@@ -23,6 +23,7 @@ Minor Behavior Changes
   be now be disabled in favor of using unsigned payloads with compatible services via the new
   ``use_unsigned_payload`` filter option (default false).
 * cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
+* dns: changed apple resolver implementation to not reuse the UDS to the local DNS daemon.
 * dns cache: the new :ref:`dns_query_timeout <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>` option has a default of 5s. See below for more information.
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
