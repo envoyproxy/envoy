@@ -286,7 +286,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
 
   wrapper->connection().removeConnectionCallbacks(*wrapper);
   if (event != ConnectionEvent::Connected) {
-    if (next_attempt_timer_->enabled()) {
+    if (next_address_ < address_list_.size()) {
       next_attempt_timer_->disableTimer();
       tryAnotherConnection();
     }

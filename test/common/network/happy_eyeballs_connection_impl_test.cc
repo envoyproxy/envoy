@@ -87,7 +87,6 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
   EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[2], _, _, _)).WillOnce(
       testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(1);
   // Since there are no more address to connect to, the fallback timer will not
   // be rescheduled.
   failover_timer_->invokeCallback();
@@ -103,6 +102,9 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
       testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(1);
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
 }
 
@@ -179,7 +181,6 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
       testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
   EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*failover_timer_, enabled()).WillRepeatedly(Return(false));
   // Since there are no more address to connect to, the fallback timer will not
   // be rescheduled.
   ASSERT_EQ(2, created_connections_.size());
