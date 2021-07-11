@@ -66,12 +66,12 @@ CreateStatsHandler& getCreateStatsHandler() { MUTABLE_CONSTRUCT_ON_FIRST_USE(Cre
 
 std::atomic<int64_t> active_wasms;
 
-void RuntimeStatsHandler::onEvent(WasmEvent event) {
+void LifecycleStatsHandler::onEvent(WasmEvent event) {
   switch (event) {
-  case WasmEvent::VMShutDown:
+  case WasmEvent::VmShutDown:
     runtime_stats_.active_.set(--active_wasms);
     break;
-  case WasmEvent::VMCreated:
+  case WasmEvent::VmCreated:
     runtime_stats_.active_.set(++active_wasms);
     runtime_stats_.created_.inc();
     break;
@@ -80,7 +80,7 @@ void RuntimeStatsHandler::onEvent(WasmEvent event) {
   }
 }
 
-int64_t RuntimeStatsHandler::getActiveVMCount() { return active_wasms; };
+int64_t LifecycleStatsHandler::getActiveVmCount() { return active_wasms; };
 
 } // namespace Wasm
 } // namespace Common

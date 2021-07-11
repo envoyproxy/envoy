@@ -105,7 +105,7 @@ protected:
   TimeSource& time_source_;
 
   // Runtime stats
-  RuntimeStatsHandler runtime_stats_handler_;
+  LifecycleStatsHandler runtime_stats_handler_;
 
   // Plugin stats
   absl::flat_hash_map<uint32_t, Stats::Counter*> counters_;

@@ -27,12 +27,12 @@ struct CreateWasmStats {
   CREATE_WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-#define RUNTIME_STATS(COUNTER, GAUGE)                                                              \
+#define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
   COUNTER(created)                                                                                 \
   GAUGE(active, NeverImport)
 
-struct RuntimeStats {
-  RUNTIME_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+struct LifecycleStats {
+  LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 using ScopeWeakPtr = std::weak_ptr<Stats::Scope>;
@@ -44,15 +44,15 @@ enum class WasmEvent : int {
   RemoteLoadCacheMiss,
   RemoteLoadCacheFetchSuccess,
   RemoteLoadCacheFetchFailure,
-  UnableToCreateVM,
-  UnableToCloneVM,
+  UnableToCreateVm,
+  UnableToCloneVm,
   MissingFunction,
   UnableToInitializeCode,
   StartFailed,
   ConfigureFailed,
   RuntimeError,
-  VMCreated,
-  VMShutDown,
+  VmCreated,
+  VmShutDown,
 };
 
 class CreateStatsHandler : Logger::Loggable<Logger::Id::wasm> {
@@ -83,19 +83,19 @@ protected:
 
 CreateStatsHandler& getCreateStatsHandler();
 
-class RuntimeStatsHandler {
+class LifecycleStatsHandler {
 public:
-  RuntimeStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime)
-      : runtime_stats_(RuntimeStats{
-            RUNTIME_STATS(POOL_COUNTER_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
-                          POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}){};
-  ~RuntimeStatsHandler() = default;
+  LifecycleStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime)
+      : runtime_stats_(LifecycleStats{
+            LIFECYCLE_STATS(POOL_COUNTER_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
+                            POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}){};
+  ~LifecycleStatsHandler() = default;
 
   void onEvent(WasmEvent event);
-  static int64_t getActiveVMCount();
+  static int64_t getActiveVmCount();
 
 protected:
-  RuntimeStats runtime_stats_;
+  LifecycleStats runtime_stats_;
 };
 
 } // namespace Wasm

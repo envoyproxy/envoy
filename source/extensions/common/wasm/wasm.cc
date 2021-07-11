@@ -84,9 +84,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
-      runtime_stats_handler_(RuntimeStatsHandler(scope, config.config().vm_config().runtime())) {
-  runtime_stats_handler_.onEvent(WasmEvent::VMCreated);
-  ENVOY_LOG(debug, "Base Wasm created {} now active", runtime_stats_handler_.getActiveVMCount());
+      runtime_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime())) {
+  runtime_stats_handler_.onEvent(WasmEvent::VmCreated);
+  ENVOY_LOG(debug, "Base Wasm created {} now active", runtime_stats_handler_.getActiveVmCount());
 }
 
 Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
@@ -100,9 +100,9 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       runtime_stats_handler_(getWasm(base_wasm_handle)->runtime_stats_handler_) {
-  runtime_stats_handler_.onEvent(WasmEvent::VMCreated);
+  runtime_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Thread-Local Wasm created {} now active",
-            runtime_stats_handler_.getActiveVMCount());
+            runtime_stats_handler_.getActiveVmCount());
 }
 
 void Wasm::error(std::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
@@ -144,8 +144,8 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 }
 
 Wasm::~Wasm() {
-  runtime_stats_handler_.onEvent(WasmEvent::VMShutDown);
-  ENVOY_LOG(debug, "~Wasm {} remaining active", runtime_stats_handler_.getActiveVMCount());
+  runtime_stats_handler_.onEvent(WasmEvent::VmShutDown);
+  ENVOY_LOG(debug, "~Wasm {} remaining active", runtime_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
     dispatcher_.post(server_shutdown_post_cb_);
   }
@@ -284,15 +284,15 @@ static proxy_wasm::PluginHandleFactory getPluginHandleFactory() {
 
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   if (!wasm) {
-    return WasmEvent::UnableToCreateVM;
+    return WasmEvent::UnableToCreateVm;
   }
   switch (wasm->wasm()->fail_state()) {
   case FailState::Ok:
     return WasmEvent::Ok;
   case FailState::UnableToCreateVM:
-    return WasmEvent::UnableToCreateVM;
+    return WasmEvent::UnableToCreateVm;
   case FailState::UnableToCloneVM:
-    return WasmEvent::UnableToCloneVM;
+    return WasmEvent::UnableToCloneVm;
   case FailState::MissingFunction:
     return WasmEvent::MissingFunction;
   case FailState::UnableToInitializeCode:
