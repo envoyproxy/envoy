@@ -57,8 +57,7 @@ private:
   static std::string createPluginKey(const envoy::extensions::wasm::v3::PluginConfig& config,
                                      envoy::config::core::v3::TrafficDirection direction,
                                      const envoy::config::core::v3::Metadata* listener_metadata) {
-    return config.root_id() + "||" + MessageUtil::anyToBytes(config.configuration()) + "||" +
-           config.name() + "||" + envoy::config::core::v3::TrafficDirection_Name(direction) +
+    return config.name() + "||" + envoy::config::core::v3::TrafficDirection_Name(direction) +
            (listener_metadata ? "||" + std::to_string(MessageUtil::hash(*listener_metadata)) : "");
   }
 
