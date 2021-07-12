@@ -776,6 +776,19 @@ Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callResumeIte
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callResetIdleTimer(
+    JNIEnv* env, jclass, jlong callback_handle, jobject j_context) {
+  jni_log("[Envoy]", "callResetIdleTimer");
+  // Context is only passed here to ensure it's not inadvertently gc'd during execution of this
+  // function. To be extra safe, do an explicit retain with a GlobalRef.
+  jobject retained_context = env->NewGlobalRef(j_context);
+  envoy_http_filter_callbacks* callbacks =
+      reinterpret_cast<envoy_http_filter_callbacks*>(callback_handle);
+  callbacks->reset_idle(callbacks->callback_context);
+  env->DeleteGlobalRef(retained_context);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_EnvoyHTTPFilterCallbacksImpl_callReleaseCallbacks(
     JNIEnv* env, jclass, jlong callback_handle) {
   jni_log("[Envoy]", "callReleaseCallbacks");

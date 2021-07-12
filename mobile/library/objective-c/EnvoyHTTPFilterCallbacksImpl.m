@@ -20,6 +20,10 @@
   _callbacks.resume_iteration(_callbacks.callback_context);
 }
 
+- (void)resetIdleTimer {
+  _callbacks.reset_idle(_callbacks.callback_context);
+}
+
 - (void)dealloc {
   _callbacks.release_callbacks(_callbacks.callback_context);
 }

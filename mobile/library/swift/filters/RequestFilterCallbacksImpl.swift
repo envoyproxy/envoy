@@ -15,4 +15,8 @@ extension RequestFilterCallbacksImpl: RequestFilterCallbacks {
   func resumeRequest() {
     self.callbacks.resumeIteration()
   }
+
+  func resetIdleTimer() {
+    self.callbacks.resetIdleTimer()
+  }
 }

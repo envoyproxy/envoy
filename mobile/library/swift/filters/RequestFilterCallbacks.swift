@@ -9,4 +9,11 @@ public protocol RequestFilterCallbacks {
   /// If the request is not complete, the filter may receive further `onData()`/`onTrailers()`
   /// calls.
   func resumeRequest()
+
+  /// Reset the underlying stream idle timeout to its configured threshold.
+  ///
+  /// This may be useful if a filter stops iteration for an extended period of time, since stream
+  /// timeouts will still apply. This may be called periodically to continue to indicate "activity"
+  /// on the stream.
+  func resetIdleTimer()
 }
