@@ -106,6 +106,7 @@ ReadOrParseState Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
   if (isTLS(socket.ioHandle())) {
+    config_->stats_.tls_skipped_.inc();
     return resetAndContinue(socket.ioHandle());
   }
 

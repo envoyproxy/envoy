@@ -903,6 +903,14 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, ConnectionWithTLS) {
+  constexpr uint8_t buffer[] = {0x16};
+  connect();
+  write(buffer, sizeof(buffer));
+  disconnect();
+  EXPECT_EQ(stats_store_.counter("tls_skipped").value(), 1);
+}
+
 TEST_P(ProxyProtocolTest, V2PartialRead) {
   // A well-formed ipv4/tcp header, delivered with part of the signature,
   // part of the header, rest of header + body

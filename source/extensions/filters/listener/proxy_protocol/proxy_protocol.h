@@ -28,7 +28,8 @@ using KeyValuePair =
  */
 // clang-format off
 #define ALL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
-  COUNTER(downstream_cx_proxy_proto_error)
+  COUNTER(downstream_cx_proxy_proto_error)                                                         \
+  COUNTER(tls_skipped)
 // clang-format on
 
 /**
