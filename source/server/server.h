@@ -191,6 +191,7 @@ public:
   Envoy::Server::DrainManager& drainManager() override { return server_.drainManager(); }
   ServerLifecycleNotifier& lifecycleNotifier() override { return server_.lifecycleNotifier(); }
   Configuration::StatsConfig& statsConfig() override { return server_.statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return server_.bootstrap(); }
 
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
@@ -274,6 +275,7 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void flushStats() override;
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
     return server_contexts_;
@@ -298,7 +300,7 @@ private:
   void flushStatsInternal();
   void updateServerStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, ListenerHooks& hooks);
+                  ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
