@@ -44,9 +44,6 @@ public:
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
-  bool isDecoder();
-  bool isEncoder();
-  StreamInfo::StreamInfo& streamInfo();
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -126,9 +123,6 @@ public:
   DecodingProcessorState(const DecodingProcessorState&) = delete;
   DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
 
-  bool isDecoder() { return true; }
-  bool isEncoder() { return false; }
-
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
     filter_callbacks_ = &callbacks;
@@ -193,9 +187,6 @@ public:
   }
   EncodingProcessorState(const EncodingProcessorState&) = delete;
   EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;
-
-  bool isEncoder() { return true; }
-  bool isDecoder() { return false; }
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;

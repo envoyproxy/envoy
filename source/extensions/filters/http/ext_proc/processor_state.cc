@@ -172,10 +172,6 @@ void DecodingProcessorState::clearWatermark() {
   }
 }
 
-StreamInfo::StreamInfo& DecodingProcessorState::streamInfo() {
-  return decoder_callbacks_->streamInfo();
-}
-
 void EncodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
   // Account for the different default behaviors of headers and trailers --
   // headers are sent by default and trailers are not.
@@ -198,10 +194,6 @@ void EncodingProcessorState::clearWatermark() {
     watermark_requested_ = false;
     encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
   }
-}
-
-StreamInfo::StreamInfo& EncodingProcessorState::streamInfo() {
-  return encoder_callbacks_->streamInfo();
 }
 
 } // namespace ExternalProcessing

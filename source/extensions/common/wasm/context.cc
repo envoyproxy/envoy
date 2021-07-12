@@ -55,6 +55,9 @@ namespace Wasm {
 
 namespace {
 
+// FilterState prefix for CelState values.
+constexpr absl::string_view CelStateKeyPrefix = "wasm.";
+
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
 using CelStatePrototype = Filters::Common::Expr::CelStatePrototype;
@@ -404,6 +407,26 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
   }
   return WasmResult::SerializationFailure;
 }
+
+#define PROPERTY_TOKENS(_f)                                                                        \
+  _f(METADATA) _f(REQUEST) _f(RESPONSE) _f(CONNECTION) _f(UPSTREAM) _f(NODE) _f(SOURCE)            \
+      _f(DESTINATION) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME)                \
+          _f(CLUSTER_METADATA) _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME)                   \
+              _f(UPSTREAM_HOST_METADATA) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)     \
+                  _f(FILTER_STATE)
+
+static inline std::string downCase(std::string s) {
+  std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+  return s;
+}
+
+#define _DECLARE(_t) _t,
+enum class PropertyToken { PROPERTY_TOKENS(_DECLARE) };
+#undef _DECLARE
+
+#define _PAIR(_t) {downCase(#_t), PropertyToken::_t},
+static absl::flat_hash_map<std::string, PropertyToken> property_tokens = {PROPERTY_TOKENS(_PAIR)};
+#undef _PAIR
 
 absl::optional<google::api::expr::runtime::CelValue>
 Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const {

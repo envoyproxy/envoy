@@ -16,15 +16,11 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
-#include "source/extensions/filters/common/attributes/attributes.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
-
-using Filters::Common::Attributes::AttributeId;
-using Filters::Common::Attributes::Attributes;
 
 #define ALL_EXT_PROC_FILTER_STATS(COUNTER)                                                         \
   COUNTER(streams_started)                                                                         \
@@ -47,18 +43,13 @@ public:
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
         stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-        processing_mode_(config.processing_mode()),
-        request_attributes_(parseAttributes(config.request_attributes())),
-        response_attributes_(parseAttributes(config.response_attributes())) {}
+        processing_mode_(config.processing_mode()) {}
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   const ExtProcFilterStats& stats() const { return stats_; }
-
-  const std::vector<AttributeId>& requestAttributes() { return request_attributes_; }
-  const std::vector<AttributeId>& responseAttributes() { return response_attributes_; }
 
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode&
   processingMode() const {
@@ -77,9 +68,6 @@ private:
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
-  const std::vector<AttributeId> request_attributes_;
-  const std::vector<AttributeId> response_attributes_;
-  std::vector<AttributeId> parseAttributes(google::protobuf::RepeatedPtrField<std::string> attrs);
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -130,8 +118,6 @@ public:
 
   void onMessageTimeout();
 
-  void sendHeaders(ProcessorState& state, const Http::RequestOrResponseHeaderMap& headers,
-                   bool end_stream);
   void sendBufferedData(ProcessorState& state, bool end_stream) {
     sendBodyChunk(state, *state.bufferedData(), end_stream);
   }
@@ -171,10 +157,6 @@ private:
   // Set to true when an "immediate response" has been delivered. This helps us
   // know what response to return from certain failures.
   bool sent_immediate_response_ = false;
-
-  // The processing mode. May be locally overridden by any response,
-  // So every instance of the filter has a copy.
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
 };
 
 } // namespace ExternalProcessing

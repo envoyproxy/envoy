@@ -1,8 +1,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
-#include "envoy/http/header_map.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
-#include "source/extensions/filters/common/attributes/attributes.h"
 
 #include "absl/strings/str_format.h"
 
@@ -75,7 +73,15 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   }
 
   state.setHeaders(&headers);
-  sendHeaders(state, headers, end_stream);
+  ProcessingRequest req;
+  auto* headers_req = state.mutableHeaders(req);
+  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
+  headers_req->set_end_of_stream(end_stream);
+  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
+  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
+  ENVOY_LOG(debug, "Sending headers message");
+  stream_->send(std::move(req), false);
+  stats_.stream_msgs_sent_.inc();
   return FilterHeadersStatus::StopIteration;
 }
 
@@ -282,35 +288,6 @@ FilterTrailersStatus Filter::encodeTrailers(ResponseTrailerMap& trailers) {
   return status;
 }
 
-void Filter::sendHeaders(ProcessorState& state, const Http::RequestOrResponseHeaderMap& headers,
-                         bool end_stream) {
-  ProcessingRequest req;
-  auto* headers_req = state.mutableHeaders(req);
-  MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
-
-  auto attributes = Attributes(state.streamInfo());
-  google::api::expr::v1alpha1::Value attrs_value;
-  if (state.isDecoder()) {
-    if (RequestHeaderMap* headers = dynamic_cast<RequestHeaderMap*>(&headers)) {
-      attributes.setRequestHeaders(headers);
-    }
-    attrs_value = attributes.buildAttributesValue(config_->requestAttributes());
-  } else {
-    if (ResponseHeaderMap* headers = dynamic_cast<ResponseHeaderMap*>(&headers)) {
-      attributes.setResponseHeaders(headers);
-    }
-    attrs_value = attributes.buildAttributesValue(config_->responseAttributes());
-  }
-  MutationUtils::attrsToProto(attrs_value, *headers_req->mutable_attributes());
-  headers_req->set_end_of_stream(end_stream);
-
-  state.setCallbackState(ProcessorState::CallbackState::HeadersCallback);
-  state.startMessageTimer(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout());
-  ENVOY_LOG(debug, "Sending headers message");
-  stream_->send(std::move(req), false);
-  stats_.stream_msgs_sent_.inc();
-}
-
 void Filter::sendBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "Sending a body chunk of {} bytes", data.length());
   state.setCallbackState(ProcessorState::CallbackState::BufferedBodyCallback);
@@ -486,16 +463,6 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
                                      mutate_headers, grpc_status, response.details());
 }
 
-std::vector<AttributeId>
-FilterConfig::parseAttributes(google::protobuf::RepeatedPtrField<std::string> attrs) {
-  std::vector<AttributeId> v;
-  for (std::string attr : attrs) {
-    auto attr_opt = AttributeId::from_path(attr);
-    if (attr_opt) {
-      v.push_back(*attr_opt);
-    }
-  }
-}
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
