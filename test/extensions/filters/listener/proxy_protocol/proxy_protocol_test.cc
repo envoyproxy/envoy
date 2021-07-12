@@ -24,6 +24,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -909,6 +910,20 @@ TEST_P(ProxyProtocolTest, ConnectionWithTLS) {
   write(buffer, sizeof(buffer));
   disconnect();
   EXPECT_EQ(stats_store_.counter("tls_skipped").value(), 1);
+}
+
+TEST_P(ProxyProtocolTest, ConnectionWithTLSRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.proxy_protocol_skip_tls", "false"}});
+  constexpr uint8_t buffer[] = {0x16, 0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55,
+                                0x49, 0x54, 0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03,
+                                0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t buffer[] = {0x16};
+  connect(false);
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+  EXPECT_EQ(stats_store_.counter("tls_skipped").value(), 0);
 }
 
 TEST_P(ProxyProtocolTest, V2PartialRead) {

@@ -21,6 +21,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
@@ -87,9 +88,11 @@ void Filter::onRead() {
 
 bool Filter::isTLS(Network::IoHandle& io_handle) {
   if (!is_tls_.has_value()) {
+    const bool enabled =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_protocol_skip_tls");
     uint8_t buf[1];
     const auto result = io_handle.recv(buf, 1, MSG_PEEK);
-    is_tls_ = result.ok() && static_cast<uint64_t>(result.rc_) == 1 && buf[0] == 0x16;
+    is_tls_ = enabled && result.ok() && static_cast<uint64_t>(result.rc_) == 1 && buf[0] == 0x16;
   }
 
   return is_tls_.value();
