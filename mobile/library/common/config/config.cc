@@ -36,6 +36,7 @@ const std::string config_header = R"(
 - &dns_refresh_rate 60s
 - &dns_fail_base_interval 2s
 - &dns_fail_max_interval 10s
+- &dns_query_timeout 25s
 - &dns_preresolve_hostnames []
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -183,6 +184,7 @@ static_resources:
               dns_failure_refresh_rate:
                 base_interval: *dns_fail_base_interval
                 max_interval: *dns_fail_max_interval
+              dns_query_timeout: *dns_query_timeout
         # TODO: make this configurable for users.
         - name: envoy.filters.http.decompressor
           typed_config:
