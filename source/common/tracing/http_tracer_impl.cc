@@ -301,12 +301,12 @@ RequestHeaderCustomTag::RequestHeaderCustomTag(
       default_value_(request_header.default_value()) {}
 
 absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (!ctx.request_headers) {
+  if (ctx.trace_context == nullptr) {
     return default_value_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.request_headers->get(name_);
-  return !entry.empty() ? entry[0]->value().getStringView() : default_value_;
+  const auto entry = ctx.trace_context->getTraceContext(name_);
+  return entry.value_or(default_value_);
 }
 
 MetadataCustomTag::MetadataCustomTag(const std::string& tag,

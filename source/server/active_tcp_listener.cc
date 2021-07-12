@@ -410,7 +410,6 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
-  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
