@@ -154,10 +154,16 @@ typedef void (*envoy_filter_release_f)(const void* context);
 typedef void (*envoy_filter_resume_f)(const void* context);
 
 /**
+ * Function signature for async filter callback to reset stream idle timeout.
+ */
+typedef void (*envoy_filter_reset_idle_f)(const void* context);
+
+/**
  * Raw datatype containing asynchronous callbacks for platform HTTP filters.
  */
 typedef struct {
   envoy_filter_resume_f resume_iteration;
+  envoy_filter_reset_idle_f reset_idle;
   envoy_filter_release_f release_callbacks;
   const void* callback_context;
 } envoy_http_filter_callbacks;

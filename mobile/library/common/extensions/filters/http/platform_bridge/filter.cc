@@ -55,6 +55,14 @@ static void envoy_filter_callback_resume_encoding(const void* context) {
   }
 }
 
+static void envoy_filter_reset_idle(const void* context) {
+  PlatformBridgeFilterWeakPtr* weak_filter =
+      static_cast<PlatformBridgeFilterWeakPtr*>(const_cast<void*>(context));
+  if (auto filter = weak_filter->lock()) {
+    filter->resetIdleTimer();
+  }
+}
+
 PlatformBridgeFilterConfig::PlatformBridgeFilterConfig(
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config)
     : filter_name_(proto_config.platform_filter_name()),
@@ -100,6 +108,7 @@ void PlatformBridgeFilter::setDecoderFilterCallbacks(
   // heap allocation below occurs when it could be avoided.
   if (platform_filter_.set_request_callbacks) {
     platform_request_callbacks_.resume_iteration = envoy_filter_callback_resume_decoding;
+    platform_request_callbacks_.reset_idle = envoy_filter_reset_idle;
     platform_request_callbacks_.release_callbacks = envoy_filter_release_callbacks;
     // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
     // The weak_ptr is heap-allocated, because it must be managed (and eventually released) by
@@ -121,6 +130,7 @@ void PlatformBridgeFilter::setEncoderFilterCallbacks(
   // heap allocation below occurs when it could be avoided.
   if (platform_filter_.set_response_callbacks) {
     platform_response_callbacks_.resume_iteration = envoy_filter_callback_resume_encoding;
+    platform_response_callbacks_.reset_idle = envoy_filter_reset_idle;
     platform_response_callbacks_.release_callbacks = envoy_filter_release_callbacks;
     // We use a weak_ptr wrapper for the filter to ensure presence before dispatching callbacks.
     // The weak_ptr is heap-allocated, because it must be managed (and eventually released) by
@@ -500,6 +510,18 @@ void PlatformBridgeFilter::resumeEncoding() {
     if (auto self = weak_self.lock()) {
       // Delegate to base implementation for request and response path.
       self->response_filter_base_->onResume();
+    }
+  });
+}
+
+void PlatformBridgeFilter::resetIdleTimer() {
+  ENVOY_LOG(trace, "PlatformBridgeFilter({})::resetIdleTimer", filter_name_);
+
+  auto weak_self = weak_from_this();
+  dispatcher_.post([weak_self]() -> void {
+    if (auto self = weak_self.lock()) {
+      // Stream idle timeout is nondirectional.
+      // self->decoder_callbacks_->resetIdleTimer();
     }
   });
 }

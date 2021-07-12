@@ -89,6 +89,11 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 /// filter.
 - (void)resumeIteration;
 
+/// Reset the underlying stream idle timeout to its configured threshold. This may be useful if
+/// a filter stops iteration for an extended period of time, since ordinarily timeouts will still
+/// apply. This may be called periodically to continue to indicate "activity" on the stream.
+- (void)resetIdleTimer;
+
 @end
 
 @interface EnvoyHTTPFilter : NSObject

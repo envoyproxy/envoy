@@ -62,6 +62,9 @@ public:
   // This is a no-op if filter iteration is already ongoing.
   void resumeEncoding();
 
+  // Asynchronously reset the stream idle timeout. Does not affect other timeouts.
+  void resetIdleTimer();
+
   // StreamFilterBase
   void onDestroy() override;
 

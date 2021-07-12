@@ -25,12 +25,21 @@ final class EnvoyHTTPFilterCallbacksImpl
 
   public void resumeIteration() { callResumeIteration(callbackHandle, this); }
 
+  public void resetIdleTimer() { callResetIdleTimer(callbackHandle, this); }
+
   /**
    * @param callbackHandle, native handle for callback execution.
    * @param object, pass this object so that the JNI retains it, preventing it from potentially
    *                being concurrently garbage-collected while the native call is executing.
    */
   private native void callResumeIteration(long callbackHandle, EnvoyHTTPFilterCallbacksImpl object);
+
+  /**
+   * @param callbackHandle, native handle for callback execution.
+   * @param object, pass this object so that the JNI retains it, preventing it from potentially
+   *                being concurrently garbage-collected while the native call is executing.
+   */
+  private native void callResetIdleTimer(long callbackHandle, EnvoyHTTPFilterCallbacksImpl object);
 
   private static native void callReleaseCallbacks(long callbackHandle);
 }
