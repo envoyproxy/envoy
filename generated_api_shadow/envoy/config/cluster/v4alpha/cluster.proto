@@ -893,7 +893,7 @@ message Cluster {
   // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
   // will be enclosed in this *typed_dns_resolver_config*.
   // This configuration will replace the *dns_resolution_config* configuration eventually.
-  // TODO(yanjunxiang-google): Investigate the deprecation plan for *dns_resolution_config*.
+  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
   // this configuration is optional.
   // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
