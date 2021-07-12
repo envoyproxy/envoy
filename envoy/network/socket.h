@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/ssl/connection.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -92,6 +93,18 @@ public:
    * @param indent_level the level of indentation.
    */
   virtual void dumpState(std::ostream& os, int indent_level) const PURE;
+
+  /**
+   * @return the upstream SSL connection. This will be nullptr if the upstream
+   * connection does not use SSL.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /**
+   * @return the downstream SSL connection. This will be nullptr if the downstream
+   * connection does not use SSL.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const PURE;
 };
 
 class SocketAddressSetter : public SocketAddressProvider {
@@ -131,6 +144,18 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param connection_info sets the downstream ssl connection.
+   */
+  virtual void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @param connection_info sets the upstream ssl connection.
+   */
+  virtual void
+  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 };
 
 using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;

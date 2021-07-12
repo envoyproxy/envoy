@@ -117,6 +117,7 @@ envoy_cc_library(
         ":address_interface",
         ":io_handle_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//envoy/ssl:connection_interface",
     ],
 )
 

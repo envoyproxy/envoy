@@ -51,6 +51,20 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
+  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
+    return downstream_ssl_info_;
+  }
+  void
+  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    downstream_ssl_info_ = ssl_connection_info;
+  }
+  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
+    return upstream_ssl_info_;
+  }
+  void
+  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    upstream_ssl_info_ = ssl_connection_info;
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -59,6 +73,8 @@ private:
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
   absl::optional<uint64_t> connection_id_;
+  Ssl::ConnectionInfoConstSharedPtr downstream_ssl_info_;
+  Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
 };
 
 class SocketImpl : public virtual Socket {
