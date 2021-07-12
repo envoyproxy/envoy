@@ -605,7 +605,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
                                        !config_.suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(headers,
-                                   callbacks_->streamInfo().downstreamSslConnection() != nullptr,
+                                   callbacks_->streamInfo().downstreamAddressProvider().downstreamSslConnection() != nullptr,
                                    host->transportSocketFactory().implementsSecureTransport());
 
   // Ensure an http transport scheme is selected before continuing with decoding.

@@ -627,7 +627,7 @@ public:
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
   Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return StreamInfoImpl::downstreamSslConnection();;
+    return StreamInfoImpl::downstreamAddressProvider().downstreamSslConnection();
   }
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return StreamInfoImpl::upstreamSslConnection();

@@ -78,14 +78,6 @@ public:
   const Network::SocketAddressSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_connection_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_connection_info_;
-  }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
     upstream_connection_info_ = connection_info;

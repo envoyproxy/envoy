@@ -280,17 +280,6 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 
-TEST_F(CodecClientTest, SSLConnectionInfo) {
-  initialize();
-  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
-  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  EXPECT_CALL(*connection_, ssl()).WillRepeatedly(Return(connection_info));
-  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
-  EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
-  EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
-}
-
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {

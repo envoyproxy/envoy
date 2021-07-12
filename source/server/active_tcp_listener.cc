@@ -302,7 +302,6 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
 
   stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  stream_info->setDownstreamSslConnection(transport_socket->ssl());
   auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   auto server_conn_ptr = parent_.dispatcher().createServerConnection(
       std::move(socket), std::move(transport_socket), *stream_info);
