@@ -32,10 +32,6 @@ protected:
                          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints"),
                      random_, dispatcher_, stats_, rate_limit_settings_) {}
 
-  Event::SimulatedTimeSystem& simulatedTimeSystem() {
-    return dynamic_cast<Event::SimulatedTimeSystem&>(dispatcher_.timeSource());
-  }
-
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;
   Stats::TestUtil::TestStore stats_;
@@ -44,6 +40,7 @@ protected:
   NiceMock<MockGrpcStreamCallbacks> callbacks_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;
   Grpc::MockAsyncClient* async_client_;
+  Event::SimulatedTimeSystem time_system_;
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>
@@ -81,8 +78,6 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 
 // Tests reducing log level depending on remote close status.
 TEST_F(GrpcStreamTest, LogClose) {
-  auto& time_source = simulatedTimeSystem();
-
   // Failures whose statuses are handled simply and not saved.
   {
     EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
@@ -112,7 +107,7 @@ TEST_F(GrpcStreamTest, LogClose) {
               Grpc::Status::WellKnownGrpcStatus::Unavailable);
 
     // Different retriable failure: warn.
-    time_source.advanceTimeWait(std::chrono::milliseconds(1000));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS(
         "warn", "stream closed: 4, Deadline Exceeded (previously 14, Unavailable since 1000ms ago)",
@@ -124,7 +119,7 @@ TEST_F(GrpcStreamTest, LogClose) {
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Same retriable failure after a short amount of time: debug.
-    time_source.advanceTimeWait(std::chrono::milliseconds(1000));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS("debug", "gRPC config stream closed", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
@@ -134,7 +129,7 @@ TEST_F(GrpcStreamTest, LogClose) {
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Same retriable failure after a long time: warn.
-    time_source.advanceTimeWait(std::chrono::milliseconds(100000));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(100000));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS("warn", "gRPC config stream closed since 101000ms ago", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
@@ -144,7 +139,7 @@ TEST_F(GrpcStreamTest, LogClose) {
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
 
     // Warn again.
-    time_source.advanceTimeWait(std::chrono::milliseconds(1000));
+    time_system_.advanceTimeWait(std::chrono::milliseconds(1000));
     EXPECT_CALL(callbacks_, onEstablishmentFailure());
     EXPECT_LOG_CONTAINS("warn", "gRPC config stream closed since 102000ms ago", {
       grpc_stream_.onRemoteClose(Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded,
