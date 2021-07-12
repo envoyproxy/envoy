@@ -291,7 +291,7 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
 
-  Quic::QuicStatNames& quic_stat_names() { return quic_stat_names_; }
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;

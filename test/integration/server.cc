@@ -241,7 +241,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     admin_address_ = server.admin().socket().addressProvider().localAddress();
     server_ = &server;
     stat_store_ = &stat_store;
-    quic_stat_names_ = &server.quic_stat_names();
+    quic_stat_names_ = &server.quicStatNames();
     serverReady();
     server.run();
   }
