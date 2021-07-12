@@ -20,6 +20,63 @@ namespace Expr {
 using CelValue = google::api::expr::runtime::CelValue;
 using CelProtoWrapper = google::api::expr::runtime::CelProtoWrapper;
 
+// Symbols for traversing the request properties
+constexpr absl::string_view Request = "request";
+constexpr absl::string_view Path = "path";
+constexpr absl::string_view UrlPath = "url_path";
+constexpr absl::string_view Host = "host";
+constexpr absl::string_view Scheme = "scheme";
+constexpr absl::string_view Method = "method";
+constexpr absl::string_view Referer = "referer";
+constexpr absl::string_view Headers = "headers";
+constexpr absl::string_view Time = "time";
+constexpr absl::string_view ID = "id";
+constexpr absl::string_view UserAgent = "useragent";
+constexpr absl::string_view Size = "size";
+constexpr absl::string_view TotalSize = "total_size";
+constexpr absl::string_view Duration = "duration";
+constexpr absl::string_view Protocol = "protocol";
+
+// Symbols for traversing the response properties
+constexpr absl::string_view Response = "response";
+constexpr absl::string_view Code = "code";
+constexpr absl::string_view CodeDetails = "code_details";
+constexpr absl::string_view Trailers = "trailers";
+constexpr absl::string_view Flags = "flags";
+constexpr absl::string_view GrpcStatus = "grpc_status";
+
+// Per-request or per-connection metadata
+constexpr absl::string_view Metadata = "metadata";
+
+// Per-request or per-connection filter state
+constexpr absl::string_view FilterState = "filter_state";
+
+// Connection properties
+constexpr absl::string_view Connection = "connection";
+constexpr absl::string_view MTLS = "mtls";
+constexpr absl::string_view RequestedServerName = "requested_server_name";
+constexpr absl::string_view TLSVersion = "tls_version";
+constexpr absl::string_view ConnectionTerminationDetails = "termination_details";
+constexpr absl::string_view SubjectLocalCertificate = "subject_local_certificate";
+constexpr absl::string_view SubjectPeerCertificate = "subject_peer_certificate";
+constexpr absl::string_view URISanLocalCertificate = "uri_san_local_certificate";
+constexpr absl::string_view URISanPeerCertificate = "uri_san_peer_certificate";
+constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate";
+constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
+
+// Source properties
+constexpr absl::string_view Source = "source";
+constexpr absl::string_view Address = "address";
+constexpr absl::string_view Port = "port";
+
+// Destination properties
+constexpr absl::string_view Destination = "destination";
+
+// Upstream properties
+constexpr absl::string_view Upstream = "upstream";
+constexpr absl::string_view UpstreamLocalAddress = "local_address";
+constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
+
 class RequestWrapper;
 
 absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
