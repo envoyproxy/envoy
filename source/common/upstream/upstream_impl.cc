@@ -618,7 +618,9 @@ void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
   // cannot directly modify read_only_all_host_map_.
   if (mutable_all_host_map_ == nullptr) {
     // Copy old read only host map to mutable host map.
-    mutable_all_host_map_ = std::make_shared<HostMap>(*read_only_all_host_map_);
+    mutable_all_host_map_ = read_only_all_host_map_ != nullptr
+                                ? std::make_shared<HostMap>(*read_only_all_host_map_)
+                                : std::make_shared<HostMap>();
   }
 
   for (const auto& host : hosts_removed) {

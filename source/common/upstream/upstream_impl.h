@@ -487,7 +487,8 @@ public:
   const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
     return read_only_all_host_map_;
   }
-  void setReadOnlyAllHostMap(HostMapConstSharedPtr all_host_map) {
+
+  virtual void setReadOnlyAllHostMap(HostMapConstSharedPtr all_host_map) {
     read_only_all_host_map_ = std::move(all_host_map);
   }
 
@@ -561,12 +562,20 @@ public:
         });
   }
 
+  // PrioritySet
   const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
     // Check if the host set in the main thread PrioritySet has been updated.
     if (mutable_all_host_map_ != nullptr) {
       read_only_all_host_map_ = std::move(mutable_all_host_map_);
     }
     return read_only_all_host_map_;
+  }
+
+  // PrioritySetImpl
+  void setReadOnlyAllHostMap(HostMapConstSharedPtr) override {
+    // Using an external host map to update the read_only_all_host_map_ is not allowed in
+    // MainPrioritySetImpl.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
 protected:
