@@ -23,6 +23,7 @@ Minor Behavior Changes
   be now be disabled in favor of using unsigned payloads with compatible services via the new
   ``use_unsigned_payload`` filter option (default false).
 * cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
+* dns: changed apple resolver implementation to not reuse the UDS to the local DNS daemon.
 * dns cache: the new :ref:`dns_query_timeout <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>` option has a default of 5s. See below for more information.
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
@@ -48,6 +49,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * aws_lambda: if ``payload_passthrough`` is set to ``false``, the downstream response content-type header will now be set from the content-type entry in the JSON response's headers map, if present.
+* cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
 * cluster: fixed the :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` histograms by moving the accounting into the router
   filter. This means that we now properly compute the number of bytes sent as well as handling retries which were previously ignored.
 * hot_restart: fix double counting of ``server.seconds_until_first_ocsp_response_expiring`` and ``server.days_until_first_cert_expiring`` during hot-restart. This stat was only incorrect until the parent process terminated.
