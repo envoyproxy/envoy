@@ -24,6 +24,9 @@ Minor Behavior Changes
   ``use_unsigned_payload`` filter option (default false).
 * cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
 * dns cache: the new :ref:`dns_query_timeout <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>` option has a default of 5s. See below for more information.
+* grpc stream: reduced log level for "Unable to establish new stream" to debug.
+  The log level for "gRPC config stream closed" is now reduced to debug when the status is ``Ok``
+  or has been retriable (``DeadlineExceeded``, ``Internal``, or ``Unavailable``) for less than 30 seconds
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
   and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
   ``envoy.reloadable_features.experimental_matching_api`` to true.

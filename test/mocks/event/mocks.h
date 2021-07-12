@@ -22,6 +22,7 @@
 #include "source/common/common/scope_tracker.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
@@ -162,7 +163,7 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
-  GlobalTimeSystem time_system_;
+  SimulatedTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
