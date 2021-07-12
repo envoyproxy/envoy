@@ -190,6 +190,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                 Filesystem::fileSystemForTest(), random_generator);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
+
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp")),
@@ -231,6 +232,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
+  (void)quic_stat_names;
+  (void)scope;
   return nullptr;
 #endif
 }
