@@ -607,6 +607,29 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
                       hosts_removed, overprovisioning_factor);
 }
 
+void MainPrioritySetImpl::updateMutableAllHostMap(const HostVector& hosts_added,
+                                                  const HostVector& hosts_removed) {
+  if (hosts_added.empty() && hosts_removed.empty()) {
+    // No new hosts have been added and no old hosts have been removed.
+    return;
+  }
+
+  // Since read_only_all_host_map_ may be shared by multiple threads, when the host set changes, we
+  // cannot directly modify read_only_all_host_map_.
+  if (mutable_all_host_map_ == nullptr) {
+    // Copy old read only host map to mutable host map.
+    mutable_all_host_map_ = std::make_shared<HostMap>(*read_only_all_host_map_);
+  }
+
+  for (const auto& host : hosts_removed) {
+    mutable_all_host_map_->erase(host->address()->asString());
+  }
+
+  for (const auto& host : hosts_added) {
+    mutable_all_host_map_->insert({host->address()->asString(), host});
+  }
+}
+
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
                                             const ClusterStatNames& stat_names) {
   return ClusterStats(stat_names, scope);

@@ -484,6 +484,13 @@ public:
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
+  const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
+    return read_only_all_host_map_;
+  }
+  void setReadOnlyAllHostMap(HostMapConstSharedPtr all_host_map) {
+    read_only_all_host_map_ = std::move(all_host_map);
+  }
+
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
@@ -503,6 +510,8 @@ protected:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+  HostMapConstSharedPtr read_only_all_host_map_;
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -537,6 +546,34 @@ private:
     PrioritySetImpl& parent_;
     absl::node_hash_set<uint32_t> priorities_;
   };
+};
+
+/**
+ * Specialized PrioritySetImpl designed for the main thread. It will update and maintain the read
+ * only all host map when the hosts set changes.
+ */
+class MainPrioritySetImpl : public PrioritySetImpl {
+public:
+  MainPrioritySetImpl() {
+    all_host_map_update_handle_ = addPriorityUpdateCb(
+        [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) {
+          updateMutableAllHostMap(hosts_added, hosts_removed);
+        });
+  }
+
+  const HostMapConstSharedPtr& readOnlyAllHostMap() const override {
+    // Check if the host set in the main thread PrioritySet has been updated.
+    if (mutable_all_host_map_ != nullptr) {
+      read_only_all_host_map_ = std::move(mutable_all_host_map_);
+    }
+    return read_only_all_host_map_;
+  }
+
+protected:
+  void updateMutableAllHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+
+  HostMapSharedPtr mutable_all_host_map_;
+  Common::CallbackHandlePtr all_host_map_update_handle_;
 };
 
 /**
@@ -875,7 +912,7 @@ protected:
 
 protected:
   TimeSource& time_source_;
-  PrioritySetImpl priority_set_;
+  MainPrioritySetImpl priority_set_;
 
   void validateEndpointsForZoneAwareRouting(
       const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;

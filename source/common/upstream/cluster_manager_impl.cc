@@ -978,35 +978,40 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
-  tls_.runOnAllThreads(
-      [info = cm_cluster.cluster().info(), params = std::move(params), add_or_update_cluster,
-       load_balancer_factory](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-        ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
-        if (add_or_update_cluster) {
-          if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
-            ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
-          } else {
-            ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
-          }
+  HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().readOnlyAllHostMap();
 
-          new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                        load_balancer_factory);
-          cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
-        }
+  tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
+                        add_or_update_cluster, load_balancer_factory, map = std::move(host_map)](
+                           OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+    ThreadLocalClusterManagerImpl::ClusterEntry* new_cluster = nullptr;
+    if (add_or_update_cluster) {
+      if (cluster_manager->thread_local_clusters_.count(info->name()) > 0) {
+        ENVOY_LOG(debug, "updating TLS cluster {}", info->name());
+      } else {
+        ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
+      }
 
-        for (const auto& per_priority : params.per_priority_update_params_) {
-          cluster_manager->updateClusterMembership(
-              info->name(), per_priority.priority_, per_priority.update_hosts_params_,
-              per_priority.locality_weights_, per_priority.hosts_added_,
-              per_priority.hosts_removed_, per_priority.overprovisioning_factor_);
-        }
+      new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
+                                                                    load_balancer_factory);
+      cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
+    }
 
-        if (new_cluster != nullptr) {
-          for (auto& cb : cluster_manager->update_callbacks_) {
-            cb->onClusterAddOrUpdate(*new_cluster);
-          }
-        }
-      });
+    for (const auto& per_priority : params.per_priority_update_params_) {
+      cluster_manager->updateClusterMembership(
+          info->name(), per_priority.priority_, per_priority.update_hosts_params_,
+          per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
+          per_priority.overprovisioning_factor_);
+    }
+
+    // Update read only all host map in worker threads.
+    cluster_manager->thread_local_clusters_[info->name()]->priority_set_.setReadOnlyAllHostMap(map);
+
+    if (new_cluster != nullptr) {
+      for (auto& cb : cluster_manager->update_callbacks_) {
+        cb->onClusterAddOrUpdate(*new_cluster);
+      }
+    }
+  });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
