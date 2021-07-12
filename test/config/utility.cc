@@ -807,14 +807,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     for (int j = 0; j < listener->filter_chains_size(); ++j) {
       if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
-        const bool has_tls = filter_chain->has_hidden_envoy_deprecated_tls_context();
-        const Protobuf::Message* tls_config = nullptr;
-        if (has_tls) {
-          tls_config = &filter_chain->hidden_envoy_deprecated_tls_context();
-          filter_chain->clear_hidden_envoy_deprecated_tls_context();
-        }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
-                              *filter_chain->mutable_transport_socket(), tls_config);
+                              *filter_chain->mutable_transport_socket());
       }
     }
   }
@@ -849,14 +843,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     }
 
     if (tap_path) {
-      const bool has_tls = cluster->has_hidden_envoy_deprecated_tls_context();
-      const Protobuf::Message* tls_config = nullptr;
-      if (has_tls) {
-        tls_config = &cluster->hidden_envoy_deprecated_tls_context();
-        cluster->clear_hidden_envoy_deprecated_tls_context();
-      }
       setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
-                            *cluster->mutable_transport_socket(), tls_config);
+                            *cluster->mutable_transport_socket());
     }
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
@@ -876,17 +864,13 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                                         envoy::config::core::v3::TransportSocket& transport_socket,
-                                         const Protobuf::Message* tls_config) {
+void ConfigHelper::setTapTransportSocket(
+    const std::string& tap_path, const std::string& type,
+    envoy::config::core::v3::TransportSocket& transport_socket) {
   // Determine inner transport socket.
   envoy::config::core::v3::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
-    RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
-  } else if (tls_config) {
-    inner_transport_socket.set_name("envoy.transport_sockets.tls");
-    inner_transport_socket.mutable_typed_config()->PackFrom(*tls_config);
   } else {
     inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
