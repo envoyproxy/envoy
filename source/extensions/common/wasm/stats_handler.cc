@@ -69,11 +69,11 @@ std::atomic<int64_t> active_wasms;
 void LifecycleStatsHandler::onEvent(WasmEvent event) {
   switch (event) {
   case WasmEvent::VmShutDown:
-    runtime_stats_.active_.set(--active_wasms);
+    lifecycle_stats_.active_.set(--active_wasms);
     break;
   case WasmEvent::VmCreated:
-    runtime_stats_.active_.set(++active_wasms);
-    runtime_stats_.created_.inc();
+    lifecycle_stats_.active_.set(++active_wasms);
+    lifecycle_stats_.created_.inc();
     break;
   default:
     break;

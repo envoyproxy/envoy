@@ -83,10 +83,10 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
           MessageUtil::anyToBytes(config.config().vm_config().configuration()),
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
-      time_source_(dispatcher.timeSource()),
-      runtime_stats_handler_(LifecycleStatsHandler(scope, config.config().vm_config().runtime())) {
-  runtime_stats_handler_.onEvent(WasmEvent::VmCreated);
-  ENVOY_LOG(debug, "Base Wasm created {} now active", runtime_stats_handler_.getActiveVmCount());
+      time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
+                                                 scope, config.config().vm_config().runtime())) {
+  lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
+  ENVOY_LOG(debug, "Base Wasm created {} now active", lifecycle_stats_handler_.getActiveVmCount());
 }
 
 Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
@@ -99,10 +99,10 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
       scope_(getWasm(base_wasm_handle)->scope_),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
-      runtime_stats_handler_(getWasm(base_wasm_handle)->runtime_stats_handler_) {
-  runtime_stats_handler_.onEvent(WasmEvent::VmCreated);
+      lifecycle_stats_handler_(getWasm(base_wasm_handle)->lifecycle_stats_handler_) {
+  lifecycle_stats_handler_.onEvent(WasmEvent::VmCreated);
   ENVOY_LOG(debug, "Thread-Local Wasm created {} now active",
-            runtime_stats_handler_.getActiveVmCount());
+            lifecycle_stats_handler_.getActiveVmCount());
 }
 
 void Wasm::error(std::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
@@ -144,8 +144,8 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 }
 
 Wasm::~Wasm() {
-  runtime_stats_handler_.onEvent(WasmEvent::VmShutDown);
-  ENVOY_LOG(debug, "~Wasm {} remaining active", runtime_stats_handler_.getActiveVmCount());
+  lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
+  ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
   if (server_shutdown_post_cb_) {
     dispatcher_.post(server_shutdown_post_cb_);
   }

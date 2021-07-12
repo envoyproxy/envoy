@@ -86,7 +86,7 @@ CreateStatsHandler& getCreateStatsHandler();
 class LifecycleStatsHandler {
 public:
   LifecycleStatsHandler(const Stats::ScopeSharedPtr& scope, std::string runtime)
-      : runtime_stats_(LifecycleStats{
+      : lifecycle_stats_(LifecycleStats{
             LIFECYCLE_STATS(POOL_COUNTER_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")),
                             POOL_GAUGE_PREFIX(*scope, absl::StrCat("wasm.", runtime, ".")))}){};
   ~LifecycleStatsHandler() = default;
@@ -95,7 +95,7 @@ public:
   static int64_t getActiveVmCount();
 
 protected:
-  LifecycleStats runtime_stats_;
+  LifecycleStats lifecycle_stats_;
 };
 
 } // namespace Wasm
