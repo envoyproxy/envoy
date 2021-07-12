@@ -122,7 +122,7 @@ message DnsCacheConfig {
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
   // this configuration is optional.
   // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
-  // when *typed_dns_resolver_config* is missing, the default behavior is in place. Envoy will either use
+  // When *typed_dns_resolver_config* is missing, the default behavior is in place. Envoy will either use
   // c-ares DNS library or apple DNS library based on the compiling flag.
   // [#not-implemented-hide:]
   config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 12;
