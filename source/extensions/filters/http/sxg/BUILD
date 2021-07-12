@@ -7,8 +7,6 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-#SXG HTTP filter
-
 envoy_extension_package()
 
 envoy_cc_library(
