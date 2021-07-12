@@ -36,3 +36,4 @@ This filter emits the following statistics:
   :widths: 1, 1, 2
 
   downstream_cx_proxy_proto_error, Counter, Total proxy protocol errors
+  tls_skipped, Counter, Total number of connections that had TLS and were skipped
