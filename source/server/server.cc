@@ -27,6 +27,7 @@
 #include "source/common/api/api_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/grpc_mux_impl.h"
@@ -338,6 +339,8 @@ void InstanceImpl::initialize(const Options& options,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options.restartEpoch(), restarter_.baseId(), restarter_.version());
+
+  DefaultsProfileSingleton::initialize(new DefaultsProfile);
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {

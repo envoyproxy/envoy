@@ -465,6 +465,7 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
         "//source/common/common:enum_to_int",
+        "//source/common/common:envoy_defaults_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/http/http1:codec_stats_lib",

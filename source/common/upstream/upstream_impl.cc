@@ -29,6 +29,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
@@ -745,7 +746,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
       per_connection_buffer_limit_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes,
+                                          DefaultsProfileSingleton::get().some_default_val)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
       load_report_stats_store_(stats_scope_->symbolTable()),
