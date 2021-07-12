@@ -271,16 +271,21 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
       Protobuf::FieldMask field_mask;
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
-      // indexing through repeated fields.
+      // indexing through repeated fields. We don't return error on failure
+      // because different callback return types will have different valid
+      // field masks.
       if (!checkFieldMaskAndTrimMessage(field_mask, *message)) {
-        return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
-            Http::Code::BadRequest, absl::StrCat("FieldMask ", field_mask.DebugString(),
-                                                 " could not be successfully used."))};
+        continue;
       }
     }
 
     auto* config = dump.add_configs();
     config->PackFrom(*message);
+  }
+  if (dump.configs().empty() && mask.has_value()) {
+    return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+        Http::Code::BadRequest,
+        absl::StrCat("FieldMask ", *mask, " could not be successfully applied to any configs."))};
   }
   return absl::nullopt;
 }

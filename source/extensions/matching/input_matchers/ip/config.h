@@ -16,9 +16,9 @@ namespace IP {
 
 class Config : public Envoy::Matcher::InputMatcherFactory {
 public:
-  Envoy::Matcher::InputMatcherFactoryCb
-  createInputMatcherFactoryCb(const Protobuf::Message& config,
-                              Server::Configuration::FactoryContext& factory_context) override;
+  Envoy::Matcher::InputMatcherFactoryCb createInputMatcherFactoryCb(
+      const Protobuf::Message& config,
+      Server::Configuration::ServerFactoryContext& factory_context) override;
 
   std::string name() const override { return "envoy.matching.matchers.ip"; }
 

@@ -954,13 +954,7 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
   // We copy by value first then override if necessary.
   auto transport_socket = filter_chain.transport_socket();
   if (!filter_chain.has_transport_socket()) {
-    if (filter_chain.has_hidden_envoy_deprecated_tls_context()) {
-      transport_socket.set_name("envoy.transport_sockets.tls");
-      transport_socket.mutable_typed_config()->PackFrom(
-          filter_chain.hidden_envoy_deprecated_tls_context());
-    } else {
-      transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-    }
+    transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<

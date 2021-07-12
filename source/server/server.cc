@@ -29,6 +29,8 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
@@ -105,7 +107,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory, hooks);
+    initialize(options, std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -334,7 +336,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, ListenerHooks& hooks) {
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
@@ -365,7 +367,8 @@ void InstanceImpl::initialize(const Options& options,
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
-  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setStatsMatcher(
+      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
@@ -557,7 +560,6 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-  hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
@@ -826,6 +828,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();

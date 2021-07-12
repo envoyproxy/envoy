@@ -213,10 +213,6 @@ public:
     return upstream_cluster_info_;
   }
 
-  void setConnectionID(uint64_t id) override { connection_id_ = id; }
-
-  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
-
   void setFilterChainName(absl::string_view filter_chain_name) override {
     filter_chain_name_ = std::string(filter_chain_name);
   }
