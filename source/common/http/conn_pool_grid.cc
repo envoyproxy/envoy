@@ -235,7 +235,8 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   ConnectionPool::InstancePtr pool;
   if (pools_.empty()) {
     pool = Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                   transport_socket_options_, state_, time_source_, quic_stat_names_, scope_);
+                                   transport_socket_options_, state_, time_source_,
+                                   quic_stat_names_, scope_);
   } else {
     pool = std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                    options_, transport_socket_options_, state_);
