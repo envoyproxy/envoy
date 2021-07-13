@@ -195,9 +195,8 @@ private:
   }
 
   bool onlyWarnOnRepeatedFailure(Grpc::Status::GrpcStatus status) {
-    return Grpc::Status::WellKnownGrpcStatus::Unavailable == status ||
-           Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded == status ||
-           Grpc::Status::WellKnownGrpcStatus::Internal == status;
+    return Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded == status ||
+           Grpc::Status::WellKnownGrpcStatus::Unavailable == status;
   }
 
   void unsetCloseStatus() { close_status_ = absl::nullopt; }
