@@ -133,7 +133,17 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
       bind_type_(factory_to_clone.bind_type_) {
   for (auto& socket : factory_to_clone.sockets_) {
     // In the cloning case we always duplicate() the socket. This makes sure that during listener
-    // update/drain we don't lose any incoming connections when using reuse port.
+    // update/drain we don't lose any incoming connections when using reuse port. Specifically on
+    // Linux the use of SO_REUSEPORT causes the kernel to allocate a separate queue for each socket
+    // on the same address. Incoming connections are immediately assigned to one of these queues.
+    // If connections are in the queue when the socket is closed, they are closed/reset, not sent to
+    // another queue. So avoid making extra queues in the kernel, even temporarily.
+    //
+    // TODO(mattklein123): In the current code as long as the address matches, the socket factory
+    // will be cloned, effectively ignoring any changed socket options. The code should probably
+    // block any updates to listeners that use the same address but different socket options.
+    // (It's possible we could handle changing some socket options, but this would be tricky and
+    // probably not worth the difficulty.)
     sockets_.push_back(socket->duplicate());
   }
 }
@@ -171,6 +181,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket(uint32_t worker_index) {
+  // Per the TODO above, sockets at this point can never be null. That only happens in the
+  // config validation path.
   ASSERT(worker_index < sockets_.size() && sockets_[worker_index] != nullptr);
   return sockets_[worker_index];
 }
@@ -813,6 +825,13 @@ bool ListenerImpl::initializeReusePort(Server::Instance& server,
   bool initial_reuse_port_value = [&server, &config]() {
     // If someone set the new field, adhere to it.
     if (config.has_enable_reuse_port()) {
+      if (config.reuse_port()) {
+        ENVOY_LOG(warn,
+                  "both enable_reuse_port and reuse_port set on listener '{}', preferring "
+                  "enable_reuse_port.",
+                  config.name());
+      }
+
       return config.enable_reuse_port().value();
     }
 

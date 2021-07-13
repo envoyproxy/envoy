@@ -629,6 +629,8 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // when it stops listening on the old listener.
   if (!doFinalPreWorkerListenerInit(listener)) {
     incListenerCreateFailureStat();
+    // TODO(mattklein123): Technically we don't need to remove the active listener if one exists.
+    // The following call will remove both.
     removeListenerInternal(listener.name(), true);
     return;
   }
