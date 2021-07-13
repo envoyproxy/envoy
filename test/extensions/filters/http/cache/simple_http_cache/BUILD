@@ -11,7 +11,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "simple_http_cache_test",
     srcs = ["simple_http_cache_test.cc"],
-    extension_name = "envoy.cache.simple_http_cache",
+    extension_names = ["envoy.cache.simple_http_cache"],
     deps = [
         "//source/extensions/filters/http/cache/simple_http_cache:config",
         "//test/extensions/filters/http/cache:common",

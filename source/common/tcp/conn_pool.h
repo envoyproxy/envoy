@@ -11,10 +11,10 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/http/conn_pool_base.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/conn_pool_base.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -139,13 +139,18 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr transport_socket_options,
+               Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                Upstream::ClusterConnectivityState& state)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
                                                 transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deleteIsPendingImpl(); }
+
+  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
+  bool isIdle() const override { return isIdleImpl(); }
+  void startDrain() override { startDrainImpl(); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients
@@ -204,10 +209,10 @@ public:
   }
 
   void onPoolFailure(const Upstream::HostDescriptionConstSharedPtr& host_description,
-                     absl::string_view, ConnectionPool::PoolFailureReason reason,
+                     absl::string_view failure_reason, ConnectionPool::PoolFailureReason reason,
                      Envoy::ConnectionPool::AttachContext& context) override {
     auto* callbacks = typedContext<TcpAttachContext>(context).callbacks_;
-    callbacks->onPoolFailure(reason, host_description);
+    callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
 
   // These two functions exist for testing parity between old and new Tcp Connection Pools.

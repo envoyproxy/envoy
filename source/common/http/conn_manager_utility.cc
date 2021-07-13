@@ -1,4 +1,4 @@
-#include "common/http/conn_manager_utility.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include <atomic>
 #include <cstdint>
@@ -6,18 +6,18 @@
 
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/utility.h"
-#include "common/http/conn_manager_config.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/path_utility.h"
-#include "common/http/utility.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/path_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -165,6 +165,10 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
   }
+  if (config.schemeToSet().has_value()) {
+    request_headers.setScheme(config.schemeToSet().value());
+    request_headers.setForwardedProto(config.schemeToSet().value());
+  }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
@@ -283,6 +287,9 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
 
   auto rid_extension = config.requestIDExtension();
+  if (!rid_extension->useRequestIdForTraceSampling()) {
+    return Tracing::Reason::Sampling;
+  }
   const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {

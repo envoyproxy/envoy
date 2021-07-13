@@ -2,8 +2,8 @@
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/router/config_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"

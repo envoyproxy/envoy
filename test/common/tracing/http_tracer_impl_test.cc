@@ -5,13 +5,13 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 
-#include "common/common/base64.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -727,6 +727,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
   span_ptr->injectContext(request_headers);
+  span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
@@ -827,6 +828,17 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
 
   HttpTracerUtility::finalizeUpstreamSpan(*child_span, &response_headers_, &response_trailers_,
                                           stream_info_, config_);
+}
+
+TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {
+  envoy::type::tracing::v3::CustomTag::Metadata testing_metadata;
+  testing_metadata.mutable_metadata_key()->set_key("key");
+  *testing_metadata.mutable_default_value() = "default_value";
+  MetadataCustomTag tag("testing", testing_metadata);
+  StreamInfo::MockStreamInfo testing_info_;
+  Http::TestRequestHeaderMapImpl header_map_;
+  CustomTagContext context{&header_map_, testing_info_};
+  EXPECT_EQ(tag.value(context), "default_value");
 }
 
 } // namespace

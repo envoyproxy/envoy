@@ -1,10 +1,9 @@
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/string_accessor_impl.h"
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/filters/common/expr/cel_state.h"
-#include "extensions/filters/common/expr/context.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/filters/common/expr/cel_state.h"
+#include "source/extensions/filters/common/expr/context.h"
 
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -441,15 +440,16 @@ TEST(Context, ConnectionAttributes) {
   const std::string sni_name = "kittens.com";
   info.downstream_address_provider_->setLocalAddress(local);
   info.downstream_address_provider_->setRemoteAddress(remote);
+  info.downstream_address_provider_->setRequestedServerName(sni_name);
   EXPECT_CALL(info, downstreamSslConnection()).WillRepeatedly(Return(downstream_ssl_info));
   EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
   EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
-  EXPECT_CALL(info, requestedServerName()).WillRepeatedly(ReturnRef(sni_name));
   EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
   EXPECT_CALL(info, upstreamTransportFailureReason())
       .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
+  info.downstream_address_provider_->setConnectionID(123);
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));

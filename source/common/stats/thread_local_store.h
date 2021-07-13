@@ -10,15 +10,15 @@
 #include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/hash.h"
-#include "common/common/thread_synchronizer.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/null_counter.h"
-#include "common/stats/null_gauge.h"
-#include "common/stats/null_text_readout.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
+#include "source/common/stats/null_text_readout.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -416,6 +416,7 @@ private:
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
                            const absl::optional<StatNameTagVector>& stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
+                           StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -476,11 +477,14 @@ private:
   void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
-  bool rejects(StatName name) const;
+  bool slowRejects(StatsMatcher::FastResult fast_reject_result, StatName name) const;
+  bool rejects(StatName name) const { return stats_matcher_->rejects(name); }
+  StatsMatcher::FastResult fastRejects(StatName name) const;
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
+  bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
+                                 StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 

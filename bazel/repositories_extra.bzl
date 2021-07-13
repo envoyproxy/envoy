@@ -1,6 +1,7 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
 load("@rules_python//python:pip.bzl", "pip_install")
 load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
+load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
@@ -37,8 +38,18 @@ def _python_deps():
         # use_category = ["test"],
     )
     pip_install(
+        name = "docs_pip3",
+        requirements = "@envoy//tools/docs:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "deps_pip3",
         requirements = "@envoy//tools/dependency:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "extensions_pip3",
+        requirements = "@envoy//tools/extensions:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
@@ -58,18 +69,6 @@ def _python_deps():
         # version = "1.1.1",
         # release_date = "2019-02-23"
         # use_category = ["test"],
-    )
-    pip_install(
-        name = "headersplit_pip3",
-        requirements = "@envoy//tools/envoy_headersplit:requirements.txt",
-        extra_pip_args = ["--require-hashes"],
-
-        # project_name = "Clang",
-        # project_url = "https://clang.llvm.org/",
-        # version = "10.0.1",
-        # release_date = "2020-07-21"
-        # use_category = ["devtools"],
-        # cpe = "cpe:2.3:a:llvm:clang:*",
     )
     pip_install(
         name = "protodoc_pip3",
@@ -133,3 +132,4 @@ def _python_deps():
 def envoy_dependencies_extra():
     _python_deps()
     proxy_wasm_cpp_host_fetch_remote_crates()
+    raze_fetch_remote_crates()

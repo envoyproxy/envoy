@@ -1,4 +1,4 @@
-#include "common/upstream/cluster_manager_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -17,37 +17,37 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/new_grpc_mux_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_resource.h"
-#include "common/grpc/async_client_manager_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/http/http1/conn_pool.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/http/mixed_conn_pool.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/router/shadow_writer_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/tcp/conn_pool.h"
-#include "common/tcp/original_conn_pool.h"
-#include "common/upstream/cds_api_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/maglev_lb.h"
-#include "common/upstream/original_dst_cluster.h"
-#include "common/upstream/priority_conn_pool_map_impl.h"
-#include "common/upstream/ring_hash_lb.h"
-#include "common/upstream/subset_lb.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/grpc/async_client_manager_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/http/http1/conn_pool.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/http/mixed_conn_pool.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/shadow_writer_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/tcp/conn_pool.h"
+#include "source/common/tcp/original_conn_pool.h"
+#include "source/common/upstream/cds_api_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/maglev_lb.h"
+#include "source/common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/priority_conn_pool_map_impl.h"
+#include "source/common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/subset_lb.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "common/http/conn_pool_grid.h"
-#include "common/http/http3/conn_pool.h"
+#include "source/common/http/conn_pool_grid.h"
+#include "source/common/http/http3/conn_pool.h"
 #endif
 
 namespace Envoy {
@@ -272,7 +272,10 @@ ClusterManagerImpl::ClusterManagerImpl(
       cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
-          admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
+          admin.getConfigTracker().add("clusters",
+                                       [this](const Matchers::StringMatcher& name_matcher) {
+                                         return dumpClusterConfigs(name_matcher);
+                                       })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
@@ -905,41 +908,45 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-Http::ConnectionPool::Instance*
+absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = connPool(priority, protocol, context, false);
+  auto pool = connPool(priority, protocol, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // Now see if another host should be preconnected.
-  // httpConnPool is called immediately before a call for newStream. newStream doesn't
-  // have the load balancer context needed to make selection decisions so preconnecting must be
-  // performed here in anticipation of the new stream.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
-    return connPool(priority, protocol, context, true);
-  });
-  return ret;
+  HttpPoolData data(
+      [this, priority, protocol, context]() -> void {
+        // Now that a new stream is being established, attempt to preconnect.
+        maybePreconnect(*this, parent_.cluster_manager_state_,
+                        [this, &priority, &protocol, &context]() {
+                          return connPool(priority, protocol, context, true);
+                        });
+      },
+      pool);
+  return data;
 }
 
-Tcp::ConnectionPool::Instance*
+absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto ret = tcpConnPool(priority, context, false);
+  auto pool = tcpConnPool(priority, context, false);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
 
-  // tcpConnPool is called immediately before a call for newConnection. newConnection
-  // doesn't have the load balancer context needed to make selection decisions so preconnecting must
-  // be performed here in anticipation of the new connection.
-  // TODO(alyssawilk) refactor to have one function call and return a pair, so this invariant is
-  // code-enforced.
-  // Now see if another host should be preconnected.
-  maybePreconnect(*this, parent_.cluster_manager_state_,
-                  [this, &priority, &context]() { return tcpConnPool(priority, context, true); });
-
-  return ret;
+  TcpPoolData data(
+      [this, priority, context]() -> void {
+        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
+          return tcpConnPool(priority, context, true);
+        });
+      },
+      pool);
+  return data;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
@@ -1041,11 +1048,15 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
   return std::make_unique<ClusterUpdateCallbacksHandleImpl>(cb, cluster_manager.update_callbacks_);
 }
 
-ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
+ProtobufTypes::MessagePtr
+ClusterManagerImpl::dumpClusterConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
+    if (!name_matcher.match(cluster.cluster_config_.name())) {
+      continue;
+    }
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
       static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
@@ -1062,6 +1073,9 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
 
   for (const auto& warming_cluster_pair : warming_clusters_) {
     const auto& cluster = *warming_cluster_pair.second;
+    if (!name_matcher.match(cluster.cluster_config_.name())) {
+      continue;
+    }
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
     dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
@@ -1102,6 +1116,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
     }
   }
   thread_local_clusters_.clear();
+
+  // Ensure that all pools are completely destructed.
+  thread_local_dispatcher_.clearDeferredDeleteList();
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) {
@@ -1115,7 +1132,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const Hos
     {
       auto container = host_tcp_conn_pool_map_.find(host);
       if (container != host_tcp_conn_pool_map_.end()) {
-        drainTcpConnPools(host, container->second);
+        drainTcpConnPools(container->second);
       }
     }
   }
@@ -1123,80 +1140,37 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(const Hos
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
-  container.drains_remaining_ += container.pools_->size();
-
   // Make a copy to protect against erasure in the callback.
   std::shared_ptr<ConnPoolsContainer::ConnPools> pools = container.pools_;
-  pools->addDrainedCallback([this, old_host]() -> void {
-    if (destroying_) {
-      // It is possible for a connection pool to fire drain callbacks during destruction. Instead
-      // of checking if old_host actually exists in the map, it's clearer and cleaner to keep
-      // track of destruction as a separate state and check for it here. This also allows us to
-      // do this check here versus inside every different connection pool implementation.
-      return;
-    }
-
-    ConnPoolsContainer* to_clear = getHttpConnPoolsContainer(old_host);
-    if (to_clear == nullptr) {
-      // This could happen if we have cleaned out the host before iterating through every connection
-      // pool. Handle it by just continuing.
-      return;
-    }
-
-    ASSERT(to_clear->drains_remaining_ > 0);
-    to_clear->drains_remaining_--;
-    if (to_clear->drains_remaining_ == 0 && to_clear->ready_to_drain_) {
-      clearContainer(old_host, *to_clear);
-    }
-  });
+  container.draining_ = true;
 
   // We need to hold off on actually emptying out the container until we have finished processing
-  // `addDrainedCallback`. If we do not, then it's possible that the container could be erased in
+  // `addIdleCallback`. If we do not, then it's possible that the container could be erased in
   // the middle of its iteration, which leads to undefined behaviour. We handle that case by
-  // checking here to see if the drains have completed.
-  container.ready_to_drain_ = true;
-  if (container.drains_remaining_ == 0) {
-    clearContainer(old_host, container);
+  // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
+  // afterwards whether it is empty and deleting it if necessary.
+  container.do_not_delete_ = true;
+  pools->startDrain();
+  container.do_not_delete_ = false;
+
+  if (container.pools_->size() == 0) {
+    host_http_conn_pool_map_.erase(old_host);
   }
 }
 
-void ClusterManagerImpl::ThreadLocalClusterManagerImpl::clearContainer(
-    HostSharedPtr old_host, ConnPoolsContainer& container) {
-  container.pools_->clear();
-  host_http_conn_pool_map_.erase(old_host);
-}
-
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
-    HostSharedPtr old_host, TcpConnPoolsContainer& container) {
-  container.drains_remaining_ += container.pools_.size();
+    TcpConnPoolsContainer& container) {
 
+  // Copy the pools so that it is safe for the completion callback to mutate `container.pools_`.
+  // `container` may be invalid after all calls to `startDrain()`.
+  std::vector<Tcp::ConnectionPool::Instance*> pools;
   for (const auto& pair : container.pools_) {
-    pair.second->addDrainedCallback([this, old_host]() -> void {
-      if (destroying_) {
-        // It is possible for a connection pool to fire drain callbacks during destruction. Instead
-        // of checking if old_host actually exists in the map, it's clearer and cleaner to keep
-        // track of destruction as a separate state and check for it here. This also allows us to
-        // do this check here versus inside every different connection pool implementation.
-        return;
-      }
+    pools.push_back(pair.second.get());
+  }
 
-      TcpConnPoolsContainer& container = host_tcp_conn_pool_map_[old_host];
-      ASSERT(container.drains_remaining_ > 0);
-      container.drains_remaining_--;
-      if (container.drains_remaining_ == 0) {
-        for (auto& pair : container.pools_) {
-          thread_local_dispatcher_.deferredDelete(std::move(pair.second));
-        }
-        host_tcp_conn_pool_map_.erase(old_host);
-      }
-    });
-
-    // The above addDrainedCallback() drain completion callback might execute immediately. This can
-    // then effectively nuke 'container', which means we can't continue to loop on its contents
-    // (we're done here).
-    if (host_tcp_conn_pool_map_.count(old_host) == 0) {
-      break;
-    }
+  container.draining_ = true;
+  for (auto pool : pools) {
+    pool->startDrain();
   }
 }
 
@@ -1257,7 +1231,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   {
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
+      container->do_not_delete_ = true;
       container->pools_->drainConnections();
+      container->do_not_delete_ = false;
+
+      if (container->pools_->size() == 0) {
+        host_http_conn_pool_map_.erase(host);
+      }
     }
   }
   {
@@ -1267,8 +1247,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
     // active connections.
     const auto& container = host_tcp_conn_pool_map_.find(host);
     if (container != host_tcp_conn_pool_map_.end()) {
+      // Draining pools or closing connections can cause pool deletion if it becomes
+      // idle. Copy `pools_` so that we aren't iterating through a container that
+      // gets mutated by callbacks deleting from it.
+      std::vector<Tcp::ConnectionPool::Instance*> pools;
       for (const auto& pair : container->second.pools_) {
-        const Tcp::ConnectionPool::InstancePtr& pool = pair.second;
+        pools.push_back(pair.second.get());
+      }
+
+      for (auto* pool : pools) {
         if (host->cluster().features() &
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();
@@ -1446,17 +1433,54 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   // function. Otherwise, we'd need to capture a few of these variables by value.
   ConnPoolsContainer::ConnPools::PoolOptRef pool =
       container.pools_->getPool(priority, hash_key, [&]() {
-        return parent_.parent_.factory_.allocateConnPool(
+        auto pool = parent_.parent_.factory_.allocateConnPool(
             parent_.thread_local_dispatcher_, host, priority, upstream_protocols,
             alternate_protocol_options, !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
             parent_.parent_.time_source_, parent_.cluster_manager_state_);
+
+        pool->addIdleCallback(
+            [this, host, priority, hash_key]() { httpConnPoolIsIdle(host, priority, hash_key); });
+
+        return pool;
       });
 
   if (pool.has_value()) {
     return &(pool.value().get());
   } else {
     return nullptr;
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolIsIdle(
+    HostConstSharedPtr host, ResourcePriority priority, const std::vector<uint8_t>& hash_key) {
+  if (parent_.destroying_) {
+    // If the Cluster is being destroyed, this pool will be cleaned up by that
+    // process.
+    return;
+  }
+
+  ConnPoolsContainer* container = parent_.getHttpConnPoolsContainer(host);
+  if (container == nullptr) {
+    // This could happen if we have cleaned out the host before iterating through every
+    // connection pool. Handle it by just continuing.
+    return;
+  }
+
+  if (container->draining_ ||
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+
+    ENVOY_LOG(trace, "Erasing idle pool for host {}", host);
+    container->pools_->erasePool(priority, hash_key);
+
+    // Guard deletion of the container with `do_not_delete_` to avoid deletion while
+    // iterating through the container in `container->pools_->startDrain()`. See
+    // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
+    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+      ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
+      parent_.host_http_conn_pool_map_.erase(
+          host); // NOTE: `container` is erased after this point in the lambda.
+    }
   }
 }
 
@@ -1497,15 +1521,50 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
   }
 
   TcpConnPoolsContainer& container = parent_.host_tcp_conn_pool_map_[host];
-  if (!container.pools_[hash_key]) {
-    container.pools_[hash_key] = parent_.parent_.factory_.allocateTcpConnPool(
-        parent_.thread_local_dispatcher_, host, priority,
-        !upstream_options->empty() ? upstream_options : nullptr,
-        have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-        parent_.cluster_manager_state_);
+  auto pool_iter = container.pools_.find(hash_key);
+  if (pool_iter == container.pools_.end()) {
+    bool inserted;
+    std::tie(pool_iter, inserted) = container.pools_.emplace(
+        hash_key,
+        parent_.parent_.factory_.allocateTcpConnPool(
+            parent_.thread_local_dispatcher_, host, priority,
+            !upstream_options->empty() ? upstream_options : nullptr,
+            have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
+            parent_.cluster_manager_state_));
+    ASSERT(inserted);
+    pool_iter->second->addIdleCallback(
+        [this, host, hash_key]() { tcpConnPoolIsIdle(host, hash_key); });
   }
 
-  return container.pools_[hash_key].get();
+  return pool_iter->second.get();
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolIsIdle(
+    HostConstSharedPtr host, const std::vector<uint8_t>& hash_key) {
+  if (parent_.destroying_) {
+    // If the Cluster is being destroyed, this pool will be cleaned up by that process.
+    return;
+  }
+
+  auto it = parent_.host_tcp_conn_pool_map_.find(host);
+  if (it != parent_.host_tcp_conn_pool_map_.end()) {
+    TcpConnPoolsContainer& container = it->second;
+
+    auto erase_iter = container.pools_.find(hash_key);
+    if (erase_iter != container.pools_.end()) {
+      if (container.draining_ ||
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_delete_when_idle")) {
+        ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", host);
+        parent_.thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
+        container.pools_.erase(erase_iter);
+      }
+    }
+
+    if (container.pools_.empty()) {
+      parent_.host_tcp_conn_pool_map_.erase(
+          host); // NOTE: `container` is erased after this point in the lambda.
+    }
+  }
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
@@ -1521,8 +1580,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
         alternate_protocol_options,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options, TimeSource& source,
-    ClusterConnectivityState& state) {
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    TimeSource& source, ClusterConnectivityState& state) {
   if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
@@ -1572,7 +1631,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
     ClusterConnectivityState& state) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.new_tcp_connection_pool")) {
     return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,

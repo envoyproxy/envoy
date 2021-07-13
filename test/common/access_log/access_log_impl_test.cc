@@ -8,11 +8,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/stream_info/utility.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -989,6 +989,7 @@ filter:
       - DT
       - UPE
       - NC
+      - OM
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null

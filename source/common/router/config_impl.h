@@ -19,17 +19,17 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/matchers.h"
-#include "common/config/metadata.h"
-#include "common/http/hash_policy.h"
-#include "common/http/header_utility.h"
-#include "common/router/config_utility.h"
-#include "common/router/header_formatter.h"
-#include "common/router/header_parser.h"
-#include "common/router/metadatamatchcriteria_impl.h"
-#include "common/router/router_ratelimit.h"
-#include "common/router/tls_context_match_criteria_impl.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/hash_policy.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/router/config_utility.h"
+#include "source/common/router/header_formatter.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/router_ratelimit.h"
+#include "source/common/router/tls_context_match_criteria_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/types/optional.h"
@@ -106,7 +106,8 @@ public:
   // Router::DirectResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                const StreamInfo::StreamInfo&) const override {}
-  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                  bool) const override {
     return {};
   }
   std::string newPath(const Http::RequestHeaderMap& headers) const override;
@@ -512,8 +513,8 @@ public:
                               bool insert_envoy_original_path) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
                                const StreamInfo::StreamInfo& stream_info) const override;
-  Http::HeaderTransforms
-  responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
+  Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                  bool do_formatting = true) const override;
   const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
   const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
@@ -647,9 +648,9 @@ private:
                                  const StreamInfo::StreamInfo& stream_info) const override {
       return parent_->finalizeResponseHeaders(headers, stream_info);
     }
-    Http::HeaderTransforms
-    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override {
-      return parent_->responseHeaderTransforms(stream_info);
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                    bool do_formatting = true) const override {
+      return parent_->responseHeaderTransforms(stream_info, do_formatting);
     }
 
     const CorsPolicy* corsPolicy() const override { return parent_->corsPolicy(); }
@@ -770,6 +771,9 @@ private:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       request_headers_parser_->evaluateHeaders(headers, stream_info);
+      if (!host_rewrite_.empty()) {
+        headers.setHost(host_rewrite_);
+      }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
     void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -777,8 +781,8 @@ private:
       response_headers_parser_->evaluateHeaders(headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
-    Http::HeaderTransforms
-    responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info) const override;
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
+                                                    bool do_formatting = true) const override;
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
 
@@ -790,6 +794,7 @@ private:
     HeaderParserPtr request_headers_parser_;
     HeaderParserPtr response_headers_parser_;
     PerFilterConfigs per_filter_configs_;
+    const std::string host_rewrite_;
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
@@ -978,8 +983,8 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  Regex::CompiledMatcherPtr regex_;
-  std::string regex_str_;
+  const std::string regex_str_;
+  const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
 /**

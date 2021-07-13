@@ -4,8 +4,8 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/network/socket_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
@@ -80,8 +80,6 @@ public:
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
-  MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
-  MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
@@ -127,7 +125,6 @@ public:
   std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
-  std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
   std::string filter_chain_name_;

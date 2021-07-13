@@ -9,7 +9,7 @@
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #else
-#include "extensions/common/wasm/ext/envoy_null_plugin.h"
+#include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #include "absl/base/casts.h"
 #endif
 

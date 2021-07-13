@@ -1,8 +1,8 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/lifecycle_notifier.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/network/mocks.h"
@@ -28,8 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginSharedPtr plugin)
-      : Context(wasm, root_context_id, plugin) {}
+  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+      : Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 
   void testClose() { onCloseTCP(); }

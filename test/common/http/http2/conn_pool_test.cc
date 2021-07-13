@@ -2,11 +2,11 @@
 #include <memory>
 #include <vector>
 
-#include "common/event/dispatcher_impl.h"
-#include "common/http/http2/conn_pool.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/http2/conn_pool.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -23,6 +23,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -41,7 +42,7 @@ public:
   TestConnPoolImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Envoy::Upstream::ClusterConnectivityState& state)
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
@@ -131,7 +132,7 @@ public:
       auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
       Network::ClientConnectionPtr connection{test_client.connection_};
       test_client.codec_client_ = new CodecClientForTest(
-          CodecClient::Type::HTTP1, std::move(connection), test_client.codec_,
+          CodecType::HTTP1, std::move(connection), test_client.codec_,
           [this](CodecClient*) -> void { onClientDestroy(); },
           Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
           *test_client.client_dispatcher_);
@@ -347,7 +348,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   createTestClients(1);
   EXPECT_CALL(*factory_ptr, createTransportSocket(_))
       .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
+          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
             EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http2);
@@ -1089,7 +1090,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(drained, ready());
@@ -1125,7 +1127,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1168,7 +1171,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
           .ok());
 
   ReadyWatcher drained;
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(r2.decoder_, decodeHeaders_(_, true));
@@ -1178,7 +1182,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
@@ -1223,7 +1227,8 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  pool_->startDrain();
 
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();

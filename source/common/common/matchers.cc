@@ -1,4 +1,4 @@
-#include "common/common/matchers.h"
+#include "source/common/common/matchers.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
@@ -6,10 +6,10 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
-#include "common/common/macros.h"
-#include "common/common/regex.h"
-#include "common/config/metadata.h"
-#include "common/http/path_utility.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/regex.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/path_utility.h"
 
 #include "absl/strings/match.h"
 
@@ -66,14 +66,7 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
 StringMatcherImpl::StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher)
     : matcher_(matcher) {
   if (matcher.match_pattern_case() ==
-      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex) {
-    if (matcher.ignore_case()) {
-      throw EnvoyException("ignore_case has no effect for regex.");
-    }
-    regex_ =
-        Regex::Utility::parseStdRegexAsCompiledMatcher(matcher_.hidden_envoy_deprecated_regex());
-  } else if (matcher.match_pattern_case() ==
-             envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
+      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
     if (matcher.ignore_case()) {
       throw EnvoyException("ignore_case has no effect for safe_regex.");
     }
@@ -119,6 +112,16 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
   }
 }
 
+bool StringMatcherImpl::getCaseSensitivePrefixMatch(std::string& prefix) const {
+  if (matcher_.match_pattern_case() ==
+          envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix &&
+      !matcher_.ignore_case()) {
+    prefix = matcher_.prefix();
+    return true;
+  }
+  return false;
+}
+
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
   ASSERT(matcher_.match_pattern_case() ==
          envoy::type::matcher::v3::ListMatcher::MatchPatternCase::kOneOf);
@@ -161,6 +164,13 @@ PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, b
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix(prefix);
   matcher.set_ignore_case(ignore_case);
+  return std::make_shared<const PathMatcher>(matcher);
+}
+
+PathMatcherConstSharedPtr
+PathMatcher::createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.mutable_safe_regex()->MergeFrom(regex_matcher);
   return std::make_shared<const PathMatcher>(matcher);
 }
 

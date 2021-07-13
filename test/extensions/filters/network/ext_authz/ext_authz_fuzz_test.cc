@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"
@@ -64,8 +63,9 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   Stats::TestUtil::TestStore stats_store;
   Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
 
-  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store);
+  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store, bootstrap);
   std::unique_ptr<Filter> filter =
       std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
 

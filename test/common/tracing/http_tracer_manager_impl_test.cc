@@ -1,6 +1,6 @@
-#include "common/tracing/http_tracer_impl.h"
-#include "common/tracing/http_tracer_manager_impl.h"
-#include "common/tracing/tracer_config_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/tracer_factory.h"
@@ -22,7 +22,7 @@ namespace {
 
 class SampleDriver : public Driver {
 public:
-  SpanPtr startSpan(const Config&, Http::RequestHeaderMap&, const std::string&, SystemTime,
+  SpanPtr startSpan(const Config&, Tracing::TraceContext&, const std::string&, SystemTime,
                     const Tracing::Decision) override {
     return nullptr;
   }

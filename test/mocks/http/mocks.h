@@ -15,10 +15,10 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/http/conn_manager_config.h"
-#include "common/http/filter_manager.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/conn_manager_config.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -202,6 +202,7 @@ public:
   MOCK_METHOD(const Network::Connection*, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback&));
@@ -270,12 +271,13 @@ public:
                std::function<void(ResponseHeaderMap& headers)> modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
@@ -291,6 +293,7 @@ public:
   MOCK_METHOD(const Network::Connection*, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (std::function<void()>));
   MOCK_METHOD(bool, canRequestRouteConfigUpdate, ());
@@ -327,7 +330,7 @@ public:
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
-  testing::NiceMock<MockScopedTrackedObject> scope_;
+  testing::NiceMock<MockScopeTrackedObject> scope_;
 };
 
 class MockStreamDecoderFilter : public StreamDecoderFilter {
@@ -528,6 +531,7 @@ public:
     ON_CALL(*this, isRoutable()).WillByDefault(testing::Return(true));
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(testing::Return(false));
     ON_CALL(*this, alwaysSetRequestIdInResponse()).WillByDefault(testing::Return(false));
+    ON_CALL(*this, schemeToSet()).WillByDefault(testing::ReturnRef(scheme_));
   }
 
   // Http::ConnectionManagerConfig
@@ -561,6 +565,7 @@ public:
   MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
               (), (const));
+  MOCK_METHOD(const absl::optional<std::string>&, schemeToSet, (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
   MOCK_METHOD(bool, useRemoteAddress, (), (const));
@@ -598,6 +603,7 @@ public:
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
+  absl::optional<std::string> scheme_;
 };
 
 class MockReceivedSettings : public ReceivedSettings {

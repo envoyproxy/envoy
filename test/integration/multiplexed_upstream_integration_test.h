@@ -9,8 +9,7 @@ class Http2UpstreamIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     upstream_tls_ = true;
-    config_helper_.configureUpstreamTls(use_alpn_,
-                                        upstreamProtocol() == FakeHttpConnection::Type::HTTP3);
+    config_helper_.configureUpstreamTls(use_alpn_, upstreamProtocol() == Http::CodecType::HTTP3);
     HttpProtocolIntegrationTest::initialize();
   }
 

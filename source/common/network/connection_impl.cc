@@ -1,4 +1,4 @@
-#include "common/network/connection_impl.h"
+#include "source/common/network/connection_impl.h"
 
 #include <atomic>
 #include <cstdint>
@@ -12,15 +12,15 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/network/address_impl.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/raw_buffer_socket.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -69,11 +69,11 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
     : ConnectionImplBase(dispatcher, next_global_id_++),
       transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       stream_info_(stream_info), filter_manager_(*this, *socket_),
-      write_buffer_(dispatcher.getWatermarkFactory().create(
+      write_buffer_(dispatcher.getWatermarkFactory().createBuffer(
           [this]() -> void { this->onWriteBufferLowWatermark(); },
           [this]() -> void { this->onWriteBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      read_buffer_(dispatcher.getWatermarkFactory().create(
+      read_buffer_(dispatcher.getWatermarkFactory().createBuffer(
           [this]() -> void { this->onReadBufferLowWatermark(); },
           [this]() -> void { this->onReadBufferHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
@@ -95,6 +95,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  // TODO(soulxu): generate the connection id inside the addressProvider directly,
+  // then we don't need a setter or any of the optional stuff.
+  socket_->addressProvider().setConnectionID(id());
 }
 
 ConnectionImpl::~ConnectionImpl() {

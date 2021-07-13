@@ -14,12 +14,12 @@
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/base64.h"
-#include "common/config/api_version.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/config/api_version.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
@@ -986,6 +986,19 @@ type_url: type.googleapis.com/envoy.test.Sensitive
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+value:
+  sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
   udpa::type::v1::TypedStruct actual;
@@ -998,6 +1011,20 @@ value:
 
   udpa::type::v1::TypedStruct expected = actual;
   MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlAny) {
+  ProtobufWkt::Any actual;
+  MessageUtil::redact(actual);
+  ProtobufWkt::Any expected = actual;
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
@@ -1183,6 +1210,11 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
             "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
   EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
             "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux").ShortDebugString(),
+            "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }");
 }
 
 TEST(LoadFromYamlExceptionTest, BadConversion) {

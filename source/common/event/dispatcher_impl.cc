@@ -1,4 +1,4 @@
-#include "common/event/dispatcher_impl.h"
+#include "source/common/event/dispatcher_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,30 +11,30 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/event/file_event_impl.h"
-#include "common/event/libevent_scheduler.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/event/signal_impl.h"
-#include "common/event/timer_impl.h"
-#include "common/filesystem/watcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/dns_impl.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/file_event_impl.h"
+#include "source/common/event/libevent_scheduler.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/event/signal_impl.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/filesystem/watcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/dns_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
 #ifdef __APPLE__
-#include "common/network/apple_dns_impl.h"
+#include "source/common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -157,7 +157,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups) {
+    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
   ASSERT(isThreadSafe());
 #ifdef __APPLE__
   static bool use_apple_api_for_dns_lookups =
@@ -169,15 +169,14 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
         "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
         "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
         "feature.");
-    RELEASE_ASSERT(!use_tcp_for_dns_lookups,
+    RELEASE_ASSERT(!dns_resolver_options.use_tcp_for_dns_lookups(),
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
-                                                           api_.rootScope());
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.rootScope());
   }
 #endif
-  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, use_tcp_for_dns_lookups);
+  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, dns_resolver_options);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
@@ -248,10 +247,13 @@ TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
-  current_to_delete_->emplace_back(std::move(to_delete));
-  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-  if (current_to_delete_->size() == 1) {
-    deferred_delete_cb_->scheduleCallbackCurrentIteration();
+  if (to_delete != nullptr) {
+    to_delete->deleteIsPending();
+    current_to_delete_->emplace_back(std::move(to_delete));
+    ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
+    if (current_to_delete_->size() == 1) {
+      deferred_delete_cb_->scheduleCallbackCurrentIteration();
+    }
   }
 }
 

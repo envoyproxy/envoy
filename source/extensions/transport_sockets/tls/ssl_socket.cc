@@ -1,16 +1,15 @@
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_features.h"
-
-#include "extensions/transport_sockets/tls/io_handle_bio.h"
-#include "extensions/transport_sockets/tls/ssl_handshaker.h"
-#include "extensions/transport_sockets/tls/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/extensions/transport_sockets/tls/io_handle_bio.h"
+#include "source/extensions/transport_sockets/tls/ssl_handshaker.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -47,7 +46,7 @@ public:
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
-                     const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                      Ssl::HandshakerFactoryCb handshaker_factory_cb)
     : transport_socket_options_(transport_socket_options),
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
@@ -357,7 +356,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(Envoy::Ssl::ClientContextConfigPt
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
-    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -403,7 +402,7 @@ Envoy::Ssl::ClientContextSharedPtr ClientSslSocketFactory::sslCtx() {
 }
 
 Network::TransportSocketPtr
-ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {
+ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.

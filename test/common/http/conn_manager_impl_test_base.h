@@ -1,11 +1,10 @@
 #pragma once
 
-#include "common/http/conn_manager_impl.h"
-#include "common/http/context_impl.h"
-#include "common/http/date_provider_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/access_loggers/common/file_access_log_impl.h"
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/http/date_provider_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -111,6 +110,7 @@ public:
   serverHeaderTransformation() const override {
     return server_transformation_;
   }
+  const absl::optional<std::string>& schemeToSet() const override { return scheme_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() const override { return use_remote_address_; }
@@ -174,6 +174,7 @@ public:
   std::string server_name_;
   HttpConnectionManagerProto::ServerHeaderTransformation server_transformation_{
       HttpConnectionManagerProto::OVERWRITE};
+  absl::optional<std::string> scheme_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
   Http::DefaultInternalAddressConfig internal_address_config_;
@@ -198,7 +199,7 @@ public:
       std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
-  MockStream stream_;
+  NiceMock<MockStream> stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::MockOverloadManager> overload_manager_;

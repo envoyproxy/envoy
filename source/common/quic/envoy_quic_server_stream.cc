@@ -1,4 +1,4 @@
-#include "common/quic/envoy_quic_server_stream.h"
+#include "source/common/quic/envoy_quic_server_stream.h"
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -14,19 +14,19 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "common/quic/platform/quic_mem_slice_span_impl.h"
+#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
 
-#include "common/quic/envoy_quic_utils.h"
-#include "common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/envoy_quic_server_session.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-#include "common/common/assert.h"
-#include "common/http/header_utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -257,8 +257,15 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
 }
 
 bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
+  // Only called in IETF Quic to close write side.
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error);
+  stats_.rx_reset_.inc();
+  bool end_stream_encoded = local_end_stream_;
+  // This call will close write.
   bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
-  if (read_side_closed()) {
+  ASSERT(write_side_closed());
+  if (read_side_closed() && !end_stream_encoded) {
+    // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
   }
@@ -266,10 +273,18 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this, frame.error_code);
   stats_.rx_reset_.inc();
+  bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
+  // This closes read side in both Google Quic and IETF Quic, but doesn't close write side in IETF
+  // Quic.
   quic::QuicSpdyServerStreamBase::OnStreamReset(frame);
-  runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  ASSERT(read_side_closed());
+  if (write_side_closed() && !end_stream_decoded_and_encoded) {
+    // If both directions are closed but upstream hasn't received or sent end stream, run reset
+    // stream callback.
+    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
+  }
 }
 
 void EnvoyQuicServerStream::Reset(quic::QuicRstStreamErrorCode error) {
@@ -295,7 +310,6 @@ void EnvoyQuicServerStream::OnConnectionClosed(quic::QuicErrorCode error,
 void EnvoyQuicServerStream::OnClose() {
   quic::QuicSpdyServerStreamBase::OnClose();
   if (isDoingWatermarkAccounting()) {
-    connection()->dispatcher().post([this] { clearWatermarkBuffer(); });
     return;
   }
   clearWatermarkBuffer();

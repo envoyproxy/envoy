@@ -1,4 +1,4 @@
-#include "extensions/filters/network/ext_authz/config.h"
+#include "source/extensions/filters/network/ext_authz/config.h"
 
 #include <chrono>
 #include <string>
@@ -9,12 +9,11 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz.h"
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
-#include "extensions/filters/network/ext_authz/ext_authz.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,7 +23,8 @@ namespace ExtAuthz {
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr ext_authz_config = std::make_shared<Config>(proto_config, context.scope());
+  ConfigSharedPtr ext_authz_config = std::make_shared<Config>(
+      proto_config, context.scope(), context.getServerFactoryContext().bootstrap());
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
   return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,

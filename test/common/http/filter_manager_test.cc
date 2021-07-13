@@ -4,12 +4,12 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "common/http/filter_manager.h"
-#include "common/http/matching/inputs.h"
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/matcher.h"
-#include "common/stream_info/filter_state_impl.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/http/filter_manager.h"
+#include "source/common/http/matching/inputs.h"
+#include "source/common/matcher/exact_map_matcher.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -28,8 +28,8 @@ class FilterManagerTest : public testing::Test {
 public:
   void initialize() {
     filter_manager_ = std::make_unique<FilterManager>(
-        filter_manager_callbacks_, dispatcher_, connection_, 0, true, 10000, filter_factory_,
-        local_reply_, protocol_, time_source_, filter_state_,
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
+        filter_factory_, local_reply_, protocol_, time_source_, filter_state_,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
 
@@ -546,6 +546,23 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   ASSERT_TRUE(filter_manager_->streamInfo().responseCodeDetails().has_value());
   EXPECT_EQ(filter_manager_->streamInfo().responseCodeDetails().value(), "details2");
   EXPECT_FALSE(filter_manager_->streamInfo().responseCode().has_value());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ResetIdleTimer) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+      }));
+  filter_manager_->createFilterChain();
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  decoder_filter->callbacks_->resetIdleTimer();
 
   filter_manager_->destroyFilters();
 }

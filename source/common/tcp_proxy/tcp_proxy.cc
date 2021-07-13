@@ -1,4 +1,4 @@
-#include "common/tcp_proxy/tcp_proxy.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include <cstdint>
 #include <memory>
@@ -13,22 +13,22 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/application_protocol.h"
-#include "common/network/proxy_protocol_filter_state.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_socket_options_filter_state.h"
-#include "common/router/metadatamatchcriteria_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -655,9 +655,9 @@ void Filter::onUpstreamConnection() {
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
       Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
-  getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
   ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-                 read_callbacks_->connection(), getStreamInfo().requestedServerName());
+                 read_callbacks_->connection(),
+                 getStreamInfo().downstreamAddressProvider().requestedServerName());
 
   if (config_->idleTimeout()) {
     // The idle_timer_ can be moved to a Drainer, so related callbacks call into
@@ -711,14 +711,22 @@ void Filter::disableIdleTimer() {
 UpstreamDrainManager::~UpstreamDrainManager() {
   // If connections aren't closed before they are destructed an ASSERT fires,
   // so cancel all pending drains, which causes the connections to be closed.
-  while (!drainers_.empty()) {
-    auto begin = drainers_.begin();
-    Drainer* key = begin->first;
-    begin->second->cancelDrain();
+  if (!drainers_.empty()) {
+    auto& dispatcher = drainers_.begin()->second->dispatcher();
+    while (!drainers_.empty()) {
+      auto begin = drainers_.begin();
+      Drainer* key = begin->first;
+      begin->second->cancelDrain();
 
-    // cancelDrain() should cause that drainer to be removed from drainers_.
-    // ASSERT so that we don't end up in an infinite loop.
-    ASSERT(drainers_.find(key) == drainers_.end());
+      // cancelDrain() should cause that drainer to be removed from drainers_.
+      // ASSERT so that we don't end up in an infinite loop.
+      ASSERT(drainers_.find(key) == drainers_.end());
+    }
+
+    // This destructor is run when shutting down `ThreadLocal`. The destructor of some objects use
+    // earlier `ThreadLocal` slots (for accessing the runtime snapshot) so they must run before that
+    // slot is destructed. Clear the list to enforce that ordering.
+    dispatcher.clearDeferredDeleteList();
   }
 }
 
@@ -789,6 +797,8 @@ void Drainer::cancelDrain() {
   // This sends onEvent(LocalClose).
   upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
+
+Event::Dispatcher& Drainer::dispatcher() { return upstream_conn_data_->connection().dispatcher(); }
 
 } // namespace TcpProxy
 } // namespace Envoy

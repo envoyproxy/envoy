@@ -14,13 +14,13 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/config/grpc_stream.h"
-#include "common/config/ttl.h"
-#include "common/config/utility.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_stream.h"
+#include "source/common/config/ttl.h"
+#include "source/common/config/utility.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -38,6 +38,17 @@ public:
               envoy::config::core::v3::ApiVersion transport_api_version,
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
+
+  ~GrpcMuxImpl() override;
+
+  // Causes all GrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `GrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  static void shutdownAll();
+
+  void shutdown() { shutdown_ = true; }
 
   void start() override;
 
@@ -140,6 +151,9 @@ private:
     // This resource type must have a Node sent at next request.
     bool must_send_node_{};
     TtlManager ttl_;
+    // The identifier for the server that sent the most recent response, or
+    // empty if there is none.
+    std::string control_plane_identifier_{};
   };
 
   bool isHeartbeatResource(const std::string& type_url, const DecodedResource& resource) {
@@ -176,6 +190,10 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  std::atomic<bool> shutdown_{false};
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;

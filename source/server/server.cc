@@ -1,4 +1,4 @@
-#include "server/server.h"
+#include "source/server/server.h"
 
 #include <csignal>
 #include <cstdint>
@@ -24,37 +24,38 @@
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/api/api_impl.h"
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/mutex_tracer_impl.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/config/xds_resource.h"
-#include "common/http/codes.h"
-#include "common/local_info/local_info_impl.h"
-#include "common/memory/stats.h"
-#include "common/network/address_impl.h"
-#include "common/network/socket_interface.h"
-#include "common/network/socket_interface_impl.h"
-#include "common/network/tcp_listener_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/signal/fatal_error_handler.h"
-#include "common/singleton/manager_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
-#include "common/version/version.h"
-
-#include "server/admin/utils.h"
-#include "server/configuration_impl.h"
-#include "server/connection_handler_impl.h"
-#include "server/guarddog_impl.h"
-#include "server/listener_hooks.h"
-#include "server/ssl_context_manager.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/http/codes.h"
+#include "source/common/local_info/local_info_impl.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/rds_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/signal/fatal_error_handler.h"
+#include "source/common/singleton/manager_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
+#include "source/common/version/version.h"
+#include "source/server/admin/utils.h"
+#include "source/server/configuration_impl.h"
+#include "source/server/connection_handler_impl.h"
+#include "source/server/guarddog_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -105,7 +106,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory, hooks);
+    initialize(options, std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -334,7 +335,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, ListenerHooks& hooks) {
+                              ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
@@ -365,7 +366,8 @@ void InstanceImpl::initialize(const Options& options,
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
   stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
-  stats_store_.setStatsMatcher(Config::Utility::createStatsMatcher(bootstrap_));
+  stats_store_.setStatsMatcher(
+      Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
 
   const std::string server_stats_prefix = "server.";
@@ -412,9 +414,27 @@ void InstanceImpl::initialize(const Options& options,
     server_compilation_settings_stats_->fips_mode_.set(1);
   }
 
-  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  bootstrap_.mutable_node()->set_user_agent_name("envoy");
-  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  // If user has set user_agent_name in the bootstrap config, use it.
+  // Default to "envoy" if unset.
+  if (bootstrap_.node().user_agent_name().empty()) {
+    bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  }
+
+  // If user has set user_agent_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_version().empty()) {
+    std::string user_agent_version = bootstrap_.node().user_agent_version();
+    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(user_agent_version);
+  } else {
+    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  }
+
+  // If user has set user_agent_build_version in the bootstrap config, use it.
+  // Default to the internal server version.
+  if (!bootstrap_.node().user_agent_build_version().has_version()) {
+    *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  }
+
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     for (const auto& name : ext.second->allRegisteredNames()) {
       auto* extension = bootstrap_.mutable_node()->add_extensions();
@@ -513,8 +533,8 @@ void InstanceImpl::initialize(const Options& options,
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  config_tracker_entry_ =
-      admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+  config_tracker_entry_ = admin_->getConfigTracker().add(
+      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
@@ -538,13 +558,27 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-  hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
-  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
+  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
+  if (bootstrap_.has_dns_resolution_config()) {
+    dns_resolver_options.CopyFrom(bootstrap_.dns_resolution_config().dns_resolver_options());
+    if (!bootstrap_.dns_resolution_config().resolvers().empty()) {
+      const auto& resolver_addrs = bootstrap_.dns_resolution_config().resolvers();
+      resolvers.reserve(resolver_addrs.size());
+      for (const auto& resolver_addr : resolver_addrs) {
+        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
+      }
+    }
+  } else {
+    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
+    // utilize bootstrap_.use_tcp_for_dns_lookups() if `bootstrap_.dns_resolver_options` is not set.
+    dns_resolver_options.set_use_tcp_for_dns_lookups(bootstrap_.use_tcp_for_dns_lookups());
+  }
+  dns_resolver_ = dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
@@ -792,6 +826,10 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
+
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();

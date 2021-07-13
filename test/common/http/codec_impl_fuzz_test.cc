@@ -9,13 +9,13 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/http/exception.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_impl.h"
-#include "common/http/http2/codec_impl.h"
-#include "common/http/conn_manager_utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
@@ -135,6 +135,13 @@ public:
         stream_state_ = StreamState::Closed;
       }
     }
+
+    void closeLocalAndRemote() {
+      remote_closed_ = true;
+      local_closed_ = true;
+      stream_state_ = StreamState::Closed;
+    }
+
   } request_, response_;
 
   HttpStream(ClientConnection& client, const TestRequestHeaderMapImpl& request_headers,
@@ -176,11 +183,11 @@ public:
       request_.closeRemote();
     }));
     ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeRemote(); }));
+        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }

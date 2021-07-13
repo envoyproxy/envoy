@@ -41,10 +41,8 @@ static_resources:
                   numerator: 0
                   denominator: HUNDRED
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 1s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
