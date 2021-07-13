@@ -159,6 +159,8 @@ public:
   // TODO: This method is unimplemented for X-Ray.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
 
+  void packSpanContextToMetadata(StreamInfo::StreamInfo&) const override {}
+
   /**
    * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.

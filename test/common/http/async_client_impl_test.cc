@@ -241,6 +241,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, packSpanContextToMetadata(_));
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -293,6 +294,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, packSpanContextToMetadata(_));
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
@@ -1121,6 +1123,7 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Canceled), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, packSpanContextToMetadata(_));
 
   request->cancel();
 }
@@ -1208,6 +1211,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
       .Times(AnyNumber());
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ErrorReason), Eq("Reset")));
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, packSpanContextToMetadata(_));
 }
 
 TEST_F(AsyncClientImplTest, PoolFailure) {
@@ -1394,6 +1398,7 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)))
       .Times(AnyNumber());
   EXPECT_CALL(*child_span, finishSpan());
+  EXPECT_CALL(*child_span, packSpanContextToMetadata(_));
   timer_->invokeCallback();
 }
 

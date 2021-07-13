@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -187,6 +188,25 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+}
+
+MATCHER(PackSpanToDynamicMetadataTestMatcher, "") {
+  return arg.fields().at("sw_service").string_value() == "CURR#SERVICE" &&
+         arg.fields().at("sw_service_instance").string_value() == "CURR#INSTANCE" &&
+         arg.fields().at("sw_span_id").number_value() == 0;
+}
+
+TEST_F(TracerTest, PackSpanToDynamicMetadata) {
+  setupTracer("{}");
+  StreamInfo::MockStreamInfo stream_info;
+
+  // Create a new SegmentContext.
+  auto segment_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
+  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan(
+      mock_tracing_config_, mock_time_source_.systemTime(), "TEST_OP", segment_context, nullptr);
+  EXPECT_CALL(stream_info, setDynamicMetadata(Eq("envoy.tracers.skywalking"),
+                                              PackSpanToDynamicMetadataTestMatcher()));
+  org_span->packSpanContextToMetadata(stream_info);
 }
 
 } // namespace

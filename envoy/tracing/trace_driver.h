@@ -160,6 +160,13 @@ public:
    * @return trace ID as a hex string
    */
   virtual std::string getTraceIdAsHex() const PURE;
+
+  /**
+   * Serialize span information (e.g. trace id) and pack into stream_info to metadata.
+   * The properties of this metadata differs from tracing provider.
+   * @param stream info.
+   */
+  virtual void packSpanContextToMetadata(StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

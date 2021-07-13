@@ -708,6 +708,7 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     Tracing::HttpTracerUtility::finalizeDownstreamSpan(
         *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
         filter_manager_.streamInfo(), *this);
+    active_span_->packSpanContextToMetadata(filter_manager_.streamInfo());
   }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
