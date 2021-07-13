@@ -15,7 +15,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> class PriorityConnPoolMap {
 public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
-  using IdleCb = typename ConnPoolMapType::IdleCb;
+  using DrainedCb = typename ConnPoolMapType::DrainedCb;
   using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
 
   PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
@@ -26,12 +26,7 @@ public:
    * is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  PoolOptRef getPool(ResourcePriority priority, const KEY_TYPE& key, const PoolFactory& factory);
-
-  /**
-   * Erase a pool for the given priority and `key` if it exists and is idle.
-   */
-  bool erasePool(ResourcePriority priority, const KEY_TYPE& key);
+  PoolOptRef getPool(ResourcePriority priority, KEY_TYPE key, const PoolFactory& factory);
 
   /**
    * @return the number of pools across all priorities.
@@ -49,21 +44,14 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addIdleCallback(const IdleCb& cb);
+  void addDrainedCallback(const DrainedCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
-   * See `Envoy::ConnectionPool::Instance::drainConnections()`.
+   * Instructs each connection pool to drain its connections.
    */
   void drainConnections();
 
 private:
-  size_t getPriorityIndex(ResourcePriority priority) const;
-
   std::array<std::unique_ptr<ConnPoolMapType>, NumResourcePriorities> conn_pool_maps_;
 };
 
