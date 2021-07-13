@@ -49,7 +49,6 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * aws_lambda: if ``payload_passthrough`` is set to ``false``, the downstream response content-type header will now be set from the content-type entry in the JSON response's headers map, if present.
-* cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
 * cluster: fixed the :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` histograms by moving the accounting into the router
   filter. This means that we now properly compute the number of bytes sent as well as handling retries which were previously ignored.
 * hot_restart: fix double counting of ``server.seconds_until_first_ocsp_response_expiring`` and ``server.days_until_first_cert_expiring`` during hot-restart. This stat was only incorrect until the parent process terminated.
