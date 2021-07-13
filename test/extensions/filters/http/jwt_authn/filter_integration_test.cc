@@ -523,6 +523,14 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
   initializeAsyncFetchFilter(true);
 
+  // There is a race condition in this test:
+  // In fast_fatch mode, the listener is activated without waiting for jwks fetch to be
+  // done. When the first request comes, if jwks is not fetched, it will fetch again.
+  // The second fetch will fail in this test since its fake_upstream is not waiting.
+  // To avoid such race condition, before sending out the first request,
+  // wait for the first fetch stats to be updated.
+  test_server_->waitForCounterGe("http.config_test.jwt_authn.jwks_fetch_success", 1);
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
