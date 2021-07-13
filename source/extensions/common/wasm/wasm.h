@@ -104,7 +104,7 @@ protected:
   absl::flat_hash_map<uint32_t, Event::TimerPtr> timer_; // per root_id.
   TimeSource& time_source_;
 
-  // Runtime stats
+  // Lifecycle stats
   LifecycleStatsHandler lifecycle_stats_handler_;
 
   // Plugin stats

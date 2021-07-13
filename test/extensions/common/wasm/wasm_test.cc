@@ -104,9 +104,9 @@ TEST_P(WasmCommonTest, WasmFailState) {
   auto wasm = std::make_shared<WasmHandle>(
       std::make_unique<Wasm>(plugin->wasmConfig(), "", scope, cluster_manager, *dispatcher));
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
-  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVM);
+  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVm);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToCreateVm);
-  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCloneVM);
+  wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCloneVm);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToCloneVm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::MissingFunction);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::MissingFunction);

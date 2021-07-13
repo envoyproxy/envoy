@@ -289,9 +289,9 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   switch (wasm->wasm()->fail_state()) {
   case FailState::Ok:
     return WasmEvent::Ok;
-  case FailState::UnableToCreateVM:
+  case FailState::UnableToCreateVm:
     return WasmEvent::UnableToCreateVm;
-  case FailState::UnableToCloneVM:
+  case FailState::UnableToCloneVm:
     return WasmEvent::UnableToCloneVm;
   case FailState::MissingFunction:
     return WasmEvent::MissingFunction;
