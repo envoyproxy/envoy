@@ -171,13 +171,13 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
   }
   return connections_[0]->bufferLimit();
 }
+
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
-  // XXX
-  /*
-    if (!connect_finished_) {
+  if (!connect_finished_) {
+    // TODO(rch): Either prohibit write before correct or eliminate infinite buffering.
     return false;
-    }
-  */
+  }
+
   return connections_[0]->aboveHighWatermark();
 }
 

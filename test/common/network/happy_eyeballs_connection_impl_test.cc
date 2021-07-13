@@ -393,6 +393,22 @@ TEST_F(HappyEyeballsConnectionImplTest, BufferLimit) {
   EXPECT_EQ(42, impl_->bufferLimit());
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, AboveHighWatermark) {
+  EXPECT_CALL(*created_connections_[0], connect());
+  impl_->connect();
+
+  EXPECT_FALSE(impl_->aboveHighWatermark());
+
+  // The call to write() will be replayed on the underlying connection.
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+
+  // Delegates to the connection once connected.
+  EXPECT_CALL(*created_connections_[0], aboveHighWatermark()).WillOnce(Return(true));
+  EXPECT_TRUE(impl_->aboveHighWatermark());
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats){
   StrictMock<Stats::MockCounter> rx_total;
   StrictMock<Stats::MockGauge> rx_current;
