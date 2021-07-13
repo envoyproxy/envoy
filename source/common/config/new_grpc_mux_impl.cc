@@ -16,35 +16,6 @@
 namespace Envoy {
 namespace Config {
 
-namespace {
-class AllMuxesState {
-public:
-  void insert(NewGrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.insert(mux);
-  }
-
-  void erase(NewGrpcMuxImpl* mux) {
-    absl::WriterMutexLock locker(&lock_);
-    muxes_.erase(mux);
-  }
-
-  void shutdownAll() {
-    absl::WriterMutexLock locker(&lock_);
-    for (auto& mux : muxes_) {
-      mux->shutdown();
-    }
-  }
-
-private:
-  absl::flat_hash_set<NewGrpcMuxImpl*> muxes_ ABSL_GUARDED_BY(lock_);
-
-  // TODO(ggreenway): can this lock be removed? Is this code only run on the main thread?
-  absl::Mutex lock_;
-};
-using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
-} // namespace
-
 NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
@@ -59,13 +30,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      transport_api_version_(transport_api_version), dispatcher_(dispatcher) {
-  AllMuxes::get().insert(this);
-}
-
-NewGrpcMuxImpl::~NewGrpcMuxImpl() { AllMuxes::get().erase(this); }
-
-void NewGrpcMuxImpl::shutdownAll() { AllMuxes::get().shutdownAll(); }
+      transport_api_version_(transport_api_version), dispatcher_(dispatcher) {}
 
 void NewGrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
   auto sub = subscriptions_.find(resource_type_url);
@@ -251,10 +216,6 @@ void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use
 }
 
 void NewGrpcMuxImpl::trySendDiscoveryRequests() {
-  if (shutdown_) {
-    return;
-  }
-
   while (true) {
     // Do any of our subscriptions even want to send a request?
     absl::optional<std::string> maybe_request_type = whoWantsToSendDiscoveryRequest();

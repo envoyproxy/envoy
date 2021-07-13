@@ -38,7 +38,6 @@ OriginalConnPoolImpl::~OriginalConnPoolImpl() {
 }
 
 void OriginalConnPoolImpl::drainConnections() {
-  ENVOY_LOG(debug, "draining connections");
   while (!ready_conns_.empty()) {
     ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
@@ -68,11 +67,9 @@ void OriginalConnPoolImpl::closeConnections() {
   }
 }
 
-void OriginalConnPoolImpl::addIdleCallback(IdleCb cb) { idle_callbacks_.push_back(cb); }
-
-void OriginalConnPoolImpl::startDrain() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
+void OriginalConnPoolImpl::addDrainedCallback(DrainedCb cb) {
+  drained_callbacks_.push_back(cb);
+  checkForDrained();
 }
 
 void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
@@ -84,22 +81,14 @@ void OriginalConnPoolImpl::assignConnection(ActiveConn& conn,
                         conn.real_host_description_);
 }
 
-bool OriginalConnPoolImpl::isIdle() const {
-  return pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
-         ready_conns_.empty();
-}
-
-void OriginalConnPoolImpl::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (pending_requests_.empty() && busy_conns_.empty() && pending_conns_.empty() &&
-      (is_draining_ || ready_conns_.empty())) {
-    if (is_draining_) {
-      ENVOY_LOG(debug, "in draining state");
-      while (!ready_conns_.empty()) {
-        ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
-      }
+void OriginalConnPoolImpl::checkForDrained() {
+  if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_conns_.empty() &&
+      pending_conns_.empty()) {
+    while (!ready_conns_.empty()) {
+      ready_conns_.front()->conn_->close(Network::ConnectionCloseType::NoFlush);
     }
-    ENVOY_LOG(debug, "Calling idle callbacks - drained={}", is_draining_);
-    for (const IdleCb& cb : idle_callbacks_) {
+
+    for (const DrainedCb& cb : drained_callbacks_) {
       cb();
     }
   }
@@ -113,8 +102,6 @@ void OriginalConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable*
 OriginalConnPoolImpl::newConnection(ConnectionPool::Callbacks& callbacks) {
-  ASSERT(!deferred_deleting_);
-
   if (!ready_conns_.empty()) {
     ready_conns_.front()->moveBetweenLists(ready_conns_, busy_conns_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_conns_.front()->conn_);
@@ -209,8 +196,8 @@ void OriginalConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::Connecti
       createNewConnection();
     }
 
-    if (check_for_drained || !is_draining_) {
-      checkForIdleAndCloseIdleConnsIfDraining();
+    if (check_for_drained) {
+      checkForDrained();
     }
   }
 
@@ -245,7 +232,7 @@ void OriginalConnPoolImpl::onPendingRequestCancel(PendingRequest& request,
     pending_conns_.back()->conn_->close(Network::ConnectionCloseType::NoFlush);
   }
 
-  checkForIdleAndCloseIdleConnsIfDraining();
+  checkForDrained();
 }
 
 void OriginalConnPoolImpl::onConnReleased(ActiveConn& conn) {
@@ -326,7 +313,7 @@ void OriginalConnPoolImpl::processIdleConnection(ActiveConn& conn, bool new_conn
     upstream_ready_cb_->scheduleCallbackCurrentIteration();
   }
 
-  checkForIdleAndCloseIdleConnsIfDraining();
+  checkForDrained();
 }
 
 OriginalConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_(parent) {
