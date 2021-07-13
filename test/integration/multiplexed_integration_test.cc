@@ -878,8 +878,8 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_,
-      quic_stat_names_, stats_store_, "host", Http::Headers::get().ContentTypeValues.Grpc);
+      lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_, "host",
+      Http::Headers::get().ContentTypeValues.Grpc);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, response->headers().getContentTypeValue());

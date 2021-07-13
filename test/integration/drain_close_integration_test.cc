@@ -93,8 +93,7 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 
   // Invoke /drain_listeners with graceful drain
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
   // With a 999s graceful drain period, the listener should still be open.
@@ -121,9 +120,8 @@ TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
 
   // Invoke /drain_listeners and shut down listeners.
   second_codec_client_->rawConnection().close(Network::ConnectionCloseType::NoFlush);
-  admin_response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
-                                                      "/drain_listeners", "", downstreamProtocol(),
-                                                      version_, quic_stat_names_, stats_store_);
+  admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
@@ -145,14 +143,12 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
 
   // Invoke /drain_listeners with graceful drain
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
   EXPECT_EQ(test_server_->counter("listener_manager.listener_stopped")->value(), 0);
 
   admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
@@ -163,9 +159,8 @@ TEST_P(DrainCloseIntegrationTest, RepeatedAdminGracefulDrain) {
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
 
-  admin_response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
-                                                      "/drain_listeners", "", downstreamProtocol(),
-                                                      version_, quic_stat_names_, stats_store_);
+  admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
   EXPECT_EQ(admin_response->headers().Status()->value().getStringView(), "200");
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);

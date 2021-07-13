@@ -819,8 +819,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
 
   // Make a simple request, should get 503
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/test/long/url", "", downstream_protocol_, version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("http"), "GET", "/test/long/url", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 

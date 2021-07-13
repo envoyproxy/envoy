@@ -163,8 +163,7 @@ http_logs:
 )EOF")));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_);
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogRequest(R"EOF(
@@ -204,8 +203,7 @@ http_logs:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
-                                                downstream_protocol_, version_, quic_stat_names_,
-                                                stats_store_);
+                                                downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
   ASSERT_TRUE(waitForAccessLogStream());

@@ -595,8 +595,7 @@ void HttpIntegrationTest::testRouterNotFound() {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_);
+      lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
@@ -606,8 +605,7 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
 }
@@ -1380,8 +1378,7 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
   // Invoke drain listeners endpoint and validate that we can still work on inflight requests.
   BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_,
-      quic_stat_names_, stats_store_);
+      lookupPort("admin"), "POST", "/drain_listeners", "", admin_request_type, version_);
   EXPECT_TRUE(admin_response->complete());
   EXPECT_EQ("200", admin_response->headers().getStatusValue());
   EXPECT_EQ("OK\n", admin_response->body());

@@ -178,8 +178,7 @@ TEST_P(IntegrationTest, RouterDirectResponseWithBody) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_, "direct.example.com");
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()
@@ -226,8 +225,7 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_, "direct.example.com");
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("example-value", response->headers()

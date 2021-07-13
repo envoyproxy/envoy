@@ -605,7 +605,6 @@ private:
   absl::Notification server_gone_;
   Stats::SymbolTableImpl symbol_table_;
   std::unique_ptr<Stats::AllocatorImpl> stats_allocator_;
-  Quic::QuicStatNames* quic_stat_names_;
 };
 
 } // namespace Envoy

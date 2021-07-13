@@ -382,8 +382,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   // Initial state: no healthy endpoints
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_, "foo.com");
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
   EXPECT_EQ("EDS not ready", response->body());
@@ -394,8 +393,7 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   setEndpoints(2, 2, 0);
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
-                                                downstream_protocol_, version_, quic_stat_names_,
-                                                stats_store_, "foo.com");
+                                                downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("EDS is ready", response->body());

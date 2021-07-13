@@ -45,8 +45,8 @@ protected:
   Network::Address::InstanceConstSharedPtr test_address_;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
   std::unique_ptr<Quic::QuicClientTransportSocketFactory> factory_;
-  Stats::IsolatedStoreImpl scope_;
-  QuicStatNames quic_stat_names_{scope_.symbolTable()};
+  Stats::IsolatedStoreImpl store_;
+  QuicStatNames quic_stat_names_{store_.symbolTable()};
 };
 
 TEST_F(QuicNetworkConnectionTest, BufferLimits) {
@@ -56,7 +56,7 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_, config, 45};
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
-      info, dispatcher_, test_address_, test_address_, quic_stat_names_, scope_);
+      info, dispatcher_, test_address_, test_address_, quic_stat_names_, store_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();

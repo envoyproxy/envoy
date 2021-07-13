@@ -208,8 +208,7 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
 TEST_P(SslIntegrationTest, AdminCertEndpoint) {
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_, quic_stat_names_,
-      stats_store_);
+      lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

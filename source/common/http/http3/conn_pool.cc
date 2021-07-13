@@ -63,7 +63,8 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope) {
   return std::make_unique<Http3ConnPoolImpl>(
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
-      [&](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+      [&quic_stat_names,
+       &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);

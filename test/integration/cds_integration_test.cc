@@ -152,8 +152,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 
   // Now that cluster_1 is gone, the listener (with its routing to cluster_1) should 503.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, quic_stat_names_,
-      stats_store_, "foo.com");
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
 
