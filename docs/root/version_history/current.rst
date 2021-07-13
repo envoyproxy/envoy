@@ -38,9 +38,9 @@ Minor Behavior Changes
   ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: the behavior of the ``present_match`` in route header matcher changed. The value of ``present_match`` was ignored in the past. The new behavior is ``present_match`` is performed when the value is true. An absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
-* listener: when balancing across active listeners and wildcard matching is used, the behavior has been changed to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+* listener: when balancing across active listeners and wildcard matching is used, the behavior has been changed to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
 * udp: limit each UDP listener to read maximum 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
 
