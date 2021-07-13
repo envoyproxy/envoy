@@ -1552,10 +1552,10 @@ public:
   AsyncStreamImpl::NullVirtualHost vhost_;
   AsyncStreamImpl::NullConfig config_;
 
-  void setupRouteImpl(const std::string& yamlConfig) {
+  void setupRouteImpl(const std::string& yaml_config) {
     envoy::config::route::v3::RetryPolicy retry_policy;
 
-    TestUtility::loadFromYaml(yamlConfig, retry_policy);
+    TestUtility::loadFromYaml(yaml_config, retry_policy);
 
     route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
         "foo", absl::nullopt,
