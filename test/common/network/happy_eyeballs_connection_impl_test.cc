@@ -34,19 +34,15 @@ class HappyEyeballsConnectionImplTest : public testing::Test {
     EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(1);
     EXPECT_CALL(*failover_timer_, enabled()).WillRepeatedly(Return(true));
     next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-    std::cerr << __LINE__ << std::endl;
     impl_ = std::make_unique<HappyEyeballsConnectionImpl>(dispatcher_,
                                                           address_list_,
                                                           Address::InstanceConstSharedPtr(),
                                                           transport_socket_factory_,
                                                           transport_socket_options_,
                                                           options_);
-    std::cerr << __LINE__ << std::endl;
-
   }
 
   MockClientConnection* createNextConnection() {
-    std::cerr << __LINE__ << " size: " << next_connections_.size() <<  std::endl;
     created_connections_.push_back(next_connections_.front().release());
     next_connections_.pop_front();
     EXPECT_CALL(*created_connections_.back(), addConnectionCallbacks(_)).WillOnce(Invoke([&](ConnectionCallbacks& cb) -> void { connection_callbacks_.push_back(&cb);}));
@@ -203,15 +199,11 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
   ASSERT_EQ(2, created_connections_.size());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << " \n";
   connection_callbacks_[1]->onEvent(ConnectionEvent::RemoteClose);
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << " \n";
 
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << " \n";
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << " \n";
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
@@ -237,7 +229,7 @@ TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
-  // Verify that noDelay calls are delegated to the remaingin connection.
+  // Verify that noDelay calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], noDelay(false));
   impl_->noDelay(false);
 }
@@ -265,7 +257,7 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled){
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
-  // Verify that detectEarlyCloseWhenReadDisabled calls are delegated to the remaingin connection.
+  // Verify that detectEarlyCloseWhenReadDisabled() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], detectEarlyCloseWhenReadDisabled(false));
   impl_->detectEarlyCloseWhenReadDisabled(false);
 }
@@ -298,7 +290,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter){
 
   ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
   filter2->initializeReadFilterCallbacks(callbacks);
-  // Verify that detectEarlyCloseWhenReadDisabled calls are delegated to the remaingin connection.
+  // Verify that addReadFilter() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter2));
   impl_->addReadFilter(filter2);
 }
@@ -324,14 +316,13 @@ TEST_F(HappyEyeballsConnectionImplTest, AddConnectionCallbacks){
   EXPECT_CALL(*created_connections_[1], addConnectionCallbacks(_)).WillOnce(Invoke([&](ConnectionCallbacks& c) -> void {
     EXPECT_EQ(&c, &callbacks);
   }));
-  //EXPECT_CALL(*created_connections_[1], addConnectionCallbacks(callbacks));
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
   MockConnectionCallbacks callbacks2;
-  // Verify that detectEarlyCloseWhenReadDisabled calls are delegated to the remaingin connection.
+  // Verify that addConnectionCallbacks() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], addConnectionCallbacks(_)).WillOnce(Invoke([&](ConnectionCallbacks& c) -> void {
     EXPECT_EQ(&c, &callbacks2);
   }));
@@ -358,7 +349,7 @@ TEST_F(HappyEyeballsConnectionImplTest, RemoveConnectionCallbacks){
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
 
-  // Verify that removeConnectionCallbacks calls are delegated to the remaingin connection.
+  // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_)).WillOnce(Invoke([&](ConnectionCallbacks& c) -> void {
     EXPECT_EQ(&c, &callbacks2);
   }));
@@ -386,24 +377,15 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnect) {
   connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
 }
 
-
-struct MockConnectionStats {
-  Connection::ConnectionStats toBufferStats() {
-    return {rx_total_,   rx_current_,   tx_total_,
-            tx_current_, &bind_errors_, &delayed_close_timeouts_};
-  }
-
-  StrictMock<Stats::MockCounter> rx_total_;
-  StrictMock<Stats::MockGauge> rx_current_;
-  StrictMock<Stats::MockCounter> tx_total_;
-  StrictMock<Stats::MockGauge> tx_current_;
-  StrictMock<Stats::MockCounter> bind_errors_;
-  StrictMock<Stats::MockCounter> delayed_close_timeouts_;
-};
-
 TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats){
-  MockConnectionStats stats;
-  Connection::ConnectionStats cs = { stats.rx_total_, stats.rx_current_, stats.tx_total_, stats.tx_current_, &stats.bind_errors_, &stats.delayed_close_timeouts_};
+  StrictMock<Stats::MockCounter> rx_total;
+  StrictMock<Stats::MockGauge> rx_current;
+  StrictMock<Stats::MockCounter> tx_total;
+  StrictMock<Stats::MockGauge> tx_current;
+  StrictMock<Stats::MockCounter> bind_errors;
+  StrictMock<Stats::MockCounter> delayed_close_timeouts;
+
+  Connection::ConnectionStats cs = { rx_total, rx_current, tx_total, tx_current, &bind_errors, &delayed_close_timeouts};
   EXPECT_CALL(*created_connections_[0], setConnectionStats(_)).WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void {
     EXPECT_EQ(&s, &cs);
   }));
@@ -430,14 +412,12 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats){
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
-  /*
-  // Verify that setConnectionStats calls are delegated to the remaingin connection.
-  MockConnectionStats stats2;
+  // Verify that setConnectionStats calls are delegated to the remaining connection.
+  Connection::ConnectionStats cs2 = { rx_total, rx_current, tx_total, tx_current, &bind_errors, &delayed_close_timeouts};
   EXPECT_CALL(*created_connections_[1], setConnectionStats(_)).WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void {
-    EXPECT_EQ(&s, &stats2);
+    EXPECT_EQ(&s, &cs2);
   }));
-  impl_->setConnectionStats(stats2);
-  */
+  impl_->setConnectionStats(cs2);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, state) {
@@ -474,12 +454,7 @@ TEST_F(HappyEyeballsConnectionImplTest, connecting) {
 // has finised.
 
 TEST_F(HappyEyeballsConnectionImplTest, addWriteFilter) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   MockWriteFilterCallbacks callbacks;
   WriteFilterSharedPtr filter = std::make_shared<MockWriteFilter>();
@@ -489,12 +464,7 @@ TEST_F(HappyEyeballsConnectionImplTest, addWriteFilter) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, addFilter) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   MockReadFilterCallbacks read_callbacks;
   MockWriteFilterCallbacks write_callbacks;
@@ -506,12 +476,7 @@ TEST_F(HappyEyeballsConnectionImplTest, addFilter) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, addBytesSentCallback) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   std::function<bool(uint64_t)> cb = [](uint64_t) { return true; };
   EXPECT_CALL(*created_connections_[0], addBytesSentCallback(_));
@@ -519,73 +484,42 @@ TEST_F(HappyEyeballsConnectionImplTest, addBytesSentCallback) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, enableHalfClose) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], enableHalfClose(true));
   impl_->enableHalfClose(true);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, isHalfCloseEnabled) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], isHalfCloseEnabled()).WillOnce(Return(true));
   EXPECT_TRUE(impl_->isHalfCloseEnabled());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, nextProtocol) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], nextProtocol()).WillOnce(Return("h3"));
   EXPECT_EQ("h3", impl_->nextProtocol());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, readDisable) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], readDisable(true));
   impl_->readDisable(true);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, readEnabled) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], readEnabled()).WillOnce(Return(true));
   EXPECT_TRUE(impl_->readEnabled());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, addressProvider) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-
+  connectFirstAttempt();
 
   const SocketAddressSetterImpl provider(std::make_shared<Address::Ipv4Instance>(80),
                                    std::make_shared<Address::Ipv4Instance>(80));
@@ -594,41 +528,23 @@ TEST_F(HappyEyeballsConnectionImplTest, addressProvider) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, addressProviderSharedPtr) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  connectFirstAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-
-
-  SocketAddressProviderSharedPtr provider = std::make_shared<SocketAddressSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
-                                                                                      std::make_shared<Address::Ipv4Instance>(80));
+  SocketAddressProviderSharedPtr provider = std::make_shared<SocketAddressSetterImpl>(std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
+                                                                                      std::make_shared<Address::Ipv4Instance>("127.0.0.1"));
   EXPECT_CALL(*created_connections_[0], addressProviderSharedPtr()).WillOnce(Return(provider));
   EXPECT_EQ(provider, impl_->addressProviderSharedPtr());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, unixSocketPeerCredentials) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], unixSocketPeerCredentials()).WillOnce(Return(absl::optional<Connection::UnixDomainSocketPeerCredentials>()));
   EXPECT_FALSE(impl_->unixSocketPeerCredentials().has_value());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ssl) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-
+  connectFirstAttempt();
 
   Ssl::ConnectionInfoConstSharedPtr ssl = nullptr;
   EXPECT_CALL(*created_connections_[0], ssl()).WillOnce(Return(ssl));
@@ -636,24 +552,14 @@ TEST_F(HappyEyeballsConnectionImplTest, ssl) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, setBufferLimits) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], setBufferLimits(42));
   impl_->setBufferLimits(42);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, socketOptions) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   ConnectionSocket::OptionsSharedPtr options = nullptr;
   EXPECT_CALL(*created_connections_[0], socketOptions()).WillOnce(ReturnRef(options));;
@@ -661,24 +567,14 @@ TEST_F(HappyEyeballsConnectionImplTest, socketOptions) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, requestedServerName) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], requestedServerName()).WillOnce(Return("name"));
   EXPECT_EQ("name", impl_->requestedServerName());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, streamInfo) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   StreamInfo::MockStreamInfo info;
   EXPECT_CALL(*created_connections_[0], streamInfo()).WillOnce(ReturnRef(info));
@@ -686,48 +582,28 @@ TEST_F(HappyEyeballsConnectionImplTest, streamInfo) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, setDelayedCloseTimeout) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], setDelayedCloseTimeout(std::chrono::milliseconds(5)));
   impl_->setDelayedCloseTimeout(std::chrono::milliseconds(5));
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, transportFailureReason) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], transportFailureReason()).WillOnce(Return("reason"));
   EXPECT_EQ("reason", impl_->transportFailureReason());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, startSecureTransport) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], startSecureTransport());
   impl_->startSecureTransport();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, lastRoundTripTime) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*created_connections_[0], lastRoundTripTime()).WillOnce(Return(rtt));
