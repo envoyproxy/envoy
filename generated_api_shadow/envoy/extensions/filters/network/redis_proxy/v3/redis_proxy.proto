@@ -240,7 +240,8 @@ message RedisProxy {
       gte {nanos: 500000000}
     }];
 
-    // Configure the dispatch interval for the attenuation operation.
+    // Configure the dispatch interval for the attenuation operation(The attenuation operation will
+    // change the frequency value to half).
     // To avoid full heat over a period of time, we need to attenuate it regularly.
     //
     // If there are two hotkeys in the cache. The last update time of A is 0. The last update time

@@ -180,14 +180,15 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
-  try {
-    // maybe throw std::invalid_argument or std::out_of_range
-    uint64_t key_max_offset(3 + std::stoull(incoming_request->asArray()[2].asString()));
+  uint64_t key_max_offset;
+  if (absl::SimpleAtoi(incoming_request->asArray()[2].asString(), &key_max_offset)) {
+    key_max_offset += 3;
     for (uint64_t i = 3; (i < key_max_offset) && (i < incoming_request->asArray().size()); ++i) {
       callbacks.incrHotKey(incoming_request->asArray()[i].asString());
     }
-  } catch (const std::exception& e) {
-    ENVOY_LOG(debug, "redis: error: '{}', request: '{}'", e.what(), incoming_request->toString());
+  } else {
+    ENVOY_LOG(debug, "redis: error: The count of keys is wrong, request: '{}'",
+              incoming_request->toString());
   }
 
   const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
