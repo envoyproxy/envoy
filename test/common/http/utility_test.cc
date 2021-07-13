@@ -870,6 +870,8 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::RemoteRefusedStreamReset));
   EXPECT_EQ("remote error with CONNECT request",
             Utility::resetReasonToString(Http::StreamResetReason::ConnectError));
+  EXPECT_EQ("overload manager reset",
+            Utility::resetReasonToString(Http::StreamResetReason::OverloadManager));
 }
 
 class TestConfig : public Router::RouteSpecificFilterConfig {
@@ -1311,6 +1313,31 @@ TEST(HttpUtility, TestRejectTeHeaderTooLong) {
 
   EXPECT_FALSE(Utility::sanitizeConnectionHeader(request_headers));
   EXPECT_EQ(sanitized_headers, request_headers);
+}
+
+TEST(HttpUtility, TestRejectUriWithNoPath) {
+  Http::TestRequestHeaderMapImpl request_headers_no_path = {
+      {":method", "GET"}, {":authority", "example.com"}, {"x-forwarded-proto", "http"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_no_path, {}), "");
+}
+
+TEST(HttpUtility, TestTruncateUri) {
+  Http::TestRequestHeaderMapImpl request_headers_truncated_path = {{":method", "GET"},
+                                                                   {":path", "/hello_world"},
+                                                                   {":authority", "example.com"},
+                                                                   {"x-forwarded-proto", "http"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, 2), "http://example.com/h");
+}
+
+TEST(HttpUtility, TestUriUsesOriginalPath) {
+  Http::TestRequestHeaderMapImpl request_headers_truncated_path = {
+      {":method", "GET"},
+      {":path", "/hello_world"},
+      {":authority", "example.com"},
+      {"x-forwarded-proto", "http"},
+      {"x-envoy-original-path", "/goodbye_world"}};
+  EXPECT_EQ(Utility::buildOriginalUri(request_headers_truncated_path, {}),
+            "http://example.com/goodbye_world");
 }
 
 TEST(Url, ParsingFails) {

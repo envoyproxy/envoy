@@ -15,7 +15,6 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 #include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/api/mocks.h"
@@ -924,6 +923,8 @@ TEST_P(ProxyProtocolTest, V2PartialRead) {
   disconnect();
 }
 
+const std::string ProxyProtocol = "envoy.filters.listener.proxy_protocol";
+
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -952,9 +953,9 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1045,9 +1046,9 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(2, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
   EXPECT_EQ(1, fields.count("PP2 vpc id"));
@@ -1099,9 +1100,9 @@ TEST_P(ProxyProtocolTest, V2WillNotOverwriteTLV) {
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ListenerFilters::ListenerFilterNames::get().ProxyProtocol));
+  EXPECT_EQ(1, metadata.count(ProxyProtocol));
 
-  auto fields = metadata.at(ListenerFilters::ListenerFilterNames::get().ProxyProtocol).fields();
+  auto fields = metadata.at(ProxyProtocol).fields();
   EXPECT_EQ(1, fields.size());
   EXPECT_EQ(1, fields.count("PP2 type authority"));
 
@@ -1437,11 +1438,10 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
 }
 
 TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
-  Server::Configuration::NamedListenerFilterConfigFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::NamedListenerFilterConfigFactory>::
-          getFactory(ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  Server::Configuration::NamedListenerFilterConfigFactory* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(ProxyProtocol);
 
-  EXPECT_EQ(factory->name(), ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
+  EXPECT_EQ(factory->name(), ProxyProtocol);
 
   const std::string yaml = R"EOF(
       rules:

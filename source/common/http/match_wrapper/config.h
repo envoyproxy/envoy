@@ -4,7 +4,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Common {

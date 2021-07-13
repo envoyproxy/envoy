@@ -51,6 +51,71 @@ licenses(["notice"])  # Apache 2
 api_proto_package($fields)
 """)
 
+IGNORED_V2_PROTOS = [
+    "envoy/config/accesslog/v2",
+    "envoy/config/cluster/aggregate/v2alpha",
+    "envoy/config/cluster/redis",
+    "envoy/config/common/tap/v2alpha",
+    "envoy/config/filter/dubbo/router/v2alpha1",
+    "envoy/config/filter/http/adaptive_concurrency/v2alpha",
+    "envoy/config/filter/http/aws_lambda/v2alpha",
+    "envoy/config/filter/http/aws_request_signing/v2alpha",
+    "envoy/config/filter/http/buffer/v2",
+    "envoy/config/filter/http/cache/v2alpha",
+    "envoy/config/filter/http/cors/v2",
+    "envoy/config/filter/http/csrf/v2",
+    "envoy/config/filter/http/dynamic_forward_proxy/v2alpha",
+    "envoy/config/filter/http/dynamo/v2",
+    "envoy/config/filter/http/fault/v2",
+    "envoy/config/filter/http/grpc_http1_bridge/v2",
+    "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1",
+    "envoy/config/filter/http/grpc_stats/v2alpha",
+    "envoy/config/filter/http/grpc_web/v2",
+    "envoy/config/filter/http/header_to_metadata/v2",
+    "envoy/config/filter/http/jwt_authn/v2alpha",
+    "envoy/config/filter/http/lua/v2",
+    "envoy/config/filter/http/on_demand/v2",
+    "envoy/config/filter/http/original_src/v2alpha1",
+    "envoy/config/filter/http/rate_limit/v2",
+    "envoy/config/filter/http/rbac/v2",
+    "envoy/config/filter/http/router/v2",
+    "envoy/config/filter/http/squash/v2",
+    "envoy/config/filter/http/tap/v2alpha",
+    "envoy/config/filter/http/transcoder/v2",
+    "envoy/config/filter/listener/http_inspector/v2",
+    "envoy/config/filter/listener/original_dst/v2",
+    "envoy/config/filter/listener/original_src/v2alpha1",
+    "envoy/config/filter/listener/proxy_protocol/v2",
+    "envoy/config/filter/listener/tls_inspector/v2",
+    "envoy/config/filter/network/client_ssl_auth/v2",
+    "envoy/config/filter/network/direct_response/v2",
+    "envoy/config/filter/network/dubbo_proxy/v2alpha1",
+    "envoy/config/filter/network/echo/v2",
+    "envoy/config/filter/network/ext_authz/v2",
+    "envoy/config/filter/network/kafka_broker/v2alpha1",
+    "envoy/config/filter/network/local_rate_limit/v2alpha",
+    "envoy/config/filter/network/mongo_proxy/v2",
+    "envoy/config/filter/network/mysql_proxy/v1alpha1",
+    "envoy/config/filter/network/rate_limit/v2",
+    "envoy/config/filter/network/rbac/v2",
+    "envoy/config/filter/network/sni_cluster/v2",
+    "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
+    "envoy/config/filter/thrift/rate_limit/v2alpha1",
+    "envoy/config/filter/udp/udp_proxy/v2alpha",
+    "envoy/config/grpc_credential/v2alpha",
+    "envoy/config/ratelimit/v2",
+    "envoy/config/rbac/v2",
+    "envoy/config/retry/omit_host_metadata/v2",
+    "envoy/config/retry/previous_priorities",
+    "envoy/config/transport_socket/raw_buffer/v2",
+    "envoy/config/transport_socket/tap/v2alpha",
+    "envoy/data/cluster/v2alpha",
+    "envoy/data/dns/v2alpha",
+    "envoy/data/core/v2alpha",
+    "envoy/service/event_reporting/v2alpha",
+    "envoy/service/trace/v2",
+]
+
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
 PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
@@ -239,8 +304,10 @@ def get_previous_message_type_deps(proto_path):
     matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
     deps = []
     for m in matches:
-        target = '//%s:pkg' % get_directory_from_package(m)
-        deps.append(target)
+        pkg = get_directory_from_package(m)
+        if pkg in IGNORED_V2_PROTOS:
+            continue
+        deps.append('//%s:pkg' % pkg)
     return deps
 
 
@@ -327,6 +394,9 @@ def generate_current_api_dir(api_dir, dst_dir):
     # so we ignore it here.
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
+    for proto in IGNORED_V2_PROTOS:
+        shutil.rmtree(str(dst.joinpath(proto[6:])))
+
 
 def git_status(path):
     return subprocess.check_output(['git', 'status', '--porcelain', str(path)]).decode()
@@ -387,7 +457,7 @@ def sync(api_root, mode, is_ci, labels, shadow):
                     if shadow else '.next_major_version_candidate.proto'))
         dst_src_paths = defaultdict(list)
         for path in paths:
-            if os.stat(path).st_size > 0:
+            if os.path.exists(path) and os.stat(path).st_size > 0:
                 abs_dst_path, rel_dst_path = get_abs_rel_destination_path(dst_dir, path)
                 if should_sync(path, api_proto_modified_files, py_tools_modified_files):
                     dst_src_paths[abs_dst_path].append(path)

@@ -294,7 +294,8 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false, bool http3 = false);
+  void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
+                            bool use_alternate_protocols_cache = false);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -373,8 +374,7 @@ private:
 
   // Configure a tap transport socket for a cluster/filter chain.
   void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket,
-                             const Protobuf::Message* tls_config);
+                             envoy::config::core::v3::TransportSocket& transport_socket);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;

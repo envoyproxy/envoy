@@ -1794,8 +1794,8 @@ TEST_F(LuaHttpFilterTest, GetRequestedServerName) {
   setup(SCRIPT);
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
-  std::string server_name = "foo.example.com";
-  EXPECT_CALL(stream_info_, requestedServerName()).WillOnce(ReturnRef(server_name));
+  absl::string_view server_name = "foo.example.com";
+  stream_info_.downstream_address_provider_->setRequestedServerName(server_name);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo.example.com")));
@@ -2185,7 +2185,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(nullptr));
 
   Http::TestRequestHeaderMapImpl request_headers_1{{":path", "/"}};
@@ -2193,7 +2193,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterDisabled) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_1, true));
   EXPECT_EQ("world", request_headers_1.get_("hello"));
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers_2{{":path", "/"}};
@@ -2229,7 +2229,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodes) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
@@ -2258,7 +2258,7 @@ TEST_F(LuaHttpFilterTest, LuaFilterRefSourceCodeNotExist) {
   setupConfig(proto_config, per_route_proto_config);
   setupFilter();
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+  ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig("envoy.filters.http.lua"))
       .WillByDefault(Return(per_route_config_.get()));
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};

@@ -22,7 +22,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "source/extensions/filters/listener/well_known_names.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
@@ -372,7 +371,7 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
                                       tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? ListenerFilterNames::get().ProxyProtocol
+                                     ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
 
       ProtobufWkt::Struct metadata(

@@ -42,7 +42,6 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],

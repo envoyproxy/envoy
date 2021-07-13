@@ -703,9 +703,6 @@ TEST_P(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
   // shouldn't be called because the connection is closed.
   quic_stream_->encodeData(buffer, false);
-  EXPECT_GT(quic_session_.bytesToSend(), 0u);
-  // Clearing watermark buffer accounting takes effect is the next event loop.
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(quic_session_.bytesToSend(), 0u);
 }
 

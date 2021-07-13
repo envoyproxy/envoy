@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/extensions/access_loggers/open_telemetry:grpc_access_log_lib",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//envoy/common:time_interface",
         "//source/common/protobuf",
@@ -52,7 +52,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
@@ -65,7 +65,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "access_log_integration_test",
     srcs = ["access_log_integration_test.cc"],
-    extension_name = "envoy.access_loggers.open_telemetry",
+    extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
