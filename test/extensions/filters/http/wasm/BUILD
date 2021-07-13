@@ -34,7 +34,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
-    extension_name = "envoy.filters.http.wasm",
+    extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
     deps = [
         "//source/common/http:message_lib",
@@ -55,7 +55,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
-    extension_name = "envoy.filters.http.wasm",
+    extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
     deps = [
         "//source/common/common:base64_lib",

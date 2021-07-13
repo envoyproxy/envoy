@@ -21,7 +21,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 typename ConnPoolMap<KEY_TYPE, POOL_TYPE>::PoolOptRef
-ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory& factory) {
+ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& factory) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   // TODO(klarose): Consider how we will change the connection pool's configuration in the future.
   // The plan is to change the downstream socket options... We may want to take those as a parameter
@@ -53,26 +53,11 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(const KEY_TYPE& key, const PoolFactory
   auto new_pool = factory();
   connPoolResource.inc();
   for (const auto& cb : cached_callbacks_) {
-    new_pool->addIdleCallback(cb);
+    new_pool->addDrainedCallback(cb);
   }
 
   auto inserted = active_pools_.emplace(key, std::move(new_pool));
   return std::ref(*inserted.first->second);
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
-bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::erasePool(const KEY_TYPE& key) {
-  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
-  auto pool_iter = active_pools_.find(key);
-
-  if (pool_iter != active_pools_.end()) {
-    thread_local_dispatcher_.deferredDelete(std::move(pool_iter->second));
-    active_pools_.erase(pool_iter);
-    host_->cluster().resourceManager(priority_).connectionPools().dec();
-    return true;
-  } else {
-    return false;
-  }
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -89,42 +74,20 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addIdleCallback(const IdleCb& cb) {
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
-    pool_pair.second->addIdleCallback(cb);
+    pool_pair.second->addDrainedCallback(cb);
   }
 
   cached_callbacks_.emplace_back(std::move(cb));
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::startDrain() {
-  // Copy the `active_pools_` so that it is safe for the call to result
-  // in deletion, and avoid iteration through a mutating container.
-  std::vector<POOL_TYPE*> pools;
-  pools.reserve(active_pools_.size());
-  for (auto& pool_pair : active_pools_) {
-    pools.push_back(pool_pair.second.get());
-  }
-
-  for (auto* pool : pools) {
-    pool->startDrain();
-  }
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
 void ConnPoolMap<KEY_TYPE, POOL_TYPE>::drainConnections() {
-  // Copy the `active_pools_` so that it is safe for the call to result
-  // in deletion, and avoid iteration through a mutating container.
-  std::vector<POOL_TYPE*> pools;
-  pools.reserve(active_pools_.size());
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
-    pools.push_back(pool_pair.second.get());
-  }
-
-  for (auto* pool : pools) {
-    pool->drainConnections();
+    pool_pair.second->drainConnections();
   }
 }
 
