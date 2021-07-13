@@ -241,8 +241,29 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
   ASSERT(false);
 }
 void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
-  // TODO(XXX)
-  //ASSERT(connect_finished_);
+  if (connect_finished_) {
+    connections_[0]->close(type);
+    return;
+  }
+
+  connect_finished_ = true;
+  next_attempt_timer_->disableTimer();
+  for (size_t i = 0; i < connections_.size(); ++i) {
+    connections_[i]->removeConnectionCallbacks(*callbacks_wrappers_[i]);
+    if (i != 0) {
+      // Wait to close the final connection until the post-connection callbacks
+      // have been added.
+      connections_[i]->close(ConnectionCloseType::NoFlush);
+    }
+  }
+  connections_.resize(1);
+  callbacks_wrappers_.clear();
+
+  for (auto cb : post_connect_state_.connection_callbacks_) {
+    if (cb) {
+      connections_[0]->addConnectionCallbacks(*cb);
+    }
+  }
   connections_[0]->close(type);
 }
 

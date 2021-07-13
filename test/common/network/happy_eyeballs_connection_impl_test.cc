@@ -262,6 +262,35 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled){
   impl_->detectEarlyCloseWhenReadDisabled(false);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttempt) {
+  EXPECT_CALL(*created_connections_[0], connect());
+  impl_->connect();
+
+  // Let the first attempt timeout to start the second attempt.
+  next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
+  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(
+      testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
+  EXPECT_CALL(*next_connections_.back(), connect());
+  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(1);
+  failover_timer_->invokeCallback();
+
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
+
+  impl_->close(ConnectionCloseType::FlushWrite);
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, CloseAfterAttemptComplete) {
+  connectFirstAttempt();
+
+  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::FlushWrite));
+  impl_->close(ConnectionCloseType::FlushWrite);
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter){
   MockReadFilterCallbacks callbacks;
   ReadFilterSharedPtr filter = std::make_shared<MockReadFilter>();
