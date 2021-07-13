@@ -44,8 +44,7 @@ void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version) {
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
   EXPECT_CALL(context, getServerFactoryContext())
-      .Times(1)
-      .WillOnce(testing::ReturnRef(server_context));
+      .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(server_context, singletonManager());
   EXPECT_CALL(context, threadLocal());
   EXPECT_CALL(context, messageValidationVisitor());
@@ -119,6 +118,9 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+  EXPECT_CALL(context, getServerFactoryContext())
+      .WillRepeatedly(testing::ReturnRef(server_context));
   EXPECT_CALL(context, messageValidationVisitor());
   EXPECT_CALL(context, clusterManager());
   EXPECT_CALL(context, runtime());
@@ -143,6 +145,9 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
   // Trigger the throw in the Envoy gRPC branch.
   {
     testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+    EXPECT_CALL(context, getServerFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(server_context));
     EXPECT_CALL(context, messageValidationVisitor());
     EXPECT_CALL(context, runtime());
     EXPECT_CALL(context, scope());
@@ -162,6 +167,9 @@ TEST(HttpExtAuthzConfigTest, DEPRECATED_FEATURE_TEST(UseAlphaFieldIsNoLongerSupp
     proto_config.mutable_grpc_service()->set_allocated_google_grpc(google_grpc);
 
     testing::StrictMock<Server::Configuration::MockFactoryContext> context;
+    testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
+    EXPECT_CALL(context, getServerFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(server_context));
     EXPECT_CALL(context, messageValidationVisitor());
     EXPECT_CALL(context, runtime());
     EXPECT_CALL(context, scope());
