@@ -182,7 +182,7 @@ protected:
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
    * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
-   * feature value (or uint32_t max value if not set), all headers are added to a map, to allow
+   * feature value (defaults to 3, if not set), all headers are added to a map, to allow
    * fast access given a header key. Once the map is initialized, it will be used even if the number
    * of headers decreases below the threshold.
    *
