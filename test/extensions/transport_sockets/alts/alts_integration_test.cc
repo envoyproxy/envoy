@@ -225,7 +225,8 @@ public:
         [&contain_peer_name](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
           const std::string key{header.key().getStringView()};
           const std::string value{header.value().getStringView()};
-          if (key == "envoy.transport_sockets.alts.peer_identity" && value == "peer_identity") {
+          if (key == "envoy.transport_sockets.peer_information.peer_identity" &&
+              value == "peer_identity") {
             contain_peer_name = true;
           }
           return Http::HeaderMap::Iterate::Continue;
