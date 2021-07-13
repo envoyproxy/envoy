@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "hotkey_impl_test",
     srcs = ["hotkey_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/extensions/filters/network/redis_proxy/hotkey:hotkey_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",

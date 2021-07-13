@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "lfu_cache_impl_test",
     srcs = ["lfu_cache_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
+    extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/extensions/filters/network/redis_proxy/hotkey/cache/lfucache:lfu_cache_lib",
     ],
