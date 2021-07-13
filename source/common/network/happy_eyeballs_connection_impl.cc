@@ -166,9 +166,9 @@ void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
 }
 
 uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
-  // XXX
-  // TODO - huh?
-  //ASSERT(connect_finished_);
+  if (!connect_finished_) {
+    return 0;
+  }
   return connections_[0]->bufferLimit();
 }
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
