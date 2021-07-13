@@ -1231,7 +1231,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
   {
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
+      container->do_not_delete_ = true;
       container->pools_->drainConnections();
+      container->do_not_delete_ = false;
+
+      if (container->pools_->size() == 0) {
+        host_http_conn_pool_map_.erase(host);
+      }
     }
   }
   {

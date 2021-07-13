@@ -1824,6 +1824,54 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Test that we close all HTTP connection pool connections when there is a host health failure.
+// Verify that the pool gets deleted if it is idle, and that a crash does not occur due to
+// deleting a container while iterating through it (see `do_not_delete_` in
+// `ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure()`).
+TEST_F(ClusterManagerImplTest, CloseHttpConnectionsAndDeletePoolOnHealthFailure) {
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("some_cluster")}));
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "some_cluster";
+  HostSharedPtr test_host = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {test_host};
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+
+  MockHealthChecker health_checker;
+  ON_CALL(*cluster1, healthChecker()).WillByDefault(Return(&health_checker));
+
+  Outlier::MockDetector outlier_detector;
+  ON_CALL(*cluster1, outlierDetector()).WillByDefault(Return(&outlier_detector));
+
+  Http::ConnectionPool::MockInstance* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
+
+  InSequence s;
+
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(outlier_detector, addChangedStateCb(_));
+  EXPECT_CALL(*cluster1, initialize(_))
+      .WillOnce(Invoke([cluster1](std::function<void()> initialize_callback) {
+        // Test inline init.
+        initialize_callback();
+      }));
+  create(parseBootstrapFromV3Json(json));
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
+  cluster_manager_->getThreadLocalCluster("some_cluster")
+      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
+
+  outlier_detector.runCallbacks(test_host);
+  health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
+
+  EXPECT_CALL(*cp1, drainConnections()).WillOnce(Invoke([&]() { cp1->idle_cb_(); }));
+  test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  outlier_detector.runCallbacks(test_host);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 // Test that we close all TCP connection pool connections when there is a host health failure.
 TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
