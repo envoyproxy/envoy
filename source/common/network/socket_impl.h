@@ -85,7 +85,7 @@ public:
   // Network::Socket
   SocketAddressSetter& addressProvider() override { return *address_provider_; }
   const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  SocketAddressSetterSharedPtr addressProviderSharedPtr() const override {
     return address_provider_;
   }
   SocketPtr duplicate() override {
