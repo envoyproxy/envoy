@@ -128,6 +128,7 @@ private:
   struct PerConnectionState {
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
+    absl::optional<const ConnectionStats*> connection_stats_;
   };
 
   // State which needs to be saved and applied only to the final connection
