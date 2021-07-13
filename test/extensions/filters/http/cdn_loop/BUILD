@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.cdn_loop",
+    extension_names = ["envoy.filters.http.cdn_loop"],
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
         "//test/mocks/http:http_mocks",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "filter_integration_test",
     srcs = ["filter_integration_test.cc"],
-    extension_name = "envoy.filters.http.cdn_loop",
+    extension_names = ["envoy.filters.http.cdn_loop"],
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
         "//test/integration:http_protocol_integration_lib",

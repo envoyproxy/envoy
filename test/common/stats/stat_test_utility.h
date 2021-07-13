@@ -49,7 +49,8 @@ public:
  * @param num_clusters the number of clusters for which to generate stats.
  * @param fn the function to call with every stat name.
  */
-void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn);
+void forEachSampleStat(int num_clusters, bool include_other_stats,
+                       std::function<void(absl::string_view)> fn);
 
 // Tracks memory consumption over a span of time. Test classes instantiate a
 // MemoryTest object to start measuring heap memory, and call consumedBytes() to
@@ -185,7 +186,9 @@ private:
   do {                                                                                             \
     if (Stats::TestUtil::MemoryTest::mode() != Stats::TestUtil::MemoryTest::Mode::Disabled) {      \
       EXPECT_LE(consumed_bytes, upper_bound);                                                      \
-      EXPECT_GT(consumed_bytes, 0);                                                                \
+      if (upper_bound != 0) {                                                                      \
+        EXPECT_GT(consumed_bytes, 0);                                                              \
+      }                                                                                            \
     } else {                                                                                       \
       ENVOY_LOG_MISC(                                                                              \
           info, "Skipping upper-bound memory test against {} bytes as platform lacks tcmalloc",    \

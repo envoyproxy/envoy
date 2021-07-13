@@ -186,7 +186,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   } else if (value == RequestedServerName) {
     return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {
-    auto id = info_.connectionID();
+    auto id = info_.downstreamAddressProvider().connectionID();
     if (id.has_value()) {
       return CelValue::CreateUint64(id.value());
     }

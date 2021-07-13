@@ -1,5 +1,6 @@
 # Script for collecting PRs in need of review, and informing maintainers via
-# slack
+# slack.
+# NOTE: Slack IDs can be found in the user's full profile from within Slack.
 
 from __future__ import print_function
 
@@ -27,6 +28,7 @@ MAINTAINERS = {
     'wrowe': 'UBQR8NGBS',
     'yanavlasov': 'UJHLR5KFS',
     'asraa': 'UKZKCFRTP',
+    'davinci26': 'U013608CUDV',
 }
 
 # Only notify API reviewers who aren't maintainers.
