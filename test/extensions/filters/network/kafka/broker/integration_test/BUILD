@@ -23,7 +23,7 @@ envoy_extension_py_test(
         "//bazel:remote_jdk11",
         "@kafka_server_binary//:all",
     ] + glob(["*.j2"]),
-    extension_name = "envoy.filters.network.kafka_broker",
+    extension_names = ["envoy.filters.network.kafka_broker"],
     flaky = True,
     python_version = "PY3",
     srcs_version = "PY3",

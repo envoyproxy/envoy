@@ -122,16 +122,11 @@ WasmResult Buffer::copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t 
 WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) {
   if (buffer_instance_) {
     if (start == 0) {
-      if (length == 0) {
-        buffer_instance_->prepend(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else if (length >= buffer_instance_->length()) {
-        buffer_instance_->drain(buffer_instance_->length());
-        buffer_instance_->add(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else {
-        return WasmResult::BadArgument;
+      if (length != 0) {
+        buffer_instance_->drain(length);
       }
+      buffer_instance_->prepend(toAbslStringView(data));
+      return WasmResult::Ok;
     } else if (start >= buffer_instance_->length()) {
       buffer_instance_->add(toAbslStringView(data));
       return WasmResult::Ok;
