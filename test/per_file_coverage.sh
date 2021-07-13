@@ -66,7 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:85.7"
 "source/server:94.4" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:95.8"
-"source/server/config_validation:78.7"
+"source/server/config_validation:78.3"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
