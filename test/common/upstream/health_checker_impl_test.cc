@@ -1074,7 +1074,7 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
 }
 
 MATCHER_P(ApplicationProtocolListEq, expected, "") {
-  const Network::TransportSocketOptionsSharedPtr& options = arg;
+  const Network::TransportSocketOptionsConstSharedPtr& options = arg;
   EXPECT_EQ(options->applicationProtocolListOverride(), std::vector<std::string>{expected});
   return true;
 }

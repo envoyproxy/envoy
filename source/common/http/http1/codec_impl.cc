@@ -469,7 +469,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
       dispatching_(false), no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
                                "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
-      output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),

@@ -75,9 +75,6 @@ public:
 
 class ActiveQuicListenerTest : public QuicMultiVersionTest {
 protected:
-  using Socket =
-      Network::NetworkListenSocket<Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>;
-
   ActiveQuicListenerTest()
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
@@ -198,6 +195,9 @@ protected:
       read_filters_.push_back(std::move(read_filter));
       // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
       // calls for the same object.
+      EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(transport_socket_factory_));
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
@@ -205,7 +205,8 @@ protected:
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
+    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
+                                                                    local_address_, nullptr));
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
         connection_id, clock_, envoyIpAddressToQuicSocketAddress(local_address_->ip()),
@@ -314,13 +315,14 @@ protected:
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
-  std::list<std::unique_ptr<Socket>> client_sockets_;
+  std::list<std::unique_ptr<Network::SocketImpl>> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
   Network::MockFilterChainManager filter_chain_manager_;
   // The following two containers must guarantee pointer stability as addresses
   // of elements are saved in expectations before new elements are added.
   std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
+  Network::MockTransportSocketFactory transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};

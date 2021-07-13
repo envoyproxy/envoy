@@ -31,6 +31,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -300,7 +301,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
   EXPECT_CALL(*factory, createTransportSocket(_))
       .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
+          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
             EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http11);
@@ -946,16 +947,17 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   InSequence s;
   ReadyWatcher drained;
 
-  EXPECT_CALL(drained, ready());
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
-
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
+
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
+
   r2.handle_->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   conn_pool_->expectEnableUpstreamReady();
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   r1.startRequest();
 
   r1.completeResponse(false);
@@ -975,10 +977,11 @@ TEST_F(Http1ConnPoolImplTest, DrainWhileConnecting) {
   Http::ConnectionPool::Cancellable* handle = conn_pool_->newStream(outer_decoder, callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
+  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
+  conn_pool_->startDrain();
   EXPECT_CALL(*conn_pool_->test_clients_[0].connection_,
               close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   handle->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onClientDestroy());

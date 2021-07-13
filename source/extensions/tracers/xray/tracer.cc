@@ -97,10 +97,10 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Http::RequestHeaderMap& request_headers) {
+void Span::injectContext(Tracing::TraceContext& trace_context) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
+  trace_context.setTraceContextReferenceKey(XRayTraceHeader, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,

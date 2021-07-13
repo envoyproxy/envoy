@@ -26,13 +26,13 @@ public:
                const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsSharedPtr, ClusterConnectivityState& state));
+               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState& state));
 
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

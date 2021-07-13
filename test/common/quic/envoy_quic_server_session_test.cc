@@ -127,11 +127,12 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
   std::string name() const override { return "quic.test_crypto_server_stream"; }
 
-  std::unique_ptr<quic::QuicCryptoServerStreamBase>
-  createEnvoyQuicCryptoServerStream(const quic::QuicCryptoServerConfig* crypto_config,
-                                    quic::QuicCompressedCertsCache* compressed_certs_cache,
-                                    quic::QuicSession* session,
-                                    quic::QuicCryptoServerStreamBase::Helper* helper) override {
+  std::unique_ptr<quic::QuicCryptoServerStreamBase> createEnvoyQuicCryptoServerStream(
+      const quic::QuicCryptoServerConfig* crypto_config,
+      quic::QuicCompressedCertsCache* compressed_certs_cache, quic::QuicSession* session,
+      quic::QuicCryptoServerStreamBase::Helper* helper,
+      OptRef<const Network::TransportSocketFactory> /*transport_socket_factory*/,
+      Event::Dispatcher& /*dispatcher*/) override {
     switch (session->connection()->version().handshake_protocol) {
     case quic::PROTOCOL_QUIC_CRYPTO:
       return std::make_unique<TestQuicCryptoServerStream>(crypto_config, compressed_certs_cache,
@@ -166,7 +167,8 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_),
+                            crypto_stream_factory_,
+                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {

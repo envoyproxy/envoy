@@ -18,7 +18,7 @@ class StartTlsSocket : public Network::TransportSocket, Logger::Loggable<Logger:
 public:
   StartTlsSocket(Network::TransportSocketPtr raw_socket, // RawBufferSocket
                  Network::TransportSocketPtr tls_socket, // TlsSocket
-                 const Network::TransportSocketOptionsSharedPtr&)
+                 const Network::TransportSocketOptionsConstSharedPtr&)
       : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
@@ -74,7 +74,7 @@ public:
         tls_socket_factory_(std::move(tls_socket_factory)) {}
 
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
   bool implementsSecureTransport() const override { return false; }
   bool usesProxyProtocolOptions() const override { return false; }
 

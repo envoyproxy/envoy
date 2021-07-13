@@ -477,7 +477,6 @@ TEST_P(WasmCommonTest, Utilities) {
               buffer.copyTo(wasm.get(), 0, 1, 1 << 30 /* bad pointer location */, 0));
     EXPECT_EQ(WasmResult::InvalidMemoryAccess,
               buffer.copyTo(wasm.get(), 0, 1, 0, 1 << 30 /* bad size location */));
-    EXPECT_EQ(WasmResult::BadArgument, buffer.copyFrom(0, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, buffer.copyFrom(1, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, const_buffer.copyFrom(1, 1, data));
     EXPECT_EQ(WasmResult::BadArgument, string_buffer.copyFrom(1, 1, data));
@@ -1418,7 +1417,8 @@ public:
   }
 
   void setupContext() {
-    context_ = std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_);
+    context_ =
+        std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_handle_);
     context_->onCreate();
   }
 

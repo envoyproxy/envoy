@@ -8,6 +8,7 @@
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
+#include "source/common/common/random_generator.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -16,9 +17,12 @@
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
 #include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/extensions/filters/network/http_connection_manager/config_test_base.h"
+#include "test/mocks/common.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -557,8 +561,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(100, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(10000, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -591,8 +595,8 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   EXPECT_EQ(200, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(300, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -625,9 +629,61 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   EXPECT_EQ(20, config.tracingConfig()->random_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
-  EXPECT_EQ(0, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+  EXPECT_EQ(30, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  tracing:
+    client_sampling:
+      value: 0.1
+    random_sampling:
+      value: 0.1
+    overall_sampling:
+      value: 0.1
+  http_filters:
+  - name: envoy.filters.http.router
+ )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string, false),
+                                     context_, date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  Stats::TestUtil::TestStore store;
+  Api::ApiPtr api = Api::createApiForTest(store);
+
+  Event::MockDispatcher dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  Random::MockRandomGenerator generator;
+  envoy::config::bootstrap::v3::LayeredRuntime runtime_config;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  Runtime::LoaderImpl runtime(dispatcher, tls, runtime_config, local_info, store, generator,
+                              validation_visitor, *api);
+
+  int sampled_count = 0;
+  NiceMock<Router::MockRoute> route;
+  Envoy::Random::RandomGeneratorImpl rand;
+  for (int i = 0; i < 1000000; i++) {
+    Envoy::Http::TestRequestHeaderMapImpl header{{"x-request-id", rand.uuid()}};
+    config.requestIDExtension()->setTraceReason(header, Envoy::Tracing::Reason::Sampling);
+    auto reason = Envoy::Http::ConnectionManagerUtility::mutateTracingRequestHeader(header, runtime,
+                                                                                    config, &route);
+    if (reason == Envoy::Tracing::Reason::Sampling) {
+      sampled_count++;
+    }
+  }
+
+  EXPECT_LE(900, sampled_count);
+  EXPECT_GE(1100, sampled_count);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
@@ -892,6 +948,27 @@ TEST_F(HttpConnectionManagerConfigTest, ServerPassThrough) {
                                      filter_config_provider_manager_);
   EXPECT_EQ(HttpConnectionManagerConfig::HttpConnectionManagerProto::PASS_THROUGH,
             config.serverHeaderTransformation());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, SchemeOverwrite) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  scheme_header_transformation:
+    scheme_to_overwrite: http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(config.schemeToSet(), "http");
 }
 
 // Validated that by default we don't normalize paths
@@ -1497,7 +1574,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1527,7 +1603,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 access_log:
 - name: accesslog
   typed_config:
@@ -1567,7 +1642,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 1024
   custom_settings_parameters: { identifier: 3, value: 2048 }
@@ -1596,7 +1670,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1630,7 +1703,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 8, value: 0 }
@@ -1654,7 +1726,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   allow_connect: true
   )EOF";
@@ -1678,7 +1749,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters: { identifier: 2, value: 1 }
   )EOF";
@@ -1703,7 +1773,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: encoder-decoder-buffer-filter
-  typed_config: {}
 http2_protocol_options:
   hpack_table_size: 2048
   max_concurrent_streams: 4096
@@ -1736,7 +1805,6 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.filters.http.router
-  typed_config: {}
 http2_protocol_options:
   custom_settings_parameters:
     - { identifier: 10, value: 0 }
@@ -1809,7 +1877,7 @@ public:
     return Tracing::Reason::Sampling;
   }
   void setTraceReason(Http::RequestHeaderMap&, Tracing::Reason) override {}
-
+  bool useRequestIdForTraceSampling() const override { return true; }
   std::string testField() { return config_.test_field(); }
 
 private:
@@ -1924,6 +1992,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtension) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_TRUE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), true);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
@@ -1935,6 +2004,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
       pack_trace_reason: false
+      use_request_id_for_trace_sampling: false
   http_filters:
   - name: envoy.filters.http.router
   )EOF";
@@ -1947,6 +2017,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultRequestIDExtensionWithParams) {
       config.requestIDExtension().get());
   ASSERT_NE(nullptr, request_id_extension);
   EXPECT_FALSE(request_id_extension->packTraceReason());
+  EXPECT_EQ(request_id_extension->useRequestIdForTraceSampling(), false);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {

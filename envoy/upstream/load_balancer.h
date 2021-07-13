@@ -82,7 +82,7 @@ public:
   /**
    * Returns the transport socket options which should be applied on upstream connections
    */
-  virtual Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const PURE;
+  virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 };
 
 /**

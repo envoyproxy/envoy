@@ -43,6 +43,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/expr:cel_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@com_google_cel_cpp//eval/public:activation",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
         "@proxy_wasm_cpp_host//:headers",
         "@proxy_wasm_cpp_sdk//:common_lib",
