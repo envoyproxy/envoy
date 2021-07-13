@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -34,7 +35,7 @@ static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_acco
 
 class BufferMemoryAccountTest : public testing::Test {
 protected:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{kMinimumBalanceToTrack};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 
@@ -474,6 +475,18 @@ TEST_F(BufferMemoryAccountTest, RemainsInSameBucketIfChangesWithinThreshold) {
 
   account->credit(getBalance(account));
   account->clearDownstream();
+}
+
+TEST(WatermarkBufferFactoryTest, CanConfigureMinimumTrackingAmount) {
+  TrackedWatermarkBufferFactory factory(4);
+  EXPECT_EQ(factory.bitshift(), 2);
+}
+
+TEST(WatermarkBufferFactoryTest, ReleaseAssertIfAccountTrackingThresholdBytesIsNotPowerOfTwo) {
+  envoy::config::bootstrap::v3::BufferFactoryConfig config;
+  config.set_account_tracking_threshold_bytes(3);
+  EXPECT_DEATH(WatermarkBufferFactory{config},
+               "Expected account_tracking_threshold_bytes to be a power of two.");
 }
 
 } // namespace

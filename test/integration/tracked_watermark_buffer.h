@@ -61,7 +61,9 @@ private:
 // Factory that tracks how the created buffers are used.
 class TrackedWatermarkBufferFactory : public WatermarkBufferFactory {
 public:
-  TrackedWatermarkBufferFactory() = default;
+  // Use the default minimum tracking threshold.
+  TrackedWatermarkBufferFactory();
+  TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes);
   ~TrackedWatermarkBufferFactory() override;
   // Buffer::WatermarkFactory
   Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,

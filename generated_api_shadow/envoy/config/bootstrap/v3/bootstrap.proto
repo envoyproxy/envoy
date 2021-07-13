@@ -40,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -216,6 +216,8 @@ message Bootstrap {
     (udpa.annotations.security).configure_for_untrusted_downstream = true,
     (udpa.annotations.security).configure_for_untrusted_upstream = true
   ];
+
+  BufferFactoryConfig buffer_factory_config = 33;
 
   // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
   // Note that this records a value for each iteration of the event loop on every thread. This
@@ -645,4 +647,17 @@ message CustomInlineHeader {
 
   // The type of the header that is expected to be set as the inline header.
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+// Configuration for the Buffer Factories that create Buffers and Accounts.
+message BufferFactoryConfig {
+  // The minimum account size at which Envoy starts tracking a stream.
+  // This *MUST* be a power of two.
+  //
+  // Envoy has 8 power of two buckets starting from this value.
+  // Concretely the 1st bucket contains accounts for streams that use
+  // [account_tracking_threshold_bytes, 2 * account_tracking_threshold_bytes).
+  // With the 8th bucket tracking accounts
+  // >= 128 * account_tracking_threshold_bytes.
+  uint32 account_tracking_threshold_bytes = 1 [(validate.rules).uint32 = {gt: 0}];
 }

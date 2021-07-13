@@ -8,8 +8,9 @@ namespace Api {
 
 ValidationImpl::ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
                                Event::TimeSystem& time_system, Filesystem::Instance& file_system,
-                               Random::RandomGenerator& random_generator)
-    : Impl(thread_factory, stats_store, time_system, file_system, random_generator),
+                               Random::RandomGenerator& random_generator,
+                               const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+    : Impl(thread_factory, stats_store, time_system, file_system, random_generator, bootstrap),
       time_system_(time_system) {}
 
 Event::DispatcherPtr ValidationImpl::allocateDispatcher(const std::string& name) {

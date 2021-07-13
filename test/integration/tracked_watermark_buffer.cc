@@ -9,6 +9,15 @@
 namespace Envoy {
 namespace Buffer {
 
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory() : TrackedWatermarkBufferFactory(0) {}
+
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes)
+    : WatermarkBufferFactory([min_tracking_bytes]() {
+        auto config = envoy::config::bootstrap::v3::BufferFactoryConfig();
+        config.set_account_tracking_threshold_bytes(min_tracking_bytes);
+        return config;
+      }()) {}
+
 TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
   ASSERT(active_buffer_count_ == 0);
 }
