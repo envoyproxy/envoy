@@ -25,7 +25,6 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::AtLeast;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -105,9 +104,7 @@ public:
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                bool test_new_connection_pool);
 
-  void addIdleCallback(IdleCb cb) override { conn_pool_->addIdleCallback(cb); }
-  bool isIdle() const override { return conn_pool_->isIdle(); }
-  void startDrain() override { return conn_pool_->startDrain(); }
+  void addDrainedCallback(DrainedCb cb) override { conn_pool_->addDrainedCallback(cb); }
   void drainConnections() override { conn_pool_->drainConnections(); }
   void closeConnections() override { conn_pool_->closeConnections(); }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
@@ -157,7 +154,6 @@ public:
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
   std::vector<TestConnection> test_conns_;
-  Upstream::HostSharedPtr host_;
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   bool test_new_connection_pool_;
   Network::ConnectionSocket::OptionsSharedPtr options_;
@@ -977,16 +973,16 @@ TEST_P(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
 TEST_P(TcpConnPoolImplTest, DrainCallback) {
   initialize();
   ReadyWatcher drained;
+
   EXPECT_CALL(drained, ready());
-  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Pending);
   c2.handle_->cancel(ConnectionPool::CancelPolicy::Default);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
+  EXPECT_CALL(drained, ready());
   c1.releaseConn();
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
@@ -1006,13 +1002,11 @@ TEST_P(TcpConnPoolImplTest, DrainWhileConnecting) {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_->newConnection(callbacks);
   EXPECT_NE(nullptr, handle);
 
-  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
-
+  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
   if (test_new_connection_pool_) {
     // The shared connection pool removes and closes connecting clients if there are no
     // pending requests.
-    EXPECT_CALL(drained, ready()).Times(AtLeast(1));
+    EXPECT_CALL(drained, ready());
     handle->cancel(ConnectionPool::CancelPolicy::Default);
   } else {
     handle->cancel(ConnectionPool::CancelPolicy::Default);
@@ -1032,12 +1026,11 @@ TEST_P(TcpConnPoolImplTest, DrainOnClose) {
   initialize();
   ReadyWatcher drained;
   EXPECT_CALL(drained, ready());
-  conn_pool_->addIdleCallback([&]() -> void { drained.ready(); });
-  conn_pool_->startDrain();
+  conn_pool_->addDrainedCallback([&]() -> void { drained.ready(); });
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
-  EXPECT_CALL(drained, ready()).Times(AtLeast(1));
+  EXPECT_CALL(drained, ready());
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(Network::ConnectionEvent::RemoteClose, event);
@@ -1116,25 +1109,6 @@ TEST_P(TcpConnPoolImplTest, RequestCapacity) {
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_->test_conns_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   conn_pool_->test_conns_[2].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-// Test that connections that are closed due to idle timeout causes the idle callback to be fired.
-TEST_P(TcpConnPoolImplTest, TestIdleTimeout) {
-  initialize();
-  testing::MockFunction<void()> idle_callback;
-  conn_pool_->addIdleCallback(idle_callback.AsStdFunction());
-
-  EXPECT_CALL(idle_callback, Call());
-  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
-  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-  c1.releaseConn();
-  conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  testing::MockFunction<void()> drained_callback;
-  EXPECT_CALL(idle_callback, Call());
-  conn_pool_->startDrain();
-  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
-  dispatcher_.clearDeferredDeleteList();
 }
 
 // Test that maybePreconnect is passed up to the base class implementation.
