@@ -177,8 +177,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
-  const std::string name = "envoy.stat_sinks.statsd";
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -188,7 +186,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

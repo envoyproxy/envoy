@@ -22,12 +22,10 @@ namespace Hystrix {
 namespace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = "envoy.stat_sinks.hystrix";
-
   envoy::config::metrics::v3::HystrixSink sink_config;
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Hystrix);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

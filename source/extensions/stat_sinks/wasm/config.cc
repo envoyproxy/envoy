@@ -55,7 +55,7 @@ ProtobufTypes::MessagePtr WasmSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::stat_sinks::wasm::v3::Wasm>();
 }
 
-std::string WasmSinkFactory::name() const { return "envoy.stat_sinks.wasm"; }
+std::string WasmSinkFactory::name() const { return Wasm; }
 
 /**
  * Static registration for the wasm access log. @see RegisterFactory.

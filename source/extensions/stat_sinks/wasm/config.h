@@ -13,6 +13,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace Wasm {
 
+// WebAssembly sink
+const std::string Wasm = "envoy.stat_sinks.wasm";
+
 /**
  * Config registration for the Wasm statsd sink. @see StatSinkFactory.
  */

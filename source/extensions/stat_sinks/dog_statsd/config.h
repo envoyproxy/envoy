@@ -9,6 +9,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 
+// DogStatsD compatible statsd sink
+const std::string DogStatsd = "envoy.stat_sinks.dog_statsd";
+
 /**
  * Config registration for the DogStatsD compatible statsd sink. @see StatsSinkFactory.
  */
