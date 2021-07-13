@@ -41,8 +41,7 @@ protected:
   }
 
   void initializeWithConfig(const envoy::extensions::stat_sinks::wasm::v3::Wasm& config) {
-    auto factory = Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-        "envoy.stat_sinks.wasm");
+    auto factory = Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Wasm);
     ASSERT_NE(factory, nullptr);
     api_ = Api::createApiForTest(stats_store_);
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(*api_));

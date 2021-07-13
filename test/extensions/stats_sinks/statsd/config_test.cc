@@ -25,13 +25,11 @@ namespace Statsd {
 namespace {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string name = "envoy.stat_sinks.statsd";
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -59,7 +57,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigParameterizedTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
-  const std::string name = "envoy.stat_sinks.statsd";
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
 
   envoy::config::metrics::v3::StatsdSink sink_config;
@@ -75,7 +72,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   EXPECT_EQ(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -90,7 +87,6 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
 }
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
-  const std::string name = "envoy.stat_sinks.statsd";
   const std::string customPrefix = "prefix.test";
 
   envoy::config::metrics::v3::StatsdSink sink_config;
@@ -107,7 +103,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   EXPECT_NE(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -122,14 +118,12 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
-  const std::string name = "envoy.stat_sinks.statsd";
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(sink_config.prefix(), "");
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -146,8 +140,6 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
-  const std::string name = "envoy.stat_sinks.statsd";
-
   envoy::config::metrics::v3::StatsdSink sink_config;
   std::string prefix = "prefixTest";
   sink_config.set_tcp_cluster_name("fake_cluster");
@@ -155,7 +147,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   sink_config.set_prefix(prefix);
   EXPECT_EQ(sink_config.prefix(), prefix);
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

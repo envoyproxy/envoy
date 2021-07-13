@@ -12,6 +12,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -466,7 +467,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name("envoy.stat_sinks.statsd");
+  sink.set_name(Statsd);
   addStatsdFakeClusterConfig(sink);
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
