@@ -1017,5 +1017,7 @@ message EnvoyMobileHttpConnectionManager {
       "envoy.extensions.filters.network.http_connection_manager.v3."
       "EnvoyMobileHttpConnectionManager";
 
+  // The configuration for the underlying HttpConnectionManager which will be
+  // instantiated for Envoy mobile.
   HttpConnectionManager config = 1;
 }
