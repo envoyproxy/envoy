@@ -525,7 +525,7 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
-   // The broad order of initialization from this point on is the following:
+  // The broad order of initialization from this point on is the following:
   // 1. Statically provisioned configuration (bootstrap) are loaded.
   // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
   //    provisioned statically in bootstrap, discovered through DNS or file based CDS) are
