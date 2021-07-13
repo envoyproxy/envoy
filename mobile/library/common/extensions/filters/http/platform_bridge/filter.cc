@@ -521,7 +521,7 @@ void PlatformBridgeFilter::resetIdleTimer() {
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
       // Stream idle timeout is nondirectional.
-      // self->decoder_callbacks_->resetIdleTimer();
+      self->decoder_callbacks_->resetIdleTimer();
     }
   });
 }
