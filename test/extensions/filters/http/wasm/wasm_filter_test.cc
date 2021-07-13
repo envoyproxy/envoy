@@ -2077,10 +2077,6 @@ TEST_P(WasmHttpFilterTest, PanicOnResponseTrailers) {
 }
 
 TEST_P(WasmHttpFilterTest, CloseRequest) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupTest("close_stream");
   setupFilter();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -2096,10 +2092,6 @@ TEST_P(WasmHttpFilterTest, CloseRequest) {
 }
 
 TEST_P(WasmHttpFilterTest, CloseResponse) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupTest("close_stream");
   setupFilter();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
