@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import os
 from functools import cached_property
 from typing import Sequence, Tuple, Type
@@ -275,3 +276,28 @@ class CheckerSummary(object):
         if lines:
             section += lines
         return section
+
+
+class AsyncChecker(Checker):
+    """Async version of the Checker class for use with asyncio"""
+
+    async def _run(self) -> int:
+        checks = self.get_checks()
+        await self.on_checks_begin()
+        for check in checks:
+            self.log.info(f"[CHECKS:{self.name}] {check}")
+            await getattr(self, f"check_{check}")()
+            await self.on_check_run(check)
+        return await self.on_checks_complete()
+
+    def run(self) -> int:
+        return asyncio.get_event_loop().run_until_complete(self._run())
+
+    async def on_check_run(self, check: str) -> None:
+        pass
+
+    async def on_checks_begin(self) -> None:
+        pass
+
+    async def on_checks_complete(self) -> int:
+        return super().on_checks_complete()

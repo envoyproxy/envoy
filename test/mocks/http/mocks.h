@@ -202,6 +202,7 @@ public:
   MOCK_METHOD(const Network::Connection*, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (const Router::RouteCallback&));
@@ -292,6 +293,7 @@ public:
   MOCK_METHOD(const Network::Connection*, connection, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, clusterInfo, ());
   MOCK_METHOD(void, requestRouteConfigUpdate, (std::function<void()>));
   MOCK_METHOD(bool, canRequestRouteConfigUpdate, ());
