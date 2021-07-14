@@ -3,6 +3,12 @@
 #include "source/common/common/assert.h"
 #include "source/common/quic/platform/quic_logging_impl.h"
 
+// NOLINT(namespace-envoy)
+//
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 namespace quic {
 
 std::atomic<bool> g_quiche_bug_exit_disabled;
