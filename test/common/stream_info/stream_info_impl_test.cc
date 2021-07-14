@@ -252,14 +252,6 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   EXPECT_EQ(nullptr, stream_info.getRequestIDProvider());
 }
 
-TEST_F(StreamInfoImplTest, ConnectionID) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
-  EXPECT_FALSE(stream_info.connectionID().has_value());
-  uint64_t id = 123;
-  stream_info.setConnectionID(id);
-  EXPECT_EQ(id, stream_info.connectionID());
-}
-
 TEST_F(StreamInfoImplTest, Details) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_FALSE(stream_info.responseCodeDetails().has_value());

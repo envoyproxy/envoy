@@ -2,7 +2,6 @@ use log::{debug, error, info, trace, warn};
 use proxy_wasm::traits::{Context, RootContext};
 use proxy_wasm::types::LogLevel;
 
-#[no_mangle]
 extern "C" {
     fn __wasilibc_initialize_environ();
 }
