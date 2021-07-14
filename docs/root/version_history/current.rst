@@ -17,6 +17,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* Removed `envoy.reloadable_features.http_upstream_wait_connect_response` runtime guard.
+
 New Features
 ------------
 
