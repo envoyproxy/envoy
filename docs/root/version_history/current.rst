@@ -34,9 +34,10 @@ Minor Behavior Changes
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
 * http: serve HEAD requests from cache.
-* http: set the default lazy headermap threshold to 3, which defines the minimal number of headers in a
-  request/response/trailers required for using a dictionary in addition to the list. Setting the
-  `envoy.http.headermap.lazy_map_min_size` runtime feature to a non-negative number will override the default value.
+* http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
+  which defines the minimal number of headers in a request/response/trailers required for using a
+  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  feature to a non-negative number will override the default value.
 * http: stop sending the transfer-encoding header for 304. This behavior can be temporarily reverted by setting
   ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
 * http: the behavior of the ``present_match`` in route header matcher changed. The value of ``present_match`` is ignored in the past. The new behavior is ``present_match`` performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match

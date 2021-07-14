@@ -246,6 +246,8 @@ Various configurable timeouts apply to an HTTP connection and its constituent st
 :ref:`this FAQ entry <faq_configuration_timeouts>` for an overview of important timeout
 configuration.
 
+.. _arch_overview_http_header_map_settings:
+
 HTTP header map settings
 ------------------------
 
