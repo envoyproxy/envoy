@@ -15,7 +15,6 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codec_client.h"
-#include "source/common/quic/quic_stat_names.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
