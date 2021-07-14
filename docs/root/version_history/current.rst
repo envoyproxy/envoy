@@ -21,7 +21,7 @@ New Features
 ------------
 
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
- 
+
 Deprecated
 ----------
 
