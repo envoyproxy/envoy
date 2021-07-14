@@ -45,8 +45,8 @@ public:
   explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
 
   // CodeStats
-  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                               Code response_code) const override;
+  void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix, Code response_code,
+                               bool exclude_http_code_stats) const override;
   void chargeResponseStat(const ResponseStatInfo& info,
                           bool exclude_http_code_stats) const override;
   void chargeResponseTiming(const ResponseTimingInfo& info) const override;
