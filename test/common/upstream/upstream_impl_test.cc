@@ -2550,28 +2550,6 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
-TEST_F(ClusterInfoImplTest,
-       DEPRECATED_FEATURE_TEST(OneofExtensionProtocolOptionsForUnknownFilter)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      no_such_filter: { option: value }
-    typed_extension_protocol_options:
-      no_such_filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
-                            "Only one of typed_extension_protocol_options or "
-                            "extension_protocol_options can be specified");
-}
-
 TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
