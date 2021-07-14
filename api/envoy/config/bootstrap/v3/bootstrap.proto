@@ -306,7 +306,7 @@ message Bootstrap {
   // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
 
-  // Specifies a set of header that needs to be registered as inline header. This configuration
+  // Specifies a set of headers that need to be registered as inline header. This configuration
   // allows users to customize the inline headers on-demand at Envoy startup without modifying
   // Envoy's source code.
   repeated CustomInlineHeader inline_headers = 31;
