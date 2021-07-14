@@ -289,10 +289,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
       accumulated_requests_ >= config_.maxRequestsPerConnection()) {
     if (codec_->protocol() < Protocol::Http2) {
       new_stream->state_.saw_connection_close_ = true;
-      drain_state_ = DrainState::Draining;
+      // The response requires a connection close header.
+      drain_state_ = DrainState::Closing;
     } else {
       startDrainSequence();
     }
+    ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
     stats_.named_.downstream_cx_max_requests_reached_.inc();
   }
 
