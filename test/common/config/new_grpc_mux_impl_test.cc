@@ -192,7 +192,7 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
 }
 
 // Validate cached nonces are cleared on reconnection.
-// TODO (dmitri-d) remove this test when legacy muxes have been removed
+// TODO (dmitri-d) remove this test when legacy implementations have been removed
 // common mux functionality is tested in xds_grpc_mux_impl_test.cc
 TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
@@ -239,7 +239,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
                     {{"x", "2000"}, {"y", "3000"}});
   remoteClose();
   if (!isUnifiedMuxTest()) {
-    // in legacy mux implmentation, destruction of the EDS subscription will issue an "unsubscribe"
+    // in legacy implmentation, destruction of the EDS subscription will issue an "unsubscribe"
     // request.
     expectSendMessage(type_url, {}, {"x", "y"});
   }

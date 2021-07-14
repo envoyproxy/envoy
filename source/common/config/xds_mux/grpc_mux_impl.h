@@ -86,12 +86,6 @@ public:
   }
 
 protected:
-  // Everything related to GrpcStream must remain abstract. GrpcStream (and the gRPC-using classes
-  // that underlie it) are templated on protobufs. That means that a single implementation that
-  // supports different types of protobufs cannot use polymorphism to share code. The workaround:
-  // the GrpcStream will be owned by a derived class, and all code that would touch grpc_stream_ is
-  // seen here in the base class as calls to abstract functions, to be provided by those derived
-  // classes.
   virtual GrpcStreamBase& grpcStream() PURE;
   void establishGrpcStream() { grpcStream().establishNewStream(); }
   void sendGrpcMessage(RQ& msg_proto, S& sub_state);
