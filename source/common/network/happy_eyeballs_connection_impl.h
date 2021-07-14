@@ -120,7 +120,6 @@ private:
   void onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* wrapper);
 
   void onWriteBufferHighWatermark();
-  void onWriteBufferLowWatermark();
 
   void cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper);
 
@@ -157,7 +156,7 @@ private:
   bool connect_finished_ = false;
   Event::TimerPtr next_attempt_timer_;
 
-   bool above_write_high_water_mark_ = false;
+  bool above_write_high_water_mark_ = false;
   PerConnectionState per_connection_state_;
   PostConnectState post_connect_state_;
 };

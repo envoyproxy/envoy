@@ -149,7 +149,7 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
       []() -> void { ASSERT(false); },
       [this]() -> void { this->onWriteBufferHighWatermark(); },
-      []() -> void { ASSERT(false) });
+      []() -> void { ASSERT(false); });
   if (per_connection_state_.buffer_limits_.has_value()) {
     post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
   }
@@ -233,11 +233,9 @@ void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb
 
 void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks& cb) {
   if (connect_finished_) {
-    std::cerr << __FUNCTION__ << " removing\n";
     connections_[0]->removeConnectionCallbacks(cb);
     return;
   }
-  std::cerr << __FUNCTION__ << " removing from queue\n";
   auto i = post_connect_state_.connection_callbacks_.begin();
   while (i != post_connect_state_.connection_callbacks_.end()) {
     if (*i == &cb) {
@@ -310,16 +308,12 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
 
 std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createNextConnection() {
   ASSERT(next_address_ < address_list_.size());
-  std::cerr << __FUNCTION__ << "\n";
   auto connection = dispatcher_.createClientConnection(
       address_list_[next_address_++], source_address_,
       socket_factory_.createTransportSocket(transport_socket_options_),
       options_);
-  std::cerr << "connection: " << connection.get() << std::endl;
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
-  std::cerr << "connection: " << connection.get() << std::endl;
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
-  std::cerr << "connection: " << connection.get() << std::endl;
 
   if (per_connection_state_.detect_early_close_when_read_disabled_.has_value()) {
     connection->detectEarlyCloseWhenReadDisabled(per_connection_state_.detect_early_close_when_read_disabled_.value());
@@ -337,25 +331,19 @@ std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createNextConnect
 }
 
 void HappyEyeballsConnectionImpl::tryAnotherConnection() {
-  std::cerr << __FUNCTION__ << "\n";
   connections_.push_back(createNextConnection());
   connections_.back()->connect();
   maybeScheduleNextAttempt();
 }
 
 void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
-  std::cerr << __FUNCTION__ << "\n";
   if (next_address_ >= address_list_.size()) {
     return;
   }
-  std::cerr << __FUNCTION__ << "\n";
   next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
 }
 
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper) {
-  std::cerr << __FUNCTION__ << " " << static_cast<int>(event) << " 1\n";
-  //ASSERT(wrapper == callbacks_wrapper_.get());
-
   wrapper->connection().removeConnectionCallbacks(*wrapper);
   if (event != ConnectionEvent::Connected) {
     if (next_address_ < address_list_.size()) {
@@ -367,47 +355,25 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
       cleanupWrapperAndConnection(wrapper);
       return;
     }
-    //ASSERT(false); /// XXX have coverage for this case.
   }
 
   connect_finished_ = true;
   next_attempt_timer_->disableTimer();
 
-  // Clean up other connections.
-  std::cerr << __FUNCTION__ << " " << connections_.size() << " \n";
-  std::cerr << __FUNCTION__ << " " << callbacks_wrappers_.size() << " \n";
-
-  {
+  // Close and delete up other connections.
   auto it = connections_.begin();
   while (it != connections_.end()) {
     if (it->get() != &(wrapper->connection())) {
+      (*it)->removeConnectionCallbacks(*wrapper);
       (*it)->close(ConnectionCloseType::NoFlush);
       it = connections_.erase(it);
     } else {
       ++it;
     }
   }
-  }
-  {
-  auto it = callbacks_wrappers_.begin();
-  while (it != callbacks_wrappers_.end()) {
-    if (it->get() != wrapper) {
-      it = callbacks_wrappers_.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  }
-  /*
-  std::remove_if(connections_.begin(),  connections_.end(), [wrapper](std::unique_ptr<ClientConnection>& connection) { return connection.get() != &(wrapper->connection()); });
-  std::remove_if(callbacks_wrappers_.begin(), callbacks_wrappers_.end(), [wrapper](std::unique_ptr<ConnectionCallbacksWrapper>& callbacks_wrapper) { return callbacks_wrapper.get() != wrapper; });
-  */
-  std::cerr << __FUNCTION__ << " " << connections_.size() << " \n";
-  std::cerr << __FUNCTION__ << " " << callbacks_wrappers_.size() << " \n";
   ASSERT(connections_.size() == 1);
-  ASSERT(callbacks_wrappers_.size() == 1);
-
   callbacks_wrappers_.clear();
+
   // Apply post-connect state to the final socket.
   for (auto cb : post_connect_state_.connection_callbacks_) {
     if (cb) {
@@ -429,23 +395,10 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
 
   std::vector<ConnectionCallbacks*> cbs;
   cbs.swap(post_connect_state_.connection_callbacks_);
-  /*
-    for (auto cb : cbs) {
-    std::cerr << __FUNCTION__ << " calling cb->onEvent\n";
-    cb->onEvent(event);
-    std::cerr << __FUNCTION__ << " done\n";
-    }
-  */
-  std::cerr << __FUNCTION__ << " finished\n";
 }
 
 void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper) {
-  std::cerr << __FUNCTION__ << " " << connections_.size() << " \n";
-  std::cerr << __FUNCTION__ << " " << callbacks_wrappers_.size() << " \n";
-
-  {
-  auto it = connections_.begin();
-  while (it != connections_.end()) {
+  for (auto it = connections_.begin(); it != connections_.end();) {
     if (it->get() == &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
       it = connections_.erase(it);
@@ -453,20 +406,14 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
       ++it;
     }
   }
-  }
-  {
-  auto it = callbacks_wrappers_.begin();
-  while (it != callbacks_wrappers_.end()) {
+
+  for (auto it = callbacks_wrappers_.begin(); it != callbacks_wrappers_.end(); ) {
     if (it->get() == wrapper) {
       it = callbacks_wrappers_.erase(it);
     } else {
       ++it;
     }
   }
-  }
-
-  std::cerr << __FUNCTION__ << " " << connections_.size() << " \n";
-  std::cerr << __FUNCTION__ << " " << callbacks_wrappers_.size() << " \n";
 }
 
 void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(ConnectionCallbacksWrapper* /*wrapper*/) {
@@ -480,10 +427,6 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(ConnectionCallb
 void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
   ASSERT(!above_write_high_water_mark_);
   above_write_high_water_mark_ = true;
-}
-
-void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
-  ASSERT(false);
 }
 
 } // namespace Network

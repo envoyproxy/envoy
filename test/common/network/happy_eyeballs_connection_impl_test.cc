@@ -143,6 +143,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
 
@@ -166,6 +167,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
@@ -226,6 +228,7 @@ TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
@@ -254,6 +257,7 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled){
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
@@ -314,6 +318,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter){
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter));
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
@@ -347,6 +352,7 @@ TEST_F(HappyEyeballsConnectionImplTest, AddConnectionCallbacks){
   }));
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
@@ -420,18 +426,19 @@ TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
       testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
   // setBufferLimits() should be applied to the newly created connection.
-  EXPECT_CALL(*created_connections_[1], setBufferLimits(42));
+  EXPECT_CALL(*next_connections_.back(), setBufferLimits(42));
   EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr)).Times(1);
   failover_timer_->invokeCallback();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
   // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], setBufferLimits(420));
-  impl_->setBufferLimits(42);
+  impl_->setBufferLimits(420);
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
@@ -522,6 +529,7 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats){
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
 
