@@ -39,11 +39,11 @@ protected:
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
 
     if (should_use_unified_) {
-      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(
-          type_url, callbacks_, dispatcher_);
+      state_ = std::make_unique<Envoy::Config::XdsMux::DeltaSubscriptionState>(type_url, callbacks_,
+                                                                               dispatcher_);
     } else {
-      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(
-          type_url, callbacks_, local_info_, dispatcher_);
+      state_ = std::make_unique<Envoy::Config::DeltaSubscriptionState>(type_url, callbacks_,
+                                                                       local_info_, dispatcher_);
     }
     updateSubscriptionInterest(initial_resources, {});
     auto cur_request = getNextRequestAckless();
@@ -160,8 +160,7 @@ INSTANTIATE_TEST_SUITE_P(DeltaSubscriptionStateTest, DeltaSubscriptionStateTest,
 // Delta subscription state of a wildcard subscription request.
 class WildcardDeltaSubscriptionStateTest : public DeltaSubscriptionStateTestBase {
 public:
-  WildcardDeltaSubscriptionStateTest()
-      : DeltaSubscriptionStateTestBase(TypeUrl, GetParam(), {}) {}
+  WildcardDeltaSubscriptionStateTest() : DeltaSubscriptionStateTestBase(TypeUrl, GetParam(), {}) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(WildcardDeltaSubscriptionStateTest, WildcardDeltaSubscriptionStateTest,
