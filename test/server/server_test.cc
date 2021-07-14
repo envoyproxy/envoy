@@ -334,6 +334,47 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// The finalize() of Http::CustomInlineHeaderRegistry will be called When InstanceImpl is
+// instantiated. For this reason, the test case for inline headers must precede all other test
+// cases.
+
+// Test the case where inline headers contain names that cannot be registered as inline headers.
+TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/bootstrap_inline_headers_error.yaml"),
+      EnvoyException, "Header set-cookie cannot be registered as an inline header.");
+}
+
+// Test whether the custom inline headers can be registered correctly.
+TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
+  static bool is_registered = false;
+
+  if (!is_registered) {
+    // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
+    // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
+    // registered again, the assertion will be triggered.
+    EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
+    is_registered = true;
+  }
+
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestHeaderMap::header_map_type>(
+          Http::LowerCaseString("test1"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::RequestTrailerMap::header_map_type>(
+          Http::LowerCaseString("test2"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseHeaderMap::header_map_type>(
+          Http::LowerCaseString("test3"))
+          .has_value());
+  EXPECT_TRUE(
+      Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseTrailerMap::header_map_type>(
+          Http::LowerCaseString("test4"))
+          .has_value());
+}
+
 // Validates that server stats are flushed even when server is stuck with initialization.
 TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
   CustomStatsSinkFactory factory;
