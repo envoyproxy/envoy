@@ -113,7 +113,7 @@ public:
   /**
    * Converts message begin into the right protocol.
    */
-  void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
+  void convertMessageBegin(MessageMetadataSharedPtr metadata) {
     ProtocolConverter::messageBegin(metadata);
   }
 
