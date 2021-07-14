@@ -29,8 +29,6 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
@@ -826,10 +824,6 @@ void InstanceImpl::terminate() {
 
   // Before the workers start exiting we should disable stat threading.
   stats_store_.shutdownThreading();
-
-  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
-  Config::GrpcMuxImpl::shutdownAll();
-  Config::NewGrpcMuxImpl::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();

@@ -247,13 +247,10 @@ TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
-  if (to_delete != nullptr) {
-    to_delete->deleteIsPending();
-    current_to_delete_->emplace_back(std::move(to_delete));
-    ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-    if (current_to_delete_->size() == 1) {
-      deferred_delete_cb_->scheduleCallbackCurrentIteration();
-    }
+  current_to_delete_->emplace_back(std::move(to_delete));
+  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
+  if (current_to_delete_->size() == 1) {
+    deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
