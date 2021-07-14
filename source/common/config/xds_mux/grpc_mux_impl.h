@@ -45,7 +45,8 @@ public:
 // starting/stopping/pausing of the subscriptions.
 template <class S, class F, class RQ, class RS>
 class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
-                    public GrpcMux, Logger::Loggable<Logger::Id::config> {
+                    public GrpcMux,
+                    Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
               const LocalInfo::LocalInfo& local_info,
@@ -76,8 +77,8 @@ public:
   void onStreamEstablished() override { handleEstablishedStream(); }
   void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
   void onWriteable() override { trySendDiscoveryRequests(); }
-  void onDiscoveryResponse(
-      std::unique_ptr<RS>&& message, ControlPlaneStats& control_plane_stats) override {
+  void onDiscoveryResponse(std::unique_ptr<RS>&& message,
+                           ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -167,10 +168,9 @@ private:
   const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
-class GrpcMuxDelta
-    : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
-                         envoy::service::discovery::v3::DeltaDiscoveryRequest,
-                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
+class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
+                                        envoy::service::discovery::v3::DeltaDiscoveryRequest,
+                                        envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method,
@@ -182,7 +182,7 @@ public:
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
-  
+
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
@@ -190,9 +190,7 @@ public:
   }
 
 protected:
-  GrpcStreamBase& grpcStream() override {
-    return grpc_stream_;
-  }
+  GrpcStreamBase& grpcStream() override { return grpc_stream_; }
   void sendMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto) override {
     grpc_stream_.sendMessage(msg_proto);
   }
@@ -221,9 +219,7 @@ public:
   }
 
 protected:
-  GrpcStreamBase& grpcStream() override {
-    return grpc_stream_;
-  }
+  GrpcStreamBase& grpcStream() override { return grpc_stream_; }
   void sendMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto) override {
     grpc_stream_.sendMessage(msg_proto);
   }

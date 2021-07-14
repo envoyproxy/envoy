@@ -192,6 +192,8 @@ TEST_P(NewGrpcMuxImplTest, DynamicContextParameters) {
 }
 
 // Validate cached nonces are cleared on reconnection.
+// TODO (dmitri-d) remove this test when legacy muxes have been removed
+// common mux functionality is tested in xds_grpc_mux_impl_test.cc
 TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   Event::MockTimer* grpc_stream_retry_timer{new Event::MockTimer()};
   Event::MockTimer* ttl_mgr_timer{new NiceMock<Event::MockTimer>()};
