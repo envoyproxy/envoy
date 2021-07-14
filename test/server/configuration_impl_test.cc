@@ -678,7 +678,7 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
@@ -719,7 +719,7 @@ TEST_F(ConfigurationImplTest, FileAccessLogOutput) {
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
@@ -1043,7 +1043,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
@@ -1079,7 +1079,7 @@ TEST_F(ConfigurationImplTest, AccessLogWithFilter) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);
 }
@@ -1115,7 +1115,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPathWit
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 2);
 }
@@ -1130,7 +1130,7 @@ TEST_F(ConfigurationImplTest, EmptyAdmin) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
   NiceMock<MockOptions> options;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
 
   ASSERT_EQ(config.admin().accessLogs().size(), 0);
 }
@@ -1154,7 +1154,7 @@ TEST_F(ConfigurationImplTest, DEPRECATED_FEATURE_TEST(DeprecatedAccessLogPath)) 
   NiceMock<MockOptions> options;
   NiceMock<Server::MockInstance> server;
   InitialImpl config(bootstrap, options);
-  config.initAccessLog(bootstrap, server_);
+  config.initAdminAccessLog(bootstrap, server_);
   Network::MockListenSocket socket_mock;
 
   ASSERT_EQ(config.admin().accessLogs().size(), 1);

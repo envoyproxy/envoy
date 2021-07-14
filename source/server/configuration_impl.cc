@@ -231,7 +231,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
   }
 }
 
-void InitialImpl::initAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                 Instance& server) {
   const auto& admin = bootstrap.admin();
 

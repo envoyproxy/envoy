@@ -544,7 +544,7 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
-  initial_config.initAccessLog(bootstrap_, *this);
+  initial_config.initAdminAccessLog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {
     admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
