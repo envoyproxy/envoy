@@ -1076,6 +1076,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsDisallowedAtFrontline) {
 }
 
 TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
+  autonomous_upstream_ = true;
   // Sent an HTTPS request over non-TLS. It will be allowed for non-front-line Envoys
   // and match the configured redirect.
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");

@@ -2643,7 +2643,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_EQ("http", headers.getForwardedProtoValue());
+        EXPECT_EQ("http", headers.getXForwardedProtoValue());
         return FilterHeadersStatus::StopIteration;
       }));
 

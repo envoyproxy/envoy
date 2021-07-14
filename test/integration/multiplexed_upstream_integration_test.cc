@@ -72,14 +72,14 @@ TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
   auto check_preserved = ([&](absl::string_view scheme, absl::string_view xff) {
     {
       default_request_headers_.setScheme(scheme);
-      default_request_headers_.setForwardedProto(xff);
+      default_request_headers_.setXForwardedProto(xff);
       auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
       ASSERT_TRUE(response->waitForEndStream());
       auto headers = reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
                          ->lastRequestHeaders();
       // Ensure original scheme and x-forwarded-proto are preserved.
       EXPECT_EQ(headers->getSchemeValue(), scheme);
-      EXPECT_EQ(headers->getForwardedProtoValue(), xff);
+      EXPECT_EQ(headers->getXForwardedProtoValue(), xff);
     }
   });
 

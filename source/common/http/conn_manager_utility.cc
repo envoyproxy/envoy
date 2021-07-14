@@ -131,8 +131,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     }
     // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
     // untrusted. Alternately if no x-forwarded-proto header exists, add one.
-    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
-      request_headers.setReferenceForwardedProto(
+    if (xff_num_trusted_hops == 0 || request_headers.XForwardedProto() == nullptr) {
+      request_headers.setReferenceXForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
   } else {
@@ -161,21 +161,23 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 
   // If the x-forwarded-proto header is not set, set it here, since Envoy uses it for determining
   // scheme and communicating it upstream.
-  if (!request_headers.ForwardedProto()) {
-    request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
-                                                                : Headers::get().SchemeValues.Http);
+  if (!request_headers.XForwardedProto()) {
+    request_headers.setReferenceXForwardedProto(
+        connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
+
   if (config.schemeToSet().has_value()) {
     request_headers.setScheme(config.schemeToSet().value());
-    request_headers.setForwardedProto(config.schemeToSet().value());
+    request_headers.setXForwardedProto(config.schemeToSet().value());
   }
+
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
   if (!request_headers.Scheme() &&
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
     request_headers.setScheme(
-        getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
+        getScheme(request_headers.getXForwardedProtoValue(), connection.ssl() != nullptr));
   }
 
   // At this point we can determine whether this is an internal or external request. The

@@ -1304,7 +1304,8 @@ TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
       }));
 
   RequestMessagePtr message{new RequestMessageImpl()};
-  HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
+  message->headers().setMethod("HEAD");
+  HttpTestUtility::addDefaultHeaders(message->headers(), false);
   EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
   timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40), _));

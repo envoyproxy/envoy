@@ -4467,7 +4467,6 @@ TEST_F(RouterTest, InternalRedirectRejectedByPredicate) {
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects(3);
   setNumPreviousRedirect(2);
-  default_request_headers_.setForwardedProto("http");
   sendRequest();
 
   EXPECT_CALL(callbacks_, clearRouteCache());
@@ -4489,6 +4488,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects(3);
   setNumPreviousRedirect(1);
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 
@@ -4508,6 +4508,7 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 TEST_F(RouterTest, CrossSchemeRedirectAllowedByPolicy) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  default_request_headers_.setScheme("https");
 
   sendRequest();
 
@@ -5560,7 +5561,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // With invalid x-forwarded-proto, still use scheme.
   {
     Http::TestRequestHeaderMapImpl headers;
-    headers.setForwardedProto("foo");
+    headers.setXForwardedProto("foo");
     FilterUtility::setUpstreamScheme(headers, true, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
@@ -5568,7 +5569,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // Use valid x-forwarded-proto.
   {
     Http::TestRequestHeaderMapImpl headers;
-    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    headers.setXForwardedProto(Http::Headers::get().SchemeValues.Http);
     FilterUtility::setUpstreamScheme(headers, true, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
@@ -5577,7 +5578,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
-    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
+    headers.setXForwardedProto(Http::Headers::get().SchemeValues.Http);
     FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }

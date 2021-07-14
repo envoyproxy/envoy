@@ -114,23 +114,21 @@ public:
 
 Http::TestRequestHeaderMapImpl genPathlessHeaders(const std::string& host,
                                                   const std::string& method) {
-  return Http::TestRequestHeaderMapImpl{{":authority", host},         {":method", method},
-                                        {"x-safe", "safe"},           {"x-global-nope", "global"},
-                                        {"x-vhost-nope", "vhost"},    {"x-route-nope", "route"},
-                                        {"x-forwarded-proto", "http"}};
+  return Http::TestRequestHeaderMapImpl{{":authority", host},      {":method", method},
+                                        {"x-safe", "safe"},        {"x-global-nope", "global"},
+                                        {"x-vhost-nope", "vhost"}, {"x-route-nope", "route"},
+                                        {":scheme", "http"}};
 }
 
 Http::TestRequestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
-                                          const std::string& method,
-                                          const std::string& forwarded_proto) {
-  auto hdrs = Http::TestRequestHeaderMapImpl{
-      {":authority", host},        {":path", path},
-      {":method", method},         {"x-safe", "safe"},
-      {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-      {"x-route-nope", "route"},   {"x-forwarded-proto", forwarded_proto}};
+                                          const std::string& method, const std::string& scheme) {
+  auto hdrs = Http::TestRequestHeaderMapImpl{{":authority", host},        {":path", path},
+                                             {":method", method},         {"x-safe", "safe"},
+                                             {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
+                                             {"x-route-nope", "route"},   {":scheme", scheme}};
 
-  if (forwarded_proto.empty()) {
-    hdrs.remove("x-forwarded-proto");
+  if (scheme.empty()) {
+    hdrs.remove(":scheme");
   }
 
   return hdrs;
@@ -731,7 +729,7 @@ virtual_hosts:
       {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // No host header, no x-forwarded-proto and no path header testing.
+  // No host header, no scheme and no path header testing.
   EXPECT_EQ(nullptr,
             config.route(Http::TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, 0));
   EXPECT_EQ(nullptr, config.route(Http::TestRequestHeaderMapImpl{{":authority", "foo"},
@@ -740,7 +738,7 @@ virtual_hosts:
                                   0));
   EXPECT_EQ(nullptr, config.route(Http::TestRequestHeaderMapImpl{{":authority", "foo"},
                                                                  {":method", "CONNECT"},
-                                                                 {"x-forwarded-proto", "http"}},
+                                                                 {":scheme", "http"}},
                                   0));
 
   // Base routing testing.
@@ -4179,14 +4177,14 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"www"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
+  // route may be called early in some edge cases and ":scheme" will not be set.
   Http::TestRequestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 /**
  * @brief  Generate headers for testing
- * @param ssl set true to insert "x-forwarded-proto: https", else "x-forwarded-proto: http"
+ * @param ssl set true to insert "":scheme: https", else ":scheme http"
  * @param internal nullopt for no such "x-envoy-internal" header, or explicit "true/false"
  * @return Http::TestRequestHeaderMapImpl
  */
@@ -4194,7 +4192,7 @@ static Http::TestRequestHeaderMapImpl genRedirectHeaders(const std::string& host
                                                          const std::string& path, bool ssl,
                                                          absl::optional<bool> internal) {
   Http::TestRequestHeaderMapImpl headers{
-      {":authority", host}, {":path", path}, {"x-forwarded-proto", ssl ? "https" : "http"}};
+      {":authority", host}, {":path", path}, {":scheme", ssl ? "https" : "http"}};
   if (internal.has_value()) {
     headers.addCopy("x-envoy-internal", internal.value() ? "true" : "false");
   }

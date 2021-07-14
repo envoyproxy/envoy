@@ -71,9 +71,9 @@ void WebsocketWithCompressorIntegrationTest::validateUpgradeRequestHeaders(
     const Http::RequestHeaderMap& original_proxied_request_headers,
     const Http::RequestHeaderMap& original_request_headers) {
   Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
-  if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(), "http");
-    proxied_request_headers.removeForwardedProto();
+  if (proxied_request_headers.XForwardedProto()) {
+    ASSERT_EQ(proxied_request_headers.getXForwardedProtoValue(), "http");
+    proxied_request_headers.removeXForwardedProto();
   }
 
   // Check for and remove headers added by default for HTTP requests.

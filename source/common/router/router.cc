@@ -51,7 +51,7 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::RequestHeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.getForwardedProtoValue() == Http::Headers::get().SchemeValues.Http) {
+  if (Http::Utility::getScheme(downstream_headers) == Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -83,8 +83,9 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       return;
     }
-    if (Http::HeaderUtility::schemeIsValid(headers.getForwardedProtoValue())) {
-      headers.setScheme(headers.getForwardedProtoValue());
+    absl::string_view xfp = headers.getXForwardedProtoValue();
+    if (Http::HeaderUtility::schemeIsValid(xfp)) {
+      headers.setScheme(xfp);
       return;
     }
   }
@@ -1516,7 +1517,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& do
   }
 
   const auto& policy = route_entry_->internalRedirectPolicy();
-  // Don't allow serving TLS responses over plaintext unless allowed by policy.
+  // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(downstream_headers, *callbacks_->connection());
   const bool target_is_http = absolute_url.scheme() == Http::Headers::get().SchemeValues.Http;
   if (!policy.isCrossSchemeRedirectAllowed() && scheme_is_http != target_is_http) {

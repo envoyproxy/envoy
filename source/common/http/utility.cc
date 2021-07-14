@@ -680,7 +680,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
 
     } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
                (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
-               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
+               (lcs_header_to_remove == Http::Headers::get().XForwardedProto) ||
                !token_sv.find(':')) {
 
       // An attacker could nominate an X-Forwarded* header, and its removal may mask
@@ -768,6 +768,14 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_scheme_header") &&
+      !headers.getSchemeValue().empty()) {
+    return headers.getSchemeValue();
+  }
+  return headers.getXForwardedProtoValue();
+}
+
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                                       const absl::optional<uint32_t> max_path_length) {
   if (!request_headers.Path()) {
@@ -781,7 +789,7 @@ std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_head
     path = path.substr(0, max_path_length.value());
   }
 
-  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
+  return absl::StrCat(Http::Utility::getScheme(request_headers), "://",
                       request_headers.getHostValue(), path);
 }
 

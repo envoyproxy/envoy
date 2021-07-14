@@ -60,10 +60,8 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
                     ProtobufMessage::getNullValidationVisitor(), true);
 
   const auto stream_info = NiceMock<Envoy::StreamInfo::MockStreamInfo>();
-  auto req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.lyft.com"},
-                                                    {":path", "/"},
-                                                    {":method", "GET"},
-                                                    {"x-forwarded-proto", "http"}};
+  auto req_headers = Http::TestRequestHeaderMapImpl{
+      {":authority", "www.lyft.com"}, {":path", "/"}, {":method", "GET"}, {":scheme", "http"}};
   // Add dummy headers to reach ~100 headers (limit per request).
   for (int i = 0; i < 90; i++) {
     req_headers.addCopy(Http::LowerCaseString(absl::StrCat("dummyheader", i)), "some_value");
