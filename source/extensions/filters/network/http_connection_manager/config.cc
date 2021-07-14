@@ -224,14 +224,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
-    auto hcm = new Http::ConnectionManagerImpl(
+    auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
         context.overloadManager(), context.dispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{hcm});
+    filter_manager.addReadFilter(std::move(hcm));
   };
 }
 
