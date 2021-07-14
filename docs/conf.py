@@ -12,47 +12,67 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-from datetime import datetime
 import os
+import sys
+from datetime import datetime
+
+import yaml
+
 from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
-import sys
+
+
+class SphinxConfigException(Exception):
+    pass
 
 
 # https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
 class SubstitutionCodeBlock(CodeBlock):
-  """
+    """
   Similar to CodeBlock but replaces placeholders with variables. See "substitutions" below.
   """
 
-  def run(self):
-    """
+    def run(self):
+        """
     Replace placeholders with given variables.
     """
-    app = self.state.document.settings.env.app
-    new_content = []
-    existing_content = self.content
-    for item in existing_content:
-      for pair in app.config.substitutions:
-        original, replacement = pair
-        item = item.replace(original, replacement)
-      new_content.append(item)
+        app = self.state.document.settings.env.app
+        new_content = []
+        existing_content = self.content
+        for item in existing_content:
+            for pair in app.config.substitutions:
+                original, replacement = pair
+                item = item.replace(original, replacement)
+            new_content.append(item)
 
-    self.content = new_content
-    return list(CodeBlock.run(self))
+        self.content = new_content
+        return list(CodeBlock.run(self))
 
 
 def setup(app):
-  app.add_config_value('release_level', '', 'env')
-  app.add_config_value('substitutions', [], 'html')
-  app.add_directive('substitution-code-block', SubstitutionCodeBlock)
+    app.add_config_value('release_level', '', 'env')
+    app.add_config_value('substitutions', [], 'html')
+    app.add_directive('substitution-code-block', SubstitutionCodeBlock)
 
 
-if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
-  raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
+missing_config = (
+    not os.environ.get("ENVOY_DOCS_BUILD_CONFIG")
+    or not os.path.exists(os.environ["ENVOY_DOCS_BUILD_CONFIG"]))
 
-release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
-blob_sha = os.environ['ENVOY_BLOB_SHA']
+if missing_config:
+    raise SphinxConfigException(
+        "`ENVOY_DOCS_BUILD_CONFIG` env var must be defined, "
+        "and point to a valid yaml file")
+
+with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
+    configs = yaml.safe_load(f.read())
+
+
+def _config(key):
+    if not configs.get(key):
+        raise SphinxConfigException(f"`{key}` config var must be defined")
+    return configs[key]
+
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -71,9 +91,14 @@ blob_sha = os.environ['ENVOY_BLOB_SHA']
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'sphinx_tabs.tabs',
-    'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe'
+    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'intersphinx_custom',
+    'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
+    'powershell_lexer'
 ]
+
+release_level = _config('release_level')
+blob_sha = _config('blob_sha')
+
 extlinks = {
     'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
     'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
@@ -81,9 +106,15 @@ extlinks = {
 
 # Setup global substitutions
 if 'pre-release' in release_level:
-  substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha))]
+    substitutions = [
+        ('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
+        ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha)),
+        ('|envoy_distroless_docker_image|', 'envoy-distroless-dev:{}'.format(blob_sha))
+    ]
 else:
-  substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha))]
+    substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
+                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha)),
+                     ('|envoy_distroless_docker_image|', 'envoy-distroless:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -111,17 +142,14 @@ author = u'Envoy Project Authors'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-if not os.environ.get('ENVOY_DOCS_VERSION_STRING'):
-  raise Exception("ENVOY_DOCS_VERSION_STRING env var must be defined")
-
 # The short X.Y version.
-version = os.environ['ENVOY_DOCS_VERSION_STRING']
+version = _config('version_string')
 # The full version, including alpha/beta/rc tags.
-release = os.environ['ENVOY_DOCS_VERSION_STRING']
+release = _config('version_string')
 
 rst_epilog = """
 .. |DOCKER_IMAGE_TAG_NAME| replace:: {}
-""".format(os.environ['DOCKER_IMAGE_TAG_NAME'])
+""".format(_config('docker_image_tag_name'))
 
 # The language for content autogenerated by Sphinx. Refer to documentation
 # for a list of supported languages.
@@ -144,8 +172,6 @@ exclude_patterns = [
     '_venv',
     'Thumbs.db',
     '.DS_Store',
-    'api-v2/api/v2/endpoint/load_report.proto.rst',
-    'api-v2/service/discovery/v2/hds.proto.rst',
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
@@ -283,4 +309,39 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "redirects.txt"
+rediraffe_redirects = "envoy-redirects.txt"
+
+intersphinx_mapping = {
+    'v1.5.0': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),
+    'v1.6.0': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', None),
+    'v1.7.0': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', None),
+    'v1.8.0': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', None),
+    'v1.9.0': ('https://www.envoyproxy.io/docs/envoy/v1.9.0', None),
+    'v1.9.1': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', None),
+    'v1.10.0': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', None),
+    'v1.11.0': ('https://www.envoyproxy.io/docs/envoy/v1.11.0', None),
+    'v1.11.1': ('https://www.envoyproxy.io/docs/envoy/v1.11.1', None),
+    'v1.11.2': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', None),
+    'v1.12.0': ('https://www.envoyproxy.io/docs/envoy/v1.12.0', None),
+    'v1.12.2': ('https://www.envoyproxy.io/docs/envoy/v1.12.2', None),
+    'v1.12.3': ('https://www.envoyproxy.io/docs/envoy/v1.12.3', None),
+    'v1.12.4': ('https://www.envoyproxy.io/docs/envoy/v1.12.4', None),
+    'v1.12.5': ('https://www.envoyproxy.io/docs/envoy/v1.12.5', None),
+    'v1.12.6': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', None),
+    'v1.13.0': ('https://www.envoyproxy.io/docs/envoy/v1.13.0', None),
+    'v1.13.1': ('https://www.envoyproxy.io/docs/envoy/v1.13.1', None),
+    'v1.13.2': ('https://www.envoyproxy.io/docs/envoy/v1.13.2', None),
+    'v1.13.3': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', None),
+    'v1.14.0': ('https://www.envoyproxy.io/docs/envoy/v1.14.0', None),
+    'v1.14.2': ('https://www.envoyproxy.io/docs/envoy/v1.14.2', None),
+    'v1.14.3': ('https://www.envoyproxy.io/docs/envoy/v1.14.3', None),
+    'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
+    'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
+    'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
+    'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
+    'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
+    'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
+    'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
+    'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
+    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
+}

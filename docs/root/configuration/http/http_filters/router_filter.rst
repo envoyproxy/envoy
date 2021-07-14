@@ -378,7 +378,7 @@ x-envoy-upstream-stream-timeout-ms
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This value is used to configure max stream living duration. It is also similar to 
-:ref:`max_stream_duration <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`but 
+:ref:`max_stream_duration <envoy_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` but 
 that is configured with per-stream. If request header has this field, that will be prior to 
 statically configured them.
 

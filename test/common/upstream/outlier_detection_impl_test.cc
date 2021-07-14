@@ -8,9 +8,9 @@
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 
-#include "common/network/utility.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
@@ -1914,7 +1914,9 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   absl::optional<MonotonicTime> monotonic_time;
   NiceMock<MockDetector> detector;
 
-  EXPECT_CALL(log_manager, createAccessLog("foo")).WillOnce(Return(file));
+  EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
+                               Filesystem::DestinationType::File, "foo"}))
+      .WillOnce(Return(file));
   EventLoggerImpl event_logger(log_manager, "foo", time_system);
 
   StringViewSaver log1;

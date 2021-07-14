@@ -1,16 +1,19 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/network/connection.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/version_converter.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 
@@ -30,8 +33,7 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+  ListenerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   ~ListenerIntegrationTest() override { resetConnections(); }
 
@@ -96,9 +98,9 @@ protected:
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     // Create the LDS upstream (fake_upstreams_[1]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     // Create the RDS upstream (fake_upstreams_[2]).
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
@@ -151,7 +153,7 @@ protected:
 
   void sendLdsResponse(const std::vector<envoy::config::listener::v3::Listener>& listener_configs,
                        const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().Listener);
     for (const auto& listener_config : listener_configs) {
@@ -173,7 +175,7 @@ protected:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
+    envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     const auto route_configuration =
@@ -263,6 +265,85 @@ TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
   initialize();
   registerTestServerPorts({listener_name_});
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+TEST_P(ListenerIntegrationTest, RejectsUnknownHttpFilter) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+              http_filters:
+                - name: filter.unknown
+                - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
+TEST_P(ListenerIntegrationTest, IgnoreUnknownOptionalHttpFilter) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    envoy::config::listener::v3::Listener listener =
+        TestUtility::parseYaml<envoy::config::listener::v3::Listener>(R"EOF(
+      name: fake_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      filter_chains:
+        - filters:
+          - name: http
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: HTTP2
+              stat_prefix: config_test
+              route_config:
+                name: route_config_0
+                virtual_hosts:
+                  - name: integration
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: /
+                        route:
+                          cluster: cluster_0
+              http_filters:
+                - name: filter.unknown
+                  is_optional: true
+                - name: envoy.filters.http.router
+        )EOF");
+    sendLdsResponse({listener}, "2");
+  };
+  initialize();
+  registerTestServerPorts({listener_name_});
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 0);
 }
 
 // Tests that a LDS deletion before Server initManager been initialized will not block the Server
@@ -409,6 +490,174 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
     EXPECT_EQ(request_size, upstream_request_->bodyLength());
   }
 }
+
+TEST_P(ListenerIntegrationTest, ChangeListenerAddress) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
+  // testing-listener-0 is not initialized as we haven't pushed any RDS yet.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
+  // Workers not started, the LDS added listener 0 is in active_listeners_ list.
+  EXPECT_EQ(test_server_->server().listenerManager().listeners().size(), 1);
+  registerTestServerPorts({listener_name_});
+
+  const std::string route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+)EOF";
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "1");
+  test_server_->waitForCounterGe(
+      fmt::format("http.config_test.rds.{}.update_success", route_table_name_), 1);
+  // Now testing-listener-0 finishes initialization, Server initManager will be ready.
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
+
+  test_server_->waitUntilListenersReady();
+  // NOTE: The line above doesn't tell you if listener is up and listening.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  const uint32_t old_port = lookupPort(listener_name_);
+  // Make a connection to the listener from version 1.
+  codec_client_ = makeHttpConnection(old_port);
+
+  // Change the listener address from loopback to wildcard.
+  const std::string new_address = Network::Test::getAnyAddressString(ipVersion());
+  listener_config_.mutable_address()->mutable_socket_address()->set_address(new_address);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(fmt::format(route_config_tmpl, route_table_name_, "cluster_0"), "2");
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  registerTestServerPorts({listener_name_});
+  // Verify that the listener was updated and that the next connection will be to the new listener.
+  // (Note that connecting to 127.0.0.1 works whether the listener address is 127.0.0.1 or 0.0.0.0.)
+  const uint32_t new_port = lookupPort(listener_name_);
+  EXPECT_NE(old_port, new_port);
+
+  // Wait for the client to be disconnected.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  // Make a new connection to the new listener.
+  codec_client_ = makeHttpConnection(new_port);
+  const uint32_t response_size = 800;
+  const uint32_t request_size = 10;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"server_id", "cluster_0, backend_0"}};
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestResponseHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {":scheme", "http"}},
+      request_size, response_headers, response_size, /*cluster_0*/ 0);
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+}
+
+class RebalancerTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                       public BaseIntegrationTest {
+public:
+  RebalancerTest()
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp_stats
+          cluster: cluster_0
+)EOF") {}
+
+  void initialize() override {
+    config_helper_.renameListener("tcp");
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          auto& src_listener_config = *bootstrap.mutable_static_resources()->mutable_listeners(0);
+          src_listener_config.mutable_use_original_dst()->set_value(true);
+          // Note that the below original_dst is replaced by FakeOriginalDstListenerFilter at the
+          // link time.
+          src_listener_config.add_listener_filters()->set_name(
+              "envoy.filters.listener.original_dst");
+          auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
+          virtual_listener_config = src_listener_config;
+          virtual_listener_config.mutable_use_original_dst()->set_value(false);
+          virtual_listener_config.clear_listener_filters();
+          virtual_listener_config.mutable_bind_to_port()->set_value(false);
+          virtual_listener_config.set_name("balanced_target_listener");
+          virtual_listener_config.mutable_connection_balance_config()->mutable_exact_balance();
+
+          // TODO(lambdai): Replace by getLoopbackAddressUrlString to emulate the real world.
+          *virtual_listener_config.mutable_address()->mutable_socket_address()->mutable_address() =
+              "127.0.0.2";
+          virtual_listener_config.mutable_address()->mutable_socket_address()->set_port_value(80);
+        });
+    BaseIntegrationTest::initialize();
+  }
+
+  std::unique_ptr<RawConnectionDriver> createConnectionAndWrite(const std::string& request,
+                                                                std::string& response) {
+    Buffer::OwnedImpl buffer(request);
+    return std::make_unique<RawConnectionDriver>(
+        lookupPort("tcp"), buffer,
+        [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+          response.append(data.toString());
+        },
+        version_, *dispatcher_);
+  }
+};
+
+struct PerConnection {
+  std::string response_;
+  std::unique_ptr<RawConnectionDriver> client_conn_;
+  FakeRawConnectionPtr upstream_conn_;
+};
+
+// Verify the connections are distributed evenly on the 2 worker threads of the redirected
+// listener.
+// Currently flaky because the virtual listener create listen socket anyway despite the socket is
+// never used. Will enable this test once https://github.com/envoyproxy/envoy/pull/16259 is merged.
+TEST_P(RebalancerTest, DISABLED_RedirectConnectionIsBalancedOnDestinationListener) {
+  auto ip_address_str =
+      Network::Test::getLoopbackAddressUrlString(TestEnvironment::getIpVersionsForTest().front());
+  concurrency_ = 2;
+  int repeats = 10;
+  initialize();
+
+  // The balancer is balanced as per active connection instead of total connection.
+  // The below vector maintains all the connections alive.
+  std::vector<PerConnection> connections;
+  for (uint32_t i = 0; i < repeats * concurrency_; ++i) {
+    connections.emplace_back();
+    connections.back().client_conn_ =
+        createConnectionAndWrite("dummy", connections.back().response_);
+    connections.back().client_conn_->waitForConnection();
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(connections.back().upstream_conn_));
+  }
+  for (auto& conn : connections) {
+    conn.client_conn_->close();
+    while (!conn.client_conn_->closed()) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  ASSERT_EQ(TestUtility::findCounter(
+                test_server_->statStore(),
+                absl::StrCat("listener.", ip_address_str, "_80.worker_0.downstream_cx_total"))
+                ->value(),
+            repeats);
+  ASSERT_EQ(TestUtility::findCounter(
+                test_server_->statStore(),
+                absl::StrCat("listener.", ip_address_str, "_80.worker_1.downstream_cx_total"))
+                ->value(),
+            repeats);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RebalancerTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace
 } // namespace Envoy

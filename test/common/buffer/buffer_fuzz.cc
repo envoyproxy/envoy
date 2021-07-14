@@ -4,11 +4,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/memory/stats.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/fuzz/utility.h"
 
@@ -72,6 +72,11 @@ public:
     // Not implemented well.
     ASSERT(false);
     drain_tracker();
+  }
+
+  void bindAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // Not implemented.
+    ASSERT(false);
   }
 
   void add(const void* data, uint64_t size) override {
@@ -188,6 +193,7 @@ public:
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 

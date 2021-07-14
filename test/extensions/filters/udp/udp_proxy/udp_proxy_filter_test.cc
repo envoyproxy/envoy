@@ -1,11 +1,10 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
-#include "common/common/hash.h"
-#include "common/network/socket_impl.h"
-#include "common/network/socket_option_impl.h"
-
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/common/common/hash.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/socket.h"
@@ -102,8 +101,14 @@ public:
                               int send_sys_errno = 0) {
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
 
-      EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
-      EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
+      if (parent_.expect_gro_) {
+        EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
+      }
+      EXPECT_CALL(*socket_->io_handle_, supportsMmsg())
+          .Times(Runtime::runtimeFeatureEnabled(
+                     "envoy.reloadable_features.udp_per_event_loop_read_limit")
+                     ? 2u
+                     : 1u);
       // Return the datagram.
       EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
           .WillOnce(
@@ -134,7 +139,6 @@ public:
               }
             }));
         // Return an EAGAIN result.
-        EXPECT_CALL(*socket_->io_handle_, supportsUdpGro());
         EXPECT_CALL(*socket_->io_handle_, supportsMmsg());
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _))
             .WillOnce(Return(ByMove(Api::IoCallUint64Result(
@@ -163,6 +167,7 @@ public:
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(os_sys_calls_, supportsIpTransparent()).WillByDefault(Return(true));
+    EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
     EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, address())
         .WillRepeatedly(Return(upstream_address_));
@@ -172,7 +177,7 @@ public:
 
   ~UdpProxyFilterTest() override { EXPECT_CALL(callbacks_.udp_listener_, onDestroy()); }
 
-  void setup(const std::string& yaml, bool has_cluster = true) {
+  void setup(const std::string& yaml, bool has_cluster = true, bool expect_gro = true) {
     envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     config_ = std::make_shared<UdpProxyFilterConfig>(cluster_manager_, time_system_, stats_store_,
@@ -185,6 +190,7 @@ public:
     }
     EXPECT_CALL(cluster_manager_, getThreadLocalCluster("fake_cluster"));
     filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
+    expect_gro_ = expect_gro;
   }
 
   void recvDataFromDownstream(const std::string& peer_address, const std::string& local_address,
@@ -281,6 +287,7 @@ use_original_src_ip: true
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   std::unique_ptr<TestUdpProxyFilter> filter_;
   std::vector<TestSession> test_sessions_;
+  bool expect_gro_{};
   const Network::Address::InstanceConstSharedPtr upstream_address_;
   const Network::Address::InstanceConstSharedPtr peer_address_;
   const std::vector<Network::SocketOptionName> transparent_options_{ENVOY_SOCKET_IP_TRANSPARENT,
@@ -330,14 +337,17 @@ public:
   }
 };
 
-// Basic UDP proxy flow with a single session.
+// Basic UDP proxy flow with a single session. Also test disabling GRO.
 TEST_F(UdpProxyFilterTest, BasicFlow) {
   InSequence s;
 
   setup(R"EOF(
 stat_prefix: foo
 cluster: fake_cluster
-  )EOF");
+upstream_socket_config:
+  prefer_gro: false
+  )EOF",
+        true, false);
 
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
@@ -721,8 +731,7 @@ hash_policies:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
-                          "caused by HashPolicyValidationError\\.SourceIp: \\[\"value must equal "
-                          "\" %!q\\(bool=true\\)\\]");
+                          "caused by HashPolicyValidationError\\.SourceIp");
 }
 
 // Make sure hash policy is null if it is not mentioned.
@@ -781,6 +790,61 @@ cluster: fake_cluster
             EXPECT_FALSE(hash.has_value());
             return host;
           }));
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[0].recvDataFromUpstream("world");
+}
+
+// Make sure hash policy with key is created.
+TEST_F(UdpProxyFilterTest, HashPolicyWithKey) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: "key"
+  )EOF");
+
+  EXPECT_NE(nullptr, config_->hashPolicy());
+}
+
+// Make sure validation fails if key is an empty string.
+TEST_F(UdpProxyFilterTest, ValidateHashPolicyWithKey) {
+  InSequence s;
+  auto config = R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: ""
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(setup(config), EnvoyException,
+                          "caused by HashPolicyValidationError\\.Key");
+}
+
+// Expect correct hash is created if hash_policy with key is mentioned.
+TEST_F(UdpProxyFilterTest, HashWithKey) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+hash_policies:
+- key: "key"
+  )EOF");
+
+  auto host = createHost(upstream_address_);
+  auto generated_hash = HashUtil::xxHash64("key");
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([host, generated_hash](
+                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        auto hash = context->computeHashKey();
+        EXPECT_TRUE(hash.has_value());
+        EXPECT_EQ(generated_hash, hash.value());
+        return host;
+      }));
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello");
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");

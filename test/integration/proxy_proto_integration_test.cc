@@ -5,7 +5,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -30,7 +30,7 @@ insertProxyProtocolFilterConfigModifier(envoy::config::bootstrap::v3::Bootstrap&
 }
 
 ProxyProtoIntegrationTest::ProxyProtoIntegrationTest()
-    : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
   config_helper_.addConfigModifier(insertProxyProtocolFilterConfigModifier);
 }
 
@@ -56,7 +56,7 @@ TEST_P(ProxyProtoIntegrationTest, CaptureTlvToMetadata) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   cleanupUpstreamAndDownstream();
   const std::string log_line = waitForAccessLog(listener_access_log_name_);
-  EXPECT_EQ(log_line, "\"foo.com\"");
+  EXPECT_EQ(log_line, "foo.com");
 }
 
 TEST_P(ProxyProtoIntegrationTest, V1RouterRequestAndResponseWithBodyNoBuffer) {
@@ -240,11 +240,10 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(
-        config_blob
-            ->Is<API_NO_BOOST(envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>());
-    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
-        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy)>(*config_blob);
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("accesslog");
@@ -274,6 +273,119 @@ TEST_P(ProxyProtoTcpIntegrationTest, AccessLog) {
   } while (log_result.empty());
 
   EXPECT_EQ(log_result, "remote=1.2.3.4:12345 local=254.254.254.254:1234");
+}
+
+ProxyProtoFilterChainMatchIntegrationTest::ProxyProtoFilterChainMatchIntegrationTest() {
+  useListenerAccessLog("%FILTER_CHAIN_NAME% %RESPONSE_CODE_DETAILS%");
+  config_helper_.skipPortUsageValidation();
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    // This test doesn't need to deal with upstream connections at all, so make sure none occur.
+    bootstrap.mutable_static_resources()->mutable_clusters(0)->clear_load_assignment();
+
+    auto* orig_filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+    for (unsigned i = 0; i < 3; i++) {
+      *bootstrap.mutable_static_resources()->mutable_listeners(0)->add_filter_chains() =
+          *orig_filter_chain;
+    }
+
+    auto setPrefix = [](auto* prefix, const std::string& ip, uint32_t length) {
+      prefix->set_address_prefix(ip);
+      prefix->mutable_prefix_len()->set_value(length);
+    };
+
+    {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      filter_chain->set_name("directsource_localhost_and_source_1.2.3.0/24");
+
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "127.0.0.1", 8);
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "::1", 128);
+
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges(), "1.2.3.0",
+                24);
+    }
+
+    {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(1);
+      filter_chain->set_name("wrong_directsource_and_source_1.2.3.0/24");
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "1.1.1.1", 32);
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "eeee::1", 128);
+
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges(), "1.2.3.0",
+                24);
+    }
+
+    {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(2);
+      filter_chain->set_name("wrong_directsource_and_source_5.5.5.5.32");
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "1.1.1.1", 32);
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_direct_source_prefix_ranges(),
+                "eeee::1", 128);
+
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges(), "5.5.5.5",
+                32);
+    }
+
+    {
+      auto* filter_chain =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(3);
+      filter_chain->set_name("no_direct_source_and_source_6.6.6.6/32");
+
+      setPrefix(filter_chain->mutable_filter_chain_match()->add_source_prefix_ranges(), "6.6.6.6",
+                32);
+    }
+  });
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtoFilterChainMatchIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that source IP and direct source IP match correctly.
+TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MatchDirectSourceAndSource) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 1.2.3.4 254.254.254.254 12345 1234\r\nhello", false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("directsource_localhost_and_source_1.2.3.0/24 -"));
+}
+
+// Test that a mismatched direct source prevents matching a filter chain with a matching source.
+TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MismatchDirectSourceButMatchSource) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 5.5.5.5 254.254.254.254 12345 1234\r\nhello", false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr(
+                  absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));
+}
+
+// Test that a more specific direct source match prevents matching a filter chain with a less
+// specific direct source match but matching source.
+TEST_P(ProxyProtoFilterChainMatchIntegrationTest, MoreSpecificDirectSource) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(tcp_client->write("PROXY TCP4 6.6.6.6 254.254.254.254 12345 1234\r\nhello", false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr(
+                  absl::StrCat("- ", StreamInfo::ResponseCodeDetails::get().FilterChainNotFound)));
 }
 
 } // namespace Envoy

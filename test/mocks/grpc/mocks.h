@@ -9,7 +9,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/grpc/typed_async_client.h"
+#include "source/common/grpc/typed_async_client.h"
 
 #include "test/test_common/utility.h"
 
@@ -107,7 +107,7 @@ public:
 
   MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               AsyncClientFactoryClusterChecks checks));
+               bool skip_cluster_check));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {

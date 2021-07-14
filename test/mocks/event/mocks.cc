@@ -29,7 +29,7 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
       .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
 
-  ON_CALL(buffer_factory_, create_(_, _, _))
+  ON_CALL(buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
@@ -49,14 +49,18 @@ MockTimer::MockTimer() {
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
 
-// Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
-// createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
-// allocated and must not be deleted by it's creator.
 MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
   dispatcher_ = dispatcher;
   EXPECT_CALL(*dispatcher, createTimer_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();
+  ON_CALL(*this, enableTimer(_, _))
+      .WillByDefault(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
+        enabled_ = true;
+        scope_ = scope;
+      }));
+  ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
 
 MockTimer::~MockTimer() {

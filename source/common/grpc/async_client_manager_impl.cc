@@ -1,12 +1,15 @@
-#include "common/grpc/async_client_manager_impl.h"
+#include "source/common/grpc/async_client_manager_impl.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/grpc/async_client_impl.h"
+#include "source/common/common/base64.h"
+#include "source/common/grpc/async_client_impl.h"
+
+#include "absl/strings/match.h"
 
 #ifdef ENVOY_GOOGLE_GRPC
-#include "common/grpc/google_async_client_impl.h"
+#include "source/common/grpc/google_async_client_impl.h"
 #endif
 
 namespace Envoy {
@@ -24,39 +27,33 @@ bool validateGrpcHeaderChars(absl::string_view key) {
   return true;
 }
 
+bool validateGrpcCompatibleAsciiHeaderValue(absl::string_view h_value) {
+  for (auto ch : h_value) {
+    if (ch < 0x20 || ch > 0x7e) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::config::core::v3::GrpcService& config,
-                                               AsyncClientFactoryClusterChecks checks,
-                                               TimeSource& time_source)
+                                               bool skip_cluster_check, TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {
+  if (skip_cluster_check) {
+    return;
+  }
+
   const std::string& cluster_name = config.envoy_grpc().cluster_name();
-  switch (checks) {
-  case AsyncClientFactoryClusterChecks::Skip:
-    return;
-  case AsyncClientFactoryClusterChecks::ValidateStaticDuringBootstrap: {
-    ASSERT(Thread::MainThread::isMainThread());
-    auto all_clusters = cm_.clusters();
-    const auto& it = all_clusters.active_clusters_.find(cluster_name);
-    if (it == all_clusters.active_clusters_.end()) {
-      throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
-    }
-    if (it->second.get().info()->addedViaApi()) {
-      throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
-    }
-    return;
+  auto all_clusters = cm_.clusters();
+  const auto& it = all_clusters.active_clusters_.find(cluster_name);
+  if (it == all_clusters.active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
   }
-  case AsyncClientFactoryClusterChecks::ValidateStatic: {
-    const auto cluster = cm_.getThreadLocalCluster(cluster_name);
-    if (!cluster) {
-      throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster_name));
-    }
-    if (cluster->info()->addedViaApi()) {
-      throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
-    }
-    return;
-  }
+  if (it->second.get().info()->addedViaApi()) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster_name));
   }
 }
 
@@ -99,8 +96,18 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   // Check metadata for gRPC API compliance. Uppercase characters are lowered in the HeaderParser.
   // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
   for (const auto& header : config.initial_metadata()) {
-    if (!validateGrpcHeaderChars(header.key()) || !validateGrpcHeaderChars(header.value())) {
-      throw EnvoyException("Illegal characters in gRPC initial metadata.");
+    // Validate key
+    if (!validateGrpcHeaderChars(header.key())) {
+      throw EnvoyException(
+          fmt::format("Illegal characters in gRPC initial metadata header key: {}.", header.key()));
+    }
+
+    // Validate value
+    // Binary base64 encoded - handled by the GRPC library
+    if (!::absl::EndsWith(header.key(), "-bin") &&
+        !validateGrpcCompatibleAsciiHeaderValue(header.value())) {
+      throw EnvoyException(fmt::format(
+          "Illegal ASCII value for gRPC initial metadata header key: {}.", header.key()));
     }
   }
 }
@@ -118,11 +125,10 @@ RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 
 AsyncClientFactoryPtr
 AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
-                                              Stats::Scope& scope,
-                                              AsyncClientFactoryClusterChecks checks) {
+                                              Stats::Scope& scope, bool skip_cluster_check) {
   switch (config.target_specifier_case()) {
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, checks, time_source_);
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config, api_, stat_names_);

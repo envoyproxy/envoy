@@ -26,3 +26,8 @@ Extensions
   watchdog/watchdog
   descriptors/descriptors
   request_id/request_id
+  http/header_formatters
+  http/original_ip_detection
+  stat_sinks/stat_sinks
+  quic/quic_extensions
+  formatter/formatter

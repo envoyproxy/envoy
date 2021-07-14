@@ -102,7 +102,7 @@ versioning guidelines:
 
   Please see [support/README.md](support/README.md) for more information on these hooks.
 
-* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code.
+* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code. Please note that draft PRs may not be reviewed and will likely not be triaged, so do not create your PR as a draft if you want prompt reviews!
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
@@ -259,6 +259,7 @@ API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-ap
 Other changes will likely include
 
   * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
+  * Editing [source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) to include metadata for the new extensions
   * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
   * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
   * Adding `source/extensions/area/well_known_names.h` for registered plugins

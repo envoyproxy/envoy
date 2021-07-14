@@ -1,7 +1,7 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 
-#include "common/config/api_type_oracle.h"
+#include "source/common/config/api_type_oracle.h"
 
 #include "gtest/gtest.h"
 
@@ -27,9 +27,6 @@ TEST(ApiTypeOracleTest, All) {
   EXPECT_EQ(envoy::config::filter::http::ip_tagging::v2::IPTagging::descriptor()->full_name(),
             ApiTypeOracle::getEarlierVersionMessageTypeName(v3_config.GetDescriptor()->full_name())
                 .value());
-  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
-            TypeUtil::typeUrlToDescriptorFullName(
-                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
 } // namespace

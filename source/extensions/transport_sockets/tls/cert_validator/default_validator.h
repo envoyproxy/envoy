@@ -8,16 +8,16 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/registry/registry.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/matchers.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/common/common/matchers.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -51,9 +51,7 @@ public:
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
-  // utility functions
-  static int ignoreCertificateExpirationCallback(int ok, X509_STORE_CTX* store_ctx);
-
+  // Utility functions.
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
                     const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);
@@ -118,9 +116,10 @@ private:
   std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
-  std::vector<std::string> verify_subject_alt_name_list_;
   bool verify_trusted_ca_{false};
 };
+
+DECLARE_FACTORY(DefaultCertValidatorFactory);
 
 } // namespace Tls
 } // namespace TransportSockets

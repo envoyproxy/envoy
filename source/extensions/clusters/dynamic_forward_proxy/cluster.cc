@@ -1,12 +1,11 @@
-#include "extensions/clusters/dynamic_forward_proxy/cluster.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
-#include "common/network/transport_socket_options_impl.h"
-
-#include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,21 +24,7 @@ Cluster::Cluster(
                                        added_via_api, factory_context.dispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
-      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {
-  // Block certain TLS context parameters that don't make sense on a cluster-wide scale. We will
-  // support these parameters dynamically in the future. This is not an exhaustive list of
-  // parameters that don't make sense but should be the most obvious ones that a user might set
-  // in error.
-  if (!cluster.hidden_envoy_deprecated_tls_context().sni().empty() ||
-      !cluster.hidden_envoy_deprecated_tls_context()
-           .common_tls_context()
-           .validation_context()
-           .hidden_envoy_deprecated_verify_subject_alt_name()
-           .empty()) {
-    throw EnvoyException(
-        "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
-  }
-}
+      update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
 
 void Cluster::startPreInit() {
   // If we are attaching to a pre-populated cache we need to initialize our hosts.

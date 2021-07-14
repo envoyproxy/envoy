@@ -7,6 +7,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -41,6 +42,7 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_real_priority_set_mocks",
@@ -70,7 +72,7 @@ envoy_cc_test(
     name = "conn_pool_map_impl_test",
     srcs = ["conn_pool_map_impl_test.cc"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
+        "//envoy/http:conn_pool_interface",
         "//source/common/upstream:conn_pool_map_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -94,6 +96,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/local_info:local_info_mocks",
@@ -209,7 +212,7 @@ envoy_cc_test(
     name = "host_stats_test",
     srcs = ["host_stats_test.cc"],
     deps = [
-        "//include/envoy/upstream:host_description_interface",
+        "//envoy/upstream:host_description_interface",
     ],
 )
 
@@ -424,7 +427,7 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
-        "//include/envoy/common:time_interface",
+        "//envoy/common:time_interface",
         "//source/common/network:utility_lib",
         "//source/common/upstream:outlier_detection_lib",
         "//source/common/upstream:upstream_includes",
@@ -448,7 +451,7 @@ envoy_cc_test(
     name = "priority_conn_pool_map_impl_test",
     srcs = ["priority_conn_pool_map_impl_test.cc"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
+        "//envoy/http:conn_pool_interface",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -462,7 +465,7 @@ envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
@@ -474,7 +477,7 @@ envoy_cc_test(
     srcs = ["ring_hash_lb_test.cc"],
     deps = [
         ":utility_lib",
-        "//include/envoy/router:router_interface",
+        "//envoy/router:router_interface",
         "//source/common/network:utility_lib",
         "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_includes",
@@ -573,7 +576,7 @@ envoy_cc_test(
     name = "transport_socket_matcher_test",
     srcs = ["transport_socket_matcher_test.cc"],
     deps = [
-        "//include/envoy/api:api_interface",
+        "//envoy/api:api_interface",
         "//source/common/config:metadata_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/upstream:transport_socket_match_lib",
@@ -591,14 +594,15 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_impl_test",
     srcs = ["upstream_impl_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/api:api_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -606,6 +610,7 @@ envoy_cc_test(
         "//source/common/upstream:static_cluster_lib",
         "//source/common/upstream:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/upstreams/http:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -623,14 +628,16 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + envoy_select_enable_http3([
+        "//source/common/quic:quic_transport_socket_factory_lib",
+    ]),
 )
 
 envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
-        "//include/envoy/stats:stats_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -649,8 +656,8 @@ envoy_cc_test_library(
     hdrs = ["test_cluster_manager.h"],
     deps = [
         ":utility_lib",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/api:api_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
@@ -693,10 +700,10 @@ envoy_cc_test(
     srcs = ["cluster_factory_impl_test.cc"],
     deps = [
         ":utility_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/http:codec_interface",
-        "//include/envoy/upstream:cluster_factory_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/api:api_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/upstream:cluster_factory_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",

@@ -10,7 +10,7 @@
 #include "envoy/service/accesslog/v3/als.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,6 +53,7 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+               envoy::config::core::v3::ApiVersion transport_version,
                Grpc::RawAsyncClientPtr&& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override;

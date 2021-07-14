@@ -64,8 +64,9 @@ then
 fi
 
 # Environment setup.
-export TEST_TMPDIR=${BUILD_DIR}/tmp
-export PATH=/opt/llvm/bin:${PATH}
+export TEST_TMPDIR="${TEST_TMPDIR:-$BUILD_DIR/tmp}"
+export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
+export PATH=${LLVM_ROOT}/bin:${PATH}
 export CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
 
 if [[ -f "/etc/redhat-release" ]]; then
@@ -81,7 +82,6 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-export LLVM_ROOT="${LLVM_ROOT:-/opt/llvm}"
 "$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=("--nocache_test_results")
@@ -97,15 +97,16 @@ BAZEL_BUILD_OPTIONS=(
   "--show_task_finish"
   "--experimental_generate_json_trace_profile"
   "--test_output=errors"
+  "--noshow_progress"
+  "--noshow_loading_progress"
   "--repository_cache=${BUILD_DIR}/repository_cache"
   "--experimental_repository_cache_hardlinks"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
 [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]] && BAZEL_BUILD_OPTIONS+=(
-  "--define" "wasm=disabled"
-	"--flaky_test_attempts=2"
-	"--test_env=HEAPCHECK=")
+  "--flaky_test_attempts=2"
+  "--test_env=HEAPCHECK=")
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean --expunge
 

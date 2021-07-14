@@ -4,8 +4,8 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/singleton/const_singleton.h"
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Http {
@@ -59,12 +59,15 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
+  const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString CdnLoop{"cdn-loop"};
   const LowerCaseString ContentEncoding{"content-encoding"};
   const LowerCaseString Etag{"etag"};
+  const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
@@ -124,7 +127,6 @@ class HeaderValues {
 public:
   const char* prefix() const { return ThreadSafeSingleton<PrefixValue>::get().prefix(); }
 
-  const LowerCaseString Age{"age"};
   const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
   const LowerCaseString ProxyAuthorization{"proxy-authorization"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
@@ -185,7 +187,6 @@ public:
       absl::StrCat(prefix(), "-upstream-stream-timeout-ms")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Expect{"expect"};
-  const LowerCaseString Expires{"expires"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
@@ -213,7 +214,6 @@ public:
   const LowerCaseString TE{"te"};
   const LowerCaseString Upgrade{"upgrade"};
   const LowerCaseString UserAgent{"user-agent"};
-  const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};

@@ -13,12 +13,13 @@ envoy_cc_library(
     srcs = [
         "default_validator.cc",
         "factory.cc",
+        "utility.cc",
     ],
     hdrs = [
         "cert_validator.h",
         "default_validator.h",
         "factory.h",
-        "well_known_names.h",
+        "utility.h",
     ],
     external_deps = [
         "ssl",
@@ -27,8 +28,8 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/ssl:context_config_interface",
-        "//include/envoy/ssl:ssl_socket_extended_info_interface",
+        "//envoy/ssl:context_config_interface",
+        "//envoy/ssl:ssl_socket_extended_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",

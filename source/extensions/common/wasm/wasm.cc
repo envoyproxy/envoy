@@ -1,14 +1,13 @@
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include <algorithm>
 #include <chrono>
 
 #include "envoy/event/deferred_deletable.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/common/wasm/wasm_extension.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/wasm_extension.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -88,10 +87,10 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
            Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
-    : WasmBase(createWasmVm(config.config().vm_config().runtime()),
-               config.config().vm_config().vm_id(),
-               MessageUtil::anyToBytes(config.config().vm_config().configuration()), vm_key,
-               config.environmentVariables(), config.allowedCapabilities()),
+    : WasmBase(
+          createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
+          MessageUtil::anyToBytes(config.config().vm_config().configuration()),
+          toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
       scope_(scope), cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
       wasm_stats_(WasmStats{ALL_WASM_STATS(
@@ -106,7 +105,9 @@ Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeShare
 Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
     : WasmBase(base_wasm_handle,
                [&base_wasm_handle]() {
-                 return createWasmVm(base_wasm_handle->wasm()->wasm_vm()->runtime());
+                 return createWasmVm(absl::StrCat(
+                     "envoy.wasm.runtime.",
+                     toAbslStringView(base_wasm_handle->wasm()->wasm_vm()->runtime())));
                }),
       scope_(getWasm(base_wasm_handle)->scope_),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
@@ -115,7 +116,7 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
   ENVOY_LOG(debug, "Thread-Local Wasm created {} now active", active_wasms);
 }
 
-void Wasm::error(absl::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
+void Wasm::error(std::string_view message) { ENVOY_LOG(error, "Wasm VM failed {}", message); }
 
 void Wasm::setTimerPeriod(uint32_t context_id, std::chrono::milliseconds new_period) {
   auto& period = timer_period_[context_id];
@@ -186,7 +187,8 @@ Word resolve_dns(void* raw_context, Word dns_address_ptr, Word dns_address_size,
     root_context->onResolveDns(token, status, std::move(response));
   };
   if (!context->wasm()->dnsResolver()) {
-    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver({}, false);
+    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver(
+        {}, envoy::config::core::v3::DnsResolverOptions());
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);
@@ -386,8 +388,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     auto config = plugin->wasmConfig();
     proxy_wasm::WasmHandleFactory proxy_wasm_factory =
         [&config, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
-         wasm_factory](absl::string_view vm_key) -> WasmHandleBaseSharedPtr {
-      return wasm_factory(config, scope, cluster_manager, dispatcher, lifecycle_notifier, vm_key);
+         wasm_factory](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
+      return wasm_factory(config, scope, cluster_manager, dispatcher, lifecycle_notifier,
+                          toAbslStringView(vm_key));
     };
     auto wasm = proxy_wasm::createWasm(
         vm_key, code, plugin, proxy_wasm_factory,
@@ -471,7 +474,9 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), critical,
                           "Plugin configured to fail closed failed to load");
     }
-    return nullptr;
+    // To handle the case when failed to create VMs and fail-open/close properly,
+    // we still create PluginHandle with null WasmBase.
+    return std::make_shared<PluginHandle>(nullptr, plugin);
   }
   return std::static_pointer_cast<PluginHandle>(proxy_wasm::getOrCreateThreadLocalPlugin(
       std::static_pointer_cast<WasmHandle>(base_wasm), plugin,

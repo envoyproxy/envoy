@@ -3,9 +3,8 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-
-#include "extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -152,10 +151,8 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, local_info_),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
-    EXPECT_CALL(async_client_manager_,
-                factoryForGrpcService(_, _, Grpc::AsyncClientFactoryClusterChecks::ValidateStatic))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                                Grpc::AsyncClientFactoryClusterChecks) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -181,8 +178,8 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
+  GrpcAccessLoggerSharedPtr logger = logger_cache_.getOrCreateLogger(
+      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope_);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:

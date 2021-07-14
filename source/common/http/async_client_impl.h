@@ -31,13 +31,13 @@
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/linked_object.h"
-#include "common/http/message_impl.h"
-#include "common/router/router.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/router/router.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -83,11 +83,6 @@ class AsyncStreamImpl : public AsyncClient::Stream,
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
-
-  // Http::StreamDecoderFilterCallbacks
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;
@@ -237,7 +232,8 @@ private:
                                 bool) const override {}
     void finalizeResponseHeaders(Http::ResponseHeaderMap&,
                                  const StreamInfo::StreamInfo&) const override {}
-    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&) const override {
+    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
+                                                    bool) const override {
       return {};
     }
     const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
@@ -361,9 +357,12 @@ private:
   Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  void setRoute(Router::RouteConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
+  // TODO(kbaichoo): Plumb account from owning request filter.
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -427,8 +426,15 @@ private:
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
+  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
+    tracked_object_stack.add(*this);
+  }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {

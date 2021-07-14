@@ -2,7 +2,7 @@
 #include "envoy/extensions/filters/http/kill_request/v3/kill_request.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "extensions/filters/http/kill_request/kill_request_config.h"
+#include "source/extensions/filters/http/kill_request/kill_request_config.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -37,6 +37,19 @@ TEST(KillRequestConfigTest, KillRequestFilterWithEmptyProto) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST(KillRequestConfigTest, RouteSpecificConfig) {
+  KillRequestFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  EXPECT_TRUE(proto_config.get());
+
+  Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+      factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                              ProtobufMessage::getNullValidationVisitor());
+  EXPECT_TRUE(route_config.get());
 }
 
 } // namespace

@@ -1,5 +1,5 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -146,8 +146,6 @@ TEST(DubboProtocolImplTest, encode) {
       body_buffer, content, RpcResponseType::ResponseWithValue);
   auto context = result.first;
   EXPECT_EQ(context->bodySize(), serialized_body_size);
-  EXPECT_EQ(false, context->hasAttachments());
-  EXPECT_EQ(0, context->attachments().size());
 
   buffer.drain(context->headerSize());
   EXPECT_TRUE(dubbo_protocol.decodeData(buffer, context, output_metadata));

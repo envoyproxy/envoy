@@ -1,11 +1,9 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 
 #include "envoy/registry/registry.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -140,7 +138,7 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
                                    MessageMetadataSharedPtr metadata) {
   ASSERT(serializer_);
 
-  if ((buffer.length()) < static_cast<uint64_t>(context->bodySize())) {
+  if ((buffer.length()) < context->bodySize()) {
     return false;
   }
 

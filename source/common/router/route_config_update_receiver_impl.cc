@@ -1,14 +1,15 @@
-#include "common/router/route_config_update_receiver_impl.h"
+#include "source/common/router/route_config_update_receiver_impl.h"
 
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -28,7 +29,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
 
   rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
   config_ = std::make_shared<ConfigImpl>(
-      *route_config_proto_, factory_context_,
+      *route_config_proto_, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
   onUpdateCommon(version_info);
@@ -53,7 +54,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
                      *route_config_after_this_update);
 
   auto new_config = std::make_shared<ConfigImpl>(
-      *route_config_after_this_update, factory_context_,
+      *route_config_after_this_update, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
   // No exception, route_config_after_this_update is valid, can update the state.

@@ -2,9 +2,9 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_impl.h"
-#include "extensions/filters/network/common/utility.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit_impl.h"
+#include "source/extensions/filters/network/common/utility.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/extensions/filters/network/common/fuzz/uber_readfilter.h"
@@ -77,8 +77,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                             Grpc::AsyncClientFactoryClusterChecks) {
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
@@ -111,8 +110,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
 
     EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                             Grpc::AsyncClientFactoryClusterChecks) {
+        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::move(async_client_factory_);
         }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(

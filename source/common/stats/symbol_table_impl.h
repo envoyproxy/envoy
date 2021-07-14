@@ -10,14 +10,14 @@
 #include "envoy/common/exception.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/lock_guard.h"
-#include "common/common/mem_block_builder.h"
-#include "common/common/non_copyable.h"
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/stats/recent_lookups.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/mem_block_builder.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/recent_lookups.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_map.h"
@@ -455,6 +455,16 @@ public:
    * @return whether this is empty.
    */
   bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
+
+  /**
+   * Determines whether this starts with the prefix. Note: dynamic segments
+   * are not supported in the current implementation; this matching only works
+   * for symbolic segments. However it OK for this to include dynamic segments
+   * following the prefix.
+   *
+   * @param symbolic_prefix the prefix, which must not contain dynamic segments.
+   */
+  bool startsWith(StatName symbolic_prefix) const;
 
 private:
   /**

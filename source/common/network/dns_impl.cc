@@ -1,4 +1,4 @@
-#include "common/network/dns_impl.h"
+#include "source/common/network/dns_impl.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,10 +8,11 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"
@@ -22,10 +23,10 @@ namespace Network {
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_tcp_for_dns_lookups)
+    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
-      use_tcp_for_dns_lookups_(use_tcp_for_dns_lookups),
+      dns_resolver_options_(dns_resolver_options),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
@@ -65,9 +66,14 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   AresOptions options{};
 
-  if (use_tcp_for_dns_lookups_) {
+  if (dns_resolver_options_.use_tcp_for_dns_lookups()) {
     options.optmask_ |= ARES_OPT_FLAGS;
     options.options_.flags |= ARES_FLAG_USEVC;
+  }
+
+  if (dns_resolver_options_.no_default_search_domain()) {
+    options.optmask_ |= ARES_OPT_FLAGS;
+    options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
 
   return options;
@@ -168,15 +174,22 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (completed_) {
     if (!cancelled_) {
-      try {
-        callback_(resolution_status, std::move(address_list));
-      } catch (const EnvoyException& e) {
+      // Use a raw try here because it is used in both main thread and filter.
+      // Can not convert to use status code as there may be unexpected exceptions in server fuzz
+      // tests, which must be handled. Potential exception may come from getAddressWithPort() or
+      // portFromTcpUrl().
+      // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
+      // exception in fuzz tests.
+      TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
+      catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (const std::exception& e) {
+      }
+      catch (const std::exception& e) {
         ENVOY_LOG(critical, "std::exception in c-ares callback: {}", e.what());
         dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (...) {
+      }
+      catch (...) {
         ENVOY_LOG(critical, "Unknown exception in c-ares callback");
         dispatcher_.post([] { throw EnvoyException("unknown"); });
       }
@@ -251,8 +264,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
+  auto pending_resolution =
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name);
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }

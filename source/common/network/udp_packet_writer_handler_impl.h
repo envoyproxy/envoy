@@ -4,7 +4,7 @@
 #include "envoy/network/socket.h"
 #include "envoy/network/udp_packet_writer_handler.h"
 
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -39,6 +39,14 @@ public:
 private:
   bool write_blocked_;
   Network::IoHandle& io_handle_;
+};
+
+class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
+public:
+  Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
+                                                    Stats::Scope&) override {
+    return std::make_unique<UdpDefaultWriter>(io_handle);
+  }
 };
 
 } // namespace Network

@@ -11,9 +11,9 @@
 #include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
 
-#include "common/common/logger.h"
-#include "common/common/matchers.h"
-#include "common/network/transport_socket_options_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -184,7 +184,8 @@ class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
   HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, TimeSource& time_source,
                              const std::string& file_name)
-      : time_source_(time_source), file_(log_manager.createAccessLog(file_name)) {}
+      : time_source_(time_source), file_(log_manager.createAccessLog(Filesystem::FilePathAndType{
+                                       Filesystem::DestinationType::File, file_name})) {}
 
   void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,

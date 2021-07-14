@@ -1,4 +1,4 @@
-#include "common/grpc/common.h"
+#include "source/common/grpc/common.h"
 
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
@@ -7,6 +7,9 @@
 
 namespace Envoy {
 namespace {
+
+// For how this value was chosen, see https://github.com/envoyproxy/envoy/issues/17067.
+constexpr double ALLOWED_ERROR = 0.10;
 
 const std::string ADMISSION_CONTROL_CONFIG =
     R"EOF(
@@ -24,6 +27,10 @@ typed_config:
     default_value:
       value: 100.0
     runtime_key: "foo.sr_threshold"
+  max_rejection_probability:
+    default_value:
+      value: 100.0
+    runtime_key: "foo.mrp"
   enabled:
     default_value: true
     runtime_key: "foo.enabled"
@@ -33,8 +40,7 @@ class AdmissionControlIntegrationTest : public Event::TestUsingSimulatedTime,
                                         public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:
-  AdmissionControlIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  AdmissionControlIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override {}
 
@@ -70,7 +76,7 @@ protected:
     au->setResponseTrailers(std::move(trailers));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }
@@ -84,7 +90,7 @@ protected:
         Http::TestResponseHeaderMapImpl({{":status", code}})));
 
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    response->waitForEndStream();
+    RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
     return response;
   }
@@ -118,9 +124,9 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
+  // throttling rate.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));
@@ -133,7 +139,7 @@ TEST_P(AdmissionControlIntegrationTest, HttpTest) {
 
 TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
   autonomous_upstream_ = true;
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   // Drop the success rate to a very low value.
@@ -158,9 +164,9 @@ TEST_P(AdmissionControlIntegrationTest, GrpcTest) {
     ++request_count;
   }
 
-  // Given the current throttling rate formula with an aggression of 1, it should result in a ~98%
-  // throttling rate. Allowing an error of 5%.
-  EXPECT_NEAR(throttle_count / request_count, 0.98, 0.05);
+  // Given the current throttling rate formula with an aggression of 2.0, it should result in a ~98%
+  // throttling rate.
+  EXPECT_NEAR(throttle_count / request_count, 0.98, ALLOWED_ERROR);
 
   // We now wait for the history to become stale.
   timeSystem().advanceTimeWait(std::chrono::seconds(120));

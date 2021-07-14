@@ -1,12 +1,11 @@
-#include "extensions/filters/http/jwt_authn/filter_factory.h"
+#include "source/extensions/filters/http/jwt_authn/filter_factory.h"
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/datasource.h"
-
-#include "extensions/filters/http/jwt_authn/filter.h"
+#include "source/common/config/datasource.h"
+#include "source/extensions/filters/http/jwt_authn/filter.h"
 
 #include "jwt_verify_lib/jwks.h"
 
@@ -45,7 +44,7 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
                                                  const std::string& prefix,
                                                  Server::Configuration::FactoryContext& context) {
   validateJwtConfig(proto_config, context.api());
-  auto filter_config = FilterConfigImpl::create(proto_config, prefix, context);
+  auto filter_config = std::make_shared<FilterConfigImpl>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };

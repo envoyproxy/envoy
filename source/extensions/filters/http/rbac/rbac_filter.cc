@@ -1,11 +1,9 @@
-#include "extensions/filters/http/rbac/rbac_filter.h"
+#include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -17,7 +15,8 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
+    : stats_(Filters::Common::RBAC::generateStats(stats_prefix,
+                                                  proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
@@ -25,15 +24,8 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
 const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
-  if (!route || !route->routeEntry()) {
-    return engine(mode);
-  }
-
-  const std::string& name = HttpFilterNames::get().Rbac;
-  const auto* entry = route->routeEntry();
-  const auto* route_local =
-      entry->mostSpecificPerFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(
-          name);
+  const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
+      RoleBasedAccessControlRouteSpecificFilterConfig>("envoy.filters.http.rbac", route);
 
   if (route_local) {
     return route_local->engine(mode);
@@ -96,7 +88,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     }
 
     *fields[config_->shadowEngineResultField()].mutable_string_value() = shadow_resp_code;
-    callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
   const auto engine =

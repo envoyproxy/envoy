@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -39,8 +39,7 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
-  void setWatermarks(uint32_t watermark) override { setWatermarks(watermark / 2, watermark); }
-  void setWatermarks(uint32_t low_watermark, uint32_t high_watermark);
+  void setWatermarks(uint32_t high_watermark) override;
   uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently
   // than the low watermark callbacks.
@@ -48,7 +47,7 @@ public:
 
 protected:
   virtual void checkHighAndOverflowWatermarks();
-  void checkLowWatermark();
+  virtual void checkLowWatermark();
 
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
@@ -76,9 +75,9 @@ using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
-  InstancePtr create(std::function<void()> below_low_watermark,
-                     std::function<void()> above_high_watermark,
-                     std::function<void()> above_overflow_watermark) override {
+  InstancePtr createBuffer(std::function<void()> below_low_watermark,
+                           std::function<void()> above_high_watermark,
+                           std::function<void()> above_overflow_watermark) override {
     return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
                                              above_overflow_watermark);
   }

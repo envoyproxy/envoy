@@ -1,4 +1,4 @@
-#include "common/router/upstream_request.h"
+#include "source/common/router/upstream_request.h"
 
 #include <chrono>
 #include <cstdint>
@@ -15,30 +15,28 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/assert.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/network/application_protocol.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/network/upstream_server_name.h"
-#include "common/network/upstream_subject_alt_names.h"
-#include "common/router/config_impl.h"
-#include "common/router/debug_config.h"
-#include "common/router/router.h"
-#include "common/stream_info/uint32_accessor_impl.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/application_protocol.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/upstream_server_name.h"
+#include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/router/config_impl.h"
+#include "source/common/router/debug_config.h"
+#include "source/common/router/router.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 namespace Envoy {
 namespace Router {
@@ -94,6 +92,20 @@ UpstreamRequest::~UpstreamRequest() {
         FilterUtility::percentageOfTimeout(response_time, parent_.timeout().per_try_timeout_));
   }
 
+  // Ditto for request/response size histograms.
+  Upstream::ClusterRequestResponseSizeStatsOptRef req_resp_stats_opt =
+      parent_.cluster()->requestResponseSizeStats();
+  if (req_resp_stats_opt.has_value()) {
+    auto& req_resp_stats = req_resp_stats_opt->get();
+    req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
+    req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
+
+    if (response_headers_size_.has_value()) {
+      req_resp_stats.upstream_rs_headers_size_.recordValue(response_headers_size_.value());
+      req_resp_stats.upstream_rs_body_size_.recordValue(stream_info_.bytesReceived());
+    }
+  }
+
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config().upstream_logs_) {
@@ -112,11 +124,14 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  addResponseHeadersSize(headers->byteSize());
   parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
+
+  addResponseHeadersSize(headers->byteSize());
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
   // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
@@ -219,7 +234,7 @@ void UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!upstream_ || paused_for_connect_) {
     ENVOY_STREAM_LOG(trace, "buffering {} bytes", *parent_.callbacks(), data.length());
     if (!buffered_request_body_) {
-      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().create(
+      buffered_request_body_ = parent_.callbacks()->dispatcher().getWatermarkFactory().createBuffer(
           [this]() -> void { this->enableDataFromDownstreamForFlowControl(); },
           [this]() -> void { this->disableDataFromDownstreamForFlowControl(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
@@ -371,6 +386,9 @@ void UpstreamRequest::onPoolReady(
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
 
+  // Have the upstream use the account of the downstream.
+  upstream_->setAccount(parent_.callbacks()->account());
+
   if (parent_.requestVcluster()) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
@@ -388,6 +406,9 @@ void UpstreamRequest::onPoolReady(
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
+  parent_.callbacks()->streamInfo().setUpstreamFilterState(
+      std::make_shared<StreamInfo::FilterStateImpl>(info.filterState().parent()->parent(),
+                                                    StreamInfo::FilterState::LifeSpan::Request));
   stream_info_.setUpstreamLocalAddress(upstream_local_address);
   parent_.callbacks()->streamInfo().setUpstreamLocalAddress(upstream_local_address);
 
@@ -450,8 +471,8 @@ void UpstreamRequest::onPoolReady(
     // erroneously remove required headers.
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
     const std::string details =
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredHeaders, "{",
-                     status.message(), "}");
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
+                     "{", status.message(), "}");
     parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                         absl::nullopt, details);
     return;

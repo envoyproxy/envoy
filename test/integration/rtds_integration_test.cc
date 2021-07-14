@@ -66,7 +66,11 @@ layered_runtime:
   - name: some_admin_layer
     admin_layer: {{}}
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -79,7 +83,7 @@ class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public H
 public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
-            Http::CodecClient::Type::HTTP2, ipVersion(),
+            Http::CodecType::HTTP2, ipVersion(),
             tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     use_lds_ = false;
     create_xds_upstream_ = true;
@@ -92,7 +96,7 @@ public:
     // The tests infra expects the xDS server to be the second fake upstream, so
     // we need a dummy data plane cluster.
     setUpstreamCount(1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     // Register admin port.
     registerTestServerPorts({});

@@ -6,8 +6,8 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/dump_state_utils.h"
-#include "common/common/linked_object.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
 
@@ -34,7 +34,8 @@ public:
                uint32_t concurrent_stream_limit);
   ~ActiveClient() override;
 
-  void releaseResources();
+  virtual void releaseResources() { releaseResourcesBase(); }
+  void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -84,16 +85,32 @@ public:
     CLOSED // Connection is closed and object is queued for destruction.
   };
 
+  State state() const { return state_; }
+
+  void setState(State state) {
+    // If the client is transitioning to draining, update the remaining
+    // streams and pool and cluster capacity.
+    if (state == State::DRAINING) {
+      drain();
+    }
+    state_ = state;
+  }
+
+  // Sets the remaining streams to 0, and updates pool and cluster capacity.
+  virtual void drain();
+
   ConnPoolImplBase& parent_;
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
-  State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
+
+private:
+  State state_{State::CONNECTING};
 };
 
 // PendingStream is the base class tracking streams for which a connection has been created but not
@@ -123,7 +140,7 @@ public:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    Upstream::ClusterConnectivityState& state);
   virtual ~ConnPoolImplBase();
 
@@ -199,29 +216,40 @@ public:
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   Upstream::ResourcePriority priority() const { return priority_; }
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() { return socket_options_; }
-  const Network::TransportSocketOptionsSharedPtr& transportSocketOptions() {
+  const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
-  void decrClusterStreamCapacity(uint32_t delta) { state_.decrConnectingStreamCapacity(delta); }
+  void decrClusterStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+  }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
        << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
-       << DUMP_MEMBER(pending_streams_.size());
+       << DUMP_MEMBER(pending_streams_.size())
+       << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
 
   friend std::ostream& operator<<(std::ostream& os, const ConnPoolImplBase& s) {
     s.dumpState(os);
     return os;
   }
+  Upstream::ClusterConnectivityState& state() { return state_; }
+
+  void decrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    ASSERT(connecting_stream_capacity_ >= delta);
+    connecting_stream_capacity_ -= delta;
+  }
 
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   enum class ConnectionResult {
+    FailedToCreateConnection,
     CreatedNewConnection,
     ShouldNotConnect,
     NoConnectionRateLimited,
@@ -257,14 +285,9 @@ protected:
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
 
-  void incrConnectingStreamCapacity(uint32_t delta) {
-    state_.incrConnectingStreamCapacity(delta);
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
-  }
-  void decrConnectingStreamCapacity(uint32_t delta) {
-    state_.decrConnectingStreamCapacity(delta);
-    ASSERT(connecting_stream_capacity_ > delta);
-    connecting_stream_capacity_ -= delta;
   }
 
   Upstream::ClusterConnectivityState& state_;
@@ -274,7 +297,7 @@ protected:
 
   Event::Dispatcher& dispatcher_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
   std::list<Instance::DrainedCb> drained_callbacks_;
 

@@ -34,6 +34,9 @@ HEXDIG
 HEXDIGIT
 OWS
 Preconnecting
+RCVBUF
+RTCP
+RTP
 STATNAME
 SkyWalking
 TIDs
@@ -273,6 +276,7 @@ RPC
 RSA
 RST
 RTDS
+RTOS
 RTTI
 RUNDIR
 RW
@@ -440,6 +444,8 @@ benchmarked
 bidi
 bignum
 bitfield
+bitmask
+bitmasks
 bitset
 bitwise
 blackhole
@@ -676,6 +682,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
@@ -791,6 +798,7 @@ megamiss
 mem
 memcmp
 memcpy
+memoize
 mergeable
 messagename
 metadata
@@ -931,6 +939,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc
@@ -1131,6 +1141,7 @@ subtypes
 subzone
 superclass
 superset
+svc
 symlink
 symlinked
 symlinks
@@ -1166,6 +1177,7 @@ timeval
 tmp
 tmpfile
 tokenize
+tokenized
 tokenizes
 tokenizing
 toolchain
@@ -1236,6 +1248,7 @@ virtualize
 vptr
 wakeup
 wakeups
+wamr
 wasmtime
 websocket
 wepoll

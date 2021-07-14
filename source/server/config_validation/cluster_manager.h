@@ -6,8 +6,8 @@
 #include "envoy/server/options.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/context_impl.h"
-#include "common/upstream/cluster_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/upstream/cluster_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -41,6 +41,7 @@ public:
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                      const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
 
 private:

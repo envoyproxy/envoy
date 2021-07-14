@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/tracer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -7,10 +7,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/listener.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
@@ -98,10 +97,10 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-void Span::injectContext(Http::RequestHeaderMap& request_headers) {
+void Span::injectContext(Tracing::TraceContext& trace_context) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  request_headers.setCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
+  trace_context.setTraceContextReferenceKey(XRayTraceHeader, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,

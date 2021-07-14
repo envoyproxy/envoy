@@ -1,14 +1,20 @@
 #include <codecvt>
 #include <locale>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/event/signal_impl.h"
-
-#include "exe/main_common.h"
-#include "exe/service_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/signal_impl.h"
+#include "source/exe/main_common.h"
+#include "source/exe/service_base.h"
 
 #include "absl/debugging/symbolize.h"
+
+// Logging macro for SCM
+#define ENVOY_LOG_SCM(LOGGER, LEVEL, ...)                                                          \
+  do {                                                                                             \
+    LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, LEVEL, __VA_ARGS__);            \
+  } while (0)
 
 namespace Envoy {
 
@@ -49,8 +55,10 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
     if (last_error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
       return false;
     } else {
-      PANIC(
-          fmt::format("Could not dispatch Envoy to start as a service with error {}", last_error));
+      std::string error_msg{
+          fmt::format("Could not dispatch Envoy to start as a service with error {}", last_error)};
+      ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+      PANIC(error_msg);
     }
   }
   return true;
@@ -65,7 +73,7 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
   // Initialize the server's main context under a try/catch loop and simply return `EXIT_FAILURE`
   // as needed. Whatever code in the initialization path that fails is expected to log an error
   // message so the user can diagnose.
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     main_common = std::make_shared<Envoy::MainCommon>(args);
     Envoy::Server::Instance* server = main_common->server();
     if (!server->options().signalHandlingEnabled()) {
@@ -77,12 +85,17 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
         server->shutdown();
       });
     }
-  } catch (const Envoy::NoServingException& e) {
+  }
+  END_TRY
+  catch (const Envoy::NoServingException& e) {
     return S_OK;
-  } catch (const Envoy::MalformedArgvException& e) {
+  }
+  catch (const Envoy::MalformedArgvException& e) {
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_INVALIDARG;
-  } catch (const Envoy::EnvoyException& e) {
-    ENVOY_LOG_MISC(warn, "Envoy failed to start with {}", e.what());
+  }
+  catch (const Envoy::EnvoyException& e) {
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_FAIL;
   }
 
@@ -127,11 +140,19 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
   if (argc < 1 || argv == 0 || argv[0] == 0) {
     service_static->UpdateState(SERVICE_STOPPED, E_INVALIDARG, true);
+    constexpr absl::string_view error_msg{"insufficient arguments provided"};
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+    PANIC(error_msg);
   }
 
   service_static->handle_ = ::RegisterServiceCtrlHandlerA("ENVOY\0", Handler);
   if (service_static->handle_ == 0) {
-    service_static->UpdateState(SERVICE_STOPPED, ::GetLastError(), false);
+    auto last_error = ::GetLastError();
+    service_static->UpdateState(SERVICE_STOPPED, last_error, false);
+    std::string error_msg{
+        fmt::format("Could not register service control handler with error {}", last_error)};
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+    PANIC(error_msg);
   }
 
   // Windows Services can get their arguments in two different ways

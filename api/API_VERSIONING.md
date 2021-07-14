@@ -1,6 +1,6 @@
 # API versioning guidelines
 
-The Envoy project (and in the future [UDPA](https://github.com/cncf/udpa)) takes API stability and
+The Envoy project and [xDS working group](https://github.com/cncf/xds) take API stability and
 versioning seriously. Providing stable APIs is a necessary step in ensuring API adoption and success
 of the ecosystem. Below we articulate the API versioning guidelines that aim to deliver this
 stability.
@@ -21,12 +21,12 @@ https://github.com/envoyproxy/envoy/issues/8416.
 
 In everyday discussion and GitHub labels, we refer to the `v2`, `v3`, `vN`, `...` APIs. This has a
 specific technical meaning. Any given message in the Envoy API, e.g. the `Bootstrap` at
-`envoy.config.bootstrap.v3.Boostrap`, will transitively reference a number of packages in the Envoy
+`envoy.config.bootstrap.v3.Bootstrap`, will transitively reference a number of packages in the Envoy
 API. These may be at `vN`, `v(N-1)`, etc. The Envoy API is technically a DAG of versioned package
 namespaces. When we talk about the `vN xDS API`, we really refer to the `N` of the root
 configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). The
-v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Boostrap`, even
-though it might might transitively reference `envoy.service.trace.v2`.
+v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Bootstrap`, even
+though it might transitively reference `envoy.service.trace.v2`.
 
 # Backwards compatibility
 

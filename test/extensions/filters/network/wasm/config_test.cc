@@ -1,12 +1,11 @@
 #include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 
-#include "common/common/base64.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/filters/network/wasm/config.h"
-#include "extensions/filters/network/wasm/wasm_filter.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/filters/network/wasm/config.h"
+#include "source/extensions/filters/network/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -61,6 +60,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
                          Envoy::Extensions::Common::Wasm::runtime_values);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -76,17 +81,35 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  WasmFilterConfig factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
-  EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
-  cb(connection);
+
+  // Intentionally we scope the factory here, and make the context outlive it.
+  // This case happens when the config is updated by ECDS, and
+  // we have to make sure that contexts still hold valid WasmVMs in these cases.
+  std::shared_ptr<Envoy::Extensions::Common::Wasm::Context> context = nullptr;
+  {
+    WasmFilterConfig factory;
+    Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context_);
+    EXPECT_CALL(init_watcher_, ready());
+    context_.initManager().initialize(init_watcher_);
+    EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, addFilter(_)).WillOnce([&context](Network::FilterSharedPtr filter) {
+      context = std::static_pointer_cast<Envoy::Extensions::Common::Wasm::Context>(filter);
+    });
+    cb(connection);
+  }
+  // Check if the context still holds a valid Wasm even after the factory is destroyed.
+  EXPECT_TRUE(context);
+  EXPECT_TRUE(context->wasm());
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   const std::string code =
       GetParam() != "null"
           ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -155,6 +178,12 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -178,6 +207,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -200,6 +235,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -227,6 +268,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }
@@ -256,6 +303,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   if (GetParam() == "null") {
     return;
   }

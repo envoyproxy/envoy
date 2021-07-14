@@ -5,14 +5,14 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/random_generator.h"
-#include "common/http/header_map_impl.h"
-#include "common/network/socket_option_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/network/socket_option_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
-#include "test/integration/filters/test_socket_interface.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -30,70 +30,6 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
-
-class SocketInterfaceSwap {
-public:
-  // Object of this class hold the state determining the IoHandle which
-  // should return EAGAIN from the `writev` call.
-  struct IoHandleMatcher {
-    bool shouldReturnEgain(uint32_t src_port, uint32_t dst_port) const {
-      absl::ReaderMutexLock lock(&mutex_);
-      return writev_returns_egain_ && (src_port == src_port_ || dst_port == dst_port_);
-    }
-
-    // Source port to match. The port specified should be associated with a listener.
-    void setSourcePort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      src_port_ = port;
-    }
-
-    // Destination port to match. The port specified should be associated with a listener.
-    void setDestinationPort(uint32_t port) {
-      absl::WriterMutexLock lock(&mutex_);
-      dst_port_ = port;
-    }
-
-    void setWritevReturnsEgain() {
-      absl::WriterMutexLock lock(&mutex_);
-      ASSERT(src_port_ != 0 || dst_port_ != 0);
-      writev_returns_egain_ = true;
-    }
-
-  private:
-    mutable absl::Mutex mutex_;
-    uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
-  };
-
-  SocketInterfaceSwap() {
-    Envoy::Network::SocketInterfaceSingleton::clear();
-    test_socket_interface_loader_ = std::make_unique<Envoy::Network::SocketInterfaceLoader>(
-        std::make_unique<Envoy::Network::TestSocketInterface>(
-            [writev_matcher = writev_matcher_](
-                Envoy::Network::TestIoSocketHandle* io_handle, const Buffer::RawSlice*,
-                uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-              if (writev_matcher->shouldReturnEgain(io_handle->localAddress()->ip()->port(),
-                                                    io_handle->peerAddress()->ip()->port())) {
-                return Api::IoCallUint64Result(
-                    0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                       Network::IoSocketError::deleteIoError));
-              }
-              return absl::nullopt;
-            }));
-  }
-
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-protected:
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
-};
 
 // It is important that the new socket interface is installed before any I/O activity starts and
 // the previous one is restored after all I/O activity stops. Since the HttpIntegrationTest
@@ -131,8 +67,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
                          TestUtility::ipTestParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower upstream outbound frame limits to make tests run faster
   config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -158,8 +94,8 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
 }
 
 void Http2FloodMitigationTest::beginSession() {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
   config_helper_.setDownstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
@@ -198,7 +134,7 @@ void Http2FloodMitigationTest::floodServer(const Http2Frame& frame, const std::s
 }
 
 // Send header only request, flood client, and verify that the upstream is disconnected and client
-// receives 503.
+// receives 502.
 void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num_frames,
                                            const std::string& flood_stat) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -216,9 +152,9 @@ void Http2FloodMitigationTest::floodClient(const Http2Frame& frame, uint32_t num
 
   // Upstream connection should be disconnected
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  // Downstream client should receive 503 since upstream did not send response headers yet
-  response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  // Downstream client should receive 502 since upstream did not send response headers yet
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
   if (!flood_stat.empty()) {
     EXPECT_EQ(1, test_server_->counter(flood_stat)->value());
   }
@@ -257,7 +193,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
 
   // Do not read from the socket and send request that causes autonomous upstream to respond
   // with the specified number of DATA frames. This pre-fills downstream outbound frame queue
-  // such the the next response triggers flood protection.
+  // such the next response triggers flood protection.
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
   // start to accumulate in the transport socket buffer.
   writev_matcher_->setWritevReturnsEgain();
@@ -396,7 +332,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
 
   // The factory will be used to create 4 buffers: the input and output buffers for request and
   // response pipelines.
-  EXPECT_EQ(4, buffer_factory->numBuffersCreated());
+  EXPECT_EQ(8, buffer_factory->numBuffersCreated());
 
   // Expect at least 1000 1 byte data frames in the output buffer. Each data frame comes with a
   // 9-byte frame header; 10 bytes per data frame, 10000 bytes total. The output buffer should also
@@ -411,7 +347,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
   EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(1024 * 1024 * 1024, 1024 * 1024 * 1024));
+              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call
@@ -1243,8 +1179,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
                                                Http2Frame::HeadersFlags::None);
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
-  response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
@@ -1266,14 +1202,12 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
       Http2Frame::makeMalformedResponseWithZerolenHeader(Http2Frame::makeClientStreamId(0));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf.begin(), buf.end())));
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
-  EXPECT_EQ(
-      1,
-      test_server_->counter("cluster.cluster_0.upstream_cx_destroy_local_with_active_rq")->value());
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+  EXPECT_EQ("502", response->headers().getStatusValue());
 }
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
@@ -1306,8 +1240,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
 
   // Make sure upstream and downstream got RST_STREAM from the server.
   ASSERT_TRUE(upstream_request_->waitForReset());
-  response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
 
   // Send another request from downstream on the same connection, and make sure
   // a new request reaches upstream on its previous connection.
@@ -1317,7 +1251,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
       Http2Frame::makeHeadersFrameWithStatus("200", Http2Frame::makeClientStreamId(1));
   ASSERT_TRUE(upstream->rawWriteConnection(0, std::string(buf2.begin(), buf2.end())));
 
-  response2->waitForEndStream();
+  ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response2->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.rx_messaging_error")->value());
@@ -1327,7 +1261,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
   // Expect a local reset due to upstream reset before a response.
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("upstream_reset_before_response_started"));
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("LR"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("UPE"));
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
@@ -1353,7 +1287,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
   }
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
@@ -1378,8 +1312,8 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
   }
 
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForEndStream();
-  EXPECT_EQ("503", response->headers().getStatusValue());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("502", response->headers().getStatusValue());
   EXPECT_EQ(1,
             test_server_->counter("cluster.cluster_0.http2.inbound_empty_frames_flood")->value());
 }
@@ -1419,7 +1353,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Downstream client should get stream reset since upstream sent headers but did not complete the
   // stream
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(
       1, test_server_->counter("cluster.cluster_0.http2.inbound_priority_frames_flood")->value());
 }
@@ -1437,7 +1371,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneClosedStream) {
   // Send response header and end the stream
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   auto frame = Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(0),
@@ -1477,7 +1411,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
   // Verify that when RST_STREAM overflows upstream queue it is handled correctly
   // by causing upstream connection to be disconnected.
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   //  EXPECT_EQ("408", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
@@ -1548,7 +1482,7 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
   // Upstream connection should be disconnected
   // Downstream client should receive 503 since upstream did not send response headers yet
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   // Verify that the flood check was triggered.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.http2.outbound_flood")->value());
@@ -1556,8 +1490,8 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
 
 // Validate that the default configuration has flood protection enabled.
 TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
-  setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
 
   floodClient(Http2Frame::makePingFrame(),

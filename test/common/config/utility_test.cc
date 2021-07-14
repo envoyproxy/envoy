@@ -6,11 +6,11 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
-using testing::_;
 using testing::Ref;
 using testing::Return;
 
@@ -72,12 +71,10 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
 
 TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::config::core::v3::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,
-                                    ApiType::get().UnsupportedRestLegacy,
+  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().Rest,
                                     api_config_source_rest_legacy);
-  EXPECT_EQ(
-      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY,
-      api_config_source_rest_legacy.api_type());
+  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST,
+            api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000,
             DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));
   EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
@@ -231,9 +228,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(
-                    ProtoEq(expected_grpc_service), Ref(scope),
-                    Grpc::AsyncClientFactoryClusterChecks::ValidateStaticDuringBootstrap));
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
     Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, false);
   }
 
@@ -241,9 +236,9 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
-    EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope),
-                                      Grpc::AsyncClientFactoryClusterChecks::Skip));
+    EXPECT_CALL(
+        async_client_manager,
+        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
     Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true);
   }
 }
@@ -497,7 +492,11 @@ TEST(UtilityTest, TypedStructToInvalidType) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   const std::string bootstrap_config_yaml = R"EOF(
     admin:
-      access_log_path: /dev/null
+      access_log:
+      - name: envoy.access_loggers.file
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+          path: /dev/null
       address:
         pipe:
           path: "/"

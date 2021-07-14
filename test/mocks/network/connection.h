@@ -1,10 +1,11 @@
 #pragma once
 
 #include <list>
+#include <ostream>
 
 #include "envoy/network/connection.h"
 
-#include "common/network/filter_manager_impl.h"
+#include "source/common/network/filter_manager_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -83,7 +84,8 @@ public:
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));                          \
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
-  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const))
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {
 public:

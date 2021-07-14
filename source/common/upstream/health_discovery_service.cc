@@ -1,4 +1,4 @@
-#include "common/upstream/health_discovery_service.h"
+#include "source/common/upstream/health_discovery_service.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -9,11 +9,11 @@
 #include "envoy/service/health/v3/hds.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/version_converter.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/config/version_converter.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -293,9 +293,9 @@ void HdsDelegate::onReceiveMessage(
   }
 
   // Validate message fields
-  try {
-    MessageUtil::validate(*message, validation_visitor_);
-  } catch (const ProtoValidationException& ex) {
+  TRY_ASSERT_MAIN_THREAD { MessageUtil::validate(*message, validation_visitor_); }
+  END_TRY
+  catch (const ProtoValidationException& ex) {
     // Increment error count
     stats_.errors_.inc();
     ENVOY_LOG(warn, "Unable to validate health check specifier: {}", ex.what());

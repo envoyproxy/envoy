@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "lua_filter_test",
     srcs = ["lua_filter_test.cc"],
-    extension_name = "envoy.filters.http.lua",
+    extension_names = ["envoy.filters.http.lua"],
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
-    extension_name = "envoy.filters.http.lua",
+    extension_names = ["envoy.filters.http.lua"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "lua_integration_test",
     srcs = ["lua_integration_test.cc"],
-    extension_name = "envoy.filters.http.lua",
+    extension_names = ["envoy.filters.http.lua"],
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/integration:http_integration_lib",
@@ -62,7 +62,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.lua",
+    extension_names = ["envoy.filters.http.lua"],
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",

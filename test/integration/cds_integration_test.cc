@@ -3,9 +3,9 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -31,7 +31,7 @@ const int UpstreamIndex2 = 2;
 class CdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
   CdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(),
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
                                 sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
     use_lds_ = false;
@@ -53,8 +53,8 @@ public:
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
-    setUpstreamCount(1);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(1);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     // HttpIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
@@ -71,8 +71,8 @@ public:
     // Create the regular (i.e. not an xDS server) upstreams. We create them manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
     cluster1_ = ConfigHelper::buildStaticCluster(
         ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
         Network::Test::getLoopbackAddressString(ipVersion()));
@@ -242,7 +242,7 @@ TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   acceptXdsConnection();
 
   // Upon reconnecting, the Envoy should tell us its current resource versions.
-  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
+  envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   result = xds_stream_->waitForGrpcMessage(*dispatcher_, request);
   RELEASE_ASSERT(result, result.message());
   const auto& initial_resource_versions = request.initial_resource_versions();

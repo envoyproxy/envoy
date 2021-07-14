@@ -41,9 +41,9 @@ void MockInstance::poolFailure(PoolFailureReason reason, bool host_null) {
   callbacks_.pop_front();
   handles_.pop_front();
   if (host_null) {
-    cb->onPoolFailure(reason, nullptr);
+    cb->onPoolFailure(reason, "", nullptr);
   } else {
-    cb->onPoolFailure(reason, host_);
+    cb->onPoolFailure(reason, "", host_);
   }
 }
 
@@ -57,6 +57,8 @@ void MockInstance::poolReady(Network::MockClientConnection& conn) {
   connection_data_->release_callback_ = [&]() -> void { released(conn); };
 
   cb->onPoolReady(std::move(connection_data_), host_);
+
+  connection_data_ = std::make_unique<NiceMock<MockConnectionData>>();
 }
 
 } // namespace ConnectionPool

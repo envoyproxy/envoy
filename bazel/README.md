@@ -6,25 +6,22 @@ It is recommended to use [Bazelisk](https://github.com/bazelbuild/bazelisk) inst
 
 On Linux, run the following commands:
 
-```
+```console
 sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazel
 ```
 
 On macOS, run the following command:
-```
+```console
 brew install bazelisk
 ```
 
 On Windows, run the following commands:
-```
+```cmd
 mkdir %USERPROFILE%\bazel
 powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
 set PATH=%PATH%;%USERPROFILE%\bazel
 ```
-
-If you're building from an revision of Envoy prior to August 2019, which doesn't contains a `.bazelversion` file, run `ci/run_envoy_docker.sh "bazel version"`
-to find the right version of Bazel and set the version to `USE_BAZEL_VERSION` environment variable to build.
 
 ## Production environments
 
@@ -52,34 +49,46 @@ for how to update or override dependencies.
 1. Install external dependencies.
     ### Ubuntu
     On Ubuntu, run the following:
-    ```
+    ```console
     sudo apt-get install \
-       libtool \
-       cmake \
-       automake \
        autoconf \
+       automake \
+       cmake \
+       curl \
+       libtool \
        make \
        ninja-build \
-       curl \
+       patch \
+       python3-pip \
        unzip \
        virtualenv
     ```
 
     ### Fedora
     On Fedora (maybe also other red hat distros), run the following:
-    ```
-    dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
+    ```console
+    dnf install \
+        aspell-en \
+        cmake \
+        libatomic \
+        libstdc++ \
+        libstdc++-static \
+        libtool \
+        lld \
+        ninja-build \
+        patch \
+        python3-pip
     ```
 
     ### Linux
     On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
     Extract the tar.xz and run the following:
-    ```
+    ```console
     bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
     ```
 
     This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
-    ```
+    ```console
     echo "build --config=clang" >> user.bazelrc
     ```
 
@@ -95,7 +104,7 @@ for how to update or override dependencies.
 
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
-    ```
+    ```console
     brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
@@ -135,7 +144,7 @@ for how to update or override dependencies.
     startup --output_base=C:/_eb
     ```
 
-    Another option to shorten the the output root for Bazel is to set the `USERNAME` environment variable in your shell
+    Another option to shorten the output root for Bazel is to set the `USERNAME` environment variable in your shell
     session to a short value. Bazel uses this value when constructing its output root path if no explicit `--output_base`
     is set.
 
@@ -154,22 +163,22 @@ for how to update or override dependencies.
     will not work. Add a symlink for `python3.exe` pointing to the installed `python.exe` for Envoy scripts
     and Bazel rules which follow POSIX python conventions. Add `pip.exe` to the PATH and install the `wheel`
     package.
-    ```
-    mklink %USERPROFILE%\Python38\python3.exe %USERPROFILE%\Python38\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python38
-    set PATH=%PATH%;%USERPROFILE%\Python38\Scripts
+    ```cmd
+    mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
+    set PATH=%PATH%;%USERPROFILE%\Python39
+    set PATH=%PATH%;%USERPROFILE%\Python39\Scripts
     pip install wheel
     ```
 
     [Build Tools for Visual Studio 2019](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019):
-    For building with MSVC (the `msvc-cl` config option), you must install at least the VC++ workload.
+    For building with MSVC, you must install at least the VC++ workload.
     You may alternately install the entire Visual Studio 2019 and use the Build Tools installed in that
     package. Earlier versions of VC++ Build Tools/Visual Studio are not recommended or supported.
     If installed in a non-standard filesystem location, be sure to set the `BAZEL_VC` environment variable
     to the path of the VC++ package to allow Bazel to find your installation of VC++. NOTE: ensure that
     the `link.exe` that resolves on your PATH is from VC++ Build Tools and not `/usr/bin/link.exe` from MSYS2,
     which is determined by their relative ordering in your PATH.
-    ```
+    ```cmd
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
     ```
@@ -180,17 +189,17 @@ for how to update or override dependencies.
     Tools are sufficient in most cases, but are 32 bit binaries. These flavors will not run in
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
     projects are used instead.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
     set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
     ```
 
-    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys32.
+    [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
 
     Set the `BAZEL_SH` environment variable to the path of the installed MSYS2 `bash.exe`
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
@@ -200,7 +209,7 @@ for how to update or override dependencies.
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
     path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
-    ```
+    ```cmd
     set TMPDIR=C:\Windows\TEMP
     mklink /d C:\c C:\
     ```
@@ -217,12 +226,12 @@ for how to update or override dependencies.
 
     [Git](https://git-scm.com/downloads): This version from the Git project, or the version
     distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
-    ```
+    ```cmd
     set PATH=%PATH%;%USERPROFILE%\Git\bin
     ```
 
     Lastly, persist environment variable changes.
-    ```
+    ``` cmd
     setx PATH "%PATH%"
     setx BAZEL_SH "%BAZEL_SH%"
     setx MSYS2_ARG_CONV_EXCL "%MSYS2_ARG_CONV_EXCL%"
@@ -253,6 +262,8 @@ On Linux, run:
 
 From a Windows host with Docker installed, the Windows containers feature enabled, and bash (installed via
 MSYS2 or Git bash), run:
+
+**Note: the command below executes the whole Windows CI and unlike Linux you are not able to set specific build targets. You can modify `./ci/windows_ci_steps.sh` to modify `bazel` arguments, tests to run, etc. as well as set environment variables to adjust your container build environment.**
 
 ```
 ./ci/run_envoy_docker.sh './ci/windows_ci_steps.sh'
@@ -618,6 +629,10 @@ bazel test //test/integration:protocol_integration_test --test_output=streamed \
   --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
+Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
+environment where `n` is the desired verbosity level (e.g.
+`--test_env="ENVOY_QUICHE_VERBOSITY=2"`.
+
 ## Disabling optional features
 
 The following optional features can be disabled on the Bazel build command-line:
@@ -629,7 +644,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-
+* http3/quic with --//bazel:http3=False
 
 ## Enabling optional features
 
@@ -839,14 +854,16 @@ The compilation database could also be used to setup editors with cross referenc
 For example, you can use [You Complete Me](https://valloric.github.io/YouCompleteMe/) or
 [clangd](https://clangd.llvm.org/) with supported editors.
 
-For example, use following command to prepare a compilation database:
+This requires Python 3.8.0+, download from [here](https://www.python.org/downloads/) if you do not have it installed already.
+
+Use the following command to prepare a compilation database:
 
 ```
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
-# Running clang-format without docker
+# Running format linting without docker
 
 The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
@@ -859,6 +876,8 @@ To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
 
+Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
+
 Edit the paths shown here to reflect the installation locations on your system:
 
 ```shell
@@ -870,9 +889,9 @@ Once this is set up, you can run clang-format without docker:
 
 ```shell
 ./tools/code_format/check_format.py check
-./tools/spelling/check_spelling.sh check
+./tools/spelling/check_spelling_pedantic.py check
 ./tools/code_format/check_format.py fix
-./tools/spelling/check_spelling.sh fix
+./tools/spelling/check_spelling_pedantic.py fix
 ```
 
 # Advanced caching setup

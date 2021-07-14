@@ -11,19 +11,15 @@ Build
 
   build/binaries
   build/boringssl
+  build/speed
 
 API
 ---
 .. toctree::
   :maxdepth: 2
 
-  api/transition
-  api/envoy_v2_support
   api/envoy_v3
-  api/envoy_upgrade_v3
   api/extensions
-  api/control_plane_version_support
-  api/control_plane
   api/package_naming
   api/why_versioning
   api/incremental
@@ -85,3 +81,17 @@ Extensions
   :maxdepth: 2
 
   extensions/contract
+
+Windows
+-------
+
+.. toctree::
+  :maxdepth: 2
+
+  windows/win_requirements
+  windows/win_not_supported_features
+  windows/win_fips_support
+  windows/win_performance
+  windows/win_security
+  windows/win_run_as_service
+

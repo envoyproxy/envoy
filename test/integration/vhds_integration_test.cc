@@ -3,9 +3,9 @@
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -26,7 +26,11 @@ namespace {
 const std::string& config() {
   CONSTRUCT_ON_FIRST_USE(std::string, fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -151,8 +155,7 @@ routes:
 class VhdsInitializationTest : public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
-  VhdsInitializationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+  VhdsInitializationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 
@@ -165,8 +168,8 @@ public:
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     // BaseIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
@@ -248,8 +251,7 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
 class VhdsIntegrationTest : public HttpIntegrationTest,
                             public Grpc::GrpcClientIntegrationParamTest {
 public:
-  VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config()) {
+  VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
   }
 
@@ -287,8 +289,8 @@ public:
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     // BaseIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
@@ -341,7 +343,7 @@ public:
 
   void notifyAboutAliasResolutionFailure(const std::string& version, FakeStreamPtr& stream,
                                          const std::vector<std::string>& aliases = {}) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(Config::TypeUrl::get().VirtualHost);
     auto* resource = response.add_resources();
@@ -372,8 +374,9 @@ public:
   // used in VhdsOnDemandUpdateWithResourceNameAsAlias test
   // to create a DeltaDiscoveryResponse with a resource name matching the value used to create an
   // on-demand request
-  envoy::api::v2::DeltaDiscoveryResponse createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) ret;
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse ret;
     ret.set_system_version_info("system_version_info_this_is_a_test");
     ret.set_type_url(Config::TypeUrl::get().VirtualHost);
 
@@ -564,7 +567,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 
-  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+  envoy::service::discovery::v3::DeltaDiscoveryResponse vhds_update =
       createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
   vhds_stream_->sendGrpcMessage(vhds_update);
 
@@ -681,12 +684,12 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
 
-  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+  envoy::service::discovery::v3::DeltaDiscoveryResponse vhds_update =
       createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
   vhds_stream_->sendGrpcMessage(vhds_update);
 
   codec_client_->sendReset(encoder);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();

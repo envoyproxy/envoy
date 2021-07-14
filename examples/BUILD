@@ -31,3 +31,10 @@ filegroup(
     name = "lua",
     srcs = glob(["**/*.lua"]),
 )
+
+filegroup(
+    name = "files",
+    srcs = glob(["**/*"]) + [
+        "//examples/wasm-cc:files",
+    ],
+)

@@ -28,7 +28,6 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
 
   - address:
       socket_address:
@@ -58,7 +57,6 @@ static_resources:
                   cluster: service2
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
 
       transport_socket:
         name: envoy.transport_sockets.tls
@@ -126,10 +124,8 @@ static_resources:
 
   clusters:
   - name: service1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service1
       endpoints:
@@ -140,10 +136,8 @@ static_resources:
                 address: service1
                 port_value: 8000
   - name: service2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
     load_assignment:
       cluster_name: service2
       endpoints:
@@ -154,17 +148,16 @@ static_resources:
                 address: service2
                 port_value: 8000
 admin:
-  access_log_path: "/dev/null"
   address:
     socket_address:
       address: 0.0.0.0
       port_value: 8001
 layered_runtime:
   layers:
-    - name: static_layer_0
-      static_layer:
-        envoy:
-          resource_limits:
-            listener:
-              example_listener_name:
-                connection_limit: 10000
+  - name: static_layer_0
+    static_layer:
+      envoy:
+        resource_limits:
+          listener:
+            example_listener_name:
+              connection_limit: 10000

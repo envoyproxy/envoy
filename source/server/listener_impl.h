@@ -13,12 +13,12 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/basic_resource_impl.h"
-#include "common/common/logger.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
+#include "source/common/common/basic_resource_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/quic/quic_stat_names.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "absl/base/call_once.h"
 
@@ -54,14 +54,18 @@ public:
   Network::SocketSharedPtr getListenSocket() override;
 
   /**
-   * @return the socket shared by worker threads; otherwise return null.
+   * @return the socket shared by worker threads; otherwise return nullopt.
    */
   Network::SocketOptRef sharedSocket() const override {
+    // If listen socket doesn't bind to port, consider it not shared.
+    if (!bind_to_port_) {
+      return absl::nullopt;
+    }
     if (!reuse_port_) {
       ASSERT(socket_ != nullptr);
       return *socket_;
     }
-    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // If reuse_port is true, always return nullopt, even socket_ is created for reserving
     // port number.
     return absl::nullopt;
   }
@@ -129,6 +133,10 @@ public:
   // DrainDecision
   bool drainClose() const override {
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
   Server::DrainManager& drainManager();
 
@@ -301,19 +309,11 @@ public:
   Stats::Scope& listenerScope() override { return listener_factory_context_->listenerScope(); }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
-    return udp_listener_factory_.get();
-  }
-  Network::UdpPacketWriterFactoryOptRef udpPacketWriterFactory() override {
-    return Network::UdpPacketWriterFactoryOptRef(std::ref(*udp_writer_factory_));
-  }
-  Network::UdpListenerWorkerRouterOptRef udpListenerWorkerRouter() override {
-    return udp_listener_worker_router_
-               ? Network::UdpListenerWorkerRouterOptRef(*udp_listener_worker_router_)
-               : absl::nullopt;
+  Network::UdpListenerConfigOptRef udpListenerConfig() override {
+    return udp_listener_config_ != nullptr ? *udp_listener_config_
+                                           : Network::UdpListenerConfigOptRef();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
-
   ResourceLimit& openConnections() override { return *open_connections_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
     return access_logs_;
@@ -341,6 +341,24 @@ public:
   SystemTime last_updated_;
 
 private:
+  struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
+    UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
+        : config_(config) {}
+
+    // Network::UdpListenerConfig
+    Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
+    Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+    Network::UdpListenerWorkerRouter& listenerWorkerRouter() override {
+      return *listener_worker_router_;
+    }
+    const envoy::config::listener::v3::UdpListenerConfig& config() override { return config_; }
+
+    const envoy::config::listener::v3::UdpListenerConfig config_;
+    Network::ActiveUdpListenerFactoryPtr listener_factory_;
+    Network::UdpPacketWriterFactoryPtr writer_factory_;
+    Network::UdpListenerWorkerRouterPtr listener_worker_router_;
+  };
+
   /**
    * Create a new listener from an existing listener and the new config message if the in place
    * filter chain update is decided. Should be called only by newListenerWithFilterChain().
@@ -352,7 +370,6 @@ private:
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
-  void buildUdpWriterFactory(Network::Socket::Type socket_type);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
   void validateFilterChains(Network::Socket::Type socket_type);
@@ -398,9 +415,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  Network::ActiveUdpListenerFactoryPtr udp_listener_factory_;
-  Network::UdpPacketWriterFactoryPtr udp_writer_factory_;
-  Network::UdpListenerWorkerRouterPtr udp_listener_worker_router_;
+  std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
@@ -416,6 +431,8 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+
+  Quic::QuicStatNames& quic_stat_names_;
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

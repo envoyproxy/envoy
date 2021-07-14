@@ -2,7 +2,7 @@
 
 #include "envoy/server/access_log_config.h"
 
-#include "common/config/datasource.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +17,7 @@ class WasmAccessLogFactory : public Server::Configuration::AccessLogInstanceFact
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context) override;
+                          Server::Configuration::CommonFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

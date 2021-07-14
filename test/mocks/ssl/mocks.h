@@ -99,6 +99,12 @@ public:
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
   MOCK_METHOD(const std::string&, signingAlgorithmsForTest, (), (const));
+
+  Ssl::HandshakerCapabilities capabilities_;
+  std::string sni_{"default_sni.example.com"};
+  std::string ciphers_{"RSA"};
+  std::string alpn_{""};
+  std::string test_{};
 };
 
 class MockServerContextConfig : public ServerContextConfig {
@@ -150,7 +156,6 @@ public:
   MOCK_METHOD(const std::string&, caCertPath, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationList, (), (const));
   MOCK_METHOD(const std::string&, certificateRevocationListPath, (), (const));
-  MOCK_METHOD(const std::vector<std::string>&, verifySubjectAltNameList, (), (const));
   MOCK_METHOD(const std::vector<envoy::type::matcher::v3::StringMatcher>&, subjectAltNameMatchers,
               (), (const));
   MOCK_METHOD(const std::vector<std::string>&, verifyCertificateHashList, (), (const));

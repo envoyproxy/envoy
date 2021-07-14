@@ -1,4 +1,4 @@
-#include "common/upstream/original_dst_cluster.h"
+#include "source/common/upstream/original_dst_cluster.h"
 
 #include <chrono>
 #include <list>
@@ -11,11 +11,11 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/headers.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -89,14 +89,16 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
     override_header = downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost);
   }
   if (!override_header.empty()) {
-    try {
-      // This is an implicitly untrusted header, so per the API documentation only the first
-      // value is used.
-      const std::string request_override_host(override_header[0]->value().getStringView());
-      request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
+    // This is an implicitly untrusted header, so per the API documentation only the first
+    // value is used.
+    const std::string request_override_host(override_header[0]->value().getStringView());
+    request_host =
+        Network::Utility::parseInternetAddressAndPortNoThrow(request_override_host, false);
+    if (request_host != nullptr) {
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
-    } catch (const Envoy::EnvoyException& e) {
-      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}", e.what());
+    } else {
+      ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
+                request_override_host);
       parent_->info()->stats().original_dst_host_invalid_.inc();
     }
   }
@@ -117,9 +119,8 @@ OriginalDstCluster::OriginalDstCluster(
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
       host_map_(std::make_shared<HostMap>()) {
-  // TODO(dio): Remove hosts check once the hosts field is removed.
-  if (config.has_load_assignment() || !config.hidden_envoy_deprecated_hosts().empty()) {
-    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment or hosts configured");
+  if (config.has_load_assignment()) {
+    throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }

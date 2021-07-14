@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.v3;
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -11,12 +12,21 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSION_CANDIDATE;
 
 enum SomeEnum {
-  hidden_envoy_deprecated_DEFAULT = 0 [deprecated = true];
+  hidden_envoy_deprecated_DEFAULT = 0
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
   FOO = 1;
-  hidden_envoy_deprecated_BAR = 2 [deprecated = true];
+  hidden_envoy_deprecated_BAR = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
   WOW = 3;
+  hidden_envoy_deprecated_OLD = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.6"];
+  hidden_envoy_deprecated_DEP = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.7"];
+  hidden_envoy_deprecated_VERY_OLD = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version_enum) = "3.5"];
 }
 
+// [#next-free-field: 7]
 message Sample {
   option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
 
@@ -37,7 +47,17 @@ message Sample {
 
   repeated Entry entries = 1;
 
-  string hidden_envoy_deprecated_will_deprecated = 2 [deprecated = true];
+  string hidden_envoy_deprecated_will_deprecated = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
 
   string renamed_component = 3;
+
+  string hidden_envoy_deprecated_old_deprecated = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.6"];
+
+  string hidden_envoy_deprecated_new_deprecated = 5
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.7"];
+
+  string hidden_envoy_deprecated_very_old_deprecated = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.5"];
 }

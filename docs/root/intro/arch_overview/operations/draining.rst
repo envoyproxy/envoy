@@ -26,7 +26,7 @@ and cease accepting new connections immediately.
 
 To add a graceful drain period prior to listeners being closed, use the query parameter
 :ref:`drain_listeners?graceful <operations_admin_interface_drain>`. By default, Envoy
-will discourage requests for some period of time (as determined by :option:`--drain-time-s`). 
+will discourage requests for some period of time (as determined by :option:`--drain-time-s`).
 The behaviour of request discouraging is determined by the drain manager.
 
 Note that although draining is a per-listener concept, it must be supported at the network filter

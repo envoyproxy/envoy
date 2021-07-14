@@ -5,18 +5,17 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
-#include "common/common/fmt.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
-#include "test/test_common/utility.h"
-
-//#include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -181,16 +180,18 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(1,
               stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
-    EXPECT_EQ("", stream_info.requestedServerName());
-    absl::string_view sni_name = "stubserver.org";
-    stream_info.setRequestedServerName(sni_name);
-    EXPECT_EQ(std::string(sni_name), stream_info.requestedServerName());
-
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
     stream_info.setUpstreamClusterInfo(cluster_info);
     EXPECT_NE(absl::nullopt, stream_info.upstreamClusterInfo());
     EXPECT_EQ("fake_cluster", stream_info.upstreamClusterInfo().value()->name());
+
+    const std::string session_id =
+        "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
+    auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
+    stream_info.setUpstreamSslConnection(ssl_info);
+    EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
   }
 }
 
@@ -249,14 +250,6 @@ TEST_F(StreamInfoImplTest, RequestHeadersTest) {
 TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_EQ(nullptr, stream_info.getRequestIDProvider());
-}
-
-TEST_F(StreamInfoImplTest, ConnectionID) {
-  StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
-  EXPECT_FALSE(stream_info.connectionID().has_value());
-  uint64_t id = 123;
-  stream_info.setConnectionID(id);
-  EXPECT_EQ(id, stream_info.connectionID());
 }
 
 TEST_F(StreamInfoImplTest, Details) {

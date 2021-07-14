@@ -1,4 +1,4 @@
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 #include <cstdint>
 #include <list>
@@ -11,17 +11,20 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
@@ -30,14 +33,20 @@
 namespace Envoy {
 namespace Network {
 
+Address::InstanceConstSharedPtr instanceOrNull(StatusOr<Address::InstanceConstSharedPtr> address) {
+  if (address.ok()) {
+    return *address;
+  }
+  return nullptr;
+}
+
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   if (urlIsTcpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(TCP_SCHEME.size()));
   } else if (urlIsUdpScheme(url)) {
     return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
   } else if (urlIsUnixScheme(url)) {
-    return Address::InstanceConstSharedPtr{
-        new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
+    return std::make_shared<Address::PipeInstance>(url.substr(UNIX_SCHEME.size()));
   } else {
     throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
   }
@@ -92,16 +101,16 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
   }
 }
 
-Api::IoCallUint64Result receiveMessage(uint64_t max_packet_size, Buffer::InstancePtr& buffer,
+Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::InstancePtr& buffer,
                                        IoHandle::RecvMsgOutput& output, IoHandle& handle,
                                        const Address::Instance& local_address) {
 
-  auto reservation = buffer->reserveSingleSlice(max_packet_size);
+  auto reservation = buffer->reserveSingleSlice(max_rx_datagram_size);
   Buffer::RawSlice slice = reservation.slice();
   Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
 
   if (result.ok()) {
-    reservation.commit(std::min(max_packet_size, result.rc_));
+    reservation.commit(std::min(max_rx_datagram_size, result.rc_));
   }
 
   return result;
@@ -125,23 +134,33 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
   return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
-                                                              uint16_t port, bool v6only) {
+Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
+                                                                     uint16_t port, bool v6only) {
   sockaddr_in sa4;
   if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
-    return std::make_shared<Address::Ipv4Instance>(&sa4);
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4));
   }
   sockaddr_in6 sa6;
   memset(&sa6, 0, sizeof(sa6));
   if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) == 1) {
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port);
-    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
+    return instanceOrNull(
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only));
   }
-  throwWithMalformedIp(ip_address);
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr;
+}
+
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string& ip_address,
+                                                              uint16_t port, bool v6only) {
+  const Address::InstanceConstSharedPtr address =
+      parseInternetAddressNoThrow(ip_address, port, v6only);
+  if (address == nullptr) {
+    throwWithMalformedIp(ip_address);
+  }
+  return address;
 }
 
 Address::InstanceConstSharedPtr
@@ -168,7 +187,8 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     }
     sa6.sin6_family = AF_INET6;
     sa6.sin6_port = htons(port64);
-    return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
+    return instanceOrNull(
+        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(sa6, v6only));
   }
   // Treat it as an IPv4 address followed by a port.
   const auto pos = ip_address.rfind(':');
@@ -188,7 +208,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   }
   sa4.sin_family = AF_INET;
   sa4.sin_port = htons(port64);
-  return std::make_shared<Address::Ipv4Instance>(&sa4);
+  return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4));
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
@@ -236,7 +256,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
         (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::addressFromSockAddr(
+      ret = Address::addressFromSockAddrOrThrow(
           *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
       if (!isLoopbackAddress(*ret)) {
         break;
@@ -394,7 +414,8 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
     return nullptr;
   }
 
-  return Address::addressFromSockAddr(orig_addr, 0, true /* default for v6 constructor */);
+  return Address::addressFromSockAddrOrDie(orig_addr, 0, -1, true /* default for v6 constructor */);
+
 #else
   // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
@@ -411,7 +432,7 @@ void Utility::parsePortRangeList(absl::string_view string, std::list<PortRange>&
     uint32_t min = 0;
     uint32_t max = 0;
 
-    if (s.find("-") != std::string::npos) {
+    if (s.find('-') != std::string::npos) {
       char dash = 0;
       ss >> min;
       ss >> dash;
@@ -566,25 +587,27 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
 Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
                                                 const Address::Instance& local_address,
                                                 UdpPacketProcessor& udp_packet_processor,
-                                                MonotonicTime receive_time,
+                                                MonotonicTime receive_time, bool use_gro,
                                                 uint32_t* packets_dropped) {
 
-  if (handle.supportsUdpGro()) {
+  if (use_gro) {
     Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
     IoHandle::RecvMsgOutput output(1, packets_dropped);
 
     // TODO(yugant): Avoid allocating 24k for each read by getting memory from UdpPacketProcessor
-    const uint64_t max_packet_size_with_gro = 16 * udp_packet_processor.maxPacketSize();
+    const uint64_t max_rx_datagram_size_with_gro =
+        NUM_DATAGRAMS_PER_RECEIVE * udp_packet_processor.maxDatagramSize();
+    ENVOY_LOG_MISC(trace, "starting gro recvmsg with max={}", max_rx_datagram_size_with_gro);
 
     Api::IoCallUint64Result result =
-        receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
+        receiveMessage(max_rx_datagram_size_with_gro, buffer, output, handle, local_address);
 
-    if (!result.ok()) {
+    if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
       return result;
     }
 
     const uint64_t gso_size = output.msg_[0].gso_size_;
-    ENVOY_LOG_MISC(trace, "recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
+    ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
 
     // Skip gso segmentation and proceed as a single payload.
     if (gso_size == 0u) {
@@ -595,6 +618,8 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     }
 
     // Segment the buffer read by the recvmsg syscall into gso_sized sub buffers.
+    // TODO(mattklein123): The following code should be optimized to avoid buffer copies, either by
+    // switching to slices or by using a CoW buffer type.
     while (buffer->length() > 0) {
       const uint64_t bytes_to_copy = std::min(buffer->length(), gso_size);
       Buffer::InstancePtr sub_buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -607,30 +632,31 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   }
 
   if (handle.supportsMmsg()) {
-    const auto max_packet_size = udp_packet_processor.maxPacketSize();
+    const auto max_rx_datagram_size = udp_packet_processor.maxDatagramSize();
 
     // Buffer::ReservationSingleSlice is always passed by value, and can only be constructed
     // by Buffer::Instance::reserve(), so this is needed to keep a fixed array
     // in which all elements are legally constructed.
     struct BufferAndReservation {
-      BufferAndReservation(uint64_t max_packet_size)
+      BufferAndReservation(uint64_t max_rx_datagram_size)
           : buffer_(std::make_unique<Buffer::OwnedImpl>()),
-            reservation_(buffer_->reserveSingleSlice(max_packet_size, true)) {}
+            reservation_(buffer_->reserveSingleSlice(max_rx_datagram_size, true)) {}
 
       Buffer::InstancePtr buffer_;
       Buffer::ReservationSingleSlice reservation_;
     };
-    constexpr uint32_t num_packets_per_mmsg_call = 16u;
     constexpr uint32_t num_slices_per_packet = 1u;
-    absl::InlinedVector<BufferAndReservation, num_packets_per_mmsg_call> buffers;
-    RawSliceArrays slices(num_packets_per_mmsg_call,
+    absl::InlinedVector<BufferAndReservation, NUM_DATAGRAMS_PER_RECEIVE> buffers;
+    RawSliceArrays slices(NUM_DATAGRAMS_PER_RECEIVE,
                           absl::FixedArray<Buffer::RawSlice>(num_slices_per_packet));
-    for (uint32_t i = 0; i < num_packets_per_mmsg_call; i++) {
-      buffers.push_back(max_packet_size);
+    for (uint32_t i = 0; i < NUM_DATAGRAMS_PER_RECEIVE; i++) {
+      buffers.push_back(max_rx_datagram_size);
       slices[i][0] = buffers[i].reservation_.slice();
     }
 
-    IoHandle::RecvMsgOutput output(num_packets_per_mmsg_call, packets_dropped);
+    IoHandle::RecvMsgOutput output(NUM_DATAGRAMS_PER_RECEIVE, packets_dropped);
+    ENVOY_LOG_MISC(trace, "starting recvmmsg with packets={} max={}", NUM_DATAGRAMS_PER_RECEIVE,
+                   max_rx_datagram_size);
     Api::IoCallUint64Result result = handle.recvmmsg(slices, local_address.ip()->port(), output);
     if (!result.ok()) {
       return result;
@@ -649,7 +675,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       ENVOY_LOG_MISC(debug, "Receive a packet with {} bytes from {}", msg_len,
                      output.msg_[i].peer_address_->asString());
 
-      buffers[i].reservation_.commit(std::min(max_packet_size, msg_len));
+      buffers[i].reservation_.commit(std::min(max_rx_datagram_size, msg_len));
 
       passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                              output.msg_[i].local_address_, udp_packet_processor, receive_time);
@@ -660,8 +686,9 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   IoHandle::RecvMsgOutput output(1, packets_dropped);
 
+  ENVOY_LOG_MISC(trace, "starting recvmsg with max={}", udp_packet_processor.maxDatagramSize());
   Api::IoCallUint64Result result =
-      receiveMessage(udp_packet_processor.maxPacketSize(), buffer, output, handle, local_address);
+      receiveMessage(udp_packet_processor.maxDatagramSize(), buffer, output, handle, local_address);
 
   if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
     return result;
@@ -678,12 +705,26 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,
-                                               TimeSource& time_source, uint32_t& packets_dropped) {
+                                               TimeSource& time_source, bool prefer_gro,
+                                               uint32_t& packets_dropped) {
+  // Read at least one time, and attempt to read numPacketsExpectedPerEventLoop() packets unless
+  // this goes over MAX_NUM_PACKETS_PER_EVENT_LOOP.
+  size_t num_packets_to_read = std::min<size_t>(
+      MAX_NUM_PACKETS_PER_EVENT_LOOP, udp_packet_processor.numPacketsExpectedPerEventLoop());
+  const bool use_gro = prefer_gro && handle.supportsUdpGro();
+  size_t num_reads =
+      use_gro ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
+              : (handle.supportsMmsg() ? (num_packets_to_read / NUM_DATAGRAMS_PER_RECEIVE)
+                                       : num_packets_to_read);
+  // Make sure to read at least once.
+  num_reads = std::max<size_t>(1, num_reads);
+  bool honor_read_limit =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit");
   do {
     const uint32_t old_packets_dropped = packets_dropped;
     const MonotonicTime receive_time = time_source.monotonicTime();
     Api::IoCallUint64Result result = Utility::readFromSocket(
-        handle, local_address, udp_packet_processor, receive_time, &packets_dropped);
+        handle, local_address, udp_packet_processor, receive_time, use_gro, &packets_dropped);
 
     if (!result.ok()) {
       // No more to read or encountered a system error.
@@ -699,11 +740,31 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               ? (packets_dropped - old_packets_dropped)
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
-      // TODO(danzh) add stats for this.
       ENVOY_LOG_MISC(
-          debug, "Kernel dropped {} more packets. Consider increase receive buffer size.", delta);
+          debug,
+          "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
+          "max datagram size.",
+          delta);
+      udp_packet_processor.onDatagramsDropped(delta);
+    }
+    if (honor_read_limit) {
+      --num_reads;
+    }
+    if (num_reads == 0) {
+      return std::move(result.err_);
     }
   } while (true);
+}
+
+ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
+    const envoy::config::core::v3::UdpSocketConfig& config, bool prefer_gro_default)
+    : max_rx_datagram_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_rx_datagram_size,
+                                                            DEFAULT_UDP_MAX_DATAGRAM_SIZE)),
+      prefer_gro_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, prefer_gro, prefer_gro_default)) {
+  if (prefer_gro_ && !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    ENVOY_LOG_MISC(
+        warn, "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.");
+  }
 }
 
 } // namespace Network

@@ -1,4 +1,4 @@
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 #include <array>
 #include <chrono>
@@ -12,10 +12,10 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"
@@ -577,7 +577,7 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
 }
 
 bool Primes::isPrime(uint32_t x) {
-  if (x < 4) {
+  if (x && x < 4) {
     return true; // eliminates special-casing 2.
   } else if ((x & 1) == 0) {
     return false; // eliminates even numbers >2.
@@ -625,7 +625,7 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
 
 InlineString::InlineString(const char* str, size_t size) : size_(size) {
   RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
-  memcpy(data_, str, size);
+  memcpy(data_, str, size); // NOLINT(safe-memcpy)
 }
 
 void ExceptionUtil::throwEnvoyException(const std::string& message) {

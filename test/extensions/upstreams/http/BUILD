@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/upstreams/http:config",
+        "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:utility_lib",
     ],
 )

@@ -1,8 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "extensions/filters/http/well_known_names.h"
-
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -16,14 +14,14 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
     // Create the xDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
   }
 
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
@@ -47,7 +45,7 @@ public:
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
 
-          const std::string key = Extensions::HttpFilters::HttpFilterNames::get().Lua;
+          const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
               R"EOF(
             foo.bar:
@@ -175,7 +173,7 @@ public:
       upstream_request_->encodeData(response_data2, true);
     }
 
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     if (enable_wrap_body) {
       EXPECT_EQ("2", response->headers()
@@ -287,9 +285,9 @@ typed_config:
       end
       request_handle:headers():add("request_protocol", request_handle:streamInfo():protocol())
       request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
-      request_handle:headers():add("request_downstream_local_address_value", 
+      request_handle:headers():add("request_downstream_local_address_value",
         request_handle:streamInfo():downstreamLocalAddress())
-      request_handle:headers():add("request_downstream_directremote_address_value", 
+      request_handle:headers():add("request_downstream_directremote_address_value",
         request_handle:streamInfo():downstreamDirectRemoteAddress())
       request_handle:headers():add("request_requested_server_name",
         request_handle:streamInfo():requestedServerName())
@@ -378,7 +376,7 @@ typed_config:
   Buffer::OwnedImpl response_data2("bye");
   upstream_request_->encodeData(response_data2, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_EQ("7", response->headers()
                      .get(Http::LowerCaseString("response_body_size"))[0]
@@ -454,7 +452,7 @@ typed_config:
                      .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 }
@@ -501,7 +499,7 @@ typed_config:
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -551,7 +549,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   cleanup();
 
@@ -585,7 +583,7 @@ typed_config:
 
   waitForNextUpstreamRequest(2);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
   cleanup();
 
   EXPECT_TRUE(response->complete());
@@ -620,7 +618,7 @@ typed_config:
 
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -720,7 +718,7 @@ typed_config:
                         .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
@@ -860,7 +858,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -946,7 +944,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
     }
 
     upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
 
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());

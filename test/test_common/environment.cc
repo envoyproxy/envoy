@@ -9,20 +9,20 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/logger.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/filesystem/directory.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/compiler_requirements.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 
 #include "absl/container/node_hash_map.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
+#include "source/common/signal/signal_action.h"
 #endif
 
-#include "server/options_impl.h"
+#include "source/server/options_impl.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
@@ -153,18 +153,8 @@ void TestEnvironment::removePath(const std::string& path) {
 }
 
 void TestEnvironment::renameFile(const std::string& old_name, const std::string& new_name) {
-#ifdef WIN32
-  // use MoveFileEx, since ::rename will not overwrite an existing file. See
-  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
-  // Note MoveFileEx cannot overwrite a directory as documented, nor a symlink, apparently.
-  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
-  ASSERT_NE(0, rc) << fmt::format("failed to rename file from  {} to {} with error {}", old_name,
-                                  new_name, ::GetLastError());
-#else
-  const int rc = ::rename(old_name.c_str(), new_name.c_str());
-  ASSERT_EQ(0, rc);
-#endif
-};
+  Filesystem::fileSystemForTest().renameFile(old_name, new_name);
+}
 
 void TestEnvironment::createSymlink(const std::string& target, const std::string& link) {
 #ifdef WIN32
@@ -264,6 +254,14 @@ Server::Options& TestEnvironment::getOptions() {
   return *options;
 }
 
+std::vector<Grpc::ClientType> TestEnvironment::getsGrpcVersionsForTest() {
+#ifdef ENVOY_GOOGLE_GRPC
+  return {Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc};
+#else
+  return {Grpc::ClientType::EnvoyGrpc};
+#endif
+}
+
 const std::string& TestEnvironment::temporaryDirectory() {
   CONSTRUCT_ON_FIRST_USE(std::string, getTemporaryDirectory());
 }
@@ -342,19 +340,8 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
-std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
-                                                     bool require_existence, bool read_binary) {
-  std::ifstream file(filename, read_binary ? std::ios::binary : std::ios::in);
-  if (file.fail()) {
-    if (!require_existence) {
-      return "";
-    }
-    RELEASE_ASSERT(false, absl::StrCat("failed to open: ", filename));
-  }
-
-  std::stringstream file_string_stream;
-  file_string_stream << file.rdbuf();
-  return file_string_stream.str();
+std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
+  return Filesystem::fileSystemForTest().fileReadToEnd(filename);
 }
 
 std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
@@ -421,11 +408,15 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
   const std::string out_path =
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
   unlink(out_path.c_str());
-  {
-    std::ofstream out_file(out_path, std::ios_base::binary);
-    RELEASE_ASSERT(!out_file.fail(), "");
-    out_file << contents;
-  }
+
+  Filesystem::FilePathAndType out_file_info{Filesystem::DestinationType::File, out_path};
+  Filesystem::FilePtr file = Filesystem::fileSystemForTest().createFile(out_file_info);
+  const Filesystem::FlagSet flags{1 << Filesystem::File::Operation::Write |
+                                  1 << Filesystem::File::Operation::Create};
+  const Api::IoCallBoolResult open_result = file->open(flags);
+  EXPECT_TRUE(open_result.rc_);
+  const Api::IoCallSizeResult result = file->write(contents);
+  EXPECT_EQ(contents.length(), result.rc_);
   return out_path;
 }
 

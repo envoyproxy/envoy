@@ -7,7 +7,8 @@ load(
 )
 load(
     "//bazel:envoy_select.bzl",
-    "envoy_select_wasm",
+    "envoy_select_wasm_cpp_tests",
+    "envoy_select_wasm_rust_tests",
 )
 
 licenses(["notice"])  # Apache 2
@@ -17,7 +18,7 @@ envoy_package()
 envoy_cc_test(
     name = "wasm_vm_test",
     srcs = ["wasm_vm_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_rust_tests([
         "//test/extensions/common/wasm/test_data:test_rust.wasm",
     ]),
     deps = [
@@ -32,7 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "wasm_test",
     srcs = ["wasm_test.cc"],
-    data = envoy_select_wasm([
+    data = envoy_select_wasm_cpp_tests([
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
@@ -91,6 +92,7 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/wasm_runtime/null:config",
         "//source/extensions/wasm_runtime/v8:config",
+        "//source/extensions/wasm_runtime/wamr:config",
         "//source/extensions/wasm_runtime/wasmtime:config",
         "//source/extensions/wasm_runtime/wavm:config",
     ],

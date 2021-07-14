@@ -1,11 +1,10 @@
-#include "extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
+#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/http/header_map_impl.h"
-
-#include "source/extensions/filters/http/cache/simple_http_cache/config.pb.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -144,7 +143,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  const auto vary_header = response_headers->get(Http::Headers::get().Vary);
+  const auto vary_header = response_headers->get(Http::CustomHeaders::get().Vary);
   ASSERT(!vary_header.empty());
 
   Key varied_request_key = request.key();
@@ -168,7 +167,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
                                  const Http::RequestHeaderMap& request_vary_headers) {
   absl::WriterMutexLock lock(&mutex_);
 
-  const auto vary_header = response_headers->get(Http::Headers::get().Vary);
+  const auto vary_header = response_headers->get(Http::CustomHeaders::get().Vary);
   ASSERT(!vary_header.empty());
 
   // Insert the varied response.
@@ -184,7 +183,8 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     Http::ResponseHeaderMapPtr vary_only_map =
         Http::createHeaderMap<Http::ResponseHeaderMapImpl>({});
     // TODO(mattklein123): Support multiple vary headers and/or just make the vary header inline.
-    vary_only_map->setCopy(Http::Headers::get().Vary, vary_header[0]->value().getStringView());
+    vary_only_map->setCopy(Http::CustomHeaders::get().Vary,
+                           vary_header[0]->value().getStringView());
     // TODO(cbdm): In a cache that evicts entries, we could maintain a list of the "varykey"s that
     // we have inserted as the body for this first lookup. This way, we would know which keys we
     // have inserted for that resource. For the first entry simply use vary_key as the entry_list,
@@ -214,7 +214,7 @@ public:
   // From TypedFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::source::extensions::filters::http::cache::SimpleHttpCacheConfig>();
+        envoy::extensions::cache::simple_http_cache::v3alpha::SimpleHttpCacheConfig>();
   }
   // From HttpCacheFactory
   HttpCache&

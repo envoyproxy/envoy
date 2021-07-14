@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
 
-#include "test/extensions/transport_sockets/tls/cert_validator/util.h"
+#include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 
 #include "gtest/gtest.h"
 

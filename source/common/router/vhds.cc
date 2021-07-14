@@ -1,4 +1,4 @@
-#include "common/router/vhds.h"
+#include "source/common/router/vhds.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,14 +7,15 @@
 
 #include "envoy/api/v2/route/route_components.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/router/config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -44,10 +45,12 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
   const auto resource_name = getResourceName();
+  Envoy::Config::SubscriptionOptions options;
+  options.use_namespace_matching_ = true;
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, true);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {

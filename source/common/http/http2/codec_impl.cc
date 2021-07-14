@@ -1,4 +1,4 @@
-#include "common/http/http2/codec_impl.h"
+#include "source/common/http/http2/codec_impl.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -11,20 +11,21 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/http/codes.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http2/codec_stats.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -129,13 +130,22 @@ template <typename T> static T* removeConst(const void* object) {
 }
 
 ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-    : parent_(parent), local_end_stream_sent_(false), remote_end_stream_(false),
-      data_deferred_(false), received_noninformational_headers_(false),
+    : parent_(parent),
+      pending_recv_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
+          [this]() -> void { this->pendingRecvBufferLowWatermark(); },
+          [this]() -> void { this->pendingRecvBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      pending_send_data_(parent_.connection_.dispatcher().getWatermarkFactory().createBuffer(
+          [this]() -> void { this->pendingSendBufferLowWatermark(); },
+          [this]() -> void { this->pendingSendBufferHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      local_end_stream_sent_(false), remote_end_stream_(false), data_deferred_(false),
+      received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
-    setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
+    setWriteBufferWatermarks(buffer_limit);
   }
 }
 
@@ -144,7 +154,7 @@ ConnectionImpl::StreamImpl::~StreamImpl() { ASSERT(stream_idle_timer_ == nullptr
 void ConnectionImpl::StreamImpl::destroy() {
   disarmStreamIdleTimer();
   parent_.stats_.streams_active_.dec();
-  parent_.stats_.pending_send_bytes_.sub(pending_send_data_.length());
+  parent_.stats_.pending_send_bytes_.sub(pending_send_data_->length());
 }
 
 static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& header) {
@@ -200,7 +210,7 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
                                                        bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // This must exist outside of the scope of isUpgrade as the underlying memory is
   // needed until encodeHeadersBase has been called.
   std::vector<nghttp2_nv> final_headers;
@@ -252,7 +262,7 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
 void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
-  if (pending_send_data_.length() > 0) {
+  if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     // However, for empty trailers, we don't need to to save the trailers.
@@ -408,13 +418,13 @@ void ConnectionImpl::StreamImpl::submitMetadata(uint8_t flags) {
 }
 
 ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
-  if (pending_send_data_.length() == 0 && !local_end_stream_) {
+  if (pending_send_data_->length() == 0 && !local_end_stream_) {
     ASSERT(!data_deferred_);
     data_deferred_ = true;
     return NGHTTP2_ERR_DEFERRED;
   } else {
     *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-    if (local_end_stream_ && pending_send_data_.length() <= length) {
+    if (local_end_stream_ && pending_send_data_->length() <= length) {
       *data_flags |= NGHTTP2_DATA_FLAG_EOF;
       if (pending_trailers_to_encode_) {
         // We need to tell the library to not set end stream so that we can emit the trailers.
@@ -424,7 +434,7 @@ ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* 
       }
     }
 
-    return std::min(length, pending_send_data_.length());
+    return std::min(length, pending_send_data_->length());
   }
 }
 
@@ -445,7 +455,7 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   }
 
   parent_.stats_.pending_send_bytes_.sub(length);
-  output.move(pending_send_data_, length);
+  output.move(*pending_send_data_, length);
   parent_.connection_.write(output, false);
 }
 
@@ -490,7 +500,9 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
 
 void ConnectionImpl::StreamImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!local_end_stream_);
-  encodeDataHelper(data, end_stream, /*skip_encoding_empty_trailers=*/false);
+  encodeDataHelper(data, end_stream,
+                   /*skip_encoding_empty_trailers=*/
+                   false);
 }
 
 void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool end_stream,
@@ -501,7 +513,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
 
   local_end_stream_ = end_stream;
   parent_.stats_.pending_send_bytes_.add(data.length());
-  pending_send_data_.move(data);
+  pending_send_data_->move(data);
   if (data_deferred_) {
     int rc = nghttp2_session_resume_data(parent_.session_, stream_id_);
     ASSERT(rc == 0);
@@ -513,7 +525,7 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
     // Intended to check through coverage that this error case is tested
     return;
   }
-  if (local_end_stream_ && pending_send_data_.length() > 0) {
+  if (local_end_stream_ && pending_send_data_->length() > 0) {
     createPendingFlushTimer();
   }
 }
@@ -566,7 +578,19 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
-  decoder().decodeMetadata(std::move(metadata_map_ptr));
+  // Empty metadata maps should not be decoded.
+  if (metadata_map_ptr->empty()) {
+    ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
+    parent_.stats_.metadata_empty_frames_.inc();
+  } else {
+    decoder().decodeMetadata(std::move(metadata_map_ptr));
+  }
+}
+
+void ConnectionImpl::StreamImpl::setAccount(Buffer::BufferMemoryAccountSharedPtr account) {
+  buffer_memory_account_ = account;
+  pending_recv_data_->bindAccount(buffer_memory_account_);
+  pending_send_data_->bindAccount(buffer_memory_account_);
 }
 
 ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stats,
@@ -582,16 +606,19 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       dispatching_(false), raised_goaway_(false), pending_deferred_reset_(false),
-      random_(random_generator) {
+      random_(random_generator),
+      last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_connection_keepalive()) {
     keepalive_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), interval));
+        PROTOBUF_GET_MS_OR_DEFAULT(http2_options.connection_keepalive(), interval, 0));
     keepalive_timeout_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(http2_options.connection_keepalive(), timeout));
     keepalive_interval_jitter_percent_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         http2_options.connection_keepalive(), interval_jitter, 15.0);
 
-    keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    if (keepalive_interval_.count() > 0) {
+      keepalive_send_timer_ = connection.dispatcher().createTimer([this]() { sendKeepalive(); });
+    }
     keepalive_timeout_timer_ =
         connection.dispatcher().createTimer([this]() { onKeepaliveResponseTimeout(); });
 
@@ -608,6 +635,12 @@ ConnectionImpl::~ConnectionImpl() {
 }
 
 void ConnectionImpl::sendKeepalive() {
+  ASSERT(keepalive_timeout_timer_);
+  if (keepalive_timeout_timer_->enabled()) {
+    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK {}", connection_);
+    return;
+  }
+
   // Include the current time as the payload to help with debugging.
   SystemTime now = connection_.dispatcher().timeSource().systemTime();
   uint64_t ms_since_epoch =
@@ -624,12 +657,13 @@ void ConnectionImpl::sendKeepalive() {
   }
   keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
 }
+
 void ConnectionImpl::onKeepaliveResponse() {
   // Check the timers for nullptr in case the peer sent an unsolicited PING ACK.
   if (keepalive_timeout_timer_ != nullptr) {
     keepalive_timeout_timer_->disableTimer();
   }
-  if (keepalive_send_timer_ != nullptr) {
+  if (keepalive_send_timer_ != nullptr && keepalive_interval_.count()) {
     uint64_t interval_ms = keepalive_interval_.count();
     const uint64_t jitter_percent_mod = keepalive_interval_jitter_percent_ * interval_ms / 100;
     if (jitter_percent_mod > 0) {
@@ -646,14 +680,6 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
 }
 
 Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
   ScopeTrackerScopeState scope(this, connection_.dispatcher());
   ENVOY_CONN_LOG(trace, "dispatching {} bytes", connection_, data.length());
   // Make sure that dispatching_ is set to false after dispatching, even when
@@ -664,6 +690,7 @@ Http::Status ConnectionImpl::innerDispatch(Buffer::Instance& data) {
     current_slice_ = nullptr;
     current_stream_id_.reset();
   });
+  last_received_data_time_ = connection_.dispatcher().timeSource().monotonicTime();
   for (const Buffer::RawSlice& slice : data.getRawSlices()) {
     current_slice_ = &slice;
     dispatching_ = true;
@@ -708,7 +735,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
   StreamImpl* stream = getStream(stream_id);
   // If this results in buffering too much data, the watermark buffer will call
   // pendingRecvBufferHighWatermark, resulting in ++read_disable_count_
-  stream->pending_recv_data_.add(data, len);
+  stream->pending_recv_data_->add(data, len);
   // Update the window to the peer unless some consumer of this stream's data has hit a flow control
   // limit and disabled reads on this stream
   if (!stream->buffersOverrun()) {
@@ -751,8 +778,8 @@ Status ConnectionImpl::protocolErrorForTest() {
 }
 
 Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
-  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}", connection_,
-                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags));
+  ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
+                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
   current_stream_id_ = hd->stream_id;
 
   // Track all the frames without padding here, since this is the only callback we receive
@@ -789,8 +816,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // was the current time when the ping was sent. This can be useful while debugging
     // to match the ping and ack.
     uint64_t data;
-    static_assert(sizeof(data) == sizeof(frame->ping.opaque_data), "Sizes are equal");
-    memcpy(&data, frame->ping.opaque_data, sizeof(data));
+    safeMemcpy(&data, &(frame->ping.opaque_data));
     ENVOY_CONN_LOG(trace, "recv PING ACK {}", connection_, data);
 
     onKeepaliveResponse();
@@ -864,10 +890,10 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
     if (!stream->deferred_reset_) {
-      stream->decoder().decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
+      stream->decoder().decodeData(*stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
-    stream->pending_recv_data_.drain(stream->pending_recv_data_.length());
+    stream->pending_recv_data_->drain(stream->pending_recv_data_->length());
     break;
   }
   case NGHTTP2_RST_STREAM: {
@@ -936,9 +962,18 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
     stream->setDetails(Http2ResponseCodeDetails::get().errorDetails(error_code));
   }
 
-  if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
-    stats_.rx_messaging_error_.inc();
+  switch (error_code) {
+  case NGHTTP2_ERR_REFUSED_STREAM:
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http2_consume_stream_refused_errors")) {
+      stats_.stream_refused_errors_.inc();
+      return 0;
+    }
+    break;
 
+  case NGHTTP2_ERR_HTTP_HEADER:
+  case NGHTTP2_ERR_HTTP_MESSAGING:
+    stats_.rx_messaging_error_.inc();
     if (stream_error_on_invalid_http_messaging_) {
       // The stream is about to be closed due to an invalid header or messaging. Don't kill the
       // entire connection if one stream has bad headers or messaging.
@@ -948,6 +983,18 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
       }
       return 0;
     }
+    break;
+
+  case NGHTTP2_ERR_FLOW_CONTROL:
+  case NGHTTP2_ERR_PROTO:
+  case NGHTTP2_ERR_STREAM_CLOSED:
+    // Known error conditions that should trigger connection close.
+    break;
+
+  default:
+    // Unknown error conditions. Trigger ENVOY_BUG and connection close.
+    ENVOY_BUG(false, absl::StrCat("Unexpected error_code: ", error_code));
+    break;
   }
 
   // Cause dispatch to return with an error code.
@@ -1007,7 +1054,10 @@ int ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
         // errors from https://tools.ietf.org/html/rfc7540#section-8 which nghttp2 is very strict
         // about). In other cases we treat invalid frames as a protocol error and just kill
         // the connection.
-        reason = StreamResetReason::LocalReset;
+
+        // Get ClientConnectionImpl or ServerConnectionImpl specific stream reset reason,
+        // depending whether the connection is upstream or downstream.
+        reason = getMessagingErrorResetReason();
       } else {
         if (error_code == NGHTTP2_REFUSED_STREAM) {
           reason = StreamResetReason::RemoteRefusedStreamReset;
@@ -1090,6 +1140,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
     return 0;
   }
 
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
     stream->setDetails(Http2ResponseCodeDetails::get().invalid_underscore);
@@ -1494,8 +1545,9 @@ void ConnectionImpl::StreamImpl::dumpState(std::ostream& os, int indent_level) c
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl::StreamImpl " << this << DUMP_MEMBER(stream_id_)
      << DUMP_MEMBER(unconsumed_bytes_) << DUMP_MEMBER(read_disable_count_)
-     << DUMP_MEMBER(local_end_stream_sent_) << DUMP_MEMBER(remote_end_stream_)
-     << DUMP_MEMBER(data_deferred_) << DUMP_MEMBER(received_noninformational_headers_)
+     << DUMP_MEMBER(local_end_stream_) << DUMP_MEMBER(local_end_stream_sent_)
+     << DUMP_MEMBER(remote_end_stream_) << DUMP_MEMBER(data_deferred_)
+     << DUMP_MEMBER(received_noninformational_headers_)
      << DUMP_MEMBER(pending_receive_buffer_high_watermark_called_)
      << DUMP_MEMBER(pending_send_buffer_high_watermark_called_)
      << DUMP_MEMBER(reset_due_to_messaging_error_)
@@ -1543,9 +1595,19 @@ ClientConnectionImpl::ClientConnectionImpl(
                                           client_http2_options.options());
   http2_session_factory.init(session_, base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
+  idle_session_requires_ping_interval_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+      http2_options.connection_keepalive(), connection_idle_interval, 0));
 }
 
 RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
+  // If the connection has been idle long enough to trigger a ping, send one
+  // ahead of creating the stream.
+  if (idle_session_requires_ping_interval_.count() != 0 &&
+      (connection_.dispatcher().timeSource().monotonicTime() - lastReceivedDataTime() >
+       idle_session_requires_ping_interval_)) {
+    sendKeepalive();
+  }
+
   ClientStreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_, decoder));
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is
@@ -1614,6 +1676,17 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
         is_outbound_flood_monitored_control_frame);
   }
   return ProtocolConstraints::ReleasorProc([]() {});
+}
+
+StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
+  StreamResetReason reason = StreamResetReason::LocalReset;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
+    reason = StreamResetReason::ProtocolError;
+    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
+  }
+
+  return reason;
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
@@ -1696,17 +1769,9 @@ ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  // TODO(#10878): Remove this wrapper when exception removal is complete. innerDispatch may either
-  // throw an exception or return an error status. The utility wrapper catches exceptions and
-  // converts them to error statuses.
-  return Http::Utility::exceptionToStatus(
-      [&](Buffer::Instance& data) -> Http::Status { return innerDispatch(data); }, data);
-}
-
-Http::Status ServerConnectionImpl::innerDispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
-  return ConnectionImpl::innerDispatch(data);
+  return ConnectionImpl::dispatch(data);
 }
 
 absl::optional<int>

@@ -178,8 +178,11 @@ message RedisProxy {
     // catch-all route becomes required when no routes are specified.
     Route catch_all_route = 4;
 
-    string hidden_envoy_deprecated_catch_all_cluster = 3
-        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    string hidden_envoy_deprecated_catch_all_cluster = 3 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
   }
 
   // RedisFault defines faults used for fault injection.
@@ -238,7 +241,7 @@ message RedisProxy {
   // * ``get abc:users`` would retrieve the key 'abc:users' from cluster_b.
   // * ``get ab:users`` would retrieve the key 'ab:users' from cluster_a.
   // * ``get z:users`` would return a NoUpstreamHost error. A :ref:`catch-all
-  //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
+  //   route<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.PrefixRoutes.catch_all_route>`
   //   would have retrieved the key from that cluster instead.
   //
   // See the :ref:`configuration section
@@ -297,12 +300,15 @@ message RedisProxy {
   // AUTH, but no ACL is set" error will be returned.
   config.core.v3.DataSource downstream_auth_username = 7 [(udpa.annotations.sensitive) = true];
 
-  string hidden_envoy_deprecated_cluster = 2
-      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+  string hidden_envoy_deprecated_cluster = 2 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
-// :ref:`typed_extension_protocol_options<envoy_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
 // keyed by the name `envoy.filters.network.redis_proxy`.
 message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =

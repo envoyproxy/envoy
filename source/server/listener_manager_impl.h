@@ -18,10 +18,11 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "server/filter_chain_factory_context_callback.h"
-#include "server/filter_chain_manager_impl.h"
-#include "server/lds_api.h"
-#include "server/listener_impl.h"
+#include "source/common/quic/quic_stat_names.h"
+#include "source/server/filter_chain_factory_context_callback.h"
+#include "source/server/filter_chain_manager_impl.h"
+#include "source/server/lds_api.h"
+#include "source/server/listener_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -202,6 +203,8 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
   ApiListenerOptRef apiListener() override;
 
+  Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+
   Instance& server_;
   ListenerComponentFactory& factory_;
 
@@ -228,7 +231,7 @@ private:
   void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
-  ProtobufTypes::MessagePtr dumpListenerConfigs();
+  ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
@@ -284,6 +287,9 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
+  void setNewOrDrainingSocketFactory(const std::string& name,
+                                     const envoy::config::core::v3::Address& proto_address,
+                                     ListenerImpl& listener, bool reuse_port);
   Network::ListenSocketFactorySharedPtr
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
@@ -313,6 +319,7 @@ private:
   using UpdateFailureState = envoy::admin::v3::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
+  Quic::QuicStatNames quic_stat_names_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

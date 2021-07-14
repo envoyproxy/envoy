@@ -26,13 +26,15 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/cleanup.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/subscription_factory_impl.h"
-#include "common/http/async_client_impl.h"
-#include "common/upstream/load_stats_reporter.h"
-#include "common/upstream/priority_conn_pool_map.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
+#include "source/common/http/alternate_protocols_cache_impl.h"
+#include "source/common/http/alternate_protocols_cache_manager_impl.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/priority_conn_pool_map.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -58,7 +60,10 @@ public:
         router_context_(router_context), admin_(admin), runtime_(runtime), stats_(stats), tls_(tls),
         dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
-        singleton_manager_(singleton_manager), options_(options) {}
+        singleton_manager_(singleton_manager), options_(options),
+        alternate_protocols_cache_manager_factory_(singleton_manager,
+                                                   main_thread_dispatcher.timeSource(), tls_),
+        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -66,19 +71,22 @@ public:
   Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, std::vector<Http::Protocol>& protocol,
+                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+                       alternate_protocol_options,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                      Network::TransportSocketOptionsSharedPtr transport_socket_options,
+                      Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                       ClusterConnectivityState& state) override;
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                      const xds::core::v3::ResourceLocator* cds_resources_locator,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
@@ -100,6 +108,8 @@ protected:
   AccessLog::AccessLogManager& log_manager_;
   Singleton::Manager& singleton_manager_;
   const Server::Options& options_;
+  Http::AlternateProtocolsCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
+  Http::AlternateProtocolsCacheManagerSharedPtr alternate_protocols_cache_manager_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -403,11 +413,11 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      Http::ConnectionPool::Instance*
-      httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-                   LoadBalancerContext* context) override;
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context) override;
+      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
+                                                absl::optional<Http::Protocol> downstream_protocol,
+                                                LoadBalancerContext* context) override;
+      absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
+                                              LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
 
@@ -555,7 +565,7 @@ private:
   void applyUpdates(ClusterManagerCluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority, bool mergeable,
                       const uint64_t timeout);
-  ProtobufTypes::MessagePtr dumpClusterConfigs();
+  ProtobufTypes::MessagePtr dumpClusterConfigs(const Matchers::StringMatcher& name_matcher);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
 
   /**

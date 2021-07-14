@@ -24,11 +24,9 @@ static_resources:
                   cluster: cluster1
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
           codec_type: AUTO
     listener_filters:
     - name: envoy.filters.listener.original_dst
-      typed_config: {}
   clusters:
   - name: cluster1
     type: ORIGINAL_DST
@@ -37,7 +35,6 @@ static_resources:
     dns_lookup_family: V4_ONLY
 cluster_manager: {}
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       address: 127.0.0.1

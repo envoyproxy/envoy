@@ -1,6 +1,6 @@
 #include "test/mocks/stream_info/mocks.h"
 
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,8 +31,9 @@ MockStreamInfo::MockStreamInfo()
     response_code_details_ = std::string(details);
   }));
   ON_CALL(*this, setConnectionTerminationDetails(_))
-      .WillByDefault(
-          Invoke([this](absl::string_view details) { connection_termination_details_ = details; }));
+      .WillByDefault(Invoke([this](absl::string_view details) {
+        connection_termination_details_ = std::string(details);
+      }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
   ON_CALL(*this, lastDownstreamRxByteReceived())
@@ -111,18 +112,12 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
         upstream_filter_state_ = filter_state;
       }));
-  ON_CALL(*this, setRequestedServerName(_))
-      .WillByDefault(Invoke([this](const absl::string_view requested_server_name) {
-        requested_server_name_ = std::string(requested_server_name);
-      }));
-  ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
-  ON_CALL(*this, connectionID()).WillByDefault(Return(connection_id_));
   ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {
     connection_id_ = id;
   }));

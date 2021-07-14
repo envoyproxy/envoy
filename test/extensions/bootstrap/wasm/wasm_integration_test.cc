@@ -1,4 +1,4 @@
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/integration/http_protocol_integration.h"
@@ -13,11 +13,11 @@ namespace {
 class WasmIntegrationTest : public HttpIntegrationTest, public testing::TestWithParam<std::string> {
 public:
   WasmIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    addFakeUpstream(FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
   }
 
   void cleanup() {
@@ -49,7 +49,7 @@ typed_config:
       value: ""
     vm_config:
       vm_id: "my_vm_id"
-      environment_variables: 
+      environment_variables:
         host_env_keys: ["NON_EXIST"]
         key_values:
           KEY: VALUE
@@ -73,6 +73,12 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmIntegrationTest,
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmIntegrationTest);
 
 TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
+#if defined(__aarch64__)
+  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+  if (GetParam() != "null") {
+    return;
+  }
+#endif
   initialize();
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, wasm_connection_));
 

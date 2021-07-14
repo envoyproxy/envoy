@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "test/mocks/upstream/basic_resource_limit.h"
 
@@ -34,12 +34,13 @@ public:
   struct MockLoadDnsCacheEntryResult {
     LoadDnsCacheEntryStatus status_;
     LoadDnsCacheEntryHandle* handle_;
+    absl::optional<DnsHostInfoSharedPtr> host_info_;
   };
 
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override {
     MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
-    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
+    return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}, result.host_info_};
   }
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override {
     Upstream::ResourceAutoIncDec* raii_ptr = canCreateDnsRequest_();

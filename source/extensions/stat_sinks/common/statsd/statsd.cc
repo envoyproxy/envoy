@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include <chrono>
 #include <cstdint>
@@ -11,15 +11,15 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/network/socket_interface.h"
-#include "common/network/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/strings/str_join.h"
 
@@ -46,10 +46,11 @@ void UdpStatsdSink::WriterImpl::writeBuffer(Buffer::Instance& data) {
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
                              Network::Address::InstanceConstSharedPtr address, const bool use_tag,
-                             const std::string& prefix, absl::optional<uint64_t> buffer_size)
+                             const std::string& prefix, absl::optional<uint64_t> buffer_size,
+                             const Statsd::TagFormat& tag_format)
     : tls_(tls.allocateSlot()), server_address_(std::move(address)), use_tag_(use_tag),
       prefix_(prefix.empty() ? Statsd::getDefaultPrefix() : prefix),
-      buffer_size_(buffer_size.value_or(0)) {
+      buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<WriterImpl>(*this);
   });
@@ -61,18 +62,14 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
 
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      const std::string counter_str =
-          absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_, "|c",
-                       buildTagStr(counter.counter_.get().tags()));
+      const std::string counter_str = buildMessage(counter.counter_.get(), counter.delta_, "|c");
       writeBuffer(buffer, writer, counter_str);
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      const std::string gauge_str =
-          absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
-                       buildTagStr(gauge.get().tags()));
+      const std::string gauge_str = buildMessage(gauge.get(), gauge.get().value(), "|g");
       writeBuffer(buffer, writer, gauge_str);
     }
   }
@@ -115,10 +112,37 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  const std::string message(absl::StrCat(prefix_, ".", getName(histogram), ":",
-                                         std::chrono::milliseconds(value).count(), "|ms",
-                                         buildTagStr(histogram.tags())));
+  const std::string message =
+      buildMessage(histogram, std::chrono::milliseconds(value).count(), "|ms");
   tls_->getTyped<Writer>().write(message);
+}
+
+const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint64_t value,
+                                              const std::string& type) const {
+  switch (tag_format_.tag_position) {
+  case Statsd::TagPosition::TagAfterValue: {
+    const std::string message = absl::StrCat(
+        // metric name
+        prefix_, ".", getName(metric),
+        // value and type
+        ":", value, type,
+        // tags
+        buildTagStr(metric.tags()));
+    return message;
+  }
+
+  case Statsd::TagPosition::TagAfterName: {
+    const std::string message = absl::StrCat(
+        // metric name
+        prefix_, ".", getName(metric),
+        // tags
+        buildTagStr(metric.tags()),
+        // value and type
+        ":", value, type);
+    return message;
+  }
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
@@ -137,9 +161,9 @@ const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags
   std::vector<std::string> tag_strings;
   tag_strings.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    tag_strings.emplace_back(tag.name_ + ":" + tag.value_);
+    tag_strings.emplace_back(tag.name_ + tag_format_.assign + tag.value_);
   }
-  return "|#" + absl::StrJoin(tag_strings, ",");
+  return tag_format_.start + absl::StrJoin(tag_strings, tag_format_.separator);
 }
 
 TcpStatsdSink::TcpStatsdSink(const LocalInfo::LocalInfo& local_info,
@@ -210,15 +234,17 @@ void TcpStatsdSink::TlsSink::commonFlush(const std::string& name, uint64_t value
   // This written this way for maximum perf since with a large number of stats and at a high flush
   // rate this can become expensive.
   const char* snapped_current = current_slice_mem_;
-  memcpy(current_slice_mem_, parent_.getPrefix().c_str(), parent_.getPrefix().size());
-  current_slice_mem_ += parent_.getPrefix().size();
+  const std::string prefix = parent_.getPrefix();
+  memcpy(current_slice_mem_, prefix.data(), prefix.size()); // NOLINT(safe-memcpy)
+  current_slice_mem_ += prefix.size();
   *current_slice_mem_++ = '.';
-  memcpy(current_slice_mem_, name.c_str(), name.size());
+  memcpy(current_slice_mem_, name.data(), name.size()); // NOLINT(safe-memcpy)
   current_slice_mem_ += name.size();
   *current_slice_mem_++ = ':';
   current_slice_mem_ += StringUtil::itoa(current_slice_mem_, 30, value);
   *current_slice_mem_++ = '|';
   *current_slice_mem_++ = stat_type;
+
   *current_slice_mem_++ = '\n';
 
   ASSERT(static_cast<uint64_t>(current_slice_mem_ - snapped_current) < max_size);

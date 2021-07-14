@@ -206,6 +206,13 @@ patches, understand exact mitigation steps, etc.
   the fix to user's environments; this can include links to external distributor documentation.
 - The Fix Lead will remove the Fix Team from the private security repo.
 
+The reporter of a vulnerability will be granted early access to fix patches upon
+request, prior to the general disclosure of patches to the Private Distributors
+List for the purpose of testing and internal vulnerability mitigation. They must
+accept the embargo policy below in order for this to occur. If the vulnerability
+reporter is also responsible for developing fix patches, they may make use of
+the patches internally in their organization at any point in the fix cycle.
+
 ### Retrospective
 
 These steps should be completed 1-3 days after the Release Date. The retrospective process
@@ -442,21 +449,24 @@ and security team to ensure they still qualify for inclusion on the list.
 
 ### Members
 
-| E-mail                                                | Organization  | End User | Last Review |
-|-------------------------------------------------------|:-------------:|:--------:|:-----------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | No       | 12/19       |
-| aws-app-mesh-security@amazon.com                      | AWS           | No       | 12/19       |
-| security@cilium.io                                    | Cilium        | No       | 12/19       |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | No       | 12/19       |
-| secalert@datawire.io                                  | Datawire      | No       | 12/19       |
-| google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
-| argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
-| envoy-security@microsoft.com                          | Microsoft     | No       | 2/21        |
-| secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
-| envoy-security@solo.io                                | solo.io       | No       | 12/19       |
-| envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
-| security@vmware.com                                   | VMware        | No       | 12/19       |
-| envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |
-| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01/20       |
-| envoy-security-predisclosure@stripe.com               | Stripe        | Yes      | 01/20       |
+| Organization  | End User | Last Review |
+|:-------------:|:--------:|:-----------:|
+| Aspen Mesh    | No       | 06/21       |
+| AWS           | No       | 06/21       |
+| Cilium        | No       | 06/21       |
+| Cloud Foundry | No       | 06/21       |
+| Datawire      | No       | 06/21       |
+| Google        | No       | 06/21       |
+| IBM           | No       | 06/21       |
+| Istio         | No       | 06/21       |
+| Microsoft     | No       | 2/21        |
+| Red Hat       | No       | 06/21       |
+| solo.io       | No       | 06/21       |
+| Tetrate       | No       | 06/21       |
+| VMware        | No       | 06/21       |
+| Pinterest     | Yes      | 06/21       |
+| Dropbox       | Yes      | 01/20       |
+| Stripe        | Yes      | 01/20       |
+| Square        | Yes      | 05/21       |
+| Apple         | Yes      | 05/21       |
+| Spotify       | Yes      | 06/21       |

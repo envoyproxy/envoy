@@ -1,4 +1,4 @@
-#include "common/http/async_client_impl.h"
+#include "source/common/http/async_client_impl.h"
 
 #include <chrono>
 #include <map>
@@ -8,9 +8,9 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/grpc/common.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -42,9 +42,10 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Random::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
-    : cluster_(cluster), config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm,
-                                 runtime, random, std::move(shadow_writer), true, false, false,
-                                 false, {}, dispatcher.timeSource(), http_context, router_context),
+    : cluster_(cluster),
+      config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm, runtime, random,
+              std::move(shadow_writer), true, false, false, false, false, {},
+              dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -87,6 +88,9 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
                                          options.hash_policy)),
       send_xff_(options.send_xff) {
+
+  stream_info_.dynamicMetadata().MergeFrom(options.metadata);
+
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
