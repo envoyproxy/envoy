@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 
@@ -22,6 +23,8 @@ class QuicMemSliceImpl {
 public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
+
+  ~QuicMemSliceImpl();
 
   // Constructs a QuicMemSliceImpl by taking ownership of the memory in |buffer|.
   QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length);
@@ -42,12 +45,16 @@ public:
     if (this != &other) {
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
+      ASSERT(other.fragment_ == nullptr);
     }
     return *this;
   }
 
   // Below methods implements interface needed by QuicMemSlice.
-  void Reset() { single_slice_buffer_.drain(length()); }
+  void Reset() {
+    single_slice_buffer_.drain(length());
+    fragment_ = nullptr;
+  }
 
   // Returns a char pointer to the one and only slice in buffer.
   const char* data() const;
@@ -58,7 +65,6 @@ public:
   Envoy::Buffer::OwnedImpl& single_slice_buffer() { return single_slice_buffer_; }
 
 private:
-  // Prerequisite: buffer has at least one slice.
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);
 
   std::unique_ptr<Envoy::Buffer::BufferFragmentImpl> fragment_;

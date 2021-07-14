@@ -253,11 +253,9 @@ std::string spdyHeaderToHttp3StreamPayload(const spdy::SpdyHeaderBlock& header) 
 }
 
 std::string bodyToHttp3StreamPayload(const std::string& body) {
-  std::unique_ptr<char[]> data_buffer;
-  quic::QuicByteCount data_frame_header_length =
-      quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-  absl::string_view data_frame_header(data_buffer.get(), data_frame_header_length);
-  return absl::StrCat(data_frame_header, body);
+  quic::SimpleBufferAllocator allocator;
+  quic::QuicBuffer header = quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &allocator);
+  return absl::StrCat(header.AsStringView(), body);
 }
 
 // A test suite with variation of ip version and a knob to turn on/off IETF QUIC implementation.
