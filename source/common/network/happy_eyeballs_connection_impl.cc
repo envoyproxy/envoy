@@ -7,11 +7,11 @@ namespace Network {
 
 HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
-    Network::Address::InstanceConstSharedPtr source_address,
-    Network::TransportSocketFactory& socket_factory,
-    Network::TransportSocketOptionsSharedPtr transport_socket_options,
-    const Network::ConnectionSocket::OptionsSharedPtr options)
+    const std::vector<Address::InstanceConstSharedPtr>& address_list,
+    Address::InstanceConstSharedPtr source_address,
+    TransportSocketFactory& socket_factory,
+    TransportSocketOptionsConstSharedPtr transport_socket_options,
+    const ConnectionSocket::OptionsSharedPtr options)
     : dispatcher_(dispatcher),
       address_list_(address_list),
       source_address_(source_address),
@@ -150,10 +150,13 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   }
 
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
-  post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().create(
+  post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
       [this]() -> void { this->onWriteBufferLowWatermark(); },
       [this]() -> void { this->onWriteBufferHighWatermark(); },
       []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
+  if (per_connection_state_.buffer_limits_.has_value()) {
+    post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
+  }
   post_connect_state_.write_buffer_.value()->move(data);
   std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   post_connect_state_.end_stream_ = end_stream;
@@ -161,12 +164,23 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
 }
 
 void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
-  ASSERT(connect_finished_);
-  connections_[0]->setBufferLimits(limit);
+  if (!connect_finished_) {
+    ASSERT(!per_connection_state_.buffer_limits_.has_value());
+    per_connection_state_.buffer_limits_ = limit;
+    if (post_connect_state_.write_buffer_.has_value()) {
+      post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
+    }
+  }
+  for (auto& connection : connections_) {
+    connection->setBufferLimits(limit);
+  }
 }
 
 uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
   if (!connect_finished_) {
+    if (per_connection_state_.buffer_limits_.has_value()) {
+      return per_connection_state_.buffer_limits_.value();
+    }
     return 0;
   }
   return connections_[0]->bufferLimit();
@@ -174,8 +188,7 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
 
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
   if (!connect_finished_) {
-    // TODO(rch): Either prohibit write before correct or eliminate infinite buffering.
-    return false;
+    return above_write_high_water_mark_;
   }
 
   return connections_[0]->aboveHighWatermark();
@@ -323,6 +336,9 @@ std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createNextConnect
   if (per_connection_state_.connection_stats_.has_value()) {
     connection->setConnectionStats(*per_connection_state_.connection_stats_.value());
   }
+  if (per_connection_state_.buffer_limits_.has_value()) {
+    connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
+  }
   return connection;
 }
 
@@ -468,8 +484,10 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(ConnectionCallb
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
-  ASSERT(false);
+  ASSERT(!above_write_high_water_mark_);
+  above_write_high_water_mark_ = true;
 }
+
 void HappyEyeballsConnectionImpl::onWriteBufferLowWatermark() {
   ASSERT(false);
 }

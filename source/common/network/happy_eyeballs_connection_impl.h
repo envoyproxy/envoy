@@ -27,7 +27,7 @@ public:
                               const std::vector<Address::InstanceConstSharedPtr>& address_list,
                               Address::InstanceConstSharedPtr source_address,
                               TransportSocketFactory& socket_factory,
-                              TransportSocketOptionsSharedPtr transport_socket_options,
+                              TransportSocketOptionsConstSharedPtr transport_socket_options,
                               const ConnectionSocket::OptionsSharedPtr options);
 
   ~HappyEyeballsConnectionImpl() override;
@@ -129,6 +129,7 @@ private:
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
     absl::optional<const ConnectionStats*> connection_stats_;
+    absl::optional<uint32_t> buffer_limits_;
   };
 
   // State which needs to be saved and applied only to the final connection
@@ -141,11 +142,11 @@ private:
   };
 
   Event::Dispatcher& dispatcher_;
-  const std::vector<Network::Address::InstanceConstSharedPtr>& address_list_;
+  const std::vector<Address::InstanceConstSharedPtr>& address_list_;
   size_t next_address_ = 0;
   Address::InstanceConstSharedPtr source_address_;
   TransportSocketFactory& socket_factory_;
-  TransportSocketOptionsSharedPtr transport_socket_options_;
+  TransportSocketOptionsConstSharedPtr transport_socket_options_;
   const ConnectionSocket::OptionsSharedPtr options_;
 
   // Set of active connections.
@@ -156,6 +157,7 @@ private:
   bool connect_finished_ = false;
   Event::TimerPtr next_attempt_timer_;
 
+   bool above_write_high_water_mark_ = false;
   PerConnectionState per_connection_state_;
   PostConnectState post_connect_state_;
 };
