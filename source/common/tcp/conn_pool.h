@@ -145,12 +145,7 @@ public:
                                                 transport_socket_options, state) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 
-  // Event::DeferredDeletable
-  void deleteIsPending() override { deleteIsPendingImpl(); }
-
-  void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
-  bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
+  void addDrainedCallback(DrainedCb cb) override { addDrainedCallbackImpl(cb); }
   void drainConnections() override {
     drainConnectionsImpl();
     // Legacy behavior for the TCP connection pool marks all connecting clients

@@ -156,9 +156,18 @@ def test_checker_path():
         == [(), {}])
 
 
-def test_runner_add_arguments(patches):
+def test_runner_add_arguments():
     run = runner.Runner("path1", "path2", "path3")
-    assert run.add_arguments("PARSER") is None
+    parser = MagicMock()
+
+    assert run.add_arguments(parser) is None
+
+    assert (
+        list(list(c) for c in parser.add_argument.call_args_list)
+        == [[('--log-level', '-l'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'info', 'help': 'Log level to display'}],
+            ])
 
 
 # LogFilter tests

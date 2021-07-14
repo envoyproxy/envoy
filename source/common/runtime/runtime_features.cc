@@ -61,7 +61,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
-    "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",

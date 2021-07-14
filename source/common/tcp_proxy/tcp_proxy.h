@@ -401,7 +401,6 @@ public:
   void onIdleTimeout();
   void onBytesSent();
   void cancelDrain();
-  Event::Dispatcher& dispatcher();
 
 private:
   UpstreamDrainManager& parent_;
