@@ -4,7 +4,7 @@ package envoy.extensions.common.matching.v4alpha;
 
 import "envoy/config/core/v4alpha/extension.proto";
 
-import "udpa/type/matcher/v1/matcher.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -31,7 +31,7 @@ message ExtensionWithMatcher {
   reserved "matcher";
 
   // The associated matcher.
-  udpa.type.matcher.v1.Matcher udpa_matcher = 3;
+  xds.type.matcher.v3.Matcher xds_matcher = 3;
 
   // The underlying extension config.
   config.core.v4alpha.TypedExtensionConfig extension_config = 2

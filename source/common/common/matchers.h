@@ -91,7 +91,7 @@ public:
   explicit StringMatcherImpl(const StringMatcherType& matcher) : matcher_(matcher) {
     if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
       if (matcher.ignore_case()) {
-        throw EnvoyException("ignore_case has no effect for safe_regex.");
+        ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
       regex_ = Regex::Utility::parseRegex(matcher_.safe_regex());
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {

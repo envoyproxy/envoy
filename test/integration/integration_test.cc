@@ -448,7 +448,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
       code: 403
-  udpa_matcher:
+  xds_matcher:
     matcher_tree:
       input:
         name: request-headers

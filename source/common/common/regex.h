@@ -12,7 +12,7 @@
 #include "source/common/stats/symbol_table_impl.h"
 
 #include "re2/re2.h"
-#include "udpa/type/matcher/v1/regex.pb.h"
+#include "xds/type/matcher/v3/regex.pb.h"
 
 namespace Envoy {
 namespace Regex {
@@ -21,7 +21,7 @@ class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
   explicit CompiledGoogleReMatcher(const std::string& regex, bool do_program_size_check);
 
-  explicit CompiledGoogleReMatcher(const udpa::type::matcher::v1::RegexMatcher& config)
+  explicit CompiledGoogleReMatcher(const xds::type::matcher::v3::RegexMatcher& config)
       : CompiledGoogleReMatcher(config.regex(), false) {}
 
   explicit CompiledGoogleReMatcher(const envoy::type::matcher::v3::RegexMatcher& config);
