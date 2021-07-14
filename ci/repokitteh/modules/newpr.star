@@ -37,7 +37,7 @@ def send_newcontributor_message(sender):
 def _pr(action, issue_number, sender, config, draft):
   if should_message_newcontributor(action, issue_number):
     send_newcontributor_message(sender)
-  if draft:
+  if action == 'opened' and draft:
     github.issue_create_comment(DRAFT_MESSAGE)
 
 handlers.pull_request(func=_pr)
