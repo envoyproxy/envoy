@@ -1,5 +1,5 @@
-1.19.0 (Pending)
-================
+1.19.0 (July 13, 2021)
+======================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -13,36 +13,36 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
-* access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
-* admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` whose default value is 80%, which means that the upper limit of the default rejection probability of the filter is changed from 100% to 80%.
+* access_log: added new access_log command operator ``%REQUEST_TX_DURATION%``.
+* access_log: removed extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
+* admission control: added :ref:`max_rejection_probability <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` which defaults to 80%, which means that the upper limit of the default rejection probability of the filter is changed from 100% to 80%.
 * aws_request_signing: requests are now buffered by default to compute signatures which include the
   payload hash, making the filter compatible with most AWS services. Previously, requests were
   never buffered, which only produced correct signatures for requests without a body, or for
   requests to S3, ES or Glacier, which used the literal string ``UNSIGNED-PAYLOAD``. Buffering can
   be now be disabled in favor of using unsigned payloads with compatible services via the new
   ``use_unsigned_payload`` filter option (default false).
+* cache filter: serve HEAD requests from cache.
 * cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
 * dns: changed apple resolver implementation to not reuse the UDS to the local DNS daemon.
 * dns cache: the new :ref:`dns_query_timeout <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>` option has a default of 5s. See below for more information.
 * http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
-  and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
+  and HTTP filters by default to reflect its experimental status. This feature can be enabled by setting
   ``envoy.reloadable_features.experimental_matching_api`` to true.
 * http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
   ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
   (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
   ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
   (do not send 1xx or 204 responses with these headers). Both are true by default.
-* http: serve HEAD requests from cache.
 * http: stop sending the transfer-encoding header for 304. This behavior can be temporarily reverted by setting
   ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
-* http: the behavior of the ``present_match`` in route header matcher changed. The value of ``present_match`` is ignored in the past. The new behavior is ``present_match`` performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
+* http: the behavior of the ``present_match`` in route header matcher changed. The value of ``present_match`` was ignored in the past. The new behavior is ``present_match`` is performed when the value is true. An absent match performed when the value is false. Please reference :ref:`present_match
   <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
-* listener: added an option when balancing across active listeners and wildcard matching is used to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
   defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
+* listener: when balancing across active listeners and wildcard matching is used, the behavior has been changed to return the listener that matches the IP family type associated with the listener's socket address. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.listener_wildcard_match_ip_family`` to false.
 * tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
-* tracing: add option :ref:`use_request_id_for_trace_sampling <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.use_request_id_for_trace_sampling>` whether to use sampling policy based on :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` or not.
+* udp: limit each UDP listener to read maximum 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
 
 Bug Fixes
 ---------
@@ -57,13 +57,11 @@ Bug Fixes
   will cause Envoy to terminate just the refused stream and retain the connection. This behavior can be temporarily
   reverted by setting the ``envoy.reloadable_features.http2_consume_stream_refused_errors`` runtime guard to false.
 * http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
-* http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
 * jwt_authn: unauthorized responses now correctly include a `www-authenticate` header.
-* listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
-* udp: limit each UDP listener to read maxmium 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
+* listener: fix a crash which could happen when a filter chain only listener update is followed by listener removal or a full listener update.
 * validation: fix an issue that causes TAP sockets to panic during config validation mode.
-* xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
-* zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
+* xray: fix the default sampling rate for AWS X-Ray tracer extension to be 5% as opposed to 50%.
+* zipkin: fix timestamp serialization in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
 
 Removed Config or Runtime
 -------------------------
@@ -84,10 +82,10 @@ New Features
 ------------
 
 * access_log: added the new response flag for :ref:`overload manager termination <envoy_v3_api_field_data.accesslog.v3.ResponseFlags.overload_manager>`. The response flag will be set when the http stream is terminated by overload manager.
-* admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.rps_threshold>` option that when average RPS of the sampling window is below this threshold, the filter will not throttle requests. Added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` option to set an upper limit on the probability of rejection.
+* admission control: added :ref:`rps_threshold <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.rps_threshold>` option that when average RPS of the sampling window is below this threshold, the filter will not throttle requests. Added :ref:`max_rejection_probability <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` option to set an upper limit on the probability of rejection.
 * bandwidth_limit: added new :ref:`HTTP bandwidth limit filter <config_http_filters_bandwidth_limit>`.
-* bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query.
-* cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains.
+* bootstrap: added :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting ``no_default_search_domain`` to true the DNS resolver will not use the default search domains. By setting the ``resolvers`` the external DNS servers to be used for external DNS queries can be specified.
+* cluster: added :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting ``no_default_search_domain`` to true the DNS resolver will not use the default search domains.
 * cluster: added :ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.host_rewrite_literal>` to WeightedCluster.
 * cluster: added :ref:`wait_for_warm_on_init <envoy_v3_api_field_config.cluster.v3.Cluster.wait_for_warm_on_init>`, which allows cluster readiness to not block on cluster warm-up. It is true by default, which preserves existing behavior. Currently, only applicable for DNS-based clusters.
 * composite filter: can now be used with filters that also add an access logger, such as the WASM filter.
@@ -101,11 +99,11 @@ New Features
 * dns_filter: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>` to aggregate all of the DNS resolver configuration in a single message. By setting the configuration option ``use_tcp_for_dns_lookups`` to true we can make dns filter's external resolvers to answer queries using TCP only, by setting the configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query which replaces the pre-existing alpha api field ``upstream_resolvers``.
 * dynamic_forward_proxy: added :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` option to the DNS cache config in order to aggregate all of the DNS resolver configuration in a single message. By setting one such configuration option ``no_default_search_domain`` as true the DNS resolver will not use the default search domains. And by setting the configuration ``resolvers`` we can specify the external DNS servers to be used for external DNS query instead of the system default resolvers.
 * ext_authz_filter: added :ref:`bootstrap_metadata_labels_key <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.bootstrap_metadata_labels_key>` option to configure labels of destination service.
-* http: a new field ``is_optional`` is added to ``extensions.filters.network.http_connection_manager.v3.HttpFilter``. When
-  value is ``true``, the unsupported http filter will be ignored by envoy. This is also same with unsupported http filter
+* http: added new field ``is_optional`` to ``extensions.filters.network.http_connection_manager.v3.HttpFilter``. When
+  set to ``true``, unsupported http filters will be ignored by envoy. This is also same with unsupported http filter
   in the typed per filter config. For more information, please reference
   :ref:`HttpFilter <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.is_optional>`.
-* http: added :ref``scheme options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme>` for adding or overwriting scheme.
+* http: added :ref:`scheme options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>` for adding or overwriting scheme.
 * http: added :ref:`stripping trailing host dot from host header <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.strip_trailing_host_dot>` support.
 * http: added support for :ref:`original IP detection extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.
   Two initial extensions were added, the :ref:`custom header <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension and the
@@ -113,22 +111,24 @@ New Features
 * http: added a new option to upstream HTTP/2 :ref:`keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>` to send a PING ahead of a new stream if the connection has been idle for a sufficient duration.
 * http: added the ability to :ref:`unescape slash sequences <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` in the path. Requests with unescaped slashes can be proxied, rejected or redirected to the new unescaped path. By default this feature is disabled. The default behavior can be overridden through :ref:`http_connection_manager.path_with_escaped_slashes_action<config_http_conn_man_runtime_path_with_escaped_slashes_action>` runtime variable. This action can be selectively enabled for a portion of requests by setting the :ref:`http_connection_manager.path_with_escaped_slashes_action_sampling<config_http_conn_man_runtime_path_with_escaped_slashes_action_enabled>` runtime variable.
 * http: added upstream and downstream alpha HTTP/3 support! See :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` for downstream and the new http3_protocol_options in :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` for upstream HTTP/3.
-* input matcher: a new input matcher that :ref:`matches an IP address against a list of CIDR ranges <envoy_v3_api_file_envoy/extensions/matching/input_matchers/ip/v3/ip.proto>`.
+* http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
+* input matcher: added a new input matcher that :ref:`matches an IP address against a list of CIDR ranges <envoy_v3_api_file_envoy/extensions/matching/input_matchers/ip/v3/ip.proto>`.
 * jwt_authn: added support to fetch remote jwks asynchronously specified by :ref:`async_fetch <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.async_fetch>`.
 * jwt_authn: added support to add padding in the forwarded JWT payload specified by :ref:`pad_forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.pad_forward_payload_header>`.
 * listener: added ability to change an existing listener's address.
 * listener: added filter chain match support for :ref:`direct source address <envoy_v3_api_field_config.listener.v3.FilterChainMatch.direct_source_prefix_ranges>`.
 * local_rate_limit_filter: added suppoort for locally rate limiting http requests on a per connection basis. This can be enabled by setting the :ref:`local_rate_limit_per_downstream_connection <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.local_rate_limit_per_downstream_connection>` field to true.
 * metric service: added support for sending metric tags as labels. This can be enabled by setting the :ref:`emit_tags_as_labels <envoy_v3_api_field_config.metrics.v3.MetricsServiceConfig.emit_tags_as_labels>` field to true.
-* proxy protocol: added support for generating the header while using the :ref:`HTTP connection manager <config_http_conn_man>`. This is done using the using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>` on upstream clusters.
+* proxy protocol: added support for generating the header while using the :ref:`HTTP connection manager <config_http_conn_man>`. This is done using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>` on upstream clusters.
   This feature is currently affected by a memory leak `issue <https://github.com/envoyproxy/envoy/issues/16682>`_.
 * req_without_query: added access log formatter extension implementing command operator :ref:`REQ_WITHOUT_QUERY <envoy_v3_api_msg_extensions.formatter.req_without_query.v3.ReqWithoutQuery>` to log the request path, while excluding the query string.
-* router: added flag ``suppress_grpc_request_failure_code_stats`` to :ref:`key <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>` to allow users to exclude incrementing HTTP status code stats on gRPC requests.
+* router: added option ``suppress_grpc_request_failure_code_stats`` to :ref:`the router <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>` to allow users to exclude incrementing HTTP status code stats on gRPC requests.
 * stats: added native :ref:`Graphite-formatted tag <envoy_v3_api_msg_extensions.stat_sinks.graphite_statsd.v3.GraphiteStatsdSink>` support.
 * tcp: added support for :ref:`preconnecting <v1.18.0:envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>`. Preconnecting is off by default, but recommended for clusters serving latency-sensitive traffic.
 * thrift_proxy: added per upstream metrics within the :ref:`thrift router <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>` for request and response size histograms.
 * thrift_proxy: added support for :ref:`outlier detection <arch_overview_outlier_detection>`.
 * tls: allow dual ECDSA/RSA certs via SDS. Previously, SDS only supported a single certificate per context, and dual cert was only supported via non-SDS.
+* tracing: add option :ref:`use_request_id_for_trace_sampling <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.use_request_id_for_trace_sampling>` which allows configuring whether to perform sampling based on :ref:`x-request-id<config_http_conn_man_headers_x-request-id>` or not.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
 * windows container image: added user, EnvoyUser which is part of the Network Configuration Operators group to the container image.
 
