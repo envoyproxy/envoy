@@ -11,7 +11,6 @@
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/assert.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
 
@@ -45,7 +44,6 @@ public:
     if (this != &other) {
       fragment_ = std::move(other.fragment_);
       single_slice_buffer_.move(other.single_slice_buffer_);
-      ASSERT(other.fragment_ == nullptr);
     }
     return *this;
   }

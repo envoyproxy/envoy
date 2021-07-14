@@ -60,6 +60,7 @@ public:
 
 private:
   Envoy::Buffer::Instance* buffer_{nullptr};
+  // Nullptr if this span is not constructed with a QuicMemSlice.
   QuicMemSliceImpl* mem_slice_{nullptr};
 };
 
@@ -67,10 +68,7 @@ template <typename ConsumeFunction>
 // NOLINTNEXTLINE(readability-identifier-naming)
 QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
   size_t saved_length = 0;
-  if (mem_slice_ != nullptr) {
-    saved_length += mem_slice_->length();
-    consume(quic::QuicMemSlice(std::move(*mem_slice_)));
-  } else {
+  if (mem_slice_ == nullptr) {
     for (auto& slice : buffer_->getRawSlices()) {
       if (slice.len_ == 0) {
         continue;
@@ -82,6 +80,9 @@ QuicByteCount QuicMemSliceSpanImpl::ConsumeAll(ConsumeFunction consume) {
       consume(QuicMemSlice(QuicMemSliceImpl(*buffer_, slice.len_)));
       saved_length += slice.len_;
     }
+  } else {
+    saved_length += mem_slice_->length();
+    consume(quic::QuicMemSlice(std::move(*mem_slice_)));
   }
   ASSERT(buffer_->length() == 0);
   return saved_length;
