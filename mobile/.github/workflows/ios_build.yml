@@ -58,6 +58,7 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.credentials
           echo "$GOOGLE_APPLICATION_CREDENTIALS"
           ls -l "$GOOGLE_APPLICATION_CREDENTIALS"
+          bazelisk shutdown
           bazelisk build --config=ios --config=remote-ci-macos //:ios_dist
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Build Envoy.framework distributable'
