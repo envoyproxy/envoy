@@ -3835,7 +3835,7 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
                             "HttpProtocolOptions can be specified");
 }
 
-TEST_F(ClusterInfoImplTest, DeprecatedMaxRquestsPerConnection) {
+TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
