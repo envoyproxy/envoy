@@ -144,6 +144,18 @@ bool GrpcMuxImpl<S, F, RQ, RS>::paused(const std::string& type_url) const {
 }
 
 template <class S, class F, class RQ, class RS>
+void GrpcMuxImpl<S, F, RQ, RS>::sendGrpcMessage(RQ& msg_proto, S& sub_state) {
+  if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
+      !skipSubsequentNode()) {
+    msg_proto.mutable_node()->CopyFrom(localInfo().node());
+  }
+  VersionConverter::prepareMessageForGrpcWire(msg_proto, transportApiVersion());
+  sendMessage(msg_proto);
+  setAnyRequestSentYetInCurrentStream(true);
+  sub_state.clearDynamicContextChanged();
+}
+
+template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_url,
                                                       const RS& response_proto,
                                                       ControlPlaneStats& control_plane_stats) {
@@ -328,33 +340,6 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                    rate_limit_settings) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
-void GrpcMuxDelta::onStreamEstablished() { handleEstablishedStream(); }
-void GrpcMuxDelta::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
-void GrpcMuxDelta::onWriteable() { trySendDiscoveryRequests(); }
-void GrpcMuxDelta::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-    ControlPlaneStats& control_plane_stats) {
-  genericHandleResponse(message->type_url(), *message, control_plane_stats);
-}
-
-void GrpcMuxDelta::establishGrpcStream() { grpc_stream_.establishNewStream(); }
-void GrpcMuxDelta::sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto,
-                                   DeltaSubscriptionState& sub_state) {
-  if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
-      !skipSubsequentNode()) {
-    msg_proto.mutable_node()->CopyFrom(localInfo().node());
-  }
-  VersionConverter::prepareMessageForGrpcWire(msg_proto, transportApiVersion());
-  grpc_stream_.sendMessage(msg_proto);
-  setAnyRequestSentYetInCurrentStream(true);
-  sub_state.clearDynamicContextChanged();
-}
-void GrpcMuxDelta::maybeUpdateQueueSizeStat(uint64_t size) {
-  grpc_stream_.maybeUpdateQueueSizeStat(size);
-}
-bool GrpcMuxDelta::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
-bool GrpcMuxDelta::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
-
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
                                          const absl::flat_hash_set<std::string>& for_update) {
   auto& sub = subscriptionStateFor(type_url);
@@ -375,37 +360,6 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                   local_info, transport_api_version),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings) {}
-
-// GrpcStreamCallbacks for GrpcMuxSotw
-void GrpcMuxSotw::onStreamEstablished() { handleEstablishedStream(); }
-void GrpcMuxSotw::onEstablishmentFailure() { handleStreamEstablishmentFailure(); }
-void GrpcMuxSotw::onWriteable() { trySendDiscoveryRequests(); }
-void GrpcMuxSotw::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
-    ControlPlaneStats& control_plane_stats) {
-  genericHandleResponse(message->type_url(), *message, control_plane_stats);
-}
-
-void GrpcMuxSotw::establishGrpcStream() { grpc_stream_.establishNewStream(); }
-
-void GrpcMuxSotw::sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto,
-                                  SotwSubscriptionState& sub_state) {
-  if (sub_state.dynamicContextChanged() || !anyRequestSentYetInCurrentStream() ||
-      !skipSubsequentNode()) {
-    msg_proto.mutable_node()->MergeFrom(localInfo().node());
-  }
-  VersionConverter::prepareMessageForGrpcWire(msg_proto, transportApiVersion());
-  grpc_stream_.sendMessage(msg_proto);
-  setAnyRequestSentYetInCurrentStream(true);
-  sub_state.clearDynamicContextChanged();
-}
-
-void GrpcMuxSotw::maybeUpdateQueueSizeStat(uint64_t size) {
-  grpc_stream_.maybeUpdateQueueSizeStat(size);
-}
-
-bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
-bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,

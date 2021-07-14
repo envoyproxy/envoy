@@ -44,7 +44,8 @@ public:
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
 template <class S, class F, class RQ, class RS>
-class GrpcMuxImpl : public GrpcMux, Logger::Loggable<Logger::Id::config> {
+class GrpcMuxImpl : public GrpcStreamCallbacks<RS>,
+                    public GrpcMux, Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
               const LocalInfo::LocalInfo& local_info,
@@ -69,12 +70,19 @@ public:
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
   }
+  bool isUnified() const override { return true; }
 
+  // GrpcStreamCallbacks
+  void onStreamEstablished() override { handleEstablishedStream(); }
+  void onEstablishmentFailure() override { handleStreamEstablishmentFailure(); }
+  void onWriteable() override { trySendDiscoveryRequests(); }
+  void onDiscoveryResponse(
+      std::unique_ptr<RS>&& message, ControlPlaneStats& control_plane_stats) override {
+    genericHandleResponse(message->type_url(), *message, control_plane_stats);
+  }
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-
-  bool isUnified() const override { return true; }
 
 protected:
   // Everything related to GrpcStream must remain abstract. GrpcStream (and the gRPC-using classes
@@ -83,12 +91,13 @@ protected:
   // the GrpcStream will be owned by a derived class, and all code that would touch grpc_stream_ is
   // seen here in the base class as calls to abstract functions, to be provided by those derived
   // classes.
-  virtual void establishGrpcStream() PURE;
-  // Deletes msg_proto_ptr.
-  virtual void sendGrpcMessage(RQ& msg_proto, S& sub_state) PURE;
-  virtual void maybeUpdateQueueSizeStat(uint64_t size) PURE;
-  virtual bool grpcStreamAvailable() const PURE;
-  virtual bool rateLimitAllowsDrain() PURE;
+  virtual GrpcStreamBase& grpcStream() PURE;
+  void establishGrpcStream() { grpcStream().establishNewStream(); }
+  void sendGrpcMessage(RQ& msg_proto, S& sub_state);
+  void maybeUpdateQueueSizeStat(uint64_t size) { grpcStream().maybeUpdateQueueSizeStat(size); }
+  bool grpcStreamAvailable() { return grpcStream().grpcStreamAvailable(); }
+  bool rateLimitAllowsDrain() { return grpcStream().checkRateLimitAllowsDrain(); }
+  virtual void sendMessage(RQ& msg_proto) PURE;
 
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
@@ -161,8 +170,7 @@ private:
 class GrpcMuxDelta
     : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
                          envoy::service::discovery::v3::DeltaDiscoveryRequest,
-                         envoy::service::discovery::v3::DeltaDiscoveryResponse>,
-      public GrpcStreamCallbacks<envoy::service::discovery::v3::DeltaDiscoveryResponse> {
+                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                const Protobuf::MethodDescriptor& service_method,
@@ -172,14 +180,9 @@ public:
                bool skip_subsequent_node);
 
   // GrpcStreamCallbacks
-  void onStreamEstablished() override;
-  void onEstablishmentFailure() override;
-  void onWriteable() override;
-  void onDiscoveryResponse(
-      std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-      ControlPlaneStats& control_plane_stats) override;
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+  
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
              envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
@@ -187,12 +190,12 @@ public:
   }
 
 protected:
-  void establishGrpcStream() override;
-  void sendGrpcMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto,
-                       DeltaSubscriptionState& sub_state) override;
-  void maybeUpdateQueueSizeStat(uint64_t size) override;
-  bool grpcStreamAvailable() const override;
-  bool rateLimitAllowsDrain() override;
+  GrpcStreamBase& grpcStream() override {
+    return grpc_stream_;
+  }
+  void sendMessage(envoy::service::discovery::v3::DeltaDiscoveryRequest& msg_proto) override {
+    grpc_stream_.sendMessage(msg_proto);
+  }
 
 private:
   GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
@@ -202,8 +205,7 @@ private:
 
 class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
                                        envoy::service::discovery::v3::DiscoveryRequest,
-                                       envoy::service::discovery::v3::DiscoveryResponse>,
-                    public GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse> {
+                                       envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
               const Protobuf::MethodDescriptor& service_method,
@@ -212,16 +214,6 @@ public:
               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
               bool skip_subsequent_node);
 
-  // GrpcStreamCallbacks
-  void onStreamEstablished() override;
-  void onEstablishmentFailure() override;
-  void onWriteable() override;
-  void
-  onDiscoveryResponse(std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
-                      ControlPlaneStats& control_plane_stats) override;
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  };
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>&
   grpcStreamForTest() {
@@ -229,12 +221,12 @@ public:
   }
 
 protected:
-  void establishGrpcStream() override;
-  void sendGrpcMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto,
-                       SotwSubscriptionState& sub_state) override;
-  void maybeUpdateQueueSizeStat(uint64_t size) override;
-  bool grpcStreamAvailable() const override;
-  bool rateLimitAllowsDrain() override;
+  GrpcStreamBase& grpcStream() override {
+    return grpc_stream_;
+  }
+  void sendMessage(envoy::service::discovery::v3::DiscoveryRequest& msg_proto) override {
+    grpc_stream_.sendMessage(msg_proto);
+  }
 
 private:
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
