@@ -173,8 +173,7 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
                    "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
                    "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
                    "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.randomGenerator(),
-                                                           api_.rootScope());
+    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.rootScope());
   }
 #endif
   return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, dns_resolver_options);
@@ -248,13 +247,10 @@ TimerPtr DispatcherImpl::createTimerInternal(TimerCb cb) {
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   ASSERT(isThreadSafe());
-  if (to_delete != nullptr) {
-    to_delete->deleteIsPending();
-    current_to_delete_->emplace_back(std::move(to_delete));
-    ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
-    if (current_to_delete_->size() == 1) {
-      deferred_delete_cb_->scheduleCallbackCurrentIteration();
-    }
+  current_to_delete_->emplace_back(std::move(to_delete));
+  ENVOY_LOG(trace, "item added to deferred deletion list (size={})", current_to_delete_->size());
+  if (current_to_delete_->size() == 1) {
+    deferred_delete_cb_->scheduleCallbackCurrentIteration();
   }
 }
 
