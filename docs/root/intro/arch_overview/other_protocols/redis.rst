@@ -28,6 +28,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Separate downstream client and upstream server authentication.
 * Request mirroring for all requests or write requests only.
 * Control :ref:`read requests routing<envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.read_policy>`. This only works with Redis Cluster.
+* HotKey Statistics.
 
 **Planned future enhancements**:
 
@@ -278,3 +279,60 @@ response for each in place of the value.
   3) (error) upstream failure
   4) (error) upstream failure
   5) "echo"
+
+HotKey Statistics
+-----------------
+
+We will count the access times of hotkeys in a period of time and convert them to heat values to show them to users.
+To that end, we created a new command and its corresponding success and failure responses.
+
+.. csv-table::
+  :header: Command, Group
+  :widths: 1, 1
+
+  HOTKEY, String
+
+.. csv-table::
+  :header: Error, Meaning
+  :widths: 1, 1
+
+  "ERR Client sent HOTKEY, but this feature is not enabled", "The hotkey item is not configured in the configuration file."
+
+
+When using HOTKEY, we can get all the hotkeys and their heat values.
+If we set the cache capacity is 2 and the acquisition interval is 5S and the attenuation detection interval is 60s and the cache attenuation interval is 0s.
+We can see the following results.
+
+.. code-block:: none
+
+  $ redis-cli HOTKEY
+  Collect 0 keys in the period !
+
+  $ redis-cli MSET key1 1 key2 2 key3 3
+  OK
+
+  ···5s···
+
+  $ redis-cli HOTKEY
+  Collect 2 keys in the period !
+  key:key2 heat:1
+  key:key3 heat:1
+
+  $ redis-cli MGET key1 key1 key1 key1
+  1) "1"
+  2) "1"
+  3) "1"
+  4) "1"
+
+  ···5s···
+
+  $ redis-cli HOTKEY
+  Collect 2 keys in the period !
+  key:key1 heat:4
+  key:key2 heat:1
+
+  ···60s···
+
+  $ redis-cli HOTKEY
+  Collect 1 keys in the period !
+  key:key1 heat:2
