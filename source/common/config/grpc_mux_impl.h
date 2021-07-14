@@ -209,6 +209,10 @@ public:
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
+  bool paused(const std::string&) const override { return false; }
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const SubscriptionOptions&) override;
+  void removeWatch(const std::string&, Watch*) override;
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
