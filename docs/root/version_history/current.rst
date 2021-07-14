@@ -9,6 +9,10 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
+  which defines the minimal number of headers in a request/response/trailers required for using a
+  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  feature to a non-negative number will override the default value.
 * listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
   field and changed the default for reuse port from false to true, as the feature is now well
   supported on the majority of production Linux kernels in use. The default change is aware of hot
@@ -19,10 +23,6 @@ Minor Behavior Changes
   to false. As part of this change, the use of reuse port for TCP listeners on both OSX and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
-* http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
-  which defines the minimal number of headers in a request/response/trailers required for using a
-  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
-  feature to a non-negative number will override the default value.
 
 Bug Fixes
 ---------
