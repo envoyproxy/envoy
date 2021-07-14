@@ -179,7 +179,11 @@ public:
     return layered_runtime_;
   }
 
-  void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server);
+  /**
+   * Initialize admin access log.
+   */
+  void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                          Instance& server);
 
 private:
   struct AdminImpl : public Admin {

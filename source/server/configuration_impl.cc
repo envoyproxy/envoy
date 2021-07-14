@@ -232,7 +232,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
 }
 
 void InitialImpl::initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                Instance& server) {
+                                     Instance& server) {
   const auto& admin = bootstrap.admin();
 
   for (const auto& access_log : admin.access_log()) {
