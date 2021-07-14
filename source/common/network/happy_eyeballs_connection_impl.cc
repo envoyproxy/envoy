@@ -141,26 +141,20 @@ bool HappyEyeballsConnectionImpl::connecting() const {
 }
 
 void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   if (connect_finished_) {
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     connections_[0]->write(data, end_stream);
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     return;
   }
 
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
-      [this]() -> void { this->onWriteBufferLowWatermark(); },
+      []() -> void { ASSERT(false); },
       [this]() -> void { this->onWriteBufferHighWatermark(); },
-      []() -> void { /* TODO(adisuissa): Handle overflow watermark */ });
+      []() -> void { ASSERT(false) });
   if (per_connection_state_.buffer_limits_.has_value()) {
     post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
   }
   post_connect_state_.write_buffer_.value()->move(data);
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   post_connect_state_.end_stream_ = end_stream;
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
 }
 
 void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
