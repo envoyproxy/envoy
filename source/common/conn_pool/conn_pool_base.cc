@@ -98,11 +98,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
 }
 
 float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_preconnect")) {
-    return host_->cluster().perUpstreamPreconnectRatio();
-  } else {
-    return 1.0;
-  }
+  return host_->cluster().perUpstreamPreconnectRatio();
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {

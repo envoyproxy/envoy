@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.add_and_validate_scheme_header",
-    "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
@@ -73,7 +72,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
-    "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
