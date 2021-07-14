@@ -233,6 +233,32 @@ TEST(PortMatcher, PortMatcher) {
   checkMatcher(PortMatcher(456), false, conn, headers, info);
 }
 
+TEST(PortRangeMatcher, PortRangeMatcher) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  info.downstream_address_provider_->setLocalAddress(addr);
+
+  envoy::type::v3::Int32Range range;
+  range.set_start(123);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(456);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(123);
+  range.set_end(456);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  range.set_start(12);
+  range.set_end(34);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+}
+
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
