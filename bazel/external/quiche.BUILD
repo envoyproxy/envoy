@@ -4184,7 +4184,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_platform_api_test",
     srcs = [
-        "quiche/quic/platform/api/quic_containers_test.cc",
         "quiche/quic/platform/api/quic_mem_slice_span_test.cc",
         "quiche/quic/platform/api/quic_mem_slice_storage_test.cc",
         "quiche/quic/platform/api/quic_mem_slice_test.cc",
