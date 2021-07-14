@@ -134,7 +134,7 @@ Deprecated
 ----------
 
 * api: the :ref:`matcher <envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.matcher>` field has been deprecated in favor of
-  :ref:`matcher <envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.matcher_tree>` in order to break a build dependency.
+  :ref:`matcher <envoy_v3_api_field_extensions.common.matching.v3.ExtensionWithMatcher.xds_matcher>` in order to break a build dependency.
 * bootstrap: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
 * cluster: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` and :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` are deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
 * dns_filter: the field :ref:`known_suffixes <envoy_v3_api_field_data.dns.v3.DnsTable.known_suffixes>` is deprecated. The internal data management of the filter has changed and the filter no longer uses the known_suffixes field.
