@@ -192,6 +192,8 @@ def envoy_dependencies(skip_targets = []):
     _com_github_wasmtime()
     _com_github_wasm_c_api()
 
+    _com_github_bufbuild_buf()
+
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
         cc = True,
@@ -1022,6 +1024,13 @@ filegroup(
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_bufbuild_buf():
+    external_http_archive(
+        name = "com_github_bufbuild_buf",
+        build_file = "@envoy//bazel/external:api_buf.BUILD",
+        tags = ["manual"],
     )
 
 def _foreign_cc_dependencies():

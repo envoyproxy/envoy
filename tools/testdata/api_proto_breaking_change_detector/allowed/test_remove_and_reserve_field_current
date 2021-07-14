@@ -1,0 +1,7 @@
+syntax = "proto3";
+package test.protos.breaking;
+
+message SampleMessage {
+    string three = 3;
+    float four = 4;
+}

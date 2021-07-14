@@ -1,0 +1,23 @@
+version: v1beta1
+# commenting these out for now until I figure out how to automate buf.lock
+#deps:
+  # TODO: should these point to specific commit hashes?
+  # 
+
+#    - buf.build/beta/udpa
+#    - buf.build/beta/googleapis
+#    - buf.build/beta/opencensus
+#    - buf.build/beta/prometheus
+#    - buf.build/beta/opentelemetry
+breaking:
+  use:
+    - FIELD_SAME_ONEOF
+    - FIELD_SAME_JSON_NAME
+    - FIELD_SAME_NAME
+    - FIELD_SAME_TYPE
+    - FIELD_SAME_LABEL
+    - FILE_SAME_PACKAGE
+
+    # needed for allowing removal/reserving of fields
+    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED

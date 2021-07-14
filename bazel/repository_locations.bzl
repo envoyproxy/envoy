@@ -1072,4 +1072,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2018-12-18",
         cpe = "N/A",
     ),
+    com_github_bufbuild_buf = dict(
+        project_name = "buf",
+        project_desc = "A new way of working with Protocol Buffers.",  # Used for breaking change detection in API protobufs
+        project_url = "https://buf.build",
+        version = "0.46.0",
+        sha256 = "4165fb44e5c0d6d5242e9f58bf53a31884a39e582abe1ce82dcb9d17c97ad54e",
+        strip_prefix = "buf",
+        urls = ["https://github.com/bufbuild/buf/releases/download/v{version}/buf-Linux-x86_64.tar.gz"],
+        release_date = "2021-07-27",
+        use_category = ["api"],
+        tags = ["manual"],
+    ),
 )
