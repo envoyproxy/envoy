@@ -437,20 +437,21 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
       response_headers.setContentLength(uint64_t(0));
     }
   } else {
+    // Only clear these hop by hop headers for non-upgrade connections.
     if (clear_hop_by_hop) {
       response_headers.removeConnection();
       response_headers.removeUpgrade();
     }
   }
-
-  if (request_headers != nullptr &&
-      (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
-    config.requestIDExtension()->setInResponse(response_headers, *request_headers);
-  }
   if (clear_hop_by_hop) {
     response_headers.removeTransferEncoding();
     response_headers.removeKeepAlive();
     response_headers.removeProxyConnection();
+  }
+
+  if (request_headers != nullptr &&
+      (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
+    config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);

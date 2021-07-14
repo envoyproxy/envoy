@@ -79,7 +79,7 @@ public:
    * Note this function may be called twice on the response path if there are
    * 100-Continue headers.
    *
-   * @param response_headers the headers to sanitize.
+   * @param response_headers the headers to mutate.
    * @param request_headers the request headers.
    * @param the configuration for the HCM, which affects request ID headers.
    * @param via the via header to append, if any.
