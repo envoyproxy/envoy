@@ -53,7 +53,7 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
-    extension_name = "envoy.filters.listener.tls_inspector",
+    extension_names = ["envoy.filters.listener.tls_inspector"],
     external_deps = [
         "benchmark",
     ],
@@ -72,7 +72,7 @@ envoy_extension_cc_benchmark_binary(
 envoy_extension_benchmark_test(
     name = "tls_inspector_benchmark_test",
     benchmark_binary = "tls_inspector_benchmark",
-    extension_name = "envoy.filters.listener.tls_inspector",
+    extension_names = ["envoy.filters.listener.tls_inspector"],
 )
 
 envoy_cc_library(

@@ -57,12 +57,12 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
     getBufferStatus(type, &size, &flags);
     setBuffer(type, size, 0, ".append");
     logBody(type);
-    return FilterDataStatus::Continue;
+    return FilterDataStatus::StopIterationNoBuffer;
 
   } else if (body_op_ == "ReplaceBody") {
     setBuffer(type, 0, buffer_length, "replace");
     logBody(type);
-    return FilterDataStatus::Continue;
+    return FilterDataStatus::StopIterationAndWatermark;
 
   } else if (body_op_ == "PartialReplaceBody") {
     setBuffer(type, 0, 1, "partial.replace.");

@@ -45,7 +45,7 @@ envoy_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.resource_monitors.injected_resource",
+    extension_names = ["envoy.resource_monitors.injected_resource"],
     deps = [
         "//envoy/registry",
         "//source/common/event:dispatcher_lib",
