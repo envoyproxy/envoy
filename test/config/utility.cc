@@ -1022,8 +1022,9 @@ void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_p
       [max_requests_per_connection](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
-        hcm.mutable_common_http_protocol_options()->set_max_requests_per_connection(
-            max_requests_per_connection);
+        hcm.mutable_common_http_protocol_options()
+            ->mutable_max_requests_per_connection()
+            ->set_value(max_requests_per_connection);
       });
 }
 

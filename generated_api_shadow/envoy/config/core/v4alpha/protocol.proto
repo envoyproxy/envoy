@@ -165,8 +165,10 @@ message HttpProtocolOptions {
   HeadersWithUnderscoresAction headers_with_underscores_action = 5;
 
   // Optional maximum requests for both upstream and downstream connections.
-  // If not specified, there is no limit. It's a soft limit.
-  uint32 max_requests_per_connection = 6;
+  // If not specified, there is no limit.
+  // Setting this parameter to 1 will effectively disable keep alive.
+  // For HTTP/2 and HTTP/3, due to concurrent stream processing, the limit is approximate.
+  google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
 // [#next-free-field: 8]
