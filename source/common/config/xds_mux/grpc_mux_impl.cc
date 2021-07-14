@@ -44,26 +44,28 @@ void GrpcMuxImpl<S, F, RQ, RS>::onDynamicContextUpdate(absl::string_view resourc
 }
 
 template <class S, class F, class RQ, class RS>
-Watch* GrpcMuxImpl<S, F, RQ, RS>::addWatch(const std::string& type_url,
-                                           const absl::flat_hash_set<std::string>& resources,
-                                           SubscriptionCallbacks& callbacks,
-                                           OpaqueResourceDecoder& resource_decoder,
-                                           const bool use_namespace_matching) {
+Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
+    const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    const SubscriptionOptions& options) {
   auto watch_map = watch_maps_.find(type_url);
   if (watch_map == watch_maps_.end()) {
     // We don't yet have a subscription for type_url! Make one!
     watch_map =
-        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(use_namespace_matching)).first;
+        watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_))
+            .first;
     subscriptions_.emplace(
         type_url, subscription_state_factory_->makeSubscriptionState(
-                      type_url, *watch_maps_[type_url], resource_decoder, use_namespace_matching));
+                      type_url, *watch_maps_[type_url], resource_decoder, resources.empty()));
     subscription_ordering_.emplace_back(type_url);
   }
 
   Watch* watch = watch_map->second->addWatch(callbacks, resource_decoder);
   // updateWatch() queues a discovery request if any of 'resources' are not yet subscribed.
-  updateWatch(type_url, watch, resources, use_namespace_matching);
-  return watch;
+  updateWatch(type_url, watch, resources, options);
+  // TODO (dmitri-d) return naked pointer instead once legacy mux has been removed and mux interface
+  // can be updated
+  return std::make_unique<WatchCompatibilityWrapper>(watch);
 }
 
 // Updates the list of resource names watched by the given watch. If an added name is new across
@@ -72,38 +74,33 @@ Watch* GrpcMuxImpl<S, F, RQ, RS>::addWatch(const std::string& type_url,
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* watch,
                                             const absl::flat_hash_set<std::string>& resources,
-                                            const bool creating_namespace_watch) {
+                                            const SubscriptionOptions& options) {
   ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
   ASSERT(watch != nullptr);
   auto& sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
 
-  // If this is a glob collection subscription, we need to compute actual context parameters.
-  absl::flat_hash_set<std::string> xdstp_resources;
-  // TODO(htuch): add support for resources beyond glob collections, the constraints below around
-  // resource size and ID reflect the progress of the xdstp:// implementation.
-  if (!resources.empty() && XdsResourceIdentifier::hasXdsTpScheme(*resources.begin())) {
-    // Callers must be asking for a single resource, the collection.
-    ASSERT(resources.size() == 1);
-    auto resource = XdsResourceIdentifier::decodeUrn(*resources.begin());
-    // We only know how to deal with glob collections and static context parameters right now.
-    // TODO(htuch): add support for dynamic context params and list collections in the future.
-    if (absl::EndsWith(resource.id(), "/*")) {
-      auto encoded_context = XdsContextParams::encodeResource(
-          local_info_.contextProvider().nodeContext(), resource.context(), {}, {});
-      resource.mutable_context()->CopyFrom(encoded_context);
+  // We need to prepare xdstp:// resources for the transport, by normalizing and adding any extra
+  // context parameters.
+  absl::flat_hash_set<std::string> effective_resources;
+  for (const auto& resource : resources) {
+    if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
+      auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
+      if (options.add_xdstp_node_context_params_) {
+        const auto context = XdsContextParams::encodeResource(
+            local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+        xdstp_resource.mutable_context()->CopyFrom(context);
+      }
       XdsResourceIdentifier::EncodeOptions encode_options;
       encode_options.sort_context_params_ = true;
-      xdstp_resources.insert(XdsResourceIdentifier::encodeUrn(resource, encode_options));
+      effective_resources.insert(XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options));
     } else {
-      // TODO(htuch): We will handle list collections here in future work.
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      effective_resources.insert(resource);
     }
   }
 
-  auto added_removed =
-      watch_map.updateWatchInterest(watch, xdstp_resources.empty() ? resources : xdstp_resources);
-  if (creating_namespace_watch && xdstp_resources.empty()) {
+  auto added_removed = watch_map.updateWatchInterest(watch, effective_resources);
+  if (options.use_namespace_matching_) {
     // This is to prevent sending out of requests that contain prefixes instead of resource names
     sub.updateSubscriptionInterest({}, {});
   } else {
@@ -118,7 +115,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
 
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::removeWatch(const std::string& type_url, Watch* watch) {
-  updateWatch(type_url, watch, {});
+  updateWatch(type_url, watch, {}, {});
   watchMapFor(type_url).removeWatch(watch);
 }
 
@@ -148,7 +145,8 @@ bool GrpcMuxImpl<S, F, RQ, RS>::paused(const std::string& type_url) const {
 
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_url,
-                                                      const RS& response_proto) {
+                                                      const RS& response_proto,
+                                                      ControlPlaneStats& control_plane_stats) {
   auto sub = subscriptions_.find(type_url);
   if (sub == subscriptions_.end()) {
     ENVOY_LOG(warn,
@@ -157,6 +155,17 @@ void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_ur
               type_url);
     return;
   }
+
+  if (response_proto.has_control_plane()) {
+    control_plane_stats.identifier_.set(response_proto.control_plane().identifier());
+  }
+
+  if (response_proto.control_plane().identifier() != sub->second->controlPlaneIdentifier()) {
+    sub->second->setControlPlaneIdentifier(response_proto.control_plane().identifier());
+    ENVOY_LOG(debug, "Receiving gRPC updates for {} from {}", response_proto.type_url(),
+              sub->second->controlPlaneIdentifier());
+  }
+
   pausable_ack_queue_.push(sub->second->handleResponse(response_proto));
   trySendDiscoveryRequests();
   Memory::Utils::tryShrinkHeap();
@@ -324,8 +333,8 @@ void GrpcMuxDelta::onEstablishmentFailure() { handleStreamEstablishmentFailure()
 void GrpcMuxDelta::onWriteable() { trySendDiscoveryRequests(); }
 void GrpcMuxDelta::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message,
-    ControlPlaneStats&) {
-  genericHandleResponse(message->type_url(), *message);
+    ControlPlaneStats& control_plane_stats) {
+  genericHandleResponse(message->type_url(), *message, control_plane_stats);
 }
 
 void GrpcMuxDelta::establishGrpcStream() { grpc_stream_.establishNewStream(); }
@@ -374,10 +383,7 @@ void GrpcMuxSotw::onWriteable() { trySendDiscoveryRequests(); }
 void GrpcMuxSotw::onDiscoveryResponse(
     std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
-  if (message->has_control_plane()) {
-    control_plane_stats.identifier_.set(message->control_plane().identifier());
-  }
-  genericHandleResponse(message->type_url(), *message);
+  genericHandleResponse(message->type_url(), *message, control_plane_stats);
 }
 
 void GrpcMuxSotw::establishGrpcStream() { grpc_stream_.establishNewStream(); }
@@ -401,13 +407,16 @@ void GrpcMuxSotw::maybeUpdateQueueSizeStat(uint64_t size) {
 bool GrpcMuxSotw::grpcStreamAvailable() const { return grpc_stream_.grpcStreamAvailable(); }
 bool GrpcMuxSotw::rateLimitAllowsDrain() { return grpc_stream_.checkRateLimitAllowsDrain(); }
 
-Watch* NullGrpcMuxImpl::addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                                 SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) {
+Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
+                                                  const absl::flat_hash_set<std::string>&,
+                                                  SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                                  const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 
 void NullGrpcMuxImpl::updateWatch(const std::string&, Watch*,
-                                  const absl::flat_hash_set<std::string>&, const bool) {
+                                  const absl::flat_hash_set<std::string>&,
+                                  const SubscriptionOptions&) {
   throw EnvoyException("ADS must be configured to support an ADS config source");
 }
 

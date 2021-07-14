@@ -112,34 +112,13 @@ public:
                                      const absl::flat_hash_set<std::string>& for_update) PURE;
 
   // Unified mux interface starts here
-  /**
-   * Start a configuration subscription asynchronously for some API type and resources.
-   * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources set of resource names to watch for. If this is empty, then all
-   *                  resources for type_url will result in callbacks.
-   * @param callbacks the callbacks to be notified of configuration updates. These must be valid
-   *                  until GrpcMuxWatch is destroyed.
-   * @param resource_decoder how incoming opaque resource objects are to be decoded.
-   * @param use_namespace_matching if namespace watch should be created. This is used for creating
-   * watches on collections of resources; individual members of a collection are identified by the
-   * namespace in resource name.
-   * @return Watch* an opaque watch token added or updated, to be used in future addOrUpdateWatch
-   *                calls.
-   */
-  virtual Watch* addWatch(const std::string& type_url,
-                          const absl::flat_hash_set<std::string>& resources,
-                          SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                          const bool use_namespace_matching) PURE;
-
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
   // subscription will enqueue and attempt to send an appropriate discovery request.
   virtual void updateWatch(const std::string& type_url, Watch* watch,
                            const absl::flat_hash_set<std::string>& resources,
-                           const bool creating_namespace_watch) PURE;
+                           const SubscriptionOptions& options) PURE;
 
-  // Unified mux interface starts here
   /**
    * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
    * makes you responsible for eventually invoking this cleanup.
@@ -155,12 +134,6 @@ public:
    * @return bool whether the API is paused.
    */
   virtual bool paused(const std::string& type_url) const PURE;
-
-  /**
-   * Passes through to all multiplexed SubscriptionStates. To be called when something
-   * definitive happens with the initial fetch: either an update is successfully received,
-   * or some sort of error happened.*/
-  virtual void disableInitFetchTimeoutTimer() PURE;
 
   virtual bool isUnified() const { return false; }
 };

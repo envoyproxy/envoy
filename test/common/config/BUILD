@@ -179,6 +179,7 @@ envoy_cc_test(
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:version_converter_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/protobuf",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks:common_lib",

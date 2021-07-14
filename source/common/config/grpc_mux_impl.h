@@ -77,6 +77,14 @@ private:
   void setRetryTimer();
   void sendDiscoveryRequest(const std::string& type_url);
 
+  bool paused(const std::string&) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
+                   const SubscriptionOptions&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
                      SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,

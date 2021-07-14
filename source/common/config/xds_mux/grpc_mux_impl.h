@@ -30,6 +30,14 @@ namespace Envoy {
 namespace Config {
 namespace XdsMux {
 
+class WatchCompatibilityWrapper : public Envoy::Config::GrpcMuxWatch {
+public:
+  WatchCompatibilityWrapper(Watch* watch) : watch_(watch) {}
+  void update(const absl::flat_hash_set<std::string>&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  Watch* watch_;
+};
+
 // Manages subscriptions to one or more type of resource. The logical protocol
 // state of those subscription(s) is handled by SubscriptionState.
 // This class owns the GrpcStream used to talk to the server, maintains queuing
@@ -42,12 +50,16 @@ public:
               const LocalInfo::LocalInfo& local_info,
               envoy::config::core::v3::ApiVersion transport_api_version);
 
-  Watch* addWatch(const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-                  const bool use_namespace_matching = false) override;
+  // TODO (dmitri-d) return a naked pointer instead of the wrapper once the legacy mux has been
+  // removed and the mux interface can be changed
+  Config::GrpcMuxWatchPtr addWatch(const std::string& type_url,
+                                   const absl::flat_hash_set<std::string>& resources,
+                                   SubscriptionCallbacks& callbacks,
+                                   OpaqueResourceDecoder& resource_decoder,
+                                   const SubscriptionOptions& options) override;
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
-                   const bool creating_namespace_watch = false) override;
+                   const SubscriptionOptions& options) override;
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
   ScopedResume pause(const std::string& type_url) override;
@@ -56,13 +68,6 @@ public:
   void start() override;
   const absl::flat_hash_map<std::string, std::unique_ptr<S>>& subscriptions() const {
     return subscriptions_;
-  }
-
-  // legacy mux interface not implemented by unified mux.
-  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
-                           const SubscriptionOptions&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
@@ -89,7 +94,8 @@ protected:
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure();
-  void genericHandleResponse(const std::string& type_url, const RS& response_proto);
+  void genericHandleResponse(const std::string& type_url, const RS& response_proto,
+                             ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();
   bool skipSubsequentNode() const { return skip_subsequent_node_; }
   bool anyRequestSentYetInCurrentStream() const { return any_request_sent_yet_in_current_stream_; }
@@ -174,6 +180,11 @@ public:
       ControlPlaneStats& control_plane_stats) override;
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+  GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3::DeltaDiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
 
 protected:
   void establishGrpcStream() override;
@@ -242,21 +253,16 @@ public:
     return std::make_unique<Cleanup>([]() {});
   }
   bool paused(const std::string&) const override { return false; }
-  void disableInitFetchTimeoutTimer() override {}
 
-  Watch* addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                  SubscriptionCallbacks&, OpaqueResourceDecoder&, const bool) override;
   void updateWatch(const std::string&, Watch*, const absl::flat_hash_set<std::string>&,
-                   const bool) override;
+                   const SubscriptionOptions&) override;
   void removeWatch(const std::string&, Watch*) override;
 
-  // legacy mux interface not implemented by unified mux.
-  GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
-                           SubscriptionCallbacks&, OpaqueResourceDecoder&,
-                           const SubscriptionOptions&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  Config::GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
+                                   SubscriptionCallbacks&, OpaqueResourceDecoder&,
+                                   const SubscriptionOptions&) override;
 
+  // legacy mux interface not implemented by unified mux.
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
