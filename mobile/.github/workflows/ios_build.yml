@@ -30,6 +30,37 @@ jobs:
       - run: bazelisk build --config=ios //:ios_dist
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Build Envoy.framework distributable'
+  iosbuildshadow:
+    name: ios_build_shadow
+    runs-on: macOS-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions/cache@v2
+        id: check-cache
+        with:
+          key: framework-shadow-${{ github.sha }}
+          path: dist/Envoy.framework
+        name: 'Check cache'
+      - run: echo "Found Envoy.framework from previous run!"
+        if: steps.check-cache.outputs.cache-hit == 'true'
+        name: 'Build cache hit'
+      - run: ./ci/mac_ci_setup.sh
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        name: 'Install dependencies'
+      - env:
+          CREDENTIALS: ${{ secrets.ENGFLOW_CREDENTIALS }}
+        run: |
+          if [[ -z $CREDENTIALS ]]; then echo "Empty CREDENTIALS"; exit 0; fi
+          echo "$CREDENTIALS" > .credentials
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.credentials
+          echo "$GOOGLE_APPLICATION_CREDENTIALS"
+          ls -l "$GOOGLE_APPLICATION_CREDENTIALS"
+          bazelisk build --config=ios --config=remote-ci-macos //:ios_dist
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        name: 'Build Envoy.framework distributable'
   swifthelloworld:
     name: swift_helloworld
     needs: iosbuild
