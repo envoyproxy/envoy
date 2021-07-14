@@ -9,6 +9,11 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
+  which defines the minimal number of headers in a request/response/trailers required for using a
+  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  feature to a non-negative number will override the default value.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
