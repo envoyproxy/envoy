@@ -187,7 +187,10 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(&connection.streamInfo(), std::move(upstream), host,
                                  latched_data->connection().addressProvider().localAddress(),
-                                 latched_data->connection().streamInfo().downstreamAddressProvider().downstreamSslConnection());
+                                 latched_data->connection()
+                                     .streamInfo()
+                                     .downstreamAddressProvider()
+                                     .downstreamSslConnection());
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -237,8 +240,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http_upstream_wait_connect_response")) {
-    upstream_->setConnPoolCallbacks(
-        std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamAddressProvider().downstreamSslConnection()));
+    upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
+        *this, host, info.downstreamAddressProvider().downstreamSslConnection()));
   } else {
     callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
                                    latched_encoder->getStream().connectionLocalAddress(),

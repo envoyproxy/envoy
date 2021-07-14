@@ -181,8 +181,9 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == MTLS) {
-    return CelValue::CreateBool(info_.downstreamAddressProvider().downstreamSslConnection() != nullptr &&
-                                info_.downstreamAddressProvider().downstreamSslConnection()->peerCertificatePresented());
+    return CelValue::CreateBool(
+        info_.downstreamAddressProvider().downstreamSslConnection() != nullptr &&
+        info_.downstreamAddressProvider().downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
     return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {

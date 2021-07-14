@@ -57,7 +57,8 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     conn_data_ = std::move(conn);
     conn_data_->addUpstreamCallbacks(callbacks_);
     host_ = host;
-    ssl_ = conn_data_->connection().streamInfo().downstreamAddressProvider().downstreamSslConnection();
+    ssl_ =
+        conn_data_->connection().streamInfo().downstreamAddressProvider().downstreamSslConnection();
     pool_ready_.ready();
   }
 

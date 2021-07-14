@@ -4868,7 +4868,9 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   ASSERT_NE(nullptr, callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection());
-  EXPECT_EQ(session_id, callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection()->sessionId());
+  EXPECT_EQ(
+      session_id,
+      callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection()->sessionId());
 }
 
 // Verify that upstream timing information is set into the StreamInfo after the upstream

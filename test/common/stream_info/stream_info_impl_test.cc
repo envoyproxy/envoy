@@ -135,7 +135,9 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
 
 TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
-    StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
+    StreamInfoImpl stream_info(
+        Http::Protocol::Http2, test_time_.timeSystem(),
+        std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr));
 
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
 
@@ -191,7 +193,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
     stream_info.setUpstreamSslConnection(ssl_info);
-    EXPECT_EQ(session_id, stream_info.downstreamAddressProvider().upstreamSslConnection()->sessionId());
+    EXPECT_EQ(session_id,
+              stream_info.downstreamAddressProvider().upstreamSslConnection()->sessionId());
   }
 }
 
