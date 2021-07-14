@@ -16,7 +16,7 @@ envoy_extension_cc_test_library(
     name = "postgres_test_utils_lib",
     srcs = ["postgres_test_utils.cc"],
     hdrs = ["postgres_test_utils.h"],
-    extension_name = "envoy.filters.network.postgres_proxy",
+    extension_names = ["envoy.filters.network.postgres_proxy"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/postgres_proxy:filter",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     srcs = [
         "postgres_decoder_test.cc",
     ],
-    extension_name = "envoy.filters.network.postgres_proxy",
+    extension_names = ["envoy.filters.network.postgres_proxy"],
     deps = [
         ":postgres_test_utils_lib",
         "//source/extensions/filters/network/postgres_proxy:filter",
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     srcs = [
         "postgres_message_test.cc",
     ],
-    extension_name = "envoy.filters.network.postgres_proxy",
+    extension_names = ["envoy.filters.network.postgres_proxy"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/postgres_proxy:filter",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
     srcs = [
         "postgres_filter_test.cc",
     ],
-    extension_name = "envoy.filters.network.postgres_proxy",
+    extension_names = ["envoy.filters.network.postgres_proxy"],
     deps = [
         ":postgres_test_utils_lib",
         "//source/extensions/filters/network/postgres_proxy:filter",
@@ -70,7 +70,7 @@ envoy_extension_cc_test(
         "postgres_test_config.yaml",
         "//test/config/integration/certs",
     ],
-    extension_name = "envoy.filters.network.postgres_proxy",
+    extension_names = ["envoy.filters.network.postgres_proxy"],
     deps = [
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/postgres_proxy:config",

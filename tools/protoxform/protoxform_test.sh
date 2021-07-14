@@ -10,7 +10,6 @@ TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 # to satisfy dependency on run_command
 export PYTHONPATH="$TOOLS"
 
-
 # protoxform fix test cases
 PROTO_TARGETS=()
 protos=$(bazel query "labels(srcs, labels(deps, //tools/testdata/protoxform:fix_protos))")

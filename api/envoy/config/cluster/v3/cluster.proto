@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 54]
+// [#next-free-field: 55]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -876,6 +876,13 @@ message Cluster {
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   core.v3.DnsResolutionConfig dns_resolution_config = 53;
 
+  // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // If true, cluster readiness blocks on warm-up. If false, the cluster will complete
+  // initialization whether or not warm-up has completed. Defaults to true.
+  google.protobuf.BoolValue wait_for_warm_on_init = 54;
+
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
   // :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
@@ -930,7 +937,7 @@ message Cluster {
   CommonLbConfig common_lb_config = 27;
 
   // Optional custom transport socket implementation to use for upstream connections.
-  // To setup TLS, set a transport socket with name `tls` and
+  // To setup TLS, set a transport socket with name `envoy.transport_sockets.tls` and
   // :ref:`UpstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>` in the `typed_config`.
   // If no transport socket configuration is specified, new connections
   // will be set up with plaintext.

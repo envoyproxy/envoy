@@ -122,16 +122,11 @@ WasmResult Buffer::copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t 
 WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) {
   if (buffer_instance_) {
     if (start == 0) {
-      if (length == 0) {
-        buffer_instance_->prepend(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else if (length >= buffer_instance_->length()) {
-        buffer_instance_->drain(buffer_instance_->length());
-        buffer_instance_->add(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else {
-        return WasmResult::BadArgument;
+      if (length != 0) {
+        buffer_instance_->drain(length);
       }
+      buffer_instance_->prepend(toAbslStringView(data));
+      return WasmResult::Ok;
     } else if (start >= buffer_instance_->length()) {
       buffer_instance_->add(toAbslStringView(data));
       return WasmResult::Ok;
@@ -1634,17 +1629,19 @@ constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
 void Context::failStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
-    if (decoder_callbacks_) {
+    if (decoder_callbacks_ && !local_reply_sent_) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
+      local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Response:
-    if (encoder_callbacks_) {
+    if (encoder_callbacks_ && !local_reply_sent_) {
       encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
+      local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Downstream:

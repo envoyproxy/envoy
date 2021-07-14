@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.retry_priorities.previous_priorities",
+    extension_names = ["envoy.retry_priorities.previous_priorities"],
     deps = [
         "//source/common/protobuf:message_validator_lib",
         "//source/extensions/retry/priority/previous_priorities:config",

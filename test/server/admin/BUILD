@@ -141,6 +141,7 @@ envoy_cc_test(
     name = "config_tracker_impl_test",
     srcs = ["config_tracker_impl_test.cc"],
     deps = [
+        "//source/common/common:matchers_lib",
         "//source/server/admin:config_tracker_lib",
         "//test/mocks:common_lib",
     ],

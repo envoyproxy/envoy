@@ -527,6 +527,7 @@ private:
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_;
   bool grpc_request_{};
+  bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
   Http::RequestTrailerMap* downstream_trailers_{};
   MonotonicTime downstream_request_complete_time_;

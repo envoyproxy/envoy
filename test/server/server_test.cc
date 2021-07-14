@@ -1718,6 +1718,12 @@ TEST_P(ServerInstanceImplTest, NullProcessContextTest) {
   EXPECT_FALSE(context.has_value());
 }
 
+TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
+  options_.service_cluster_name_ = "some_cluster_name";
+  options_.service_node_name_ = "some_node_name";
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
