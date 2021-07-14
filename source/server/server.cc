@@ -450,7 +450,7 @@ void InstanceImpl::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options, *this);
+  Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   restarter_.sendParentAdminShutdownRequest(original_start_time_);
@@ -523,20 +523,6 @@ void InstanceImpl::initialize(const Options& options,
     dispatcher_->initializeStats(stats_store_, "server.");
   }
 
-  if (initial_config.admin().address()) {
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
-                              initial_config.admin().address(),
-                              initial_config.admin().socketOptions(),
-                              stats_store_.createScope("listener.admin."));
-  } else {
-    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
-  }
-  config_tracker_entry_ = admin_->getConfigTracker().add(
-      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
-  if (initial_config.admin().address()) {
-    admin_->addListenerToHandler(handler_.get());
-  }
-
   // The broad order of initialization from this point on is the following:
   // 1. Statically provisioned configuration (bootstrap) are loaded.
   // 2. Cluster manager is created and all primary clusters (i.e. with endpoint assignments
@@ -556,6 +542,21 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
+  initial_config.initAdminAccessLog(bootstrap_, *this);
+
+  if (initial_config.admin().address()) {
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
+                              initial_config.admin().address(),
+                              initial_config.admin().socketOptions(),
+                              stats_store_.createScope("listener.admin."));
+  } else {
+    ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
+  }
+  config_tracker_entry_ = admin_->getConfigTracker().add(
+      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
+  if (initial_config.admin().address()) {
+    admin_->addListenerToHandler(handler_.get());
+  }
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
