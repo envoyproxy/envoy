@@ -268,10 +268,20 @@ def test_checker_warning_count():
     assert "warning_count" not in checker.__dict__
 
 
-def test_checker_add_arguments():
+def test_checker_add_arguments(patches):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     parser = MagicMock()
-    checker.add_arguments(parser)
+    patched = patches(
+        "runner.Runner.add_arguments",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert checker.add_arguments(parser) is None
+
+    assert (
+        list(m_super.call_args)
+        == [(parser,), {}])
+
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
         == [[('--fix',),
@@ -311,9 +321,6 @@ def test_checker_add_arguments():
             [('--path', '-p'),
              {'default': None,
               'help': 'Path to the test root (usually Envoy source dir). If not specified the first path of paths is used'}],
-            [('--log-level', '-l'),
-             {'choices': ['info', 'warn', 'debug', 'error'],
-              'default': 'info', 'help': 'Log level to display'}],
             [('paths',),
              {'nargs': '*',
               'help': 'Paths to check. At least one path must be specified, or the `path` argument should be provided'}]])
