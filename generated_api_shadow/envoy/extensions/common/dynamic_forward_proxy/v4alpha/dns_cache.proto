@@ -119,7 +119,7 @@ message DnsCacheConfig {
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`envoy_v3_api_msg_config.core.v3.DnsResolutionConfig`
+  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
   // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
   // :ref:'dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>'
   // configuration eventually.
