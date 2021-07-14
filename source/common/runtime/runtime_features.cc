@@ -72,7 +72,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
-    "envoy.reloadable_features.http_upstream_wait_connect_response",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
