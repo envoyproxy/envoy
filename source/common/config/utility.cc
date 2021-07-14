@@ -25,6 +25,8 @@
 namespace Envoy {
 namespace Config {
 
+const std::string Wildcard = "*";
+
 std::string Utility::truncateGrpcStatusMessage(absl::string_view error_message) {
   // GRPC sends error message via trailers, which by default has a 8KB size limit(see
   // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests). Truncates the

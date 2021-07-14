@@ -540,7 +540,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscriptio
 // Check that resource changes from being interested in implicitly to explicitly when we update the
 // subscription interest. Such resources will show up in the initial wildcard requests
 // too. Receiving the update on such resource will not change their interest mode.
-TEST_F(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
+TEST_P(WildcardDeltaSubscriptionStateTest, ExplicitInterestOverridesImplicit) {
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> add1_2_a =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   EXPECT_CALL(*ttl_timer_, disableTimer()).Times(2);

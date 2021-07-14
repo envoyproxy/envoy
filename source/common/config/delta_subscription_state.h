@@ -60,19 +60,17 @@ private:
 
   class ResourceState {
   public:
-    ResourceState(absl::optional<std::string> version) : version_(std::move(version)) {}
-
-    ResourceState(const envoy::service::discovery::v3::Resource& resource)
-        : ResourceState(resource.version()) {}
-
     // Builds a ResourceState in the waitingForServer state.
-    ResourceState() : ResourceState(absl::nullopt) {}
+    ResourceState() = default;
+    // Self-documenting alias of default constructor.
+    static ResourceState waitingForServer() { return ResourceState(); }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
-    bool waitingForServer() const { return version_ == absl::nullopt; }
+    bool isWaitingForServer() const { return version_ == absl::nullopt; }
 
     void setAsWaitingForServer() { version_ = absl::nullopt; }
+    void setVersion(absl::string_view version) { version_ = std::string(version); }
 
     // Must not be called if waitingForServer() == true.
     std::string version() const {
@@ -85,7 +83,8 @@ private:
   };
 
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
-  OptRef<ResourceState> getRequestedResourceState(const std::string& resource_name);
+  OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
+  OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have

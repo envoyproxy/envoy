@@ -35,6 +35,8 @@
 namespace Envoy {
 namespace Config {
 
+extern const std::string Wildcard;
+
 /**
  * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */

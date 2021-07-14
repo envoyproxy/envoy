@@ -16,9 +16,6 @@
 namespace Envoy {
 namespace Config {
 
-extern const std::string Wildcard;
-extern const absl::flat_hash_set<std::string> WildcardSet;
-
 struct AddedRemoved {
   AddedRemoved(absl::flat_hash_set<std::string>&& added, absl::flat_hash_set<std::string>&& removed)
       : added_(std::move(added)), removed_(std::move(removed)) {}

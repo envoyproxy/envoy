@@ -5,13 +5,11 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
 
 namespace Envoy {
 namespace Config {
-
-const std::string Wildcard = "*";
-const absl::flat_hash_set<std::string> WildcardSet = {Wildcard};
 
 namespace {
 // Returns the namespace part (if there's any) in the resource name.

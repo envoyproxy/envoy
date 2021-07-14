@@ -44,7 +44,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
   for (const auto& a : cur_added) {
     // This adds a resource state that is waiting for the server for more information. This also may
     // be a wildcard resource, which is fine too.
-    requested_resource_state_.insert_or_assign(a, ResourceState());
+    requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
     wildcard_resource_state_.erase(a);
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
@@ -77,7 +77,10 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     is_legacy_wildcard_ = !any_request_sent_yet_in_current_stream_ &&
                           requested_resource_state_.empty() && names_removed_.empty();
     if (is_legacy_wildcard_) {
-      requested_resource_state_.insert_or_assign(Wildcard, ResourceState());
+      // Inserting wildcard to requested resource as waiting for server, which means that wildcard
+      // resource has no version and should never get one actually. As such, it won't be listed in
+      // initial_resource_versions field.
+      requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
       names_added_.insert(Wildcard);
     }
   }
@@ -112,14 +115,15 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
   if (resource.has_resource()) {
     return false;
   }
-  const auto itr = requested_resource_state_.find(resource.name());
-  if (itr != requested_resource_state_.end()) {
-    return !itr->second.waitingForServer() && resource.version() == itr->second.version();
+
+  if (const auto maybe_resource = getRequestedResourceState(resource.name());
+      maybe_resource.has_value()) {
+    return !maybe_resource->isWaitingForServer() && resource.version() == maybe_resource->version();
   }
 
-  const auto itr2 = wildcard_resource_state_.find(resource.name());
-  if (itr2 != wildcard_resource_state_.end()) {
-    return resource.version() == itr2->second;
+  if (const auto itr = wildcard_resource_state_.find(resource.name());
+      itr != wildcard_resource_state_.end()) {
+    return resource.version() == itr->second;
   }
 
   return false;
@@ -213,7 +217,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
       // Populate initial_resource_versions with the resource versions we currently have.
       // Resources we are interested in, but are still waiting to get any version of from the
       // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_state.waitingForServer()) {
+      if (!resource_state.isWaitingForServer()) {
         (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
       }
       // We are going over a list of resources that we are interested in, so add them to
@@ -264,10 +268,10 @@ void DeltaSubscriptionState::addResourceStateFromServer(
     ttl_.clear(resource.name());
   }
 
-  if (auto it = requested_resource_state_.find(resource.name());
-      it != requested_resource_state_.end()) {
+  if (auto maybe_resource = getRequestedResourceState(resource.name());
+      maybe_resource.has_value()) {
     // It is a resource that we requested.
-    it->second = ResourceState(resource);
+    maybe_resource->setVersion(resource.version());
   } else {
     // It is a resource that is a part of our wildcard request.
     wildcard_resource_state_.insert({resource.name(), resource.version()});
@@ -275,7 +279,16 @@ void DeltaSubscriptionState::addResourceStateFromServer(
 }
 
 OptRef<DeltaSubscriptionState::ResourceState>
-DeltaSubscriptionState::getRequestedResourceState(const std::string& resource_name) {
+DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
+  auto itr = requested_resource_state_.find(resource_name);
+  if (itr == requested_resource_state_.end()) {
+    return {};
+  }
+  return {itr->second};
+}
+
+OptRef<const DeltaSubscriptionState::ResourceState>
+DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
