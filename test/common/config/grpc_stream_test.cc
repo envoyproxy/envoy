@@ -78,7 +78,8 @@ TEST_F(GrpcStreamTest, EstablishStream) {
 
 // Tests reducing log level depending on remote close status.
 TEST_F(GrpcStreamTest, LogClose) {
-  // Failures whose statuses are handled simply and not saved.
+  // Failures with statuses that do not need special handling. They are always logged in the same
+  // way and so never saved.
   {
     EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
 

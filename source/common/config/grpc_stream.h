@@ -17,11 +17,6 @@ namespace Config {
 
 namespace {
 
-constexpr auto CloseLogMessage = "{} gRPC config stream closed: {}, {}";
-constexpr auto CloseLogMessageWithSince = "{} gRPC config stream closed since {}ms ago: {}, {}";
-constexpr auto CloseLogMessageWithPrevious =
-    "{} gRPC config stream closed: {}, {} (previously {}, {} since {}ms ago)";
-
 // TODO(htuch): Make this configurable.
 constexpr uint32_t RetryInitialDelayMs = 500;
 constexpr uint32_t RetryMaxDelayMs = 30000; // Do not cross more than 30s
@@ -76,7 +71,7 @@ public:
       return;
     }
     control_plane_stats_.connected_state_.set(1);
-    unsetCloseStatus();
+    clearCloseStatus();
     callbacks_->onStreamEstablished();
   }
 
@@ -153,19 +148,22 @@ private:
   // been occurring for a short amount of time.
   void logClose(Grpc::Status::GrpcStatus status, const std::string& message) {
     if (Grpc::Status::WellKnownGrpcStatus::Ok == status) {
-      ENVOY_LOG(debug, CloseLogMessage, service_method_.name(), status, message);
+      ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+                message);
       return;
     }
 
     if (!onlyWarnOnRepeatedFailure(status)) {
-      // Failure is considered non-retriable. Warn.
-      ENVOY_LOG(warn, CloseLogMessage, service_method_.name(), status, message);
+      // When the failure is considered non-retriable, warn.
+      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+                message);
       return;
     }
 
     if (!isCloseStatusSet()) {
-      // First failure. Debug. Record occurrence.
-      ENVOY_LOG(debug, CloseLogMessage, service_method_.name(), status, message);
+      // For the first failure, record its occurrence and log at the debug level.
+      ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+                message);
       setCloseStatus(status, message);
       return;
     }
@@ -177,21 +175,23 @@ private:
 
     if (status != close_status) {
       // This is a different failure. Warn on both statuses and remember the new one.
-      ENVOY_LOG(warn, CloseLogMessageWithPrevious, service_method_.name(), status, message,
-                close_status, close_message_, ms_since_first_close);
+      ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {} (previously {}, {} since {}ms ago)",
+                service_method_.name(), status, message, close_status, close_message_,
+                ms_since_first_close);
       setCloseStatus(status, message);
       return;
     }
 
     if (ms_since_first_close > RetryMaxDelayMs) {
       // Warn if we are over the time limit.
-      ENVOY_LOG(warn, CloseLogMessageWithSince, service_method_.name(), ms_since_first_close,
-                close_status, close_message_);
+      ENVOY_LOG(warn, "{} gRPC config stream closed since {}ms ago: {}, {}", service_method_.name(),
+                ms_since_first_close, close_status, close_message_);
       return;
     }
 
     // Failure is retriable and new enough to only log at the debug level.
-    ENVOY_LOG(debug, CloseLogMessage, service_method_.name(), status, message);
+    ENVOY_LOG(debug, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
   }
 
   bool onlyWarnOnRepeatedFailure(Grpc::Status::GrpcStatus status) {
@@ -199,7 +199,7 @@ private:
            Grpc::Status::WellKnownGrpcStatus::Unavailable == status;
   }
 
-  void unsetCloseStatus() { close_status_ = absl::nullopt; }
+  void clearCloseStatus() { close_status_ = absl::nullopt; }
   bool isCloseStatusSet() { return close_status_.has_value(); }
 
   void setCloseStatus(Grpc::Status::GrpcStatus status, const std::string& message) {
