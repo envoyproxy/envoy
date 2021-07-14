@@ -18,7 +18,7 @@ ScopedDisableExitOnQuicheBug::~ScopedDisableExitOnQuicheBug() {
 }
 
 QuicheBugEmitter::~QuicheBugEmitter() {
-  // Release mode ENVOHY_BUG applies rate limit.
+  // Release mode ENVOY_BUG applies rate limit.
   if (Envoy::Assert::shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(bug_name_)) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), error,
                         "QUICHE_BUG failure: {}.{}{}", condition_str_,
