@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.add_and_validate_scheme_header",
-    "envoy.reloadable_features.allow_preconnect",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
