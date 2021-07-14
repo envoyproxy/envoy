@@ -23,6 +23,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
                                              IPMatcher::Type::DownstreamLocal);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
+  case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
+    return std::make_shared<const PortRangeMatcher>(permission.destination_port_range());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
@@ -157,6 +159,18 @@ bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::Request
   const Envoy::Network::Address::Ip* ip =
       info.downstreamAddressProvider().localAddress().get()->ip();
   return ip && ip->port() == port_;
+}
+
+bool PortRangeMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                          const StreamInfo::StreamInfo& info) const {
+  const Envoy::Network::Address::Ip* ip =
+      info.downstreamAddressProvider().localAddress().get()->ip();
+  if (ip) {
+    const auto port = ip->port();
+    return start_ <= port && port < end_;
+  } else {
+    return false;
+  }
 }
 
 bool AuthenticatedMatcher::matches(const Network::Connection& connection,
