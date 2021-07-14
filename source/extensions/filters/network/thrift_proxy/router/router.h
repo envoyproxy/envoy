@@ -93,7 +93,7 @@ using ConfigConstSharedPtr = std::shared_ptr<const Config>;
  */
 class RequestOwner : public ProtocolConverter {
 public:
-  virtual ~RequestOwner() = default;
+  ~RequestOwner() override = default;
 
   /**
    * @return ConnectionPool::UpstreamCallbacks& the handler for upstream data.
