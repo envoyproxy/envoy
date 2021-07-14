@@ -239,7 +239,7 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
                     {{"x", "2000"}, {"y", "3000"}});
   remoteClose();
   if (!isUnifiedMuxTest()) {
-    // in legacy implmentation, destruction of the EDS subscription will issue an "unsubscribe"
+    // in legacy implementation, destruction of the EDS subscription will issue an "unsubscribe"
     // request.
     expectSendMessage(type_url, {}, {"x", "y"});
   }
