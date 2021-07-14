@@ -282,6 +282,9 @@ public:
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config);
 
+  // Check whether a new listener can share sockets with this listener.
+  bool hasCompatibleAddress(const ListenerImpl& other) const;
+
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
