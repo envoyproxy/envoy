@@ -9,10 +9,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
                            Server::Configuration::FactoryContext& context)
     : tls_slot_(ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
           context.threadLocal())) {
-  plugin_ = std::make_shared<Common::Wasm::Plugin>(
+  const auto plugin = std::make_shared<Common::Wasm::Plugin>(
       config.config(), context.direction(), context.localInfo(), &context.listenerMetadata());
 
-  auto plugin = plugin_;
   auto callback = [plugin, this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
     tls_slot_->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
@@ -21,7 +20,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Was
     });
   };
 
-  if (!Common::Wasm::createWasm(plugin_, context.scope().createScope(""), context.clusterManager(),
+  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
                                 context.initManager(), context.dispatcher(), context.api(),
                                 context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {

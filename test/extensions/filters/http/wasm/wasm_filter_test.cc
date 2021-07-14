@@ -413,6 +413,23 @@ TEST_P(WasmHttpFilterTest, BodyRequestReplaceBody) {
   filter().onDestroy();
 }
 
+// Script that replaces the first character in the body.
+TEST_P(WasmHttpFilterTest, BodyRequestPartialReplaceBody) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::err, Eq(absl::string_view("onBody partial.replace.ello"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::err,
+                             Eq(absl::string_view("onBody partial.replace.artial.replace.ello"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "PartialReplaceBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  filter().onDestroy();
+}
+
 // Script that removes the body.
 TEST_P(WasmHttpFilterTest, BodyRequestRemoveBody) {
   setupTest("body");
@@ -420,6 +437,19 @@ TEST_P(WasmHttpFilterTest, BodyRequestRemoveBody) {
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody "))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "RemoveBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  filter().onDestroy();
+}
+
+// Script that removes the first character from the body.
+TEST_P(WasmHttpFilterTest, BodyRequestPartialRemoveBody) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody ello"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "PartialRemoveBody"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
@@ -495,6 +525,20 @@ TEST_P(WasmHttpFilterTest, BodyRequestReplaceBufferedBody) {
   filter().onDestroy();
 }
 
+// Script that replaces the first character in the buffered body.
+TEST_P(WasmHttpFilterTest, BodyRequestPartialReplaceBufferedBody) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::err, Eq(absl::string_view("onBody partial.replace.ello"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":path", "/"}, {"x-test-operation", "PartialReplaceBufferedBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  filter().onDestroy();
+}
+
 // Script that removes the buffered body.
 TEST_P(WasmHttpFilterTest, BodyRequestRemoveBufferedBody) {
   setupTest("body");
@@ -502,6 +546,19 @@ TEST_P(WasmHttpFilterTest, BodyRequestRemoveBufferedBody) {
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody "))));
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
                                                  {"x-test-operation", "RemoveBufferedBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+  filter().onDestroy();
+}
+
+// Script that removes the first character from the buffered body.
+TEST_P(WasmHttpFilterTest, BodyRequestPartialRemoveBufferedBody) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody ello"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "PartialRemoveBufferedBody"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
@@ -963,11 +1020,6 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK (pending update to ABI 0.2.1).
-    return;
-  }
-
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_call");
   if (std::get<1>(GetParam()) == "cpp") {

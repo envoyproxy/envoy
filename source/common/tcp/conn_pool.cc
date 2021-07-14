@@ -42,7 +42,7 @@ ActiveTcpClient::~ActiveTcpClient() {
     ASSERT(state() == ActiveClient::State::CLOSED);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
-    parent_.checkForIdleAndCloseIdleConnsIfDraining();
+    parent_.checkForDrained();
   }
 }
 
@@ -54,7 +54,7 @@ void ActiveTcpClient::clearCallbacks() {
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
-  parent_.checkForIdleAndCloseIdleConnsIfDraining();
+  parent_.checkForDrained();
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {

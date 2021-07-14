@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "connection_limit_test",
     srcs = ["connection_limit_test.cc"],
-    extension_name = "envoy.filters.network.connection_limit",
+    extension_names = ["envoy.filters.network.connection_limit"],
     deps = [
         "//source/extensions/filters/network/connection_limit:connection_limit_lib",
         "//test/mocks/event:event_mocks",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "connection_limit_integration_test",
     srcs = ["connection_limit_integration_test.cc"],
-    extension_name = "envoy.filters.network.connection_limit",
+    extension_names = ["envoy.filters.network.connection_limit"],
     deps = [
         "//source/extensions/filters/network/connection_limit:config",
         "//source/extensions/filters/network/tcp_proxy:config",
