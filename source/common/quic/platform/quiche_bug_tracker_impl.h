@@ -7,12 +7,13 @@
 // porting layer for QUICHE.
 
 #include <sstream>
+#include "absl/strings/string_view.h"
 
 namespace quic {
 
 class QuicheBugEmitter {
 public:
-  explicit QuicheBugEmitter(std::string_view condition_str, std::string_view bug_name)
+  explicit QuicheBugEmitter(absl::string_view condition_str, absl::string_view bug_name)
       : condition_str_(condition_str), bug_name_(bug_name) {}
 
   ~QuicheBugEmitter();
