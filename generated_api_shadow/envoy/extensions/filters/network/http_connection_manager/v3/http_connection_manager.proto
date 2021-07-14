@@ -922,8 +922,11 @@ message ScopedRoutes {
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
 
-        // Specifies how to extract a value from dynamic metadata.
-        DynamicMetadataValueExtractor metadata_value_extractor = 2;
+        // Specifies how to extract a value from dynamic connection metadata.
+        DynamicMetadataValueExtractor conn_metadata_value_extractor = 2;
+
+        // Specifies how to extract a value from dynamic filter metadata.
+        DynamicMetadataValueExtractor filter_metadata_value_extractor = 3;
       }
     }
 

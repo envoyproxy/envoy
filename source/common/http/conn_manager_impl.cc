@@ -551,9 +551,11 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
     requestVhdsUpdate(host_header, thread_local_dispatcher, std::move(route_config_updated_cb));
     return;
   } else if (parent_.snapped_scoped_routes_config_ != nullptr) {
-    const auto& dynamic_metadata = parent_.connection()->streamInfo().dynamicMetadata();
+    // @tallen
+    const auto& conn_metadata = parent_.connection()->streamInfo().dynamicMetadata();
+    const auto& stream_metadata = parent_.streamInfo().dynamicMetadata();
     Router::ScopeKeyPtr scope_key = parent_.snapped_scoped_routes_config_->computeScopeKey(
-        *parent_.request_headers_, dynamic_metadata);
+        *parent_.request_headers_, conn_metadata, stream_metadata);
     // If scope_key is not null, the scope exists but RouteConfiguration is not initialized.
     if (scope_key != nullptr) {
       requestSrdsUpdate(std::move(scope_key), thread_local_dispatcher,
