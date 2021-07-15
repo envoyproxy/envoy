@@ -401,9 +401,9 @@ def generate_current_api_dir(api_dir, dst_dir):
 
     for proto in IGNORED_V2_PROTOS:
         try:
-          shutil.rmtree(str(dst.joinpath(proto[6:])))
+            shutil.rmtree(str(dst.joinpath(proto[6:])))
         except:
-          pass
+            pass
 
 
 def git_status(path):
