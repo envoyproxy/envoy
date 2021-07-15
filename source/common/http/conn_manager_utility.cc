@@ -165,6 +165,10 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
   }
+  if (config.schemeToSet().has_value()) {
+    request_headers.setScheme(config.schemeToSet().value());
+    request_headers.setForwardedProto(config.schemeToSet().value());
+  }
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
@@ -283,6 +287,9 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   }
 
   auto rid_extension = config.requestIDExtension();
+  if (!rid_extension->useRequestIdForTraceSampling()) {
+    return Tracing::Reason::Sampling;
+  }
   const auto rid_to_integer = rid_extension->toInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {

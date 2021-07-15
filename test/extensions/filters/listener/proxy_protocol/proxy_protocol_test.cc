@@ -53,7 +53,7 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_, time_system_)),
+      : api_(Api::createApiForTest(stats_store_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::TcpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
@@ -78,10 +78,8 @@ public:
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
-  std::chrono::milliseconds listenerFiltersTimeout() const override {
-    return std::chrono::milliseconds(1000);
-  }
-  bool continueOnListenerFiltersTimeout() const override { return true; }
+  std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
+  bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   ResourceLimit& openConnections() override { return open_connections_; }
@@ -185,7 +183,6 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
-  Event::SimulatedTimeSystemHelper time_system_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
   BasicResourceLimitImpl open_connections_;
@@ -211,23 +208,6 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
-
-// This test ensures the socket file event was reset after timeout, otherwise
-// the assertion which avoid to create file event duplicated will be triggered.
-TEST_P(ProxyProtocolTest, Timeout) {
-  connect();
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(2000), *dispatcher_,
-                                 Event::Dispatcher::RunType::NonBlock);
-  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
-    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
-              "127.0.0.1");
-  } else {
-    EXPECT_EQ(server_connection_->addressProvider().remoteAddress()->ip()->addressAsString(),
-              "::1");
-  }
-  EXPECT_EQ(stats_store_.counter("downstream_cx_total").value(), 1);
-  disconnect();
-}
 
 TEST_P(ProxyProtocolTest, V1Basic) {
   connect();

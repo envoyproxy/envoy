@@ -8,10 +8,10 @@ namespace IP {
 
 Envoy::Matcher::InputMatcherFactoryCb
 Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
-                                    Server::Configuration::FactoryContext& context) {
+                                    Server::Configuration::ServerFactoryContext& factory_context) {
   const auto& ip_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::matching::input_matchers::ip::v3::Ip&>(
-      config, context.messageValidationVisitor());
+      config, factory_context.messageValidationVisitor());
 
   const auto& cidr_ranges = ip_config.cidr_ranges();
   std::vector<Network::Address::CidrRange> ranges;
@@ -30,7 +30,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
   }
 
   const std::string& stat_prefix = ip_config.stat_prefix();
-  Stats::Scope& scope = context.scope();
+  Stats::Scope& scope = factory_context.scope();
   return [ranges, stat_prefix, &scope]() {
     return std::make_unique<Matcher>(ranges, stat_prefix, scope);
   };

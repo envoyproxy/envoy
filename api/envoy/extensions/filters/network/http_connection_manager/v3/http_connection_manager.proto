@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 48]
+// [#next-free-field: 49]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -370,6 +370,11 @@ message HttpConnectionManager {
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
       [(validate.rules).enum = {defined_only: true}];
+
+  // Allows for explicit transformation of the :scheme header on the request path.
+  // If not set, Envoy's default :ref:`scheme  <config_http_conn_man_headers_scheme>`
+  // handling applies.
+  config.core.v3.SchemeHeaderTransformation scheme_header_transformation = 48;
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.

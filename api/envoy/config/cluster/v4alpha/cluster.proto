@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 54]
+// [#next-free-field: 55]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.cluster.v3.Cluster";
 
@@ -801,6 +801,13 @@ message Cluster {
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
   core.v4alpha.DnsResolutionConfig dns_resolution_config = 53;
+
+  // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
+  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
+  // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`.
+  // If true, cluster readiness blocks on warm-up. If false, the cluster will complete
+  // initialization whether or not warm-up has completed. Defaults to true.
+  google.protobuf.BoolValue wait_for_warm_on_init = 54;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
