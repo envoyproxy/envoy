@@ -10,9 +10,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "absl/types/optional.h"
-
 #include "source/common/network/connection_impl.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Network {
@@ -84,27 +84,22 @@ private:
   // ConnectionCallbacks which will be set on an ClientConnection which
   // sends connection events back to the HappyEyeballsConnectionImpl.
   class ConnectionCallbacksWrapper : public ConnectionCallbacks {
-   public:
-    ConnectionCallbacksWrapper(HappyEyeballsConnectionImpl& parent,
-                               ClientConnection& connection)
+  public:
+    ConnectionCallbacksWrapper(HappyEyeballsConnectionImpl& parent, ClientConnection& connection)
         : parent_(parent), connection_(connection) {}
 
-    void onEvent(ConnectionEvent event) override {
-      parent_.onEvent(event, this);
-    }
+    void onEvent(ConnectionEvent event) override { parent_.onEvent(event, this); }
 
     void onAboveWriteBufferHighWatermark() override {
       parent_.onAboveWriteBufferHighWatermark(this);
     }
 
-    void onBelowWriteBufferLowWatermark() override {
-      parent_.onBelowWriteBufferLowWatermark(this);
-    }
+    void onBelowWriteBufferLowWatermark() override { parent_.onBelowWriteBufferLowWatermark(this); }
 
     // Not needed? interesting.
     ClientConnection& connection() { return connection_; }
 
-   private:
+  private:
     HappyEyeballsConnectionImpl& parent_;
     ClientConnection& connection_;
   };

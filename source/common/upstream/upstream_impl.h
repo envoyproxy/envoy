@@ -156,6 +156,7 @@ public:
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
   }
+
 protected:
   void setAddress(Network::Address::InstanceConstSharedPtr address) { address_ = address; }
 

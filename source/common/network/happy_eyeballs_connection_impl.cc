@@ -6,17 +6,12 @@ namespace Envoy {
 namespace Network {
 
 HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
-    Event::Dispatcher& dispatcher,
-    const std::vector<Address::InstanceConstSharedPtr>& address_list,
-    Address::InstanceConstSharedPtr source_address,
-    TransportSocketFactory& socket_factory,
+    Event::Dispatcher& dispatcher, const std::vector<Address::InstanceConstSharedPtr>& address_list,
+    Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    : dispatcher_(dispatcher),
-      address_list_(address_list),
-      source_address_(source_address),
-      socket_factory_(socket_factory),
-      transport_socket_options_(transport_socket_options),
+    : dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
+      socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
       options_(options),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   connections_.push_back(createNextConnection());
@@ -118,7 +113,8 @@ SocketAddressProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderShare
   return connections_[0]->addressProviderSharedPtr();
 }
 
-absl::optional<Connection::UnixDomainSocketPeerCredentials> HappyEyeballsConnectionImpl::unixSocketPeerCredentials() const {
+absl::optional<Connection::UnixDomainSocketPeerCredentials>
+HappyEyeballsConnectionImpl::unixSocketPeerCredentials() const {
   ASSERT(connect_finished_);
   return connections_[0]->unixSocketPeerCredentials();
 }
@@ -147,11 +143,11 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
   }
 
   post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
-      []() -> void { ASSERT(false); },
-      [this]() -> void { this->onWriteBufferHighWatermark(); },
+      []() -> void { ASSERT(false); }, [this]() -> void { this->onWriteBufferHighWatermark(); },
       []() -> void { ASSERT(false); });
   if (per_connection_state_.buffer_limits_.has_value()) {
-    post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
+    post_connect_state_.write_buffer_.value()->setWatermarks(
+        per_connection_state_.buffer_limits_.value());
   }
   post_connect_state_.write_buffer_.value()->move(data);
   post_connect_state_.end_stream_ = end_stream;
@@ -162,7 +158,8 @@ void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
     ASSERT(!per_connection_state_.buffer_limits_.has_value());
     per_connection_state_.buffer_limits_ = limit;
     if (post_connect_state_.write_buffer_.has_value()) {
-      post_connect_state_.write_buffer_.value()->setWatermarks(per_connection_state_.buffer_limits_.value());
+      post_connect_state_.write_buffer_.value()->setWatermarks(
+          per_connection_state_.buffer_limits_.value());
     }
   }
   for (auto& connection : connections_) {
@@ -310,13 +307,13 @@ std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createNextConnect
   ASSERT(next_address_ < address_list_.size());
   auto connection = dispatcher_.createClientConnection(
       address_list_[next_address_++], source_address_,
-      socket_factory_.createTransportSocket(transport_socket_options_),
-      options_);
+      socket_factory_.createTransportSocket(transport_socket_options_), options_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
   if (per_connection_state_.detect_early_close_when_read_disabled_.has_value()) {
-    connection->detectEarlyCloseWhenReadDisabled(per_connection_state_.detect_early_close_when_read_disabled_.value());
+    connection->detectEarlyCloseWhenReadDisabled(
+        per_connection_state_.detect_early_close_when_read_disabled_.value());
   }
   if (per_connection_state_.no_delay_.has_value()) {
     connection->noDelay(per_connection_state_.no_delay_.value());
@@ -343,7 +340,8 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
   next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
 }
 
-void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallbacksWrapper* wrapper) {
+void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
+                                          ConnectionCallbacksWrapper* wrapper) {
   wrapper->connection().removeConnectionCallbacks(*wrapper);
   if (event != ConnectionEvent::Connected) {
     if (next_address_ < address_list_.size()) {
@@ -387,10 +385,10 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event, ConnectionCallb
   }
 
   if (post_connect_state_.write_buffer_.has_value()) {
-    //ASSERT(false);
     // write_buffer_ and end_stream_ are both set together in write().
     ASSERT(post_connect_state_.end_stream_.has_value());
-    connections_[0]->write(*post_connect_state_.write_buffer_.value(), post_connect_state_.end_stream_.value());
+    connections_[0]->write(*post_connect_state_.write_buffer_.value(),
+                           post_connect_state_.end_stream_.value());
   }
 
   std::vector<ConnectionCallbacks*> cbs;
@@ -407,7 +405,7 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
     }
   }
 
-  for (auto it = callbacks_wrappers_.begin(); it != callbacks_wrappers_.end(); ) {
+  for (auto it = callbacks_wrappers_.begin(); it != callbacks_wrappers_.end();) {
     if (it->get() == wrapper) {
       it = callbacks_wrappers_.erase(it);
     } else {
@@ -416,11 +414,13 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
   }
 }
 
-void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(ConnectionCallbacksWrapper* /*wrapper*/) {
+void HappyEyeballsConnectionImpl::onAboveWriteBufferHighWatermark(
+    ConnectionCallbacksWrapper* /*wrapper*/) {
   ASSERT(false);
 }
 
-void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(ConnectionCallbacksWrapper* /*wrapper*/) {
+void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
+    ConnectionCallbacksWrapper* /*wrapper*/) {
   ASSERT(false);
 }
 

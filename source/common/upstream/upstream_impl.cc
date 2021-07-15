@@ -282,8 +282,8 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(), options,
-                           transport_socket_options),
+  return {createConnection(dispatcher, cluster(), address(), addressList(),
+                           transportSocketFactory(), options, transport_socket_options),
           shared_from_this()};
 }
 
@@ -318,13 +318,13 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
           shared_from_this()};
 }
 
-Network::ClientConnectionPtr
-HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
-                           Network::TransportSocketFactory& socket_factory,
-                           const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
+Network::ClientConnectionPtr HostImpl::createConnection(
+    Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
+    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    Network::TransportSocketFactory& socket_factory,
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
     if (options) {
@@ -340,13 +340,14 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
   }
   ASSERT(!address->envoyInternalAddress());
   Network::ClientConnectionPtr connection =
-      address_list.size() > 1 ?
-      std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address_list, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
-      :
-    dispatcher.createClientConnection(
-        address, cluster.sourceAddress(),
-        socket_factory.createTransportSocket(std::move(transport_socket_options)),
-        connection_options);
+      address_list.size() > 1
+          ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
+                dispatcher, address_list, cluster.sourceAddress(), socket_factory,
+                transport_socket_options, connection_options)
+          : dispatcher.createClientConnection(
+                address, cluster.sourceAddress(),
+                socket_factory.createTransportSocket(std::move(transport_socket_options)),
+                connection_options);
 
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   cluster.createNetworkFilterChain(*connection);

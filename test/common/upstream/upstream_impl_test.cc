@@ -1317,11 +1317,13 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  Network::Address::InstanceConstSharedPtr address = Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(cluster.info_, "lyft.com", address,
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::config::core::v3::UNKNOWN, simTime());
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1332,7 +1334,8 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(connection));
 
-  Envoy::Upstream::Host::CreateConnectionData connection_data = host->createConnection(dispatcher, options, transport_socket_options);
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
   EXPECT_EQ(connection, connection_data.connection_.get());
 }
 
@@ -1346,11 +1349,13 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  Network::Address::InstanceConstSharedPtr address = Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(cluster.info_, "lyft.com", address,
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::config::core::v3::UNKNOWN, simTime());
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1358,18 +1363,20 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
   Network::MockTransportSocketFactory socket_factory;
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list = {
-    Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
-    address,
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+      address,
   };
   host->setAddressList(address_list);
   auto connection = new testing::StrictMock<Network::MockClientConnection>();
   EXPECT_CALL(*connection, setBufferLimits(0));
   EXPECT_CALL(*connection, addConnectionCallbacks(_));
   // The underlying connection should be created with the first address in the list.
-  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _)).WillOnce(Return(connection));
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection));
   EXPECT_CALL(dispatcher, createTimer_(_));
 
-  Envoy::Upstream::Host::CreateConnectionData connection_data = host->createConnection(dispatcher, options, transport_socket_options);
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
 }
