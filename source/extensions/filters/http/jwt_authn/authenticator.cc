@@ -83,7 +83,7 @@ private:
   std::vector<JwtLocationConstPtr> tokens_;
   JwtLocationConstPtr curr_token_;
   // The JWT object.
-  std::unique_ptr<::google::jwt_verify::Jwt> new_jwt_;
+  std::unique_ptr<::google::jwt_verify::Jwt> owned_jwt_;
   // The JWKS data object
   JwksCache::JwksData* jwks_data_{};
   // The HTTP request headers
@@ -143,19 +143,19 @@ void AuthenticatorImpl::startVerify() {
   curr_token_ = std::move(tokens_.back());
   tokens_.pop_back();
 
-  if (provider_) {
+  if (provider_ != absl::nullopt) {
     jwks_data_ = jwks_cache_.findByProvider(provider_.value());
     jwt_ = jwks_data_->getJwtCache().lookup(curr_token_->token());
-    if (jwt_) {
+    if (jwt_ != nullptr) {
       handleGoodJwt(/*cache_hit=*/true);
       return;
     }
   }
 
   ENVOY_LOG(debug, "{}: Parse Jwt {}", name(), curr_token_->token());
-  new_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-  Status status = new_jwt_->parseFromString(curr_token_->token());
-  jwt_ = new_jwt_.get();
+  owned_jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+  Status status = owned_jwt_->parseFromString(curr_token_->token());
+  jwt_ = owned_jwt_.get();
 
   if (status != Status::Ok) {
     doneWithStatus(status);
@@ -295,8 +295,8 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     set_payload_cb_(provider.payload_in_metadata(), jwt_->payload_pb_);
   }
   if (provider_ && !cache_hit) {
-    // move the ownership of "new_jwt_" into the function.
-    jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(new_jwt_));
+    // move the ownership of "owned_jwt_" into the function.
+    jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));
   }
   doneWithStatus(Status::Ok);
 }
