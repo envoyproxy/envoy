@@ -3,6 +3,7 @@
 #include "envoy/http/async_client.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
@@ -210,9 +211,9 @@ void AuthenticatorImpl::startVerify() {
   // jwks fetching can be shared by two requests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
     if (!fetcher_) {
-      fetcher_ = create_jwks_fetcher_cb_(cm_);
+      fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
     }
-    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *parent_span_, *this);
+    fetcher_->fetch(*parent_span_, *this);
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local
@@ -252,9 +253,17 @@ void AuthenticatorImpl::verifyKey() {
 
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
+
   if (!provider.forward_payload_header().empty()) {
-    headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
-                      jwt_->payload_str_base64url_);
+    if (provider.pad_forward_payload_header()) {
+      std::string payload_with_padding = jwt_->payload_str_base64url_;
+      Base64::completePadding(payload_with_padding);
+      headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
+                        payload_with_padding);
+    } else {
+      headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
+                        jwt_->payload_str_base64url_);
+    }
   }
 
   if (!provider.forward()) {

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from tools.base.checker import BazelChecker, Checker, CheckerSummary, ForkingChecker
+from tools.base.checker import AsyncChecker, BazelChecker, Checker, CheckerSummary, ForkingChecker
 from tools.base.runner import BazelRunner, ForkingRunner
 
 
@@ -268,10 +268,20 @@ def test_checker_warning_count():
     assert "warning_count" not in checker.__dict__
 
 
-def test_checker_add_arguments():
+def test_checker_add_arguments(patches):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     parser = MagicMock()
-    checker.add_arguments(parser)
+    patched = patches(
+        "runner.Runner.add_arguments",
+        prefix="tools.base.checker")
+
+    with patched as (m_super, ):
+        assert checker.add_arguments(parser) is None
+
+    assert (
+        list(m_super.call_args)
+        == [(parser,), {}])
+
     assert (
         list(list(c) for c in parser.add_argument.call_args_list)
         == [[('--fix',),
@@ -311,9 +321,6 @@ def test_checker_add_arguments():
             [('--path', '-p'),
              {'default': None,
               'help': 'Path to the test root (usually Envoy source dir). If not specified the first path of paths is used'}],
-            [('--log-level', '-l'),
-             {'choices': ['info', 'warn', 'debug', 'error'],
-              'default': 'info', 'help': 'Log level to display'}],
             [('paths',),
              {'nargs': '*',
               'help': 'Paths to check. At least one path must be specified, or the `path` argument should be provided'}]])
@@ -654,3 +661,120 @@ def test_bazelchecker_constructor():
     checker = DummyBazelChecker()
     assert isinstance(checker, BazelRunner)
     assert isinstance(checker, Checker)
+
+
+# AsyncChecker tests
+
+def test_asynchecker_constructor():
+    checker = AsyncChecker()
+    assert isinstance(checker, Checker)
+
+
+def test_asynchecker_run(patches):
+    checker = AsyncChecker()
+
+    patched = patches(
+        "asyncio",
+        ("AsyncChecker._run", dict(new_callable=MagicMock)),
+        prefix="tools.base.checker")
+
+    with patched as (m_async, m_run):
+        assert (
+            checker.run()
+            == m_async.get_event_loop.return_value.run_until_complete.return_value)
+
+    assert (
+        list(m_async.get_event_loop.call_args)
+        == [(), {}])
+    assert (
+        list(m_async.get_event_loop.return_value.run_until_complete.call_args)
+        == [(m_run.return_value,), {}])
+    assert (
+        list(m_run.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_check_run():
+    checker = AsyncChecker()
+
+    assert not await checker.on_check_run("CHECKNAME")
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_checks_begin():
+    checker = AsyncChecker()
+
+    assert not await checker.on_checks_begin()
+
+
+@pytest.mark.asyncio
+async def test_asynchecker_on_checks_complete(patches):
+    checker = AsyncChecker()
+
+    patched = patches(
+        "Checker.on_checks_complete",
+        prefix="tools.base.checker")
+
+    with patched as (m_complete, ):
+        assert (
+            await checker.on_checks_complete()
+            == m_complete.return_value)
+
+    assert (
+        list(m_complete.call_args)
+        == [(), {}])
+
+
+@pytest.mark.asyncio
+async def test_asynchecker__run(patches):
+    _check1 = MagicMock()
+    _check2 = MagicMock()
+    _check3 = MagicMock()
+
+    class AsyncCheckerWithChecks(AsyncChecker):
+
+        async def check_check1(self):
+            return _check1()
+
+        async def check_check2(self):
+            return _check2()
+
+        async def check_check3(self):
+            return _check3()
+
+    checker = AsyncCheckerWithChecks()
+
+    patched = patches(
+        "Checker.log",
+        "Checker.get_checks",
+        "AsyncChecker.on_checks_begin",
+        "AsyncChecker.on_check_run",
+        "AsyncChecker.on_checks_complete",
+        prefix="tools.base.checker")
+
+    with patched as (m_log, m_checks, m_begin, m_run, m_complete):
+        m_checks.return_value = ["check1", "check2", "check3"]
+        assert await checker._run() == m_complete.return_value
+
+    assert (
+        list(m_checks.call_args)
+        == [(), {}])
+    assert (
+        list(m_begin.call_args)
+        == [(), {}])
+    assert (
+        list(list(c) for c in m_log.info.call_args_list)
+        == [[('[CHECKS:AsyncCheckerWithChecks] check1',), {}],
+            [('[CHECKS:AsyncCheckerWithChecks] check2',), {}],
+            [('[CHECKS:AsyncCheckerWithChecks] check3',), {}]])
+    for check in [_check1, _check2, _check3]:
+        assert (
+            list(check.call_args)
+            == [(), {}])
+    assert (
+        list(list(c) for c in m_run.call_args_list)
+        == [[('check1',), {}], [('check2',), {}], [('check3',), {}]])
+    assert (
+        list(m_complete.call_args)
+        == [(), {}])
