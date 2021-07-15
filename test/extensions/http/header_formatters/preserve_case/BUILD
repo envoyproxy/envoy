@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "preserve_case_formatter_test.cc",
     ],
-    extension_name = "envoy.http.stateful_header_formatters.preserve_case",
+    extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
     deps = [
         "//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
     ],
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
     srcs = [
         "preserve_case_formatter_integration_test.cc",
     ],
-    extension_name = "envoy.http.stateful_header_formatters.preserve_case",
+    extension_names = ["envoy.http.stateful_header_formatters.preserve_case"],
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [

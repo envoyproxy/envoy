@@ -9,7 +9,7 @@ import subprocess
 import sys
 from functools import cached_property
 
-LOG_LEVELS = (("info", logging.INFO), ("debug", logging.DEBUG), ("warn", logging.WARN),
+LOG_LEVELS = (("debug", logging.DEBUG), ("info", logging.INFO), ("warn", logging.WARN),
               ("error", logging.ERROR))
 
 
@@ -75,7 +75,12 @@ class Runner(object):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Override this method to add custom arguments to the arg parser"""
-        pass
+        parser.add_argument(
+            "--log-level",
+            "-l",
+            choices=[level[0] for level in LOG_LEVELS],
+            default="info",
+            help="Log level to display")
 
 
 class ForkingAdapter(object):

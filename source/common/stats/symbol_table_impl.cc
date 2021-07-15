@@ -154,6 +154,43 @@ void SymbolTableImpl::Encoding::decodeTokens(
   }
 }
 
+bool StatName::startsWith(StatName symbolic_prefix) const {
+  bool ret = true;
+  std::vector<Symbol> prefix_symbols;
+
+  // Decode the prefix as a StatNameVec.
+  SymbolTableImpl::Encoding::decodeTokens(
+      symbolic_prefix.data(), symbolic_prefix.dataSize(),
+      [&prefix_symbols](Symbol symbol) { prefix_symbols.push_back(symbol); },
+      [&ret](absl::string_view) { ret = false; });
+
+  // If there any dynamic components, our string_view lambda will be called, and
+  // then we'll return false for simplicity. We don't have a current need for
+  // prefixes to be expressed dynamically, and handling that case would add
+  // complexity.
+  if (!ret) {
+    return false;
+  }
+
+  // Now decode the StatName, matching against the symbols. It's OK for there to
+  // be dynamic string_view elements after the prefix match.
+  uint32_t index = 0;
+  SymbolTableImpl::Encoding::decodeTokens(
+      data(), dataSize(),
+      [&prefix_symbols, &index, &ret](Symbol symbol) {
+        if (index < prefix_symbols.size() && prefix_symbols[index] != symbol) {
+          ret = false;
+        }
+        ++index;
+      },
+      [&prefix_symbols, &index, &ret](absl::string_view) {
+        if (index < prefix_symbols.size()) {
+          ret = false;
+        }
+      });
+  return ret && index >= prefix_symbols.size();
+}
+
 std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
                                                               size_t size) const {
   std::vector<absl::string_view> strings;

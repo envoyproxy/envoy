@@ -56,6 +56,36 @@ public:
                  Cluster::InitializePhase::Secondary);
   }
 
+  //  Define a cluster with secure and unsecure (default) transport
+  //  sockets.
+  void resetClusterWithTransportSockets() {
+    resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+      transport_socket_matches:
+      - match:
+          secure: enabled
+        name: secure-mode
+        transport_socket:
+          name: envoy.transport_sockets.tls
+      - match: {}
+        name: default-mode
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+ )EOF",
+                 Cluster::InitializePhase::Secondary);
+  }
+
   void resetClusterDrainOnHostRemoval() {
     resetCluster(R"EOF(
         name: name
@@ -117,7 +147,7 @@ public:
 
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
-  Ssl::MockContextManager ssl_context_manager_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -450,6 +480,51 @@ TEST_F(EdsTest, EndpointMetadata) {
                                             Config::MetadataFilters::get().ENVOY_LB, "version")
                 .string_value(),
             "v2");
+}
+
+// Test verifies that updating metadata updates
+// data members dependent on metadata values.
+// Specifically, it transport socket matcher has changed,
+// the transport socket factory should also be updated.
+TEST_F(EdsTest, EndpointMetadataWithTransportSocket) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  resetClusterWithTransportSockets();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  // Add single endpoint to the cluster.
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+
+  auto* socket_address = endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  ASSERT_EQ(hosts.size(), 1);
+  auto* upstream_host = hosts[0].get();
+
+  // Verify that default transport socket is raw (does not implement secure transport).
+  EXPECT_FALSE(upstream_host->transportSocketFactory().implementsSecureTransport());
+
+  // Create metadata with transport socket match pointing to secure mode.
+  auto metadata = new envoy::config::core::v3::Metadata();
+  MetadataConstSharedPtr metadata_sharedptr(metadata);
+  Config::Metadata::mutableMetadataValue(
+      *metadata, Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH, "secure")
+      .set_string_value("enabled");
+
+  // Update metadata.
+  upstream_host->metadata(metadata_sharedptr);
+
+  // Transport socket factory should point to tls, which implements secure transport.
+  EXPECT_TRUE(upstream_host->transportSocketFactory().implementsSecureTransport());
 }
 
 // Validate that onConfigUpdate() updates endpoint health status.

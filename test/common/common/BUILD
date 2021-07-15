@@ -318,7 +318,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "callback_impl_test",
     srcs = ["callback_impl_test.cc"],
-    deps = ["//source/common/common:callback_impl_lib"],
+    deps = [
+        "//source/common/common:callback_impl_lib",
+        "//test/mocks/event:event_mocks",
+    ],
 )
 
 envoy_cc_benchmark_binary(

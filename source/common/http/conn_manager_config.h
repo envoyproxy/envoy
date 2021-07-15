@@ -349,6 +349,11 @@ public:
   serverHeaderTransformation() const PURE;
 
   /**
+   * @return const absl::optional<std::string> the scheme name to write into requests.
+   */
+  virtual const absl::optional<std::string>& schemeToSet() const PURE;
+
+  /**
    * @return ConnectionManagerStats& the stats to write to.
    */
   virtual ConnectionManagerStats& stats() PURE;
