@@ -3,12 +3,9 @@
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
-#include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/event/deferred_task.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/timespan_impl.h"
@@ -18,7 +15,7 @@ namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerConfig& config)
-    : TypedActiveStreamListenerBase<ActiveTcpConnection>(
+    : ActiveStreamListenerBase(
           parent, parent.dispatcher(),
           parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
                                              config.bindToPort(), config.tcpBacklogSize()),
@@ -30,8 +27,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
                                      Network::ListenerConfig& config)
-    : TypedActiveStreamListenerBase<ActiveTcpConnection>(parent, parent.dispatcher(),
-                                                         std::move(listener), config),
+    : ActiveStreamListenerBase(parent, parent.dispatcher(), std::move(listener), config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -67,10 +63,46 @@ ActiveTcpListener::~ActiveTcpListener() {
                                                      config_->name(), numConnections()));
 }
 
+void ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
+  ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  auto removed = connection.removeFromList(active_connections.connections_);
+  dispatcher().deferredDelete(std::move(removed));
+  // Delete map entry only iff connections becomes empty.
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
+    dispatcher().deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_context_.erase(iter);
+    }
+  }
+}
+
 void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   ENVOY_LOG(trace, "replacing listener ", config_->listenerTag(), " by ", config.listenerTag());
   ASSERT(&config_->connectionBalancer() == &config.connectionBalancer());
   config_ = &config;
+}
+
+void ActiveTcpListener::deferRemoveFilterChain(const Network::FilterChain* filter_chain) {
+  auto iter = connections_by_context_.find(filter_chain);
+  if (iter == connections_by_context_.end()) {
+    // It is possible when listener is stopping.
+  } else {
+    auto& connections = iter->second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
+    // Since is_deleting_ is on, we need to manually remove the map value and drive the
+    // iterator. Defer delete connection container to avoid race condition in destroying
+    // connection.
+    dispatcher().deferredDelete(std::move(iter->second));
+    connections_by_context_.erase(iter);
+  }
 }
 
 void ActiveTcpListener::onAccept(Network::ConnectionSocketPtr&& socket) {
@@ -115,11 +147,6 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   onSocketAccepted(std::move(active_socket));
 }
 
-Network::BalancedConnectionHandlerOptRef
-ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
-  return tcp_conn_handler_.getBalancedHandlerByAddress(address);
-}
-
 void ActiveTcpListener::pauseListening() {
   if (listener_ != nullptr) {
     listener_->disable();
@@ -132,11 +159,16 @@ void ActiveTcpListener::resumeListening() {
   }
 }
 
+Network::BalancedConnectionHandlerOptRef
+ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+  return tcp_conn_handler_.getBalancedHandlerByAddress(address);
+}
+
 void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_chain,
                                             Network::ServerConnectionPtr server_conn_ptr,
                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  ActiveConnectionPtr active_connection(
+  ActiveTcpConnectionPtr active_connection(
       new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
                               dispatcher().timeSource(), std::move(stream_info)));
   // If the connection is already closed, we can just let this connection immediately die.
