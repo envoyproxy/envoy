@@ -236,8 +236,8 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_handle_ = nullptr;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-  upstream_->setConnPoolCallbacks(
-      std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamAddressProvider().downstreamSslConnection()));
+  upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
+      *this, host, info.downstreamAddressProvider().downstreamSslConnection()));
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
