@@ -21,11 +21,14 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
 
     can be used as so:
 
+    ```python
+
     class MyRunner(runner.Runner):
 
         @runner.catches((MyError, MyOtherError))
         def run(self):
             self.myrun()
+    ```
 
     """
 
