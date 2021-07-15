@@ -59,8 +59,11 @@ public:
   bool empty() const { return buffer_->length() == 0; }
 
 private:
+  // If constructed with a QuicMemSlice, mem_slice_ point to that object and this points to
+  // mem_slice_->getSingleSliceBuffer(). If constructed with an Envoy buffer, this points to the
+  // buffer itself.
   Envoy::Buffer::Instance* buffer_{nullptr};
-  // Nullptr if this span is not constructed with a QuicMemSlice.
+  // If this span is not constructed with a QuicMemSlice, this points to nullptr.
   QuicMemSliceImpl* mem_slice_{nullptr};
 };
 

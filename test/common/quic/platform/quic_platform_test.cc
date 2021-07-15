@@ -121,7 +121,7 @@ TEST_F(QuicPlatformTest, QuicExpectBug) {
   EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
   EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
 #ifdef NDEBUG
-  // The 3rd triggering in release mode should be omitted.
+  // The 3rd triggering in release mode should not be logged.
   EXPECT_LOG_NOT_CONTAINS("error", "bug three", bug("bug three is expected"));
 #else
   EXPECT_QUIC_BUG(bug("bug three is expected"), "bug three");
