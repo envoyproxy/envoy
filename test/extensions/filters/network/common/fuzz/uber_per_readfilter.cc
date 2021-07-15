@@ -71,15 +71,11 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
 
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -104,15 +100,10 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
           return async_request_.get();
         })));
 
-    EXPECT_CALL(*async_client_factory_, create()).WillOnce(Invoke([&] {
-      return std::move(async_client_);
-    }));
-
-    EXPECT_CALL(factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          return std::move(async_client_factory_);
-        }));
+    ON_CALL(factory_context_.cluster_manager_.async_client_manager_,
+            getOrCreateRawAsyncClient(_, _, _, _))
+        .WillByDefault(Invoke([&](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                  Grpc::CacheOption) { return async_client_; }));
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
