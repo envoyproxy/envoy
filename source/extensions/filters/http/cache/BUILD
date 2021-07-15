@@ -50,9 +50,8 @@ envoy_cc_library(
     deps = [
         ":cache_headers_utils_lib",
         ":http_cache_lib",
-        "//envoy/http:header_map",
-        "//envoy/stream_info:filter_state",
         "//source/common/http:header_map_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )
 
