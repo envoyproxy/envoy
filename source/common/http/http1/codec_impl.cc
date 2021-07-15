@@ -904,6 +904,11 @@ void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_leve
                                !active_request_.value().request_url_.getStringView().empty()
                            ? active_request_.value().request_url_.getStringView()
                            : "null");
+  os << DUMP_MEMBER_AS(
+      active_request_.response_encoder_.local_end_stream_,
+      active_request_.has_value()
+          ? absl::StrCat(active_request_.value().response_encoder_.local_end_stream_)
+          : "null");
   os << '\n';
 
   // Dump header map, it may be null if it was moved to the request, and
