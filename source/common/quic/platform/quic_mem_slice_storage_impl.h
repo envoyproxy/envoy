@@ -34,8 +34,10 @@ public:
   QuicMemSliceStorageImpl(QuicMemSliceStorageImpl&& other) = default;
   QuicMemSliceStorageImpl& operator=(QuicMemSliceStorageImpl&& other) = default;
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
 
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.getSingleSliceBuffer()); }
 
 private:
