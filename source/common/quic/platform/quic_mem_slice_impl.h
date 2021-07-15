@@ -49,6 +49,7 @@ public:
   }
 
   // Below methods implements interface needed by QuicMemSlice.
+  // NOLINTNEXTLINE(readability-identifier-naming)
   void Reset() {
     single_slice_buffer_.drain(length());
     fragment_ = nullptr;
@@ -60,7 +61,7 @@ public:
   size_t length() const { return single_slice_buffer_.length(); }
   bool empty() const { return length() == 0; }
 
-  Envoy::Buffer::OwnedImpl& single_slice_buffer() { return single_slice_buffer_; }
+  Envoy::Buffer::OwnedImpl& getSingleSliceBuffer() { return single_slice_buffer_; }
 
 private:
   size_t firstSliceLength(Envoy::Buffer::Instance& buffer);

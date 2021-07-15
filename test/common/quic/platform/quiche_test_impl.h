@@ -17,6 +17,7 @@ using QuicheTest = ::testing::Test;
 
 template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string QuicheGetCommonSourcePathImpl() {
   std::string test_srcdir(getenv("TEST_SRCDIR"));
   return absl::StrCat(test_srcdir, "/external/com_googlesource_quiche/quiche/common");

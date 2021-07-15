@@ -26,7 +26,7 @@ public:
    */
   explicit QuicMemSliceSpanImpl(Envoy::Buffer::Instance& buffer) : buffer_(&buffer) {}
   explicit QuicMemSliceSpanImpl(QuicMemSliceImpl* slice)
-      : buffer_(&slice->single_slice_buffer()), mem_slice_(slice) {}
+      : buffer_(&slice->getSingleSliceBuffer()), mem_slice_(slice) {}
 
   QuicMemSliceSpanImpl(const QuicMemSliceSpanImpl& other) = default;
   QuicMemSliceSpanImpl& operator=(const QuicMemSliceSpanImpl& other) = default;

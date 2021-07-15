@@ -36,7 +36,7 @@ public:
 
   QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
 
-  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.single_slice_buffer()); }
+  void Append(QuicMemSliceImpl mem_slice) { buffer_.move(mem_slice.getSingleSliceBuffer()); }
 
 private:
   Envoy::Buffer::OwnedImpl buffer_;
