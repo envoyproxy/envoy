@@ -2687,4 +2687,40 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
 }
 
+TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(65535);
+  http2_options.mutable_initial_connection_window_size()->set_value(65535);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // The response is larger than the stream flow control window. So the reset of it will
+  // likely be buffered QUIC stream send buffer.
+  constexpr uint64_t response_size = 100 * 1024;
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-length", "10"},
+                                     {"response_size_bytes", absl::StrCat(response_size)}});
+  auto& encoder = encoder_decoder.first;
+  std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+
+  auto response = std::move(encoder_decoder.second);
+  response->waitForHeaders();
+  // Reset stream while the quic server stream might have FIN buffered in its send buffer.
+  codec_client_->sendReset(encoder);
+  codec_client_->close();
+}
+
 } // namespace Envoy

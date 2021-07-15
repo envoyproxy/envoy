@@ -2,7 +2,6 @@ use log::{debug, error, info, trace, warn};
 use proxy_wasm::traits::{Context, RootContext};
 use proxy_wasm::types::LogLevel;
 
-#[no_mangle]
 extern "C" {
     fn __wasilibc_initialize_environ();
 }
@@ -28,7 +27,7 @@ impl RootContext for TestRoot {
         trace!("test trace logging");
         debug!("test debug logging");
         error!("test error logging");
-        if let Some(value) = self.get_configuration() {
+        if let Some(value) = self.get_plugin_configuration() {
             warn!("warn {}", String::from_utf8(value).unwrap());
         }
         true

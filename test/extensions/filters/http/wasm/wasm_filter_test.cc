@@ -380,8 +380,15 @@ TEST_P(WasmHttpFilterTest, BodyRequestPrependAndAppendToBody) {
                                                  {"x-test-operation", "PrependAndAppendToBody"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  if (std::get<1>(GetParam()) == "rust") {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  } else {
+    // This status is not available in the rust SDK.
+    // TODO: update all SDKs to the new revision of the spec and update the tests accordingly.
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter().decodeData(data, true));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter().encodeData(data, true));
+  }
   filter().onDestroy();
 }
 
@@ -394,8 +401,15 @@ TEST_P(WasmHttpFilterTest, BodyRequestReplaceBody) {
                                                  {"x-test-operation", "ReplaceBody"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
   Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  if (std::get<1>(GetParam()) == "rust") {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data, true));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data, true));
+  } else {
+    // This status is not available in the rust SDK.
+    // TODO: update all SDKs to the new revision of the spec and update the tests accordingly.
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter().decodeData(data, true));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter().encodeData(data, true));
+  }
   filter().onDestroy();
 }
 
@@ -1006,11 +1020,6 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
 }
 
 TEST_P(WasmHttpFilterTest, GrpcCallBadCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK (pending update to ABI 0.2.1).
-    return;
-  }
-
   std::vector<std::string> proto_or_cluster;
   proto_or_cluster.push_back("grpc_call");
   if (std::get<1>(GetParam()) == "cpp") {
