@@ -468,7 +468,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -487,7 +488,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -506,7 +508,8 @@ actions:
       expect_match: false
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -525,7 +528,8 @@ actions:
       expect_match: false
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
@@ -562,7 +566,8 @@ actions:
       descriptor_value: fake_value
       headers:
         - name: x-header-name
-          exact_match: test_value
+          string_match:
+            exact: test_value
   )EOF";
 
   initialize(yaml);
