@@ -4,6 +4,7 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
@@ -26,8 +27,8 @@ namespace Http {
 Client::DirectStreamCallbacks::DirectStreamCallbacks(DirectStream& direct_stream,
                                                      envoy_http_callbacks bridge_callbacks,
                                                      Client& http_client)
-    : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks),
-      http_client_(http_client) {}
+    : direct_stream_(direct_stream), bridge_callbacks_(bridge_callbacks), http_client_(http_client),
+      explicit_flow_control_(http_client_.explicit_flow_control_) {}
 
 void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& headers,
                                                   bool end_stream) {
@@ -35,7 +36,8 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
   ENVOY_LOG(debug, "[S{}] response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_));
+  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
+                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
   if (end_stream) {
     closeStream();
   }
@@ -79,9 +81,17 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
             direct_stream_.stream_handle_, end_stream, headers);
   bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream,
                                bridge_callbacks_.context);
+  response_headers_forwarded_ = true;
   if (end_stream) {
     onComplete();
   }
+}
+
+uint32_t calculateBytesToSend(const Buffer::Instance& data, uint32_t max_bytes) {
+  if (max_bytes == 0) {
+    return data.length();
+  }
+  return std::min<uint32_t>(max_bytes, data.length());
 }
 
 void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -89,7 +99,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   ENVOY_LOG(debug, "[S{}] response data for stream (length={} end_stream={})",
             direct_stream_.stream_handle_, data.length(), end_stream);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_));
+  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
+                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
   if (end_stream) {
     closeStream();
   }
@@ -99,14 +110,52 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     return;
   }
 
+  // Send data if in default flow control mode, or if resumeData has been called in explicit
+  // flow control mode.
+  if (bytes_to_send_ > 0 || !explicit_flow_control_) {
+    ASSERT(!hasBufferedData());
+    sendDataToBridge(data, end_stream);
+  }
+
+  // If not all the bytes have been sent up, buffer any remaining data in response_data.
+  if (data.length() != 0) {
+    ASSERT(explicit_flow_control_);
+    if (!response_data_) {
+      response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
+          [this]() -> void { this->onBufferedDataDrained(); },
+          [this]() -> void { this->onHasBufferedData(); }, []() -> void {});
+      // Default to 1M per stream. This is fairly arbitrary and will result in
+      // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
+      // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
+      response_data_->setWatermarks(1000000);
+    }
+    ENVOY_LOG(
+        debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
+        direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
+    response_data_->move(data);
+  }
+}
+
+void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
+  ASSERT(!explicit_flow_control_ || bytes_to_send_ > 0);
+
+  // Cap by bytes_to_send_ if and only if applying explicit flow control.
+  uint32_t bytes_to_send = calculateBytesToSend(data, bytes_to_send_);
+  // Only send end stream if all data is being sent.
+  bool send_end_stream = end_stream && (bytes_to_send == data.length());
+
   ENVOY_LOG(debug,
             "[S{}] dispatching to platform response data for stream (length={} end_stream={})",
-            direct_stream_.stream_handle_, data.length(), end_stream);
-  bridge_callbacks_.on_data(Data::Utility::toBridgeData(data), end_stream,
+            direct_stream_.stream_handle_, bytes_to_send, send_end_stream);
+
+  bridge_callbacks_.on_data(Data::Utility::toBridgeData(data, bytes_to_send), end_stream,
                             bridge_callbacks_.context);
-  if (end_stream) {
+  if (send_end_stream) {
     onComplete();
   }
+  // Make sure that when using explicit flow control this won't send more data until the next call
+  // to resumeData.
+  bytes_to_send_ = 0;
 }
 
 void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& trailers) {
@@ -114,22 +163,75 @@ void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& tra
   ENVOY_LOG(debug, "[S{}] response trailers for stream:\n{}", direct_stream_.stream_handle_,
             trailers);
 
-  ASSERT(http_client_.getStream(direct_stream_.stream_handle_));
+  ASSERT(http_client_.getStream(direct_stream_.stream_handle_,
+                                GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
   closeStream(); // Trailers always indicate the end of the stream.
 
+  // For explicit flow control, don't send data unless prompted.
+  if (explicit_flow_control_ && bytes_to_send_ == 0) {
+    response_trailers_ = ResponseTrailerMapImpl::create();
+    HeaderMapImpl::copyFrom(*response_trailers_, trailers);
+    return;
+  }
+
+  sendTrailersToBridge(trailers);
+}
+
+void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMap& trailers) {
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
+
   bridge_callbacks_.on_trailers(Utility::toBridgeHeaders(trailers), bridge_callbacks_.context);
   onComplete();
 }
 
+void Client::DirectStreamCallbacks::resumeData(int32_t bytes_to_send) {
+  ASSERT(explicit_flow_control_);
+  ASSERT(bytes_to_send > 0);
+
+  bytes_to_send_ = bytes_to_send;
+
+  ENVOY_LOG(debug, "[S{}] received resume data call for {} bytes", direct_stream_.stream_handle_,
+            bytes_to_send_);
+
+  // If there is buffered data, send up to bytes_to_send bytes.
+  // Make sure to send end stream with data only if
+  // 1) it has been received from the peer and
+  // 2) there are no trailers
+  if (hasBufferedData() ||
+      (remote_end_stream_received_ && !remote_end_stream_forwarded_ && !response_trailers_)) {
+    sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
+    bytes_to_send_ = 0;
+  }
+
+  // If all buffered data has been sent, send and free up trailers.
+  if (!hasBufferedData() && response_trailers_.get() && bytes_to_send_ > 0) {
+    sendTrailersToBridge(*response_trailers_);
+    response_trailers_.reset();
+    bytes_to_send_ = 0;
+  }
+
+  if (error_code_.has_value() && bytes_to_send_ > 0) {
+    onError();
+  }
+}
+
 void Client::DirectStreamCallbacks::closeStream() {
-  // Envoy itself does not currently allow half-open streams where the local half is open
-  // but the remote half is closed. Note that if local is open, Envoy will reset the stream.
-  http_client_.removeStream(direct_stream_.stream_handle_);
+  remote_end_stream_received_ = true;
+
+  auto& client = direct_stream_.parent_;
+  auto stream = client.getStream(direct_stream_.stream_handle_, ALLOW_ONLY_FOR_OPEN_STREAMS);
+  ASSERT(stream != nullptr);
+  if (stream) {
+    client.closed_streams_.emplace(direct_stream_.stream_handle_, std::move(stream));
+    size_t erased = client.streams_.erase(direct_stream_.stream_handle_);
+    ASSERT(erased == 1, "closeStream should always remove one entry from the streams map");
+  }
 }
 
 void Client::DirectStreamCallbacks::onComplete() {
+  http_client_.removeStream(direct_stream_.stream_handle_);
+  remote_end_stream_forwarded_ = true;
   ENVOY_LOG(debug, "[S{}] complete stream (success={})", direct_stream_.stream_handle_, success_);
   if (success_) {
     http_client_.stats().stream_success_.inc();
@@ -143,9 +245,17 @@ void Client::DirectStreamCallbacks::onError() {
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
   ENVOY_LOG(debug, "[S{}] remote reset stream", direct_stream_.stream_handle_);
 
+  // When using explicit flow control, if any response data has been sent (e.g. headers), response
+  // errors must be deferred until after resumeData has been called.
+  if (explicit_flow_control_ && response_headers_forwarded_ && bytes_to_send_ == 0) {
+    return;
+  }
+
+  http_client_.removeStream(direct_stream_.stream_handle_);
   // The stream should no longer be preset in the map, because onError() was either called from a
   // terminal callback that mapped to an error or it was called in response to a resetStream().
-  ASSERT(!http_client_.getStream(direct_stream_.stream_handle_));
+  ASSERT(!http_client_.getStream(direct_stream_.stream_handle_,
+                                 GetStreamFilters::ALLOW_FOR_ALL_STREAMS));
   envoy_error_code_t code = error_code_.value_or(ENVOY_STREAM_RESET);
   envoy_data message = error_message_.value_or(envoy_nodata);
   int32_t attempt_count = error_attempt_count_.value_or(-1);
@@ -153,6 +263,11 @@ void Client::DirectStreamCallbacks::onError() {
   ENVOY_LOG(debug, "[S{}] dispatching to platform remote reset stream",
             direct_stream_.stream_handle_);
   http_client_.stats().stream_failure_.inc();
+
+  error_code_ = {};
+  error_message_ = {};
+  error_attempt_count_ = {};
+
   bridge_callbacks_.on_error({code, message, attempt_count}, bridge_callbacks_.context);
 }
 
@@ -173,13 +288,12 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // line with upstream expectations.
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
   runResetCallbacks(reason);
-  if (!parent_.getStream(stream_handle_)) {
+  if (!parent_.getStream(stream_handle_, GetStreamFilters::ALLOW_FOR_ALL_STREAMS)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely
     // while still open locally. In this case the stream will already have been removed from
-    // our streams_ map due to the remote closure.
+    // our stream maps due to the remote closure.
     return;
   }
-  parent_.removeStream(stream_handle_);
   callbacks_->onError();
 }
 
@@ -209,7 +323,8 @@ void Client::startStream(envoy_stream_t new_stream_handle, envoy_http_callbacks 
 
 void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
-  Client::DirectStreamSharedPtr direct_stream = getStream(stream);
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -246,7 +361,8 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
 
 void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
-  Client::DirectStreamSharedPtr direct_stream = getStream(stream);
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -270,7 +386,8 @@ void Client::sendMetadata(envoy_stream_t, envoy_headers) { NOT_IMPLEMENTED_GCOVR
 
 void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   ASSERT(dispatcher_.isThreadSafe());
-  Client::DirectStreamSharedPtr direct_stream = getStream(stream);
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream, GetStreamFilters::ALLOW_ONLY_FOR_OPEN_STREAMS);
   // If direct_stream is not found, it means the stream has already closed or been reset
   // and the appropriate callback has been issued to the caller. There's nothing to do here
   // except silently swallow this.
@@ -288,7 +405,11 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
 
 void Client::cancelStream(envoy_stream_t stream) {
   ASSERT(dispatcher_.isThreadSafe());
-  Client::DirectStreamSharedPtr direct_stream = getStream(stream);
+  // This is the one place where downstream->upstream communication is allowed
+  // for closed streams: if the client cancels the stream it should be canceled
+  // whether it was closed or not.
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
   if (direct_stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     removeStream(direct_stream->stream_handle_);
@@ -311,10 +432,19 @@ void Client::cancelStream(envoy_stream_t stream) {
 
 const HttpClientStats& Client::stats() const { return stats_; }
 
-Client::DirectStreamSharedPtr Client::getStream(envoy_stream_t stream) {
+Client::DirectStreamSharedPtr Client::getStream(envoy_stream_t stream,
+                                                GetStreamFilters get_stream_filters) {
   auto direct_stream_pair_it = streams_.find(stream);
-  // Returning will copy the shared_ptr and increase the ref count.
-  return (direct_stream_pair_it != streams_.end()) ? direct_stream_pair_it->second : nullptr;
+  if (direct_stream_pair_it != streams_.end()) {
+    return direct_stream_pair_it->second;
+  }
+  if (direct_stream_pair_it == streams_.end() && get_stream_filters == ALLOW_FOR_ALL_STREAMS) {
+    direct_stream_pair_it = closed_streams_.find(stream);
+    if (direct_stream_pair_it != closed_streams_.end()) {
+      return direct_stream_pair_it->second;
+    }
+  }
+  return nullptr;
 }
 
 void Client::removeStream(envoy_stream_t stream_handle) {
@@ -322,7 +452,8 @@ void Client::removeStream(envoy_stream_t stream_handle) {
       dispatcher_.isThreadSafe(),
       fmt::format("[S{}] stream removeStream must be performed on the dispatcher_'s thread.",
                   stream_handle));
-  Client::DirectStreamSharedPtr direct_stream = getStream(stream_handle);
+  Client::DirectStreamSharedPtr direct_stream =
+      getStream(stream_handle, GetStreamFilters::ALLOW_FOR_ALL_STREAMS);
   RELEASE_ASSERT(
       direct_stream,
       fmt::format(
@@ -340,6 +471,9 @@ void Client::removeStream(envoy_stream_t stream_handle) {
   // However, the entry in the map should not exist after removeStream.
   // Hence why it is synchronously erased from the streams map.
   size_t erased = streams_.erase(stream_handle);
+  if (erased != 1) {
+    erased = closed_streams_.erase(stream_handle);
+  }
   ASSERT(erased == 1, "removeStream should always remove one entry from the streams map");
   ENVOY_LOG(debug, "[S{}] erased stream from streams container", stream_handle);
 }
