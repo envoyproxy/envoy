@@ -114,7 +114,8 @@ public:
     http_status: 503
   headers:
   - name: X-Foo1
-    exact_match: Bar
+    string_match:
+      exact: Bar
   - name: X-Foo2
   )EOF";
 

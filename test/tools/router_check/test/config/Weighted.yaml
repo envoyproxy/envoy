@@ -17,11 +17,13 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: :path
-      safe_regex_match:
-        google_re2: {}
-        regex: ^/test/\d+$
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: ^/test/\d+$
     - name: :method
-      exact_match: GET
+      string_match:
+        exact: GET
     name: test_virtual_cluster
 - name: www2
   domains:

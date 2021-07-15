@@ -668,7 +668,7 @@ void ConfigHelper::setConnectConfig(
 
     auto* header = match->add_headers();
     header->set_name(":method");
-    header->set_exact_match("POST");
+    header->mutable_string_match()->set_exact("POST");
   } else {
     match->mutable_connect_matcher();
   }
