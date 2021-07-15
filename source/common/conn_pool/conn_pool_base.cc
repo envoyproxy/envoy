@@ -388,7 +388,6 @@ void ConnPoolImplBase::checkForDrained() {
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
                                          Network::ConnectionEvent event) {
-  std::cerr << __FUNCTION__ <<  " here! 1\n";
   if (client.state() == ActiveClient::State::CONNECTING) {
     ASSERT(connecting_stream_capacity_ >= client.effectiveConcurrentStreamLimit());
     connecting_stream_capacity_ -= client.effectiveConcurrentStreamLimit();
@@ -399,7 +398,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.connect_timer_.reset();
   }
 
-  std::cerr << __FUNCTION__ <<  " here! 2\n";
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     state_.decrConnectingAndConnectedStreamCapacity(client.currentUnusedCapacity());
@@ -456,25 +454,16 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       tryCreateNewConnections();
     }
   } else if (event == Network::ConnectionEvent::Connected) {
-    std::cerr << __FUNCTION__ <<  " here! 3 " << client.conn_connect_ms_.get() << "\n";
     client.conn_connect_ms_->complete();
-  std::cerr << __FUNCTION__ <<  " here! 4\n";
     client.conn_connect_ms_.reset();
-  std::cerr << __FUNCTION__ <<  " here! 4\n";
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
-  std::cerr << __FUNCTION__ <<  " here! 4\n";
     transitionActiveClientState(client, ActiveClient::State::READY);
-  std::cerr << __FUNCTION__ <<  " here! 4\n";
 
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
-  std::cerr << __FUNCTION__ <<  " here! 5\n";
     onConnected(client);
-  std::cerr << __FUNCTION__ <<  " here! 6\n";
     onUpstreamReady();
-  std::cerr << __FUNCTION__ <<  " here! 7\n";
     checkForDrained();
-  std::cerr << __FUNCTION__ <<  " here! 8\n";
   }
 }
 

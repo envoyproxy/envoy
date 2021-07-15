@@ -546,24 +546,17 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 // TODO(lilika) : Support connection pooling
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_ =
         host_
             ->createHealthCheckConnection(parent_.dispatcher_, parent_.transportSocketOptions(),
                                           parent_.transportSocketMatchMetadata().get())
             .connection_;
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     session_callbacks_ = std::make_shared<TcpSessionCallbacks>(*this);
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_->addConnectionCallbacks(*session_callbacks_);
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_->addReadFilter(session_callbacks_);
 
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     expect_close_ = false;
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_->connect();
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_->noDelay(true);
   }
 
@@ -573,11 +566,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
       data.add(segment.data(), segment.size());
     }
 
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     client_->write(data, false);
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   }
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {

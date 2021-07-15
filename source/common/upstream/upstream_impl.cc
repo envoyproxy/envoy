@@ -282,7 +282,7 @@ Network::TransportSocketFactory& HostDescriptionImpl::resolveTransportSocketFact
 Host::CreateConnectionData HostImpl::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
-  return {createConnection(dispatcher, cluster(), address(), transportSocketFactory(), options,
+  return {createConnection(dispatcher, cluster(), address(), addressList(), transportSocketFactory(), options,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -313,7 +313,7 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
   Network::TransportSocketFactory& factory =
       (metadata != nullptr) ? resolveTransportSocketFactory(healthCheckAddress(), metadata)
                             : transportSocketFactory();
-  return {createConnection(dispatcher, cluster(), healthCheckAddress(), factory, nullptr,
+  return {createConnection(dispatcher, cluster(), healthCheckAddress(), {}, factory, nullptr,
                            transport_socket_options),
           shared_from_this()};
 }
@@ -321,36 +321,49 @@ Host::CreateConnectionData HostImpl::createHealthCheckConnection(
 Network::ClientConnectionPtr
 HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                            const Network::Address::InstanceConstSharedPtr& address,
+                           const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                            Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     if (options) {
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       connection_options = std::make_shared<Network::ConnectionSocket::Options>();
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       *connection_options = *options;
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       std::copy(cluster.clusterSocketOptions()->begin(), cluster.clusterSocketOptions()->end(),
                 std::back_inserter(*connection_options));
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     } else {
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       connection_options = cluster.clusterSocketOptions();
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     }
   } else {
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     connection_options = options;
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   }
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   ASSERT(!address->envoyInternalAddress());
   Network::ClientConnectionPtr connection =
-      /*
-    true ?
-      std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, addressList(), cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
-  :
-      */
+      address_list.size() > 1 ?
+      std::make_unique<Network::HappyEyeballsConnectionImpl>(dispatcher, address_list, cluster.sourceAddress(), socket_factory,transport_socket_options, connection_options)
+      :
     dispatcher.createClientConnection(
         address, cluster.sourceAddress(),
         socket_factory.createTransportSocket(std::move(transport_socket_options)),
         connection_options);
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
 
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   cluster.createNetworkFilterChain(*connection);
+  std::cerr << __FUNCTION__ << ":" << __LINE__ << " " << connection.get() << std::endl;
   return connection;
 }
 
