@@ -122,6 +122,7 @@ private:
   bool kernel_worker_routing_{};
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
+  sock_fprog prog_;
   std::vector<sock_filter> filter_;
 #endif
 };

@@ -5459,21 +5459,21 @@ TEST(ListenerEnableReusePortTest, All) {
     config.mutable_enable_reuse_port()->set_value(false);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_FALSE(ListenerImpl::initializeReusePort(server, config));
+    EXPECT_FALSE(ListenerImpl::getReusePortOrDefault(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_enable_reuse_port()->set_value(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.set_reuse_port(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
@@ -5481,14 +5481,14 @@ TEST(ListenerEnableReusePortTest, All) {
     config.set_reuse_port(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_FALSE(ListenerImpl::initializeReusePort(server, config));
+    EXPECT_FALSE(ListenerImpl::getReusePortOrDefault(server, config));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
     EXPECT_CALL(server, enableReusePortDefault());
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::initializeReusePort(server, config));
+    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
   }
 }
 

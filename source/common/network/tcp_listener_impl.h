@@ -30,8 +30,6 @@ public:
   static const absl::string_view GlobalMaxCxRuntimeKey;
 
 protected:
-  void setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket);
-
   TcpListenerCallbacks& cb_;
 
 private:

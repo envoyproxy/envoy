@@ -104,8 +104,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     }
   }
 
-  sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, options, bind_type_,
-                                                       listener_name, 0));
+  sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, 0));
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
     local_address_ = sockets_[0]->addressProvider().localAddress();
@@ -118,8 +117,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     if (bind_type_ != ListenerComponentFactory::BindType::ReusePort && sockets_[0] != nullptr) {
       sockets_.push_back(sockets_[0]->duplicate());
     } else {
-      sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, options,
-                                                           bind_type_, listener_name, i));
+      sockets_.push_back(createListenSocketAndApplyOptions(factory, socket_type, i));
     }
   }
   ASSERT(sockets_.size() == num_sockets);
@@ -149,23 +147,21 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
 }
 
 Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions(
-    ListenerComponentFactory& factory, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType bind_type,
-    const std::string& listener_name, uint32_t worker_index) {
+    ListenerComponentFactory& factory, Network::Socket::Type socket_type, uint32_t worker_index) {
   // Socket might be nullptr when doing server validation.
   // TODO(mattklein123): See the comment in the validation code. Make that code not return nullptr
   // so this code can be simpler.
   Network::SocketSharedPtr socket =
-      factory.createListenSocket(local_address_, socket_type, options, bind_type, worker_index);
+      factory.createListenSocket(local_address_, socket_type, options_, bind_type_, worker_index);
 
   // Binding is done by now.
-  ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name,
+  ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
             local_address_->asString());
-  if (socket != nullptr && options != nullptr) {
+  if (socket != nullptr && options_ != nullptr) {
     const bool ok = Network::Socket::applyOptions(
-        options, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
+        options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
     const std::string message =
-        fmt::format("{}: Setting socket options {}", listener_name, ok ? "succeeded" : "failed");
+        fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
       throw Network::SocketOptionException(message);
@@ -175,7 +171,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
 
     // Add the options to the socket_ so that STATE_LISTENING options can be
     // set after listen() is called and immediately before the workers start running.
-    socket->addOptions(options);
+    socket->addOptions(options_);
   }
   return socket;
 }
@@ -312,7 +308,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           parent.factory_.createDrainManager(config.drain_type()))),
       filter_chain_manager_(address_, listener_factory_context_->parentFactoryContext(),
                             initManager()),
-      reuse_port_(initializeReusePort(parent_.server_, config_)),
+      reuse_port_(getReusePortOrDefault(parent_.server_, config_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
@@ -341,6 +337,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
 
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
+  // listener factory can provide additional options.
   buildUdpListenerFactory(socket_type, concurrency);
   buildListenSocketOptions(socket_type);
   createListenerFilterFactories(socket_type);
@@ -400,6 +398,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
+  // listener factory can provide additional options.
   buildUdpListenerFactory(socket_type, concurrency);
   buildListenSocketOptions(socket_type);
   createListenerFilterFactories(socket_type);
@@ -493,6 +493,8 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
     }
 
     // Additional factory specific options.
+    ASSERT(udp_listener_config_->listener_factory_ != nullptr,
+           "buildUdpListenerFactory() must run first");
     addListenSocketOptions(udp_listener_config_->listener_factory_->socketOptions());
   }
 }
@@ -820,8 +822,8 @@ void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
   }
 }
 
-bool ListenerImpl::initializeReusePort(Server::Instance& server,
-                                       const envoy::config::listener::v3::Listener& config) {
+bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
+                                         const envoy::config::listener::v3::Listener& config) {
   bool initial_reuse_port_value = [&server, &config]() {
     // If someone set the new field, adhere to it.
     if (config.has_enable_reuse_port()) {

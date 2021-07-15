@@ -63,12 +63,9 @@ public:
 private:
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
 
-  Network::SocketSharedPtr
-  createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
-                                    Network::Socket::Type socket_type,
-                                    const Network::Socket::OptionsSharedPtr& options,
-                                    ListenerComponentFactory::BindType bind_type,
-                                    const std::string& listener_name, uint32_t worker_index);
+  Network::SocketSharedPtr createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
+                                                             Network::Socket::Type socket_type,
+                                                             uint32_t worker_index);
 
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port
@@ -282,8 +279,8 @@ public:
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
-  static bool initializeReusePort(Server::Instance& server,
-                                  const envoy::config::listener::v3::Listener& config);
+  static bool getReusePortOrDefault(Server::Instance& server,
+                                    const envoy::config::listener::v3::Listener& config);
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }

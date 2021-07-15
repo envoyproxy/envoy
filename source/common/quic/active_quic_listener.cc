@@ -300,17 +300,16 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
   // SPELLCHECKER(on)
-  sock_fprog prog;
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing")) {
     if (concurrency_ > 1) {
       // Note that this option refers to the BPF program data above, which must live until the
       // option is used. The program is kept as a member variable for this purpose.
-      prog.len = filter_.size();
-      prog.filter = filter_.data();
+      prog_.len = filter_.size();
+      prog_.filter = filter_.data();
       options_->push_back(std::make_shared<Network::SocketOptionImpl>(
           envoy::config::core::v3::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
-          absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
+          absl::string_view(reinterpret_cast<char*>(&prog_), sizeof(prog_))));
     } else {
       ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
     }
