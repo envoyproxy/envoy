@@ -44,12 +44,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   } else if (proto_config.grpc_service().has_google_grpc()) {
     // Google gRPC client.
 
-    // The use_alpha field was there select the v2alpha api version, which is
-    // long deprecated and should not be used anymore.
-    if (proto_config.hidden_envoy_deprecated_use_alpha()) {
-      throw EnvoyException("The use_alpha field is deprecated and is no longer supported.");
-    }
-
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
     Grpc::AsyncClientCacheSingletonSharedPtr async_client_cache_singleton =
@@ -68,12 +62,6 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     };
   } else {
     // Envoy gRPC client.
-
-    // The use_alpha field was there select the v2alpha api version, which is
-    // long deprecated and should not be used anymore.
-    if (proto_config.hidden_envoy_deprecated_use_alpha()) {
-      throw EnvoyException("The use_alpha field is deprecated and is no longer supported.");
-    }
 
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);

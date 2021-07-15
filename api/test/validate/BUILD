@@ -16,7 +16,7 @@ api_cc_test(
         "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/health_check/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/health_check/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
