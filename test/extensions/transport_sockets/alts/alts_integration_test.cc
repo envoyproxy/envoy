@@ -114,6 +114,13 @@ public:
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
       transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
+
+    config_helper_.addFilter(R"EOF(
+    name: decode-dynamic-metadata-filter
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Empty
+    )EOF");
+
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});
   }
@@ -211,6 +218,22 @@ public:
     return Network::Utility::resolveUrl(url);
   }
 
+  bool tsiPeerIdentitySet() {
+    bool contain_peer_name = false;
+    Http::TestRequestHeaderMapImpl upstream_request(upstream_request_->headers());
+    upstream_request.iterate(
+        [&contain_peer_name](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          const std::string key{header.key().getStringView()};
+          const std::string value{header.value().getStringView()};
+          if (key == "envoy.transport_sockets.peer_information.peer_identity" &&
+              value == "peer_identity") {
+            contain_peer_name = true;
+          }
+          return Http::HeaderMap::Iterate::Continue;
+        });
+    return contain_peer_name;
+  }
+
   const std::string server_peer_identity_;
   const std::string client_peer_identity_;
   bool server_connect_handshaker_;
@@ -246,6 +269,7 @@ TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  EXPECT_TRUE(tsiPeerIdentitySet());
 }
 
 TEST_P(AltsIntegrationTestValidPeer, RouterRequestAndResponseWithBodyRawHttp) {
@@ -282,6 +306,7 @@ TEST_P(AltsIntegrationTestEmptyPeer, RouterRequestAndResponseWithBodyNoBuffer) {
     return makeAltsConnection();
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  EXPECT_FALSE(tsiPeerIdentitySet());
 }
 
 class AltsIntegrationTestClientInvalidPeer : public AltsIntegrationTestBase {
