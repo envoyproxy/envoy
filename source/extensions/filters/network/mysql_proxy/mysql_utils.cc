@@ -257,35 +257,73 @@ AuthMethod AuthHelper::authMethod(uint32_t cap, const std::string& auth_plugin_n
   return AuthMethod::Unknown;
 }
 
-// https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L186
-std::vector<uint8_t> OldPassword::signature(const std::string& password,
-                                            const std::vector<uint8_t>& seed) {
-  std::vector<uint8_t> to;
+std::vector<uint8_t> OldPassword::generateSeedImpl() {
+  return PasswordAuthHelper<OldPassword>::generateSeed(SEED_LENGTH);
+}
+
+// ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L186
+std::vector<uint8_t> OldPassword::signatureImpl(const std::string& password,
+                                                const std::vector<uint8_t>& seed) {
   if (password.empty()) {
-    return to;
+    return {};
   }
-  to.resize(SEED_LENGTH);
+
+  std::vector<uint8_t> to(SEED_LENGTH);
   auto hash_pass = hash(password);
   auto hash_seed = hash(seed);
   RandStruct rand_st(hash_pass[0] ^ hash_seed[0], hash_pass[1] ^ hash_seed[1]);
   for (int i = 0; i < SEED_LENGTH; i++) {
     to[i] = static_cast<uint8_t>((floor(rand_st.myRnd() * 31) + 64));
   }
-  char extra = static_cast<char>(floor(rand_st.myRnd() * 31));
+  char extra = static_cast<uint8_t>(floor(rand_st.myRnd() * 31));
   for (int i = 0; i < SEED_LENGTH; i++) {
     to[i] ^= extra;
   }
   return to;
 }
 
-std::vector<uint8_t> NativePassword::generateSeed() {
-  std::vector<uint8_t> res(SEED_LENGTH);
-  RAND_bytes(res.data(), SEED_LENGTH);
-  return res;
+// ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L119
+std::vector<uint32_t> OldPassword::hash(const char* text, int size) {
+  uint32_t nr = 1345345333L, add = 7, nr2 = 0x12345671L;
+  uint32_t tmp;
+  std::vector<uint32_t> result(2);
+  for (int i = 0; i < size; i++) {
+    if (text[i] == ' ' || text[i] == '\t') {
+      continue;
+    }
+    tmp = static_cast<uint32_t>(text[i]);
+    nr ^= (((nr & 63) + add) * tmp) + (nr << 8);
+    nr2 += (nr2 << 8) ^ nr;
+    add += tmp;
+  }
+
+  result[0] = nr & ((static_cast<uint32_t>(1L) << 31) - 1L); /* Don't use sign bit (str2int) */
+  result[1] = nr2 & ((static_cast<uint32_t>(1L) << 31) - 1L);
+  return result;
 }
 
-std::vector<uint8_t> NativePassword::signature(const std::string& password,
-                                               const std::vector<uint8_t>& seed) {
+// ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L80
+OldPassword::RandStruct::RandStruct(uint32_t seed1, uint32_t seed2) {
+  max_value_ = 0x3FFFFFFFL;
+  max_value_dbl_ = static_cast<double>(max_value_);
+  seed1_ = seed1 % max_value_;
+  seed2_ = seed2 % max_value_;
+}
+
+// ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L101
+double OldPassword::RandStruct::myRnd() {
+  seed1_ = (seed1_ * 3 + seed2_) % max_value_;
+  seed2_ = (seed1_ + seed2_ + 33) % max_value_;
+  return ((static_cast<double>(seed1_)) / max_value_dbl_);
+}
+
+std::vector<uint8_t> NativePassword::generateSeedImpl() {
+  return PasswordAuthHelper<NativePassword>::generateSeed(SEED_LENGTH);
+}
+
+// ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L471
+std::vector<uint8_t> NativePassword::signatureImpl(const std::string& password,
+                                                   const std::vector<uint8_t>& seed) {
   auto hashstage1 = hash(password);
   auto hashstage2 = hash(hashstage1);
 
@@ -309,44 +347,6 @@ std::vector<uint8_t> NativePassword::hash(const char* text, int size) {
   rc = EVP_DigestFinal(ctx.get(), result.data(), nullptr);
   RELEASE_ASSERT(rc == 1, "Failed to finalize digest");
   return result;
-}
-
-std::vector<uint8_t> OldPassword::generateSeed() {
-  std::vector<uint8_t> res(SEED_LENGTH);
-  RAND_bytes(res.data(), SEED_LENGTH);
-  return res;
-}
-
-std::vector<uint32_t> OldPassword::hash(const char* text, int size) {
-  uint32_t nr = 1345345333L, add = 7, nr2 = 0x12345671L;
-  uint32_t tmp;
-  std::vector<uint32_t> result(2);
-  for (int i = 0; i < size; i++) {
-    if (text[i] == ' ' || text[i] == '\t') {
-      continue;
-    }
-    tmp = static_cast<uint32_t>(text[i]);
-    nr ^= (((nr & 63) + add) * tmp) + (nr << 8);
-    nr2 += (nr2 << 8) ^ nr;
-    add += tmp;
-  }
-
-  result[0] = nr & ((static_cast<uint32_t>(1L) << 31) - 1L); /* Don't use sign bit (str2int) */
-  result[1] = nr2 & ((static_cast<uint32_t>(1L) << 31) - 1L);
-  return result;
-}
-
-OldPassword::RandStruct::RandStruct(uint32_t seed1, uint32_t seed2) {
-  max_value_ = 0x3FFFFFFFL;
-  max_value_dbl_ = static_cast<double>(max_value_);
-  seed1_ = seed1 % max_value_;
-  seed2_ = seed2 % max_value_;
-}
-
-double OldPassword::RandStruct::myRnd() {
-  seed1_ = (seed1_ * 3 + seed2_) % max_value_;
-  seed2_ = (seed1_ + seed2_ + 33) % max_value_;
-  return ((static_cast<double>(seed1_)) / max_value_dbl_);
 }
 
 } // namespace MySQLProxy

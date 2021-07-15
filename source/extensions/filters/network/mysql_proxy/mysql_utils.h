@@ -1,5 +1,7 @@
 #pragma once
 
+#include <openssl/rand.h>
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 
@@ -63,12 +65,41 @@ enum class AuthMethod : uint8_t {
   ClearPassword
 };
 
-// Helper function collection of old_password
-struct OldPassword {
+// interface of auth helper
+template <class Derived> class PasswordAuthHelper {
 public:
-  static std::vector<uint8_t> generateSeed();
+  // generatedSeed generate random seed used for auth
+  static std::vector<uint8_t> generateSeed() { return Derived::generateSeedImpl(); }
+  // signature use password and seed to construct auth signature
   static std::vector<uint8_t> signature(const std::string& password,
-                                        const std::vector<uint8_t>& seed);
+                                        const std::vector<uint8_t>& seed) {
+    return Derived::signatureImpl(password, seed);
+  }
+  // seedLength return seed length that Derived auth plugin wanted
+  static int seedLength() { return Derived::seedLength(); }
+
+protected:
+  static std::vector<uint8_t> generateSeed(int len) {
+    std::vector<uint8_t> res(len);
+    RAND_bytes(res.data(), len);
+    return res;
+  }
+};
+
+// implementation of mysql_old_password auth helper
+class OldPassword : public PasswordAuthHelper<OldPassword> {
+private:
+  friend PasswordAuthHelper<OldPassword>;
+  // make implementation functions private, force user using
+  // PasswordAuthHelper<OldPassword>::xxImpl()
+  static std::vector<uint8_t> generateSeedImpl();
+  static std::vector<uint8_t> signatureImpl(const std::string& password,
+                                            const std::vector<uint8_t>& seed);
+  static int seedLength() { return SEED_LENGTH; }
+
+private:
+  static constexpr int SEED_LENGTH = 8;
+
   static std::vector<uint32_t> hash(const std::string& text) {
     return hash(text.data(), text.size());
   }
@@ -80,9 +111,7 @@ public:
    * Used for Pre-4.1 password handling
    */
   static std::vector<uint32_t> hash(const char* text, int size);
-  static constexpr int SEED_LENGTH = 8;
 
-private:
   struct RandStruct {
     RandStruct(uint32_t seed1, uint32_t seed2);
     double myRnd();
@@ -91,11 +120,19 @@ private:
   };
 };
 
-// Helper function collection of native_password
-struct NativePassword {
-  static std::vector<uint8_t> generateSeed();
-  static std::vector<uint8_t> signature(const std::string& password,
-                                        const std::vector<uint8_t>& seed);
+// implementation of mysql_native_password auth helper
+class NativePassword : public PasswordAuthHelper<NativePassword> {
+private:
+  friend PasswordAuthHelper<NativePassword>;
+  // make implementation functions private, force user using
+  // PasswordAuthHelper<NativePassword>::xxImpl()
+  static std::vector<uint8_t> generateSeedImpl();
+  static std::vector<uint8_t> signatureImpl(const std::string& password,
+                                            const std::vector<uint8_t>& seed);
+  static int seedLength() { return SEED_LENGTH; }
+
+private:
+  static constexpr int SEED_LENGTH = 20;
 
   static std::vector<uint8_t> hash(const std::string& text) {
     return hash(text.data(), text.size());
@@ -104,7 +141,6 @@ struct NativePassword {
     return hash(reinterpret_cast<const char*>(text.data()), text.size());
   }
   static std::vector<uint8_t> hash(const char* data, int len);
-  static constexpr int SEED_LENGTH = 20;
 };
 
 /**

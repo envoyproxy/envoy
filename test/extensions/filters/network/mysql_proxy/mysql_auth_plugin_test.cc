@@ -29,7 +29,8 @@ TEST(AuthHelperTest, AuthMethod) {
 
 // test cases come from https://github.com/go-sql-driver/mysql/blob/master/auth_test.go#L42
 TEST(AuthHelperTest, OldPasswordSingature) {
-  EXPECT_EQ(OldPassword::generateSeed().size(), OldPassword::SEED_LENGTH);
+  EXPECT_EQ(PasswordAuthHelper<OldPassword>::generateSeed().size(),
+            PasswordAuthHelper<OldPassword>::seedLength());
   std::vector<uint8_t> seed = {9, 8, 7, 6, 5, 4, 3, 2};
   std::vector<std::pair<std::string, std::string>> test_cases = {
       {" pass", "47575c5a435b4251"},
@@ -38,7 +39,7 @@ TEST(AuthHelperTest, OldPasswordSingature) {
       {"C0mpl!ca ted#PASS123", "5d5d554849584a45"},
   };
   for (const auto& test_case : test_cases) {
-    auto actual = OldPassword::signature(test_case.first, seed);
+    auto actual = PasswordAuthHelper<OldPassword>::signature(test_case.first, seed);
     EXPECT_EQ(Hex::encode(reinterpret_cast<uint8_t*>(actual.data()), actual.size()),
               test_case.second);
   }
@@ -46,7 +47,8 @@ TEST(AuthHelperTest, OldPasswordSingature) {
 
 // test cases come from https://github.com/go-sql-driver/mysql/blob/master/auth_test.go#L448
 TEST(AuthHelperTest, NativePasswordSingature) {
-  EXPECT_EQ(NativePassword::generateSeed().size(), NativePassword::SEED_LENGTH);
+  EXPECT_EQ(PasswordAuthHelper<NativePassword>::generateSeed().size(),
+            PasswordAuthHelper<NativePassword>::seedLength());
   std::vector<uint8_t> seed = {70, 114, 92,  94,  1,  38, 11, 116, 63, 114,
                                23, 101, 126, 103, 26, 95, 81, 17,  24, 21};
   std::vector<std::pair<std::string, std::vector<uint8_t>>> test_cases = {
@@ -54,7 +56,8 @@ TEST(AuthHelperTest, NativePasswordSingature) {
                   172, 50,  211, 192, 240, 164, 26,  48, 207, 45}},
   };
   for (const auto& test_case : test_cases) {
-    EXPECT_EQ(NativePassword::signature(test_case.first, seed), test_case.second);
+    EXPECT_EQ(PasswordAuthHelper<NativePassword>::signature(test_case.first, seed),
+              test_case.second);
   }
 }
 
