@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
+        "//source/common/router:config_lib",
         "//source/extensions/common:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
