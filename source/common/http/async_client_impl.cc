@@ -19,7 +19,6 @@ const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
 const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
-const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
 const Router::InternalRedirectPolicyImpl AsyncStreamImpl::RouteEntryImpl::internal_redirect_policy_;
 const std::vector<Router::ShadowPolicyPtr> AsyncStreamImpl::RouteEntryImpl::shadow_policies_;
 const AsyncStreamImpl::NullVirtualHost AsyncStreamImpl::RouteEntryImpl::virtual_host_;
@@ -86,7 +85,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout,
-                                         options.hash_policy)),
+                                         options.hash_policy, options.retry_policy)),
       send_xff_(options.send_xff) {
 
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
