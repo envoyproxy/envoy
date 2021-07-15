@@ -45,10 +45,12 @@ fi
 DEFAULT_TEST_TARGETS=(
   "//test/integration:integration_test"
   "//test/integration:protocol_integration_test"
-  "//test/integration:tcp_proxy_integration_test")
+  "//test/integration:tcp_proxy_integration_test"
+  "//test/integration:extension_discovery_integration_test"
+  "//test/integration:listener_lds_integration_test")
 
 if [[ $# -gt 0 ]]; then
-  TEST_TARGETS=("$*")
+  TEST_TARGETS=("$@")
 else
   TEST_TARGETS=("${DEFAULT_TEST_TARGETS[@]}")
 fi
