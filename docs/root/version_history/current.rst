@@ -13,6 +13,7 @@ Minor Behavior Changes
 * http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
   which defines the minimal number of headers in a request/response/trailers required for using a
   dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  feature to a non-negative number will override the default value.
 
 Bug Fixes
 ---------
@@ -21,6 +22,9 @@ Bug Fixes
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+* http: removed ``envoy.reloadable_features.http_upstream_wait_connect_response`` runtime guard and legacy code paths.
+* http: removed ``envoy.reloadable_features.allow_preconnect`` runtime guard and legacy code paths.
 
 New Features
 ------------
