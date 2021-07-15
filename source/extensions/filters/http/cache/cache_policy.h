@@ -17,7 +17,7 @@ struct CacheEntryUsability {
 };
 
 class CachePolicyCallbacks {
- public:
+public:
   virtual ~CachePolicyCallbacks() = default;
 
   virtual const Envoy::StreamInfo::FilterStateSharedPtr& filterState() PURE;
