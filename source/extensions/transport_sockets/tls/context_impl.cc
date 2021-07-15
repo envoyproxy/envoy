@@ -1168,16 +1168,20 @@ bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
 bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates,
                                   std::string& error_details) {
   bssl::UniquePtr<X509_STORE_CTX> ctx(X509_STORE_CTX_new());
+
+  ASSERT(!tls_contexts_.empty());
   // It doesn't matter which SSL context is used, because they share the same
   // cert validation config.
-  X509_STORE* store = SSL_CTX_get_cert_store(tls_contexts_[0].ssl_ctx_.get());
+  const SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
+  X509_STORE* store = SSL_CTX_get_cert_store(ssl_ctx);
   if (!X509_STORE_CTX_init(ctx.get(), store, &leaf_cert, &intermediates)) {
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
     return false;
   }
 
   int res = cert_validator_->doVerifyCertChain(ctx.get(), nullptr, leaf_cert, nullptr);
-  if (res <= 0) {
+  // If |SSL_VERIFY_NONE|, the error is non-fatal, but we keep the error details.
+  if (res <= 0 && SSL_CTX_get_verify_mode(ssl_ctx) != SSL_VERIFY_NONE) {
     const int n = X509_STORE_CTX_get_error(ctx.get());
     const int depth = X509_STORE_CTX_get_error_depth(ctx.get());
     error_details = absl::StrCat("X509_verify_cert: certificate verification error at depth ",

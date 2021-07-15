@@ -43,6 +43,8 @@ routing PRs, questions, etc. to the right place.
   * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
+* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
+  * Windows, low level networking.
 
 # Senior extension maintainers
 

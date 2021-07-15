@@ -171,7 +171,7 @@ struct RouterStats {
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
-               public ProtocolConverter,
+               public RequestOwner,
                public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
@@ -200,7 +200,21 @@ public:
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   bool passthroughSupported() const override { return passthrough_supported_; }
 
-  // ProtocolConverter
+  // RequestOwner
+  Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() override { return *this; }
+  Buffer::OwnedImpl& buffer() override { return upstream_request_buffer_; }
+  Event::Dispatcher& dispatcher() override { return callbacks_->dispatcher(); }
+  void addSize(uint64_t size) override { request_size_ += size; }
+  void continueDecoding() override { callbacks_->continueDecoding(); }
+  void resetDownstreamConnection() override { callbacks_->resetDownstreamConnection(); }
+  void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
+    callbacks_->sendLocalReply(response, end_stream);
+  }
+  void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
+    recordClusterScopeHistogram({upstream_rq_time_}, unit, value);
+  }
+
+  // RequestOwner::ProtocolConverter
   FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus transportEnd() override;
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
@@ -223,7 +237,7 @@ public:
 
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
-    UpstreamRequest(Router& parent, Upstream::TcpPoolData& pool_data,
+    UpstreamRequest(RequestOwner& parent, Upstream::TcpPoolData& pool_data,
                     MessageMetadataSharedPtr& metadata, TransportType transport_type,
                     ProtocolType protocol_type);
     ~UpstreamRequest() override;
@@ -246,7 +260,7 @@ private:
     void onResetStream(ConnectionPool::PoolFailureReason reason);
     void chargeResponseTiming();
 
-    Router& parent_;
+    RequestOwner& parent_;
     Upstream::TcpPoolData& conn_pool_data_;
     MessageMetadataSharedPtr metadata_;
 
@@ -280,7 +294,6 @@ private:
         .recordValue(count);
   }
 
-  void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
   RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return RouterStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),

@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
-    extension_name = "envoy.filters.listener.proxy_protocol",
+    extension_names = ["envoy.filters.listener.proxy_protocol"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

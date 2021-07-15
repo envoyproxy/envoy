@@ -155,6 +155,7 @@ BUILD_URLS_ALLOWLIST = (
     "./generated_api_shadow/bazel/repository_locations.bzl",
     "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
+    "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
     "./api/bazel/envoy_http_archive.bzl",
 )

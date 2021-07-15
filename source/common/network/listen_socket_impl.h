@@ -80,10 +80,32 @@ public:
 
   Socket::Type socketType() const override { return T::type; }
 
+  // These four overrides are introduced to perform check. A null io handle is possible only if the
+  // the owner socket is a listen socket that does not bind to port.
+  IoHandle& ioHandle() override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  const IoHandle& ioHandle() const override {
+    ASSERT(io_handle_ != nullptr);
+    return *io_handle_;
+  }
+  void close() override {
+    if (io_handle_ != nullptr) {
+      if (io_handle_->isOpen()) {
+        io_handle_->close();
+      }
+    }
+  }
+  bool isOpen() const override {
+    ASSERT(io_handle_ != nullptr);
+    return io_handle_->isOpen();
+  }
+
 protected:
   void setPrebindSocketOptions() {
     // On Windows, SO_REUSEADDR does not restrict subsequent bind calls when there is a listener as
-    // on Linux and later BSD socket stacks
+    // on Linux and later BSD socket stacks.
 #ifndef WIN32
     int on = 1;
     auto status = setSocketOption(SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
@@ -95,12 +117,6 @@ protected:
 template <>
 inline void
 NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::setPrebindSocketOptions() {}
-
-// UDP listen socket desires io handle regardless bind_to_port is true or false.
-template <>
-NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>::NetworkListenSocket(
-    const Address::InstanceConstSharedPtr& address,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port);
 
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Stream>>;
 template class NetworkListenSocket<NetworkSocketTrait<Socket::Type::Datagram>>;
