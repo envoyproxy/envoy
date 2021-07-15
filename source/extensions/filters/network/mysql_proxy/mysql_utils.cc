@@ -284,6 +284,10 @@ std::vector<uint8_t> OldPassword::signatureImpl(const std::string& password,
 
 // ref https://github.com/mysql/mysql-server/blob/5.5/sql/password.c#L119
 std::vector<uint32_t> OldPassword::hash(const char* text, int size) {
+  // feel curious with these magic numbers?
+  // ref F. Muller and T. Peyrin "Cryptanalysis of T-Function-Based Hash Functions" in International
+  // Conference on Information Security and Cryptology - ICISC 2006
+  // link https://sites.google.com/site/thomaspeyrin/Muller-Peyrin-ICISC2006.ps
   uint32_t nr = 1345345333L, add = 7, nr2 = 0x12345671L;
   uint32_t tmp;
   std::vector<uint32_t> result(2);

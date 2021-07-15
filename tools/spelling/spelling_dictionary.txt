@@ -26,13 +26,17 @@ CB
 CDN
 CDS
 CEL
+Cryptanalysis
+Cryptology
 DSR
 EBADF
 ENOTCONN
 EPIPE
 HEXDIG
 HEXDIGIT
+ICISC
 OWS
+Peyrin
 Preconnecting
 RCVBUF
 RTCP
