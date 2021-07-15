@@ -72,7 +72,7 @@ private:
   using ObjQueue = std::queue<std::weak_ptr<C>>;
 
   // TODO(tonya11en): We can reduce memory utilization by using an absl::flat_hash_map of QueueInfo
-  // with heterogeneous lookup on the weight. This would allow us to save 4 bytes per unique weight.
+  // with heterogeneous lookup on the weight. This would allow us to save 8 bytes per unique weight.
   using QueueMap = absl::flat_hash_map<double, ObjQueue>;
 
   // Used to store a queue's weight info necessary to perform the weighted random selection.
