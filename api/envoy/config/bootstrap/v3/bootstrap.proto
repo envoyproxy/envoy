@@ -600,5 +600,5 @@ message CustomInlineHeader {
   string inline_header_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The type of the header that is expected to be set as the inline header.
-  InlineHeaderType inline_header_type = 2;
+  InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
 }

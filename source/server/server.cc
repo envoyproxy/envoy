@@ -296,7 +296,7 @@ void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
   }
 }
 
-bool canBeRegisteredAsInlineHeaderOrNot(const Http::LowerCaseString& header_name) {
+bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
   // 'set-cookie' cannot currently be registered as an inline header.
   if (header_name == Http::Headers::get().SetCookie) {
     return false;
@@ -307,8 +307,8 @@ bool canBeRegisteredAsInlineHeaderOrNot(const Http::LowerCaseString& header_name
 void registerCustomInlineHeadersFromBootstrap(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   for (const auto& inline_header : bootstrap.inline_headers()) {
-    Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
-    if (!canBeRegisteredAsInlineHeaderOrNot(lower_case_name)) {
+    const Http::LowerCaseString lower_case_name(inline_header.inline_header_name());
+    if (!canBeRegisteredAsInlineHeader(lower_case_name)) {
       throw EnvoyException(fmt::format("Header {} cannot be registered as an inline header.",
                                        inline_header.inline_header_name()));
     }

@@ -349,12 +349,16 @@ TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
 TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
   static bool is_registered = false;
 
+  // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
+  // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
+  // registered again, the assertion will be triggered.
   if (!is_registered) {
-    // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
-    // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
-    // registered again, the assertion will be triggered.
     EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
     is_registered = true;
+  } else {
+#if !defined(NDEBUG)
+    EXPECT_DEATH(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
+#endif // !defined(NDEBUG)
   }
 
   EXPECT_TRUE(
