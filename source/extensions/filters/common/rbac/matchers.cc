@@ -162,7 +162,7 @@ bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::Request
 }
 
 bool PortRangeMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
-                          const StreamInfo::StreamInfo& info) const {
+                               const StreamInfo::StreamInfo& info) const {
   const Envoy::Network::Address::Ip* ip =
       info.downstreamAddressProvider().localAddress().get()->ip();
   if (ip) {
