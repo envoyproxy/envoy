@@ -46,6 +46,19 @@ TEST(DataConstructorTest, FromCppToC) {
   c_data.release(c_data.context);
 }
 
+TEST(DataConstructorTest, FromCppToCPartial) {
+  std::string s = "test string";
+  Buffer::OwnedImpl cpp_data = Buffer::OwnedImpl(absl::string_view(s));
+
+  envoy_data c_data = Utility::toBridgeData(cpp_data, 4);
+
+  ASSERT_EQ(c_data.length, 4);
+  ASSERT_EQ(Utility::copyToString(c_data), "test");
+  ASSERT_EQ(cpp_data.length(), 7);
+  ASSERT_EQ(cpp_data.toString(), " string");
+  c_data.release(c_data.context);
+}
+
 TEST(DataConstructorTest, CopyFromCppToC) {
   std::string s = "test string";
   Buffer::OwnedImpl cpp_data = Buffer::OwnedImpl(absl::string_view(s));
@@ -54,6 +67,19 @@ TEST(DataConstructorTest, CopyFromCppToC) {
 
   ASSERT_EQ(c_data.length, s.size());
   ASSERT_EQ(Utility::copyToString(c_data), s);
+  c_data.release(c_data.context);
+}
+
+TEST(DataConstructorTest, CopyFromCppToCPartial) {
+  std::string s = "test string";
+  Buffer::OwnedImpl cpp_data = Buffer::OwnedImpl(absl::string_view(s));
+
+  envoy_data c_data = Utility::copyToBridgeData(cpp_data, 4);
+
+  ASSERT_EQ(c_data.length, 4);
+  ASSERT_EQ(Utility::copyToString(c_data), "test");
+  ASSERT_EQ(cpp_data.length(), 11);
+  ASSERT_EQ(cpp_data.toString(), "test string");
   c_data.release(c_data.context);
 }
 
