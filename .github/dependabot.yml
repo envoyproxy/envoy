@@ -27,6 +27,11 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/tools/git"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/github"
   schedule:
     interval: "daily"
