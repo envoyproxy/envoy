@@ -27,6 +27,7 @@ private:
   const std::string bug_name_;
 };
 
+// Test and fuzz only, not for production, not thread-safe.
 class ScopedDisableExitOnQuicheBug {
 public:
   ScopedDisableExitOnQuicheBug();
