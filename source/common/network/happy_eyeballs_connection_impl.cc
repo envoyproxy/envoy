@@ -379,7 +379,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     }
   }
   if (event == ConnectionEvent::Connected) {
-    for (auto filter : post_connect_state_.read_filters_) {
+    for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
     }
   }
