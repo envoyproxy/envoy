@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
@@ -13,6 +14,13 @@ namespace Cache {
 struct CacheEntryUsability {
   CacheEntryStatus status = CacheEntryStatus::Unusable;
   Envoy::Seconds age = Envoy::Seconds::max();
+};
+
+class CachePolicyCallbacks {
+ public:
+  virtual ~CachePolicyCallbacks() = default;
+
+  virtual const Envoy::StreamInfo::FilterStateSharedPtr& filterState() PURE;
 };
 
 // CachePolicy is an extension point for deployment specific caching behavior.
