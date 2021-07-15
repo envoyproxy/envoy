@@ -657,7 +657,7 @@ public:
     extractor_ = Extractor::create(jwks_cache_.jwks_data_.jwt_provider_);
     // Not to use jwks_fetcher, mocked that JwksObj already has Jwks
     EXPECT_CALL(jwks_cache_.jwks_data_, getJwksObj()).WillRepeatedly(Return(jwks_.get()));
-    EXPECT_CALL(mock_fetcher_, Call(_)).Times(0);
+    EXPECT_CALL(mock_fetcher_, Call(_, _)).Times(0);
   }
 
   void createAuthenticator(const absl::optional<std::string>& provider) {
@@ -679,7 +679,7 @@ public:
 
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<MockJwksCache> jwks_cache_;
-  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&)> mock_fetcher_;
+  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;
   AuthenticatorPtr auth_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::SimulatedTimeSystem time_system_;
