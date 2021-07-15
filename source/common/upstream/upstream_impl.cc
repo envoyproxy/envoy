@@ -325,30 +325,19 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
                            Network::TransportSocketFactory& socket_factory,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            Network::TransportSocketOptionsConstSharedPtr transport_socket_options) {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   Network::ConnectionSocket::OptionsSharedPtr connection_options;
   if (cluster.clusterSocketOptions() != nullptr) {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     if (options) {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       connection_options = std::make_shared<Network::ConnectionSocket::Options>();
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       *connection_options = *options;
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       std::copy(cluster.clusterSocketOptions()->begin(), cluster.clusterSocketOptions()->end(),
                 std::back_inserter(*connection_options));
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     } else {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
       connection_options = cluster.clusterSocketOptions();
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     }
   } else {
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
     connection_options = options;
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   }
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   ASSERT(!address->envoyInternalAddress());
   Network::ClientConnectionPtr connection =
       address_list.size() > 1 ?
@@ -358,12 +347,9 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
         address, cluster.sourceAddress(),
         socket_factory.createTransportSocket(std::move(transport_socket_options)),
         connection_options);
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
 
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << std::endl;
   cluster.createNetworkFilterChain(*connection);
-  std::cerr << __FUNCTION__ << ":" << __LINE__ << " " << connection.get() << std::endl;
   return connection;
 }
 
