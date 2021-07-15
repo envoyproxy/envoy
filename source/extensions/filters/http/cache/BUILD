@@ -44,6 +44,16 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "cache_policy_lib",
+    hdrs = ["cache_policy.h"],
+    deps = [
+        ":cache_headers_utils_lib",
+        ":http_cache_lib",
+        "//source/common/http:header_map_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "key",
     srcs = ["key.proto"],
