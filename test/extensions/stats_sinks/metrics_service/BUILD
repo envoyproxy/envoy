@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.stat_sinks.metrics_service",
+    extension_names = ["envoy.stat_sinks.metrics_service"],
     deps = [
         "//envoy/registry",
         "//source/extensions/stat_sinks/metrics_service:config",
@@ -25,7 +25,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "metrics_service_test",
     srcs = ["grpc_metrics_service_impl_test.cc"],
-    extension_name = "envoy.stat_sinks.metrics_service",
+    extension_names = ["envoy.stat_sinks.metrics_service"],
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/upstream:upstream_includes",
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "metrics_service_integration_test",
     srcs = ["metrics_service_integration_test.cc"],
-    extension_name = "envoy.stat_sinks.metrics_service",
+    extension_names = ["envoy.stat_sinks.metrics_service"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

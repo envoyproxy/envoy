@@ -2,6 +2,7 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -65,6 +66,10 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
     header_match_type_ = HeaderMatchType::Contains;
     value_ = config.contains_match();
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    header_match_type_ = HeaderMatchType::StringMatch;
+    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -138,17 +143,18 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     }
   }
 
+  const auto value = header_value.result().value();
   bool match;
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header_value.result().value() == header_data.value_;
+    match = header_data.value_.empty() || value == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = header_data.regex_->match(header_value.result().value());
+    match = header_data.regex_->match(value);
     break;
   case HeaderMatchType::Range: {
     int64_t header_int_value = 0;
-    match = absl::SimpleAtoi(header_value.result().value(), &header_int_value) &&
+    match = absl::SimpleAtoi(value, &header_int_value) &&
             header_int_value >= header_data.range_.start() &&
             header_int_value < header_data.range_.end();
     break;
@@ -157,13 +163,16 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
     match = header_data.present_;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header_value.result().value(), header_data.value_);
+    match = absl::StartsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header_value.result().value(), header_data.value_);
+    match = absl::EndsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Contains:
-    match = absl::StrContains(header_value.result().value(), header_data.value_);
+    match = absl::StrContains(value, header_data.value_);
+    break;
+  case HeaderMatchType::StringMatch:
+    match = header_data.string_match_->match(value);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
