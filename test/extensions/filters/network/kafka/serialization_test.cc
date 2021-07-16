@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/kafka/tagged_fields.h"
 
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,6 +28,8 @@ TEST_EmptyDeserializerShouldNotBeReady(UInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BooleanDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarUInt32Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(VarInt32Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(VarInt64Deserializer);
 
 TEST_EmptyDeserializerShouldNotBeReady(StringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactStringDeserializer);
@@ -151,7 +154,78 @@ TEST(VarUInt32Deserializer, ShouldThrowIfNoEndWith5Bytes) {
 
   // when
   // then
-  EXPECT_THROW(testee.feed(data), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "is too long");
+}
+
+// Variable-length int32_t tests.
+
+TEST(VarInt32Deserializer, ShouldDeserialize) {
+  Buffer::OwnedImpl buffer;
+  const char input[1] = {0};
+  buffer.add(absl::string_view(input, sizeof(input)));
+  const int32_t expected_value = 0;
+  deserializeCompactAndCheckEquality<VarInt32Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt32Deserializer, ShouldDeserializeMinInt32) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[5] = {0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int32_t expected_value = std::numeric_limits<int32_t>::min();
+  deserializeCompactAndCheckEquality<VarInt32Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt32Deserializer, ShouldDeserializeMaxInt32) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[5] = {0xFE, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int32_t expected_value = std::numeric_limits<int32_t>::max();
+  deserializeCompactAndCheckEquality<VarInt32Deserializer>(buffer, expected_value);
+}
+
+// Variable-length int64_t tests.
+
+TEST(VarInt64Deserializer, ShouldDeserialize) {
+  Buffer::OwnedImpl buffer;
+  const char input[1] = {0};
+  buffer.add(absl::string_view(input, sizeof(input)));
+  const int64_t expected_value = 0;
+  deserializeCompactAndCheckEquality<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldDeserializeMinInt64) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int64_t expected_value = std::numeric_limits<int64_t>::min();
+  deserializeCompactAndCheckEquality<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldDeserializeMaxInt64) {
+  Buffer::OwnedImpl buffer;
+  const uint8_t input[10] = {0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x0F};
+  buffer.add(absl::string_view(reinterpret_cast<const char*>(input), sizeof(input)));
+  const int64_t expected_value = std::numeric_limits<int64_t>::max();
+  deserializeCompactAndCheckEquality<VarInt64Deserializer>(buffer, expected_value);
+}
+
+TEST(VarInt64Deserializer, ShouldThrowIfNoEndWith10Bytes) {
+  // given
+  VarInt64Deserializer testee;
+  Buffer::OwnedImpl buffer;
+
+  // The buffer makes no sense, it's 10 times 0xFF, while varint encoding ensures that in the worst
+  // case 10th byte has the highest bit clear.
+  for (int i = 0; i < 10; ++i) {
+    const uint8_t all_bits_set = 0xFF;
+    buffer.add(&all_bits_set, sizeof(all_bits_set));
+  }
+
+  absl::string_view data = {getRawData(buffer), 1024};
+
+  // when
+  // then
+  EXPECT_THROW_WITH_REGEX(testee.feed(data), EnvoyException, "is too long");
 }
 
 // String tests.

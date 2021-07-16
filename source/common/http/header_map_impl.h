@@ -182,7 +182,7 @@ protected:
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
    * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
-   * feature value (or uint32_t max value if not set), all headers are added to a map, to allow
+   * feature value (defaults to 3, if not set), all headers are added to a map, to allow
    * fast access given a header key. Once the map is initialized, it will be used even if the number
    * of headers decreases below the threshold.
    *
@@ -200,8 +200,8 @@ protected:
 
     HeaderList()
         : pseudo_headers_end_(headers_.end()),
-          lazy_map_min_size_(static_cast<uint32_t>(Runtime::getInteger(
-              "envoy.http.headermap.lazy_map_min_size", std::numeric_limits<uint32_t>::max()))) {}
+          lazy_map_min_size_(static_cast<uint32_t>(
+              Runtime::getInteger("envoy.http.headermap.lazy_map_min_size", 3))) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
