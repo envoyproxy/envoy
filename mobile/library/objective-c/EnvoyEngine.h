@@ -408,6 +408,8 @@ extern const int kEnvoyFailure;
 
 - (void)flushStats;
 
+- (void)terminate;
+
 @end
 
 #pragma mark - EnvoyLogger

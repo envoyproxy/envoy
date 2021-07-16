@@ -13,8 +13,7 @@ final class EngineImpl: NSObject {
     case standard(config: EnvoyConfiguration)
   }
 
-  private init(configType: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine)
-  {
+  private init(configType: ConfigurationType, logLevel: LogLevel, engine: EnvoyEngine) {
     self.engine = engine
     self.pulseClientImpl = PulseClientImpl(engine: engine)
     self.streamClientImpl = StreamClientImpl(engine: engine)
@@ -33,8 +32,7 @@ final class EngineImpl: NSObject {
   /// - parameter config:          Configuration to use for starting Envoy.
   /// - parameter logLevel:        Log level to use for this instance.
   /// - parameter engine:          The underlying engine to use for starting Envoy.
-  convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine)
-  {
+  convenience init(config: EnvoyConfiguration, logLevel: LogLevel = .info, engine: EnvoyEngine) {
     self.init(configType: .standard(config: config), logLevel: logLevel, engine: engine)
   }
 
@@ -62,5 +60,9 @@ extension EngineImpl: Engine {
 
   func flushStats() {
     self.engine.flushStats()
+  }
+
+  func terminate() {
+    self.engine.terminate()
   }
 }

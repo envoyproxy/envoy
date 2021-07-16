@@ -14,4 +14,7 @@ public protocol Engine: AnyObject {
   /// Note: stat flushing is done asynchronously, this function will never block.
   /// This is a noop if called before the underlying EnvoyEngine has started.
   func flushStats()
+
+  /// Terminates the running engine.
+  func terminate()
 }
