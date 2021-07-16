@@ -305,6 +305,8 @@ message Bootstrap {
   // field.
   // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
+
+  google.protobuf.Int64Value max_receive_grpc_message_size = 31;
 }
 
 // Administration interface :ref:`operations documentation

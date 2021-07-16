@@ -23,7 +23,7 @@ class AsyncClientManagerImplTest : public testing::Test {
 public:
   AsyncClientManagerImplTest()
       : api_(Api::createApiForTest()), stat_names_(scope_.symbolTable()),
-        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_) {}
+        async_client_manager_(cm_, tls_, test_time_.timeSystem(), *api_, stat_names_, -1) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;

@@ -304,6 +304,8 @@ message Bootstrap {
   // [#not-implemented-hide:]
   map<string, core.v3.TypedExtensionConfig> certificate_provider_instances = 25;
 
+  google.protobuf.Int64Value max_receive_grpc_message_size = 31;
+
   Runtime hidden_envoy_deprecated_runtime = 11 [
     deprecated = true,
     (envoy.annotations.deprecated_at_minor_version) = "3.0",

@@ -59,8 +59,10 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                ThreadLocal::Instance& tls, TimeSource& time_source,
-                                               Api::Api& api, const StatNames& stat_names)
-    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names) {
+                                               Api::Api& api, const StatNames& stat_names,
+                                               int64_t max_receive_message_length)
+    : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
+      max_receive_message_length_(max_receive_message_length) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
@@ -76,10 +78,16 @@ RawAsyncClientPtr AsyncClientFactoryImpl::create() {
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
-    const envoy::config::core::v3::GrpcService& config, Api::Api& api, const StatNames& stat_names)
+    const envoy::config::core::v3::GrpcService& config, Api::Api& api, const StatNames& stat_names,
+    int64_t max_receive_massage_length)
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), api_(api), stat_names_(stat_names) {
+  envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value
+      max_receive_message_length_val;
+  max_receive_message_length_val.set_int_value(max_receive_massage_length);
+  config_.mutable_google_grpc()->mutable_channel_args()->mutable_args()->insert(
+      {std::string("grpc.max_receive_message_length"), max_receive_message_length_val});
 
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
@@ -131,7 +139,8 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::config::core::v3::Grp
     return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
   case envoy::config::core::v3::GrpcService::TargetSpecifierCase::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
-                                                          config, api_, stat_names_);
+                                                          config, api_, stat_names_,
+                                                          max_receive_message_length_);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

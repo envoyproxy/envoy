@@ -32,7 +32,7 @@ public:
   GoogleAsyncClientFactoryImpl(ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot,
                                Stats::Scope& scope,
                                const envoy::config::core::v3::GrpcService& config, Api::Api& api,
-                               const StatNames& stat_names);
+                               const StatNames& stat_names, int64_t max_receive_message_length);
 
   RawAsyncClientPtr create() override;
 
@@ -40,7 +40,7 @@ private:
   ThreadLocal::Instance& tls_;
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
-  const envoy::config::core::v3::GrpcService config_;
+  envoy::config::core::v3::GrpcService config_;
   Api::Api& api_;
   const StatNames& stat_names_;
 };
@@ -48,7 +48,8 @@ private:
 class AsyncClientManagerImpl : public AsyncClientManager {
 public:
   AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
-                         TimeSource& time_source, Api::Api& api, const StatNames& stat_names);
+                         TimeSource& time_source, Api::Api& api, const StatNames& stat_names,
+                         int64_t max_receive_message_length);
 
   // Grpc::AsyncClientManager
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
@@ -62,6 +63,7 @@ private:
   TimeSource& time_source_;
   Api::Api& api_;
   const StatNames& stat_names_;
+  int64_t max_receive_message_length_;
 };
 
 } // namespace Grpc
