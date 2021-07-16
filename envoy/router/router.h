@@ -1075,6 +1075,15 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this route.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const { return empty_metadata_; }
+
+private:
+  envoy::config::core::v3::Metadata empty_metadata_;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

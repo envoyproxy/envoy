@@ -54,15 +54,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
   }
-
-  const Router::RouteEntry* routeEntry = callbacks->route()->routeEntry();
-  if (routeEntry == nullptr) {
-    routeEntry = dynamic_cast<const Router::RouteEntryImplBase*>(callbacks->route().get());
-    if (routeEntry == nullptr) {
-      return ProtobufWkt::Struct::default_instance();
-    }
-  }
-  const auto& metadata = routeEntry->metadata();
+  const auto& metadata = callbacks->route()->metadata();
 
   {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
