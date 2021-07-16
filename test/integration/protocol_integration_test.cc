@@ -2478,13 +2478,13 @@ TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_max_requests_reached")->value(),
             1);
 
-  ASSERT_TRUE(fake_upstream_connection_->close());
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     EXPECT_EQ(nullptr, response->headers().Connection());
     EXPECT_EQ("close", response_2->headers().getConnectionValue());
   } else {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
