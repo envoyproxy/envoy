@@ -29,6 +29,7 @@ namespace {
 
 const char TypeUrl[] = "type.googleapis.com/envoy.api.v2.Cluster";
 enum class LegacyOrUnified { Legacy, Unified };
+const auto WildcardStr = std::string(Wildcard);
 
 class DeltaSubscriptionStateTestBase : public testing::TestWithParam<LegacyOrUnified> {
 protected:
@@ -409,7 +410,7 @@ TEST_P(DeltaSubscriptionStateTest, SwitchIntoWildcardMode) {
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   // switch into wildcard mode
-  updateSubscriptionInterest({"name4", Wildcard}, {"name1"});
+  updateSubscriptionInterest({"name4", WildcardStr}, {"name1"});
   markStreamFresh(); // simulate a stream reconnection
   auto cur_request = getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
@@ -492,7 +493,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, CancellingImplicitWildcardSubscriptio
   EXPECT_CALL(*ttl_timer_, disableTimer());
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
-  updateSubscriptionInterest({"name3"}, {Wildcard});
+  updateSubscriptionInterest({"name3"}, {WildcardStr});
   auto cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));
@@ -522,7 +523,7 @@ TEST_P(WildcardDeltaSubscriptionStateTest, CancellingExplicitWildcardSubscriptio
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name3"));
 
   // cancel wildcard subscription
-  updateSubscriptionInterest({"name4"}, {Wildcard});
+  updateSubscriptionInterest({"name4"}, {WildcardStr});
   cur_request = getNextRequestAckless();
   EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_THAT(cur_request->resource_names_unsubscribe(), UnorderedElementsAre(Wildcard));

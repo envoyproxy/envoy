@@ -81,7 +81,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
       // resource has no version and should never get one actually. As such, it won't be listed in
       // initial_resource_versions field.
       requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-      names_added_.insert(Wildcard);
+      names_added_.emplace(Wildcard);
     }
   }
 }
