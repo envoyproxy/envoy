@@ -3871,12 +3871,10 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
 
 TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
   NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
+          [&](Http::ResponseDecoder&,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder = &decoder;
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
@@ -3895,12 +3893,10 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
 
 TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke(
-          [&](Http::ResponseDecoder& decoder,
+          [&](Http::ResponseDecoder&,
               Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            response_decoder = &decoder;
             callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
