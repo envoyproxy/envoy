@@ -122,7 +122,7 @@ private:
   struct PerConnectionState {
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
-    absl::optional<const ConnectionStats*> connection_stats_;
+    OptRef<const ConnectionStats> connection_stats_;
     absl::optional<uint32_t> buffer_limits_;
   };
 

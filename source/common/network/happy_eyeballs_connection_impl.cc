@@ -286,7 +286,7 @@ void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash) const {
 
 void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   if (!connect_finished_) {
-    per_connection_state_.connection_stats_ = &stats;
+    per_connection_state_.connection_stats_ = stats;
   }
   for (auto& connection : connections_) {
     connection->setConnectionStats(stats);
@@ -319,7 +319,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
     connection->noDelay(per_connection_state_.no_delay_.value());
   }
   if (per_connection_state_.connection_stats_.has_value()) {
-    connection->setConnectionStats(*per_connection_state_.connection_stats_.value());
+    connection->setConnectionStats(*per_connection_state_.connection_stats_);
   }
   if (per_connection_state_.buffer_limits_.has_value()) {
     connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
