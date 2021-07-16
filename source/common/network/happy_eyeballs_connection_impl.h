@@ -104,7 +104,7 @@ private:
     ClientConnection& connection_;
   };
 
-  std::unique_ptr<ClientConnection> createNextConnection();
+  ClientConnectionPtr createNextConnection();
   void tryAnotherConnection();
   void maybeScheduleNextAttempt();
 
@@ -144,7 +144,7 @@ private:
   const ConnectionSocket::OptionsSharedPtr options_;
 
   // Set of active connections.
-  std::vector<std::unique_ptr<ClientConnection>> connections_;
+  std::vector<ClientConnectionPtr> connections_;
   std::vector<std::unique_ptr<ConnectionCallbacksWrapper>> callbacks_wrappers_;
 
   // True when connect() has finished, either success or failure.

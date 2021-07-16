@@ -303,7 +303,7 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   connections_[0]->dumpState(os, indent_level);
 }
 
-std::unique_ptr<ClientConnection> HappyEyeballsConnectionImpl::createNextConnection() {
+ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   ASSERT(next_address_ < address_list_.size());
   auto connection = dispatcher_.createClientConnection(
       address_list_[next_address_++], source_address_,
