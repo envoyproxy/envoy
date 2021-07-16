@@ -509,6 +509,10 @@ static envoy_data ios_get_string(const void *context) {
   flush_stats(_engineHandle);
 }
 
+- (void)terminate {
+  terminate_engine(_engineHandle);
+}
+
 #pragma mark - Private
 
 - (void)startObservingLifecycleNotifications {

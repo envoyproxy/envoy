@@ -13,6 +13,7 @@ final class MockEnvoyEngine: NSObject {
     _ config: EnvoyConfiguration,
     _ logLevel: String?
   ) -> Void)?
+
   /// Closure called when `recordCounterInc(_:tags:count:)` is called.
   static var onRecordCounter: (
     (_ elements: String, _ tags: [String: String], _ count: UInt) -> Void)?
@@ -35,14 +36,12 @@ final class MockEnvoyEngine: NSObject {
 }
 
 extension MockEnvoyEngine: EnvoyEngine {
-  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32
-  {
+  func run(withConfig config: EnvoyConfiguration, logLevel: String) -> Int32 {
     MockEnvoyEngine.onRunWithConfig?(config, logLevel)
     return kEnvoySuccess
   }
 
-  func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String) -> Int32
-  {
+  func run(withTemplate template: String, config: EnvoyConfiguration, logLevel: String) -> Int32 {
     MockEnvoyEngine.onRunWithTemplate?(template, config, logLevel)
     return kEnvoySuccess
   }
@@ -85,4 +84,6 @@ extension MockEnvoyEngine: EnvoyEngine {
   func flushStats() {
     MockEnvoyEngine.onFlushStats?()
   }
+
+  func terminate() {}
 }
