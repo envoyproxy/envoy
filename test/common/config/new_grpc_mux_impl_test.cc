@@ -528,6 +528,24 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
   onDiscoveryResponse(std::move(response));
 }
 
+TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
+  setup();
+
+  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("foo", {"x", "y"}, {});
+  grpc_mux_->start();
+
+  expectSendMessage("foo", {"z"}, {});
+  grpc_mux_->requestOnDemandUpdate("foo", {"z"});
+
+  if (!isUnifiedMuxTest()) {
+    // in legacy implementation, destruction of the EDS subscription will issue an "unsubscribe"
+    // request.
+    expectSendMessage("foo", {}, {"x", "y"});
+  }
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

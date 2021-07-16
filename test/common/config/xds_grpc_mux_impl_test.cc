@@ -223,6 +223,13 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("type_url_foo", {}, "");
 }
 
+// Validate paused() behaviour.
+TEST_F(GrpcMuxImplTest, Paused) {
+  setup();
+  ScopedResume a = grpc_mux_->pause("type_url_foo");
+  EXPECT_TRUE(grpc_mux_->paused("type_url_foo"));
+}
+
 // Validate pause-resume behavior.
 TEST_F(GrpcMuxImplTest, PauseResume) {
   setup();
