@@ -25,6 +25,89 @@ class DummyForkingRunner(runner.ForkingRunner):
         self.args = PropertyMock()
 
 
+class Error1(Exception):
+
+    def __str__(self):
+        return ""
+
+    pass
+
+
+class Error2(Exception):
+    pass
+
+
+def _failing_runner(errors):
+
+    class DummyFailingRunner(object):
+
+        log = PropertyMock()
+        _runner = MagicMock()
+
+        def __init__(self, raises=None):
+            self.raises = raises
+
+        @runner.catches(errors)
+        def run(self, *args, **kwargs):
+            result = self._runner(*args, **kwargs)
+            if self.raises:
+                raise self.raises("AN ERROR OCCURRED")
+            return result
+
+    return DummyFailingRunner
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [Error1, (Error1, Error2)])
+@pytest.mark.parametrize(
+    "raises",
+    [None, Error1, Error2])
+@pytest.mark.parametrize(
+    "args",
+    [(), ("ARG1", "ARG2")])
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, dict(key1="VAL1", key2="VAL2")])
+def test_catches(errors, raises, args, kwargs):
+    run = _failing_runner(errors)(raises)
+    should_fail = (
+        raises
+        and not (
+            raises == errors
+            or (isinstance(errors, tuple)
+                and raises in errors)))
+
+    if should_fail:
+        result = 1
+        with pytest.raises(raises):
+            run.run(*args, **kwargs)
+    else:
+        result = run.run(*args, **kwargs)
+
+    assert (
+        list(run._runner.call_args)
+        == [args, kwargs])
+
+    if not should_fail and raises:
+        assert result == 1
+        error = run.log.error.call_args[0][0]
+        _error = raises("AN ERROR OCCURRED")
+        assert (
+            error
+            == (str(_error) or repr(_error)))
+        assert (
+            list(run.log.error.call_args)
+            == [(error,), {}])
+    else:
+        assert not run.log.error.called
+
+    if raises:
+        assert result == 1
+    else:
+        assert result == run._runner.return_value
+
+
 def test_runner_constructor():
     run = runner.Runner("path1", "path2", "path3")
     assert run._args == ("path1", "path2", "path3")
