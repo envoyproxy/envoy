@@ -357,7 +357,7 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
     is_registered = true;
   } else {
 #if !defined(NDEBUG)
-    EXPECT_DEATH(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
+    EXPECT_DEATH(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"), "");
 #endif // !defined(NDEBUG)
   }
 
