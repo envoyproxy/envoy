@@ -4,6 +4,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
@@ -98,6 +99,15 @@ TEST(OrMatcher, Permission_Set) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
   info.downstream_address_provider_->setLocalAddress(addr);
+
+  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+
+  perm = set.add_rules();
+  envoy::type::v3::Int32Range range;
+  range.set_start(123);
+  range.set_end(456);
+  perm->mutable_destination_port_range()->set_start(123);
+  perm->mutable_destination_port_range()->set_end(456);
 
   checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
@@ -257,6 +267,12 @@ TEST(PortRangeMatcher, PortRangeMatcher) {
   range.set_start(12);
   range.set_end(34);
   checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  NiceMock<StreamInfo::MockStreamInfo> info2;
+  Envoy::Network::Address::InstanceConstSharedPtr addr2 =
+      std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
+  info2.downstream_address_provider_->setLocalAddress(addr2);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
