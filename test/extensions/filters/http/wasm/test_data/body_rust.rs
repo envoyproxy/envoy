@@ -28,7 +28,7 @@ impl TestStream {
 }
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         self.test = self.get_http_request_header("x-test-operation");
         self.body_chunks = 0;
         Action::Continue
@@ -135,7 +135,7 @@ impl HttpContext for TestStream {
         }
     }
 
-    fn on_http_response_headers(&mut self, _: usize) -> Action {
+    fn on_http_response_headers(&mut self, _: usize, _: bool) -> Action {
         self.test = self.get_http_response_header("x-test-operation");
         Action::Continue
     }

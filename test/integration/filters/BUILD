@@ -427,6 +427,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "decode_dynamic_metadata_filter_lib",
+    srcs = [
+        "decode_dynamic_metadata_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "encode_headers_return_stop_all_filter_config_lib",
     srcs = [
         "encode_headers_return_stop_all_filter.cc",

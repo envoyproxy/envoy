@@ -181,9 +181,12 @@ INSTANTIATE_TEST_SUITE_P(
         // Schema. Should be parsed fine, but should not produce any metadata
         TEST_VALUE("SHOW databases;", true, {}, {}), TEST_VALUE("SHOW tables;", true, {}, {}),
         TEST_VALUE("SELECT * FROM;", false, {}, {}),
-        TEST_VALUE("SELECT 1 FROM tabletest1;", true, {{"tabletest1", {"select"}}}, {})
+        TEST_VALUE("SELECT 1 FROM tabletest1;", true, {{"tabletest1", {"select"}}}, {}),
 
-            ));
+        // SQL parser now can not recognize use keywords as identifier.
+        TEST_VALUE("CREATE TABLE test ( text VARCHAR(255) );", false, {}, {}),
+        // Keyword as function.
+        TEST_VALUE("SHOW DATABASE();", false, {}, {})));
 
 } // namespace SQLUtils
 } // namespace Common

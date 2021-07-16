@@ -14,6 +14,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
+struct TsiInfo {
+  std::string name_;
+};
+
 /**
  * A factory function to create TsiHandshaker
  * @param dispatcher the dispatcher for the thread where the socket is running on.
@@ -31,7 +35,8 @@ using HandshakerFactory = std::function<TsiHandshakerPtr(
  * output param that should be populated by the function implementation.
  * @return true if the peer is valid or false if the peer is invalid.
  */
-using HandshakeValidator = std::function<bool(const tsi_peer& peer, std::string& err)>;
+using HandshakeValidator =
+    std::function<bool(const tsi_peer& peer, TsiInfo& tsi_info, std::string& err)>;
 
 /* Forward declaration */
 class TsiTransportSocketCallbacks;
