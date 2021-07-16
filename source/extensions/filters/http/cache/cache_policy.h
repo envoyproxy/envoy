@@ -23,32 +23,58 @@ public:
   virtual const StreamInfo::FilterStateSharedPtr& filterState() PURE;
 };
 
-// CachePolicy is an extension point for deployment specific caching behavior.
+/**
+ * An extension point for deployment specific caching behavior.
+ */
 class CachePolicy {
 public:
   virtual ~CachePolicy() = default;
 
-  // createCacheKey calculates the lookup key for storing the entry in the cache.
+  /**
+   * Calculates the lookup key for storing the entry in the cache.
+   * @param request_headers - headers from the request the CacheFilter is currently processing.
+   */
   virtual Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
 
-  // requestCacheable modifies the cacheability of the response during
-  // decoding. request_cache_control is the result of parsing the request's
-  // Cache-Control header, parsed by the caller.
+  /**
+   * Modifies the cacheability of the response during decoding.
+   * @param request_headers - headers from the request the CacheFilter is currently processing.
+   * @param request_cache_control - the result of parsing the request's Cache-Control header, parsed
+   * by the caller.
+   * @return true if the response may be cached, based on the contents of the request.
+   */
   virtual bool requestCacheable(const Http::RequestHeaderMap& request_headers,
                                 const RequestCacheControl& request_cache_control) PURE;
 
-  // responseCacheable modifies the cacheability of the response during
-  // encoding. response_cache_control is the result of parsing the response's
-  // Cache-Control header, parsed by the caller.
+  /**
+   * Modifies the cacheability of the response during encoding.
+   * @param request_headers - headers from the request the CacheFilter is currently processing.
+   * @param response_headers - headers from the upstream response the CacheFilter is currently
+   * processing.
+   * @param response_cache_control - the result of parsing the response's Cache-Control header,
+   * parsed by the caller.
+   * @param vary_allow_list - list of headers that the cache will respect when creating the Key for
+   * Vary-differentiated responses.
+   * @return true if the response may be cached.
+   */
   virtual bool responseCacheable(const Http::RequestHeaderMap& request_headers,
                                  const Http::ResponseHeaderMap& response_headers,
                                  const ResponseCacheControl& response_cache_control,
                                  const VaryHeader& vary_allow_list) PURE;
 
-  // computeCacheEntryUsability calculates whether the cached entry may be used
-  // directly or must be validated with upstream. request_cache_control and
-  // response_cache_control are the result of parsing the request's and
-  // response's Cache-Control header, respectively, parsed by the caller.
+  /**
+   * Calculates whether the cached entry may be used directly or must be validated with upstream.
+   * @param request_headers - headers from the request the CacheFilter is currently processing.
+   * @param response_headers - headers from the cached response the CacheFilter has retrieved.
+   * @param request_cache_control - the parsed result of the request's Cache-Control header, parsed
+   * by the caller.
+   * @param cached_response_cache_control - the parsed result of the response's Cache-Control
+   * header, parsed by the caller.
+   * @param content_length - the byte length of the cached content.
+   * @param cached_metadata - the metadata that has been stored along side the cached entry.
+   * @param now - the timestamp for this request.
+   * @return details about whether or not the cached entry can be used.
+   */
   virtual CacheEntryUsability
   computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
                              const Http::ResponseHeaderMap& cached_response_headers,
@@ -57,8 +83,12 @@ public:
                              const uint64_t content_length, const ResponseMetadata& cached_metadata,
                              SystemTime now) PURE;
 
-  // setCallbacks allows additional callbacks to be set when the CacheFilter
-  // sets decoder filter callbacks.
+  /**
+   * Perform actions when StreamInfo and FilterState become available, for
+   * example for logging and observability, or to adapt CacheFilter behavior based on
+   * route-specific CacheFilter config.
+   * @param callbacks - Gives access to StreamInfo and FilterState
+   */
   virtual void setCallbacks(CachePolicyCallbacks& callbacks) PURE;
 };
 
