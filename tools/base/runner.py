@@ -39,7 +39,7 @@ def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
             try:
                 return fun(self, *args, **kwargs)
             except errors as e:
-                self.log.error(e)
+                self.log.error(str(e) or repr(e))
                 return 1
 
         return wrapped

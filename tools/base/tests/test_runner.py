@@ -26,6 +26,10 @@ class DummyForkingRunner(runner.ForkingRunner):
 
 
 class Error1(Exception):
+
+    def __str__(self):
+        return ""
+
     pass
 
 
@@ -88,10 +92,10 @@ def test_catches(errors, raises, args, kwargs):
     if not should_fail and raises:
         assert result == 1
         error = run.log.error.call_args[0][0]
-        assert isinstance(error, raises)
+        _error = raises("AN ERROR OCCURRED")
         assert (
-            error.args[0]
-            == 'AN ERROR OCCURRED')
+            error
+            == (str(_error) or repr(_error)))
         assert (
             list(run.log.error.call_args)
             == [(error,), {}])
