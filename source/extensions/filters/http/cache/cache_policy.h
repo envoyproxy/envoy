@@ -13,14 +13,14 @@ namespace Cache {
 
 struct CacheEntryUsability {
   CacheEntryStatus status = CacheEntryStatus::Unusable;
-  Envoy::Seconds age = Envoy::Seconds::max();
+  Seconds age = Seconds::max();
 };
 
 class CachePolicyCallbacks {
 public:
   virtual ~CachePolicyCallbacks() = default;
 
-  virtual const Envoy::StreamInfo::FilterStateSharedPtr& filterState() PURE;
+  virtual const StreamInfo::FilterStateSharedPtr& filterState() PURE;
 };
 
 // CachePolicy is an extension point for deployment specific caching behavior.
@@ -29,19 +29,19 @@ public:
   virtual ~CachePolicy() = default;
 
   // createCacheKey calculates the lookup key for storing the entry in the cache.
-  virtual Key createCacheKey(const Envoy::Http::RequestHeaderMap& request_headers) PURE;
+  virtual Key createCacheKey(const Http::RequestHeaderMap& request_headers) PURE;
 
   // requestCacheable modifies the cacheability of the response during
   // decoding. request_cache_control is the result of parsing the request's
   // Cache-Control header, parsed by the caller.
-  virtual bool requestCacheable(const Envoy::Http::RequestHeaderMap& request_headers,
+  virtual bool requestCacheable(const Http::RequestHeaderMap& request_headers,
                                 const RequestCacheControl& request_cache_control) PURE;
 
   // responseCacheable modifies the cacheability of the response during
   // encoding. response_cache_control is the result of parsing the response's
   // Cache-Control header, parsed by the caller.
-  virtual bool responseCacheable(const Envoy::Http::RequestHeaderMap& request_headers,
-                                 const Envoy::Http::ResponseHeaderMap& response_headers,
+  virtual bool responseCacheable(const Http::RequestHeaderMap& request_headers,
+                                 const Http::ResponseHeaderMap& response_headers,
                                  const ResponseCacheControl& response_cache_control,
                                  const VaryHeader& vary_allow_list) PURE;
 
@@ -50,12 +50,12 @@ public:
   // response_cache_control are the result of parsing the request's and
   // response's Cache-Control header, respectively, parsed by the caller.
   virtual CacheEntryUsability
-  computeCacheEntryUsability(const Envoy::Http::RequestHeaderMap& request_headers,
-                             const Envoy::Http::ResponseHeaderMap& cached_response_headers,
+  computeCacheEntryUsability(const Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap& cached_response_headers,
                              const RequestCacheControl& request_cache_control,
                              const ResponseCacheControl& cached_response_cache_control,
                              const uint64_t content_length, const ResponseMetadata& cached_metadata,
-                             Envoy::SystemTime now) PURE;
+                             SystemTime now) PURE;
 
   // setCallbacks allows additional callbacks to be set when the CacheFilter
   // sets decoder filter callbacks.
