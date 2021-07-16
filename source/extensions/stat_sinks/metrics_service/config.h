@@ -11,7 +11,7 @@ namespace StatSinks {
 namespace MetricsService {
 
 // MetricsService sink
-const std::string MetricsService = "envoy.stat_sinks.metrics_service";
+extern constexpr char MetricsService[] = "envoy.stat_sinks.metrics_service";
 
 /**
  * Config registration for the MetricsService stats sink. @see StatsSinkFactory.

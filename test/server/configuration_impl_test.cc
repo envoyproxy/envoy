@@ -12,7 +12,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/cluster_manager_impl.h"
-#include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/upstream/utility.h"
