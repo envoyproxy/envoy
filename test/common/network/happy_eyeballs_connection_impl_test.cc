@@ -106,7 +106,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
   impl_->connect();
 
   // When the first connection attempt fails, the next attempt will be immediately
-  // started and the timer will be armed for the third attempe.
+  // started and the timer will be armed for the third attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
@@ -579,7 +579,7 @@ TEST_F(HappyEyeballsConnectionImplTest, Connecting) {
 }
 
 // Tests for HappyEyeballsConnectionImpl methods which must only be called after connect()
-// has finised.
+// has finished.
 
 TEST_F(HappyEyeballsConnectionImplTest, AddWriteFilter) {
   connectFirstAttempt();

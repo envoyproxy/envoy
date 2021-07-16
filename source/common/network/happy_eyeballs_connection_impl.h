@@ -118,7 +118,7 @@ private:
 
   void cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper);
 
-  // State which needs to be applie to every connection attempt.
+  // State which needs to be applied to every connection attempt.
   struct PerConnectionState {
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
