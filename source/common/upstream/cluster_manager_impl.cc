@@ -287,7 +287,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                             validation_context.dynamicValidationVisitor(), api) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames(),
-      bootstrap.has_max_receive_grpc_message_size() ? bootstrap.max_receive_grpc_message_size()
+      bootstrap.has_max_receive_grpc_message_size() ? bootstrap.max_receive_grpc_message_size().value()
                                                     : -1);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
