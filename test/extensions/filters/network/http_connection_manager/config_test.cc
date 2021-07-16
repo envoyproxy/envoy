@@ -2416,6 +2416,41 @@ TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   EXPECT_EQ(singletons_two.http_tracer_manager_, singletons_one.http_tracer_manager_);
 }
 
+class HttpConnectionManagerMobileConfigTest : public HttpConnectionManagerConfigTest,
+                                              public Event::TestUsingSimulatedTime {};
+
+TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
+  const std::string yaml_string = R"EOF(
+  config:
+    stat_prefix: ingress_http
+    route_config:
+      name: local_route
+    http_filters:
+    - name: envoy.filters.http.router
+  )EOF";
+
+  envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
+      config;
+  TestUtility::loadFromYamlAndValidate(yaml_string, config, false, true);
+
+  MobileHttpConnectionManagerFilterConfigFactory factory;
+  Network::FilterFactoryCb create_hcm_cb = factory.createFilterFactoryFromProto(config, context_);
+
+  NiceMock<Network::MockFilterManager> fm;
+  NiceMock<Network::MockReadFilterCallbacks> cb;
+  Network::ReadFilterSharedPtr hcm_filter;
+  Http::ConnectionManagerImpl* hcm = nullptr;
+  EXPECT_CALL(fm, addReadFilter(_))
+      .WillOnce(Invoke([&](Network::ReadFilterSharedPtr manager) -> void {
+        hcm_filter = manager;
+        hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
+      }));
+  create_hcm_cb(fm);
+  ASSERT(hcm != nullptr);
+  hcm->initializeReadFilterCallbacks(cb);
+  EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
+}
+
 } // namespace
 } // namespace HttpConnectionManager
 } // namespace NetworkFilters

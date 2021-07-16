@@ -114,6 +114,7 @@ class Checker(runner.Runner):
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         """Add arguments to the arg parser"""
+        super().add_arguments(parser)
         parser.add_argument(
             "--fix", action="store_true", default=False, help="Attempt to fix in place")
         parser.add_argument(
@@ -155,12 +156,6 @@ class Checker(runner.Runner):
             help=
             "Path to the test root (usually Envoy source dir). If not specified the first path of paths is used"
         )
-        parser.add_argument(
-            "--log-level",
-            "-l",
-            choices=["info", "warn", "debug", "error"],
-            default="info",
-            help="Log level to display")
         parser.add_argument(
             "paths",
             nargs="*",

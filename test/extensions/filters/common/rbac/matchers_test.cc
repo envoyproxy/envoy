@@ -146,7 +146,7 @@ TEST(NotMatcher, Principal) {
 TEST(HeaderMatcher, HeaderMatcher) {
   envoy::config::route::v3::HeaderMatcher config;
   config.set_name("foo");
-  config.set_exact_match("bar");
+  config.mutable_string_match()->set_exact("bar");
 
   Envoy::Http::TestRequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");

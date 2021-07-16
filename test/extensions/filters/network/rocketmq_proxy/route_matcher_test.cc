@@ -36,7 +36,8 @@ routes:
         exact: test_topic
       headers:
         - name: code
-          exact_match: '310'
+          string_match:
+            exact: '310'
     route:
       cluster: fake_cluster
       metadata_match:
