@@ -435,6 +435,9 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
@@ -447,7 +450,9 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_rq_call")
                      .value());
-
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
@@ -468,6 +473,9 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::Timeout);
 }
@@ -680,6 +688,9 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -696,6 +707,9 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -987,6 +1001,10 @@ TEST_P(ThriftRouterFieldTypeTest, OneWay) {
 
   initializeRouter();
   startRequest(MessageType::Oneway);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
@@ -1005,9 +1023,17 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
 
   initializeRouter();
   startRequest(MessageType::Call);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   returnResponse();
   destroyRouter();
 
@@ -1063,9 +1089,17 @@ TEST_P(ThriftRouterFieldTypeTest, Call_Error) {
 
   initializeRouter();
   startRequest(MessageType::Call);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   returnResponse(MessageType::Reply, false);
   destroyRouter();
 
@@ -1088,9 +1122,17 @@ TEST_P(ThriftRouterFieldTypeTest, Exception) {
 
   initializeRouter();
   startRequest(MessageType::Call);
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
+
+  EXPECT_CALL(
+      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
+      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   returnResponse(MessageType::Exception);
   destroyRouter();
 

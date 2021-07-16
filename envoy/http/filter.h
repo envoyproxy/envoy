@@ -296,6 +296,11 @@ public:
    * added to.
    */
   virtual void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) PURE;
+
+  /**
+   * Called when filter activity indicates that the stream idle timeout should be reset.
+   */
+  virtual void resetIdleTimer() PURE;
 };
 
 /**

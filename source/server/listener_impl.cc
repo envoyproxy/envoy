@@ -40,32 +40,11 @@ namespace Server {
 
 namespace {
 
-const std::string TlsInspector = "envoy.filters.listener.tls_inspector";
-
 bool anyFilterChain(
     const envoy::config::listener::v3::Listener& config,
     std::function<bool(const envoy::config::listener::v3::FilterChain&)> predicate) {
   return (config.has_default_filter_chain() && predicate(config.default_filter_chain())) ||
          std::any_of(config.filter_chains().begin(), config.filter_chains().end(), predicate);
-}
-
-bool needTlsInspector(const envoy::config::listener::v3::Listener& config) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disable_tls_inspector_injection")) {
-    return false;
-  }
-  return anyFilterChain(config,
-                        [](const auto& filter_chain) {
-                          const auto& matcher = filter_chain.filter_chain_match();
-                          return matcher.transport_protocol() == "tls" ||
-                                 (matcher.transport_protocol().empty() &&
-                                  (!matcher.server_names().empty() ||
-                                   !matcher.application_protocols().empty()));
-                        }) &&
-         !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
-                      [](const auto& filter) {
-                        return filter.name() == "envoy.listener.tls_inspector" ||
-                               filter.name() == TlsInspector;
-                      });
 }
 
 bool usesProxyProto(const envoy::config::listener::v3::Listener& config) {
@@ -296,12 +275,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                               // ready.
                               listener_init_target_.ready();
                             }
-                          })
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+                          }),
+      quic_stat_names_(parent_.quicStatNames()) {
 
   const absl::optional<std::string> runtime_val =
       listener_factory_context_->runtime().snapshot().get(cx_limit_runtime_key_);
@@ -323,7 +298,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
-    buildTlsInspectorListenerFilter();
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -368,12 +342,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                           [this] {
                             ASSERT(workers_started_);
                             parent_.inPlaceFilterChainUpdate(*this);
-                          })
-#ifdef ENVOY_ENABLE_QUIC
-      ,
-      quic_stat_names_(parent_.quicStatNames())
-#endif
-{
+                          }),
+      quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   buildListenSocketOptions(socket_type);
@@ -385,7 +355,6 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   buildSocketOptions();
   buildOriginalDstListenerFilter();
   buildProxyProtocolListenerFilter();
-  buildTlsInspectorListenerFilter();
   open_connections_ = origin.open_connections_;
 }
 
@@ -575,27 +544,6 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
   }
 }
 
-void ListenerImpl::buildTlsInspectorListenerFilter() {
-  // TODO(zuercher) remove the deprecated TLS inspector name when the deprecated names are removed.
-  const bool need_tls_inspector = needTlsInspector(config_);
-  // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
-  if (need_tls_inspector) {
-    const std::string message =
-        fmt::format("adding listener '{}': filter chain match rules require TLS Inspector "
-                    "listener filter, but it isn't configured, trying to inject it "
-                    "(this might fail if Envoy is compiled without it)",
-                    address_->asString());
-    ENVOY_LOG(warn, "{}", message);
-
-    auto& factory =
-        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
-            TlsInspector);
-    listener_filter_factories_.push_back(factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(),
-        /*listener_filter_matcher=*/nullptr, *listener_factory_context_));
-  }
-}
-
 AccessLog::AccessLogManager& PerListenerFactoryContextImpl::accessLogManager() {
   return listener_factory_context_base_->accessLogManager();
 }
@@ -752,11 +700,6 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
 
   // See buildProxyProtocolListenerFilter().
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
-    return false;
-  }
-
-  // See buildTlsInspectorListenerFilter().
-  if (needTlsInspector(config_) ^ needTlsInspector(config)) {
     return false;
   }
   return ListenerMessageUtil::filterChainOnlyChange(config_, config);

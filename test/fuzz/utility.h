@@ -152,7 +152,6 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   if (stream_info.has_response_code()) {
     test_stream_info->response_code_ = stream_info.response_code().value();
   }
-  test_stream_info->setRequestedServerName(stream_info.requested_server_name());
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       replaceInvalidStringValues(stream_info.upstream_metadata()));
@@ -168,6 +167,8 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   test_stream_info->upstream_local_address_ = upstream_local_address;
   test_stream_info->downstream_address_provider_ =
       std::make_shared<Network::SocketAddressSetterImpl>(address, address);
+  test_stream_info->downstream_address_provider_->setRequestedServerName(
+      stream_info.requested_server_name());
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));

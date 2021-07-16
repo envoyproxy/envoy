@@ -14,9 +14,9 @@ TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
 }
 
 Buffer::InstancePtr
-TrackedWatermarkBufferFactory::create(std::function<void()> below_low_watermark,
-                                      std::function<void()> above_high_watermark,
-                                      std::function<void()> above_overflow_watermark) {
+TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_watermark,
+                                            std::function<void()> above_high_watermark,
+                                            std::function<void()> above_overflow_watermark) {
   absl::MutexLock lock(&mutex_);
   uint64_t idx = next_idx_++;
   ++active_buffer_count_;

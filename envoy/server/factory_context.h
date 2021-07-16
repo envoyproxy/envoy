@@ -163,6 +163,11 @@ public:
    * @return StatsConfig& the servers stats configuration.
    */
   virtual StatsConfig& statsConfig() PURE;
+
+  /**
+   * @return envoy::config::bootstrap::v3::Bootstrap& the servers bootstrap configuration.
+   */
+  virtual envoy::config::bootstrap::v3::Bootstrap& bootstrap() PURE;
 };
 
 /**

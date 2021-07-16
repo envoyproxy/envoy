@@ -90,6 +90,8 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
 
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
+
   TimeSource& timeSource() override { return time_system_; }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
@@ -117,6 +119,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Router::ContextImpl router_context_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockStatsConfig>> stats_config_;
@@ -159,6 +162,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
+  envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
@@ -184,6 +188,7 @@ public:
   testing::NiceMock<Api::MockApi> api_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
 };
 
 } // namespace Configuration

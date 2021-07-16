@@ -175,7 +175,8 @@ protected:
   findFilterChain(uint16_t destination_port, const std::string& destination_address,
                   const std::string& server_name, const std::string& transport_protocol,
                   const std::vector<std::string>& application_protocols,
-                  const std::string& source_address, uint16_t source_port) {
+                  const std::string& source_address, uint16_t source_port,
+                  std::string direct_source_address = "") {
     if (absl::StartsWith(destination_address, "/")) {
       local_address_ = std::make_shared<Network::Address::PipeInstance>(destination_address);
     } else {
@@ -196,6 +197,18 @@ protected:
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     socket_->address_provider_->setRemoteAddress(remote_address_);
+
+    if (direct_source_address.empty()) {
+      direct_source_address = source_address;
+    }
+    if (absl::StartsWith(direct_source_address, "/")) {
+      direct_remote_address_ =
+          std::make_shared<Network::Address::PipeInstance>(direct_source_address);
+    } else {
+      direct_remote_address_ =
+          Network::Utility::parseInternetAddress(direct_source_address, source_port);
+    }
+    socket_->address_provider_->setDirectRemoteAddressForTest(direct_remote_address_);
 
     return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
   }
@@ -262,22 +275,17 @@ protected:
                                           .value());
   }
 
-  void checkConfigDump(const std::string& expected_dump_yaml) {
-    auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
+  void checkConfigDump(
+      const std::string& expected_dump_yaml,
+      const Matchers::StringMatcher& name_matcher = Matchers::UniversalStringMatcher()) {
+    auto message_ptr =
+        server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"](name_matcher);
     const auto& listeners_config_dump =
         dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 
     envoy::admin::v3::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
-  }
-
-  ABSL_MUST_USE_RESULT
-  auto enableTlsInspectorInjectionForThisTest() {
-    auto scoped_runtime = std::make_unique<TestScopedRuntime>();
-    Runtime::LoaderSingleton::getExisting()->mergeValues(
-        {{"envoy.reloadable_features.disable_tls_inspector_injection", "false"}});
-    return scoped_runtime;
   }
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
@@ -294,6 +302,7 @@ protected:
   Api::ApiPtr api_;
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
+  Network::Address::InstanceConstSharedPtr direct_remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
   bool enable_dispatcher_stats_{false};

@@ -114,7 +114,7 @@ public:
     p.add_resources("https://example.com");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
-    matcher->set_exact_match("OPTIONS");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
@@ -257,7 +257,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   p.set_forward_bearer_token(true);
   auto* matcher = p.add_pass_through_matcher();
   matcher->set_name(":method");
-  matcher->set_exact_match("OPTIONS");
+  matcher->mutable_string_match()->set_exact("OPTIONS");
 
   auto credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);
