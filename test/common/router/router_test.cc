@@ -3872,13 +3872,12 @@ TEST_F(RouterTest, MaxStreamDurationWithRetryPolicy) {
 TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder&,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
+                              upstream_stream_info_, Http::Protocol::Http10);
+        return nullptr;
+      }));
   expectMaxStreamDurationTimerCreate();
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-stream-timeout-ms", "500"}};
@@ -3894,13 +3893,12 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
 TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder&,
-              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
-            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
-                                  upstream_stream_info_, Http::Protocol::Http10);
-            return nullptr;
-          }));
+      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
+                              upstream_stream_info_, Http::Protocol::Http10);
+        return nullptr;
+      }));
 
   // not to be called timer creation.
   EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
