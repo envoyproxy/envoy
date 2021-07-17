@@ -99,7 +99,11 @@ void TcpListenerImpl::onSocketEvent(short flags) {
 void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
   ASSERT(bind_to_port_);
 
-  socket.ioHandle().listen(backlog_size_);
+  auto result = socket.ioHandle().listen(backlog_size_);
+
+  if (result.rc_ == -1) {
+    throw CreateListenerException(fmt::format("listen failed: {}", errorDetails(result.errno_)));
+  }
 
   // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
   // loss of the trigger due to transient accept errors.
