@@ -535,6 +535,7 @@ envoy_cc_test_library(
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
+        "//test/integration/filters:crash_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
