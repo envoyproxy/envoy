@@ -251,8 +251,7 @@ public:
   }
 
   void checkErrorStat(DNSServiceErrorType error_code) {
-    switch (error_code)
-    {
+    switch (error_code) {
     case kDNSServiceErr_DefunctConnection:
       EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.connection_failure")->value());
       break;
@@ -270,14 +269,14 @@ public:
 
   void synchronousWithError(DNSServiceErrorType error_code) {
     EXPECT_CALL(dns_service_, dnsServiceGetAddrInfo(_, _, _, _, _, _, _))
-      .WillOnce(Return(error_code));
+        .WillOnce(Return(error_code));
 
-    EXPECT_EQ(nullptr,
-              resolver_->resolve("foo.com", Network::DnsLookupFamily::Auto,
-                                [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void {
-                                  // This callback should never be executed.
-                                  FAIL();
-                                }));
+    EXPECT_EQ(nullptr, resolver_->resolve(
+                           "foo.com", Network::DnsLookupFamily::Auto,
+                           [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void {
+                             // This callback should never be executed.
+                             FAIL();
+                           }));
 
     checkErrorStat(error_code);
   }
@@ -306,13 +305,13 @@ public:
     // The returned value is nullptr because the query has already been fulfilled. Verify that the
     // callback ran via notification.
     EXPECT_EQ(nullptr, resolver_->resolve(
-                          hostname, Network::DnsLookupFamily::Auto,
-                          [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                           hostname, Network::DnsLookupFamily::Auto,
+                           [&dns_callback_executed](DnsResolver::ResolutionStatus status,
                                                     std::list<DnsResponse>&& responses) -> void {
-                            EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-                            EXPECT_TRUE(responses.empty());
-                            dns_callback_executed.Notify();
-                          }));
+                             EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                             EXPECT_TRUE(responses.empty());
+                             dns_callback_executed.Notify();
+                           }));
     dns_callback_executed.WaitForNotification();
     checkErrorStat(error_code);
   }
@@ -801,7 +800,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
 
   auto query = resolver_->resolve(
       hostname, Network::DnsLookupFamily::Auto,
-      [](DnsResolver::ResolutionStatus, std::list<DnsResponse>&&) -> void { FAIL(); });
+      [](DnsResolver::ResolutionStatus, std::list<DnsResponse> &&) -> void { FAIL(); });
   ASSERT_NE(nullptr, query);
 
   EXPECT_DEATH(reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError,

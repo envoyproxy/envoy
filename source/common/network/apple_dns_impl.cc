@@ -107,21 +107,20 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
-switch (error_code)
-{
-case kDNSServiceErr_DefunctConnection:
-  stats_.connection_failure_.inc();
-  break;
-case kDNSServiceErr_NoRouter:
-  stats_.network_failure_.inc();
-  break;
-case kDNSServiceErr_Timeout:
-  stats_.timeout_.inc();
-  break;
-default:
-  stats_.get_addr_failure_.inc();
-  break;
-}
+  switch (error_code) {
+  case kDNSServiceErr_DefunctConnection:
+    stats_.connection_failure_.inc();
+    break;
+  case kDNSServiceErr_NoRouter:
+    stats_.network_failure_.inc();
+    break;
+  case kDNSServiceErr_Timeout:
+    stats_.timeout_.inc();
+    break;
+  default:
+    stats_.get_addr_failure_.inc();
+    break;
+  }
 }
 
 AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl& parent,
