@@ -194,12 +194,14 @@ class Checker(runner.Runner):
     def run(self) -> int:
         """Run all configured checks and return the sum of their error counts"""
         checks = self.get_checks()
-        self.on_checks_begin()
-        for check in checks:
-            self.log.info(f"[CHECKS:{self.name}] {check}")
-            getattr(self, f"check_{check}")()
-            self.on_check_run(check)
-        return self.on_checks_complete()
+        try:
+            self.on_checks_begin()
+            for check in checks:
+                self.log.info(f"[CHECKS:{self.name}] {check}")
+                getattr(self, f"check_{check}")()
+                self.on_check_run(check)
+        finally:
+            return self.on_checks_complete()
 
     def succeed(self, name: str, success: list, log: bool = True) -> None:
         """Record (and log) success for a check type"""
@@ -279,11 +281,13 @@ class AsyncChecker(Checker):
     async def _run(self) -> int:
         checks = self.get_checks()
         await self.on_checks_begin()
-        for check in checks:
-            self.log.info(f"[CHECKS:{self.name}] {check}")
-            await getattr(self, f"check_{check}")()
-            await self.on_check_run(check)
-        return await self.on_checks_complete()
+        try:
+            for check in checks:
+                self.log.info(f"[CHECKS:{self.name}] {check}")
+                await getattr(self, f"check_{check}")()
+                await self.on_check_run(check)
+        finally:
+            return await self.on_checks_complete()
 
     def run(self) -> int:
         return asyncio.get_event_loop().run_until_complete(self._run())
