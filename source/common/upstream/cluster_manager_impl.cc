@@ -341,7 +341,7 @@ ClusterManagerImpl::ClusterManagerImpl(
       ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
-              ->create(),
+              ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
@@ -358,7 +358,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
                                                          dyn_resources.ads_config(), stats, false)
-              ->create(),
+              ->createUncachedRawAsyncClient(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               Config::Utility::getAndCheckTransportVersion(dyn_resources.ads_config()) ==
@@ -448,7 +448,7 @@ void ClusterManagerImpl::initializeSecondaryClusters(
         local_info_, *this, stats_,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
                                                        stats_, false)
-            ->create(),
+            ->createUncachedRawAsyncClient(),
         Config::Utility::getAndCheckTransportVersion(load_stats_config), dispatcher_);
   }
 }

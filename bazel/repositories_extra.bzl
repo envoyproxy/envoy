@@ -1,6 +1,7 @@
 load("@rules_python//python:repositories.bzl", "py_repositories")
 load("@rules_python//python:pip.bzl", "pip_install")
 load("@proxy_wasm_cpp_host//bazel/cargo:crates.bzl", "proxy_wasm_cpp_host_fetch_remote_crates")
+load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 
 # Python dependencies.
 def _python_deps():
@@ -49,6 +50,11 @@ def _python_deps():
     pip_install(
         name = "extensions_pip3",
         requirements = "@envoy//tools/extensions:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
+        name = "git_pip3",
+        requirements = "@envoy//tools/git:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
@@ -131,3 +137,4 @@ def _python_deps():
 def envoy_dependencies_extra():
     _python_deps()
     proxy_wasm_cpp_host_fetch_remote_crates()
+    raze_fetch_remote_crates()

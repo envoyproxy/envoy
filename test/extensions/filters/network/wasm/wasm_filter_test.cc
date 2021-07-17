@@ -282,11 +282,6 @@ TEST_P(WasmNetworkFilterTest, RestrictLog) {
 }
 
 TEST_P(WasmNetworkFilterTest, StopAndResumeDownstreamViaAsyncCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK.
-    return;
-  }
-
   setupConfig("", "resume_call");
   setupFilter();
 
@@ -332,10 +327,6 @@ TEST_P(WasmNetworkFilterTest, StopAndResumeDownstreamViaAsyncCall) {
 }
 
 TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(PiotrSikora): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "resume_call");
   setupFilter();
 
@@ -366,8 +357,12 @@ TEST_P(WasmNetworkFilterTest, StopAndResumeUpstreamViaAsyncCall) {
         callbacks->onSuccess(request, std::move(response_message));
         return proxy_wasm::WasmResult::Ok;
       }));
-  EXPECT_CALL(filter(),
-              log_(spdlog::level::info, Eq(absl::string_view("continueUpstream unimplemented"))));
+
+  if (std::get<1>(GetParam()) != "rust") {
+    // Rust SDK panics on Status::Unimplemented and other non-recoverable errors.
+    EXPECT_CALL(filter(),
+                log_(spdlog::level::info, Eq(absl::string_view("continueUpstream unimplemented"))));
+  }
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter().onNewConnection());
   Buffer::OwnedImpl fake_upstream_data("");
@@ -432,10 +427,6 @@ TEST_P(WasmNetworkFilterTest, PanicOnUpstreamData) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseDownstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);
@@ -450,10 +441,6 @@ TEST_P(WasmNetworkFilterTest, CloseDownstream) {
 }
 
 TEST_P(WasmNetworkFilterTest, CloseUpstream) {
-  if (std::get<1>(GetParam()) == "rust") {
-    // TODO(mathetake): not yet supported in the Rust SDK.
-    return;
-  }
   setupConfig("", "close_stream");
   setupFilter();
   EXPECT_EQ(read_filter_callbacks_.connection().state(), Network::Connection::State::Open);

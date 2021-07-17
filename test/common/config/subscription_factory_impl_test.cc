@@ -140,7 +140,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<Grpc::MockAsyncClient>();
         }));
         return async_client_factory;
@@ -305,7 +305,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
       .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, create()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
         }));
         return async_client_factory;

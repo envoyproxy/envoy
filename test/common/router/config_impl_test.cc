@@ -373,7 +373,8 @@ virtual_hosts:
         {}
       headers:
       - name: x-safe
-        exact_match: "safe"
+        string_match:
+          exact: "safe"
     route:
       cluster: connect_header_match
 - name: default
@@ -388,11 +389,13 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/location$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/location$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ulu
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -677,51 +680,63 @@ virtual_hosts:
   virtual_clusters:
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/rides$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/rides$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ride_request
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/rides/\\d+$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/rides/\\d+$"
     - name: ":method"
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_ride
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/chargeaccounts$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/chargeaccounts$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: cc_add
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: create_user_login
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+$"
     - name: ":method"
-      exact_match: PUT
+      string_match:
+        exact: PUT
     name: update_user
   - headers:
     - name: ":path"
-      safe_regex_match:
-        google_re2: {}
-        regex: "^/users/\\d+/location$"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "^/users/\\d+/location$"
     - name: ":method"
-      exact_match: POST
+      string_match:
+        exact: POST
     name: ulu
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1173,9 +1188,10 @@ virtual_hosts:
       name: "invalid"
       headers:
         name: "invalid"
-        safe_regex_match:
-          google_re2: {}
-          regex: "^/(+invalid)"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "^/(+invalid)"
   )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1845,16 +1861,19 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: test_header
-        exact_match: test
+        string_match:
+          exact: test
     route:
       cluster: local_service_with_headers
   - match:
       prefix: "/"
       headers:
       - name: test_header_multiple1
-        exact_match: test1
+        string_match:
+          exact: test1
       - name: test_header_multiple2
-        exact_match: test2
+        string_match:
+          exact: test2
     route:
       cluster: local_service_with_multiple_headers
   - match:
@@ -1868,16 +1887,18 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: test_header_pattern
-        safe_regex_match:
-          google_re2: {}
-          regex: "^user=test-\\d+$"
+        string_match:
+          safe_regex:
+            google_re2: {}
+            regex: "^user=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_set_regex
   - match:
       prefix: "/"
       headers:
       - name: test_header_pattern
-        exact_match: "^customer=test-\\d+$"
+        string_match:
+          exact: "^customer=test-\\d+$"
     route:
       cluster: local_service_with_header_pattern_unset_regex
   - match:
@@ -1976,7 +1997,8 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              exact_match: "(+not a regex)"
+              string_match:
+                exact: "(+not a regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -1989,9 +2011,10 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              safe_regex_match:
-                google_re2: {}
-                regex: "(+invalid regex)"
+              string_match:
+                safe_regex:
+                  google_re2: {}
+                  regex: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -2808,7 +2831,8 @@ virtual_hosts:
       prefix: "/"
       headers:
       - name: content-type
-        exact_match: application/grpc
+        string_match:
+          exact: application/grpc
     route:
       cluster: local_service_grpc
   - match:
@@ -6692,16 +6716,19 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              exact_match: test
+              string_match:
+                exact: test
         route:
           cluster: local_service_with_headers
       - match:
           prefix: "/"
           headers:
             - name: test_header_multiple1
-              exact_match: test1
+              string_match:
+                exact: test1
             - name: test_header_multiple2
-              exact_match: test2
+              string_match:
+                exact: test2
         route:
           cluster: local_service_with_multiple_headers
       - match:
@@ -6714,16 +6741,18 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header_pattern
-              safe_regex_match:
-                google_re2: {}
-                regex: "^user=test-\\d+$"
+              string_match:
+                safe_regex:
+                  google_re2: {}
+                  regex: "^user=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_set_regex
       - match:
           prefix: "/"
           headers:
             - name: test_header_pattern
-              exact_match: "^customer=test-\\d+$"
+              string_match:
+                exact: "^customer=test-\\d+$"
         route:
           cluster: local_service_with_header_pattern_unset_regex
       - match:
@@ -6743,7 +6772,8 @@ virtual_hosts:
                  start: -10
                  end: 1
             - name: test_header_multiple_exact
-              exact_match: test
+              string_match:
+                exact: test
         route:
           cluster: local_service_with_header_range_test2
       - match:
@@ -6768,7 +6798,8 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header_range
-              exact_match: "9223372036854775807"
+              string_match:
+                exact: "9223372036854775807"
         route:
           cluster: local_service_with_header_range_test5
       - match:
@@ -7172,7 +7203,8 @@ virtual_hosts:
           retry_policy:
             retriable_headers:
             - name: ":status"
-              exact_match: "500"
+              string_match:
+                exact: "500"
             - name: X-Upstream-Pushback
   )EOF";
 

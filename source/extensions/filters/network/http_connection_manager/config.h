@@ -50,6 +50,11 @@ public:
   HttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
+  static Network::FilterFactoryCb createFilterFactoryFromProtoAndHopByHop(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
+      Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers);
+
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -58,6 +63,26 @@ private:
 };
 
 DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
+
+/**
+ * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
+ */
+class MobileHttpConnectionManagerFilterConfigFactory
+    : Logger::Loggable<Logger::Id::config>,
+      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::v3::
+                                     EnvoyMobileHttpConnectionManager> {
+public:
+  MobileHttpConnectionManagerFilterConfigFactory()
+      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
+
+private:
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::network::http_connection_manager::v3::
+          EnvoyMobileHttpConnectionManager& proto_config,
+      Server::Configuration::FactoryContext& context) override;
+};
+
+DECLARE_FACTORY(MobileHttpConnectionManagerFilterConfigFactory);
 
 /**
  * Determines if an address is internal based on user provided config.
