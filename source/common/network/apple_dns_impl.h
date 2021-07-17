@@ -45,6 +45,7 @@ using DnsServiceSingleton = ThreadSafeSingleton<DnsService>;
 #define ALL_APPLE_DNS_RESOLVER_STATS(COUNTER)                                                      \
   COUNTER(connection_failure)                                                                      \
   COUNTER(get_addr_failure)                                                                        \
+  COUNTER(network_failure)                                                                         \
   COUNTER(processing_failure)                                                                      \
   COUNTER(socket_failure)                                                                          \
   COUNTER(timeout)

@@ -106,7 +106,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   return nullptr;
 }
 
-void AppleDnsResolverImp::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
+void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
 switch (error_code)
 {
 case kDNSServiceErr_DefunctConnection:
