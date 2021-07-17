@@ -1413,8 +1413,8 @@ public:
   }
 
   void setupContext() {
-    context_ =
-        std::make_unique<TestContext>(wasm_->wasm().get(), root_context_->id(), plugin_handle_);
+    context_ = std::make_unique<TestContext>(wasmHandle()->wasm().get(), root_context_->id(),
+                                             plugin_handle_->handle());
     context_->onCreate();
   }
 

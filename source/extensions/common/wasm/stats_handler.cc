@@ -75,12 +75,17 @@ void LifecycleStatsHandler::onEvent(WasmEvent event) {
     lifecycle_stats_.active_.set(++active_wasms);
     lifecycle_stats_.created_.inc();
     break;
+  case WasmEvent::VmRestart:
+    lifecycle_stats_.restarted_.inc();
   default:
     break;
   }
 }
 
 int64_t LifecycleStatsHandler::getActiveVmCount() { return active_wasms; };
+int64_t LifecycleStatsHandler::getRestartCountForTest() {
+  return lifecycle_stats_.restarted_.value();
+};
 
 } // namespace Wasm
 } // namespace Common

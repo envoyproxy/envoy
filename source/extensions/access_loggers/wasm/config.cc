@@ -34,8 +34,7 @@ AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     auto tls_slot =
         ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal>::makeUnique(context.threadLocal());
     tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
-          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
+      return Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, dispatcher);
     });
     access_log->setTlsSlot(std::move(tls_slot));
   };

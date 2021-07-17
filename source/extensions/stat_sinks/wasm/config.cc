@@ -38,7 +38,8 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
       return;
     }
     wasm_sink->setSingleton(
-        Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
+        Common::Wasm::getPluginHandleThreadLocal(base_wasm, plugin, context.dispatcher())
+            ->handle());
   };
 
   if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),

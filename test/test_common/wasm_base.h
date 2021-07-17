@@ -75,25 +75,26 @@ public:
     vm_configuration_string.set_value(vm_configuration_);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+    vm_config->set_max_restart_count(max_restart_count_);
 
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
         plugin_config, envoy::config::core::v3::TrafficDirection::INBOUND, local_info_,
         &listener_metadata_);
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
-    // Passes ownership of root_context_.
-    Extensions::Common::Wasm::createWasm(
-        plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
-        remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
-    plugin_handle_ = getOrCreateThreadLocalPlugin(
-        wasm_, plugin_, dispatcher_,
-        [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
-          root_context_ = static_cast<Context*>(create_root(wasm, plugin));
-          return root_context_;
-        });
-    wasm_ = plugin_handle_->wasmHandle();
+    auto create_wasm_callback = [this, create_root](WasmHandleSharedPtr wasm) {
+      plugin_handle_ = getPluginHandleThreadLocal(
+          wasm, plugin_, dispatcher_,
+          [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
+            root_context_ = static_cast<Context*>(create_root(wasm, plugin));
+            return root_context_;
+          });
+    };
+    Extensions::Common::Wasm::createWasm(plugin_, scope_, cluster_manager_, init_manager_,
+                                         dispatcher_, *api, lifecycle_notifier_,
+                                         remote_data_provider_, create_wasm_callback, create_root);
   }
 
-  WasmHandleSharedPtr& wasm() { return wasm_; }
+  WasmHandleSharedPtr& wasmHandle() { return plugin_handle_->handle()->wasmHandle(); }
   Context* rootContext() { return root_context_; }
 
   DeferredRunner deferred_runner_;
@@ -103,9 +104,8 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Init::MockManager> init_manager_;
-  WasmHandleSharedPtr wasm_;
   PluginSharedPtr plugin_;
-  PluginHandleSharedPtr plugin_handle_;
+  PluginHandleThreadLocalSharedPtr plugin_handle_;
   NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -126,6 +126,7 @@ public:
     allowed_capabilities_ = allowed_capabilities;
   }
   void setEnvs(envoy::extensions::wasm::v3::EnvironmentVariables envs) { envs_ = envs; }
+  void setMaxRestartCount(uint32_t count) { max_restart_count_ = count; }
 
 private:
   std::string root_id_ = "";
@@ -134,15 +135,17 @@ private:
   std::string plugin_configuration_ = "";
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
   envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
+  uint32_t max_restart_count_ = 0;
 };
 
 template <typename Base = testing::Test> class WasmHttpFilterTestBase : public WasmTestBase<Base> {
 public:
   template <typename TestFilter> void setupFilterBase() {
-    auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
+    auto wasm =
+        WasmTestBase<Base>::wasmHandle() ? WasmTestBase<Base>::wasmHandle()->wasm().get() : nullptr;
     int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ =
-        std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_handle_);
+    context_ = std::make_unique<TestFilter>(wasm, root_context_id,
+                                            WasmTestBase<Base>::plugin_handle_->handle());
     context_->setDecoderFilterCallbacks(decoder_callbacks_);
     context_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -157,10 +160,11 @@ template <typename Base = testing::Test>
 class WasmNetworkFilterTestBase : public WasmTestBase<Base> {
 public:
   template <typename TestFilter> void setupFilterBase() {
-    auto wasm = WasmTestBase<Base>::wasm_ ? WasmTestBase<Base>::wasm_->wasm().get() : nullptr;
+    auto wasm =
+        WasmTestBase<Base>::wasmHandle() ? WasmTestBase<Base>::wasmHandle()->wasm().get() : nullptr;
     int root_context_id = wasm ? wasm->getRootContext(WasmTestBase<Base>::plugin_, false)->id() : 0;
-    context_ =
-        std::make_unique<TestFilter>(wasm, root_context_id, WasmTestBase<Base>::plugin_handle_);
+    context_ = std::make_unique<TestFilter>(wasm, root_context_id,
+                                            WasmTestBase<Base>::plugin_handle_->handle());
     context_->initializeReadFilterCallbacks(read_filter_callbacks_);
     context_->initializeWriteFilterCallbacks(write_filter_callbacks_);
   }
