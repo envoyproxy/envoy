@@ -345,20 +345,29 @@ TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
       EnvoyException, "Header set-cookie cannot be registered as an inline header.");
 }
 
+TEST_P(ServerInstanceImplTest, WithDeathCustomInlineHeaders) {
+#if !defined(NDEBUG)
+  // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
+  // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
+  // registered again, the assertion will be triggered.
+  EXPECT_DEATH(
+      {
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+        initialize("test/server/test_data/server/bootstrap_inline_headers.yaml");
+      },
+      "");
+#endif // !defined(NDEBUG)
+}
+
 // Test whether the custom inline headers can be registered correctly.
 TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
   static bool is_registered = false;
 
-  // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
-  // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
-  // registered again, the assertion will be triggered.
   if (!is_registered) {
+    // Avoid repeated registration of custom inline headers in the current process after the
+    // finalize() of Http::CustomInlineHeaderRegistry has already been called.
     EXPECT_NO_THROW(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"));
     is_registered = true;
-  } else {
-#if !defined(NDEBUG)
-    EXPECT_DEATH(initialize("test/server/test_data/server/bootstrap_inline_headers.yaml"), "");
-#endif // !defined(NDEBUG)
   }
 
   EXPECT_TRUE(
