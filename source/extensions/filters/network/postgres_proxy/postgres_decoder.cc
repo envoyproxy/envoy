@@ -496,7 +496,7 @@ void DecoderImpl::onStartup() {
   // It is skipped. After that message contains attributes.
   std::vector<absl::string_view> splitter =
       absl::StrSplit(absl::string_view(message_).substr(4), absl::ByChar('\0'), absl::SkipEmpty());
-  // With Xcode12, StrSplit with map return type fails range-loop-analysis as absl does not use
+  // With "Xcode12", StrSplit with map return type fails range-loop-analysis as absl does not use
   // reference type in range loop while constructing map.
   // This is a workaround to use reference type to avoid that compilation error.
   bool insert = true;
