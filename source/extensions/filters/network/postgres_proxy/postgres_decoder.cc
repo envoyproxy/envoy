@@ -492,21 +492,23 @@ void DecoderImpl::onQuery() { callbacks_->processQuery(message_); }
 // The message format is continuous string of the following format:
 // user<username>database<database-name>application_name<application>encoding<encoding-type>
 void DecoderImpl::onStartup() {
-// First 4 bytes of startup message contains version code.
+  // First 4 bytes of startup message contains version code.
   // It is skipped. After that message contains attributes.
-  std::vector<absl::string_view> splitter = absl::StrSplit(absl::string_view(message_).substr(4), absl::ByChar('\0'), absl::SkipEmpty());
-  // With Xcode12, StrSplit with map return type fails range-loop-analysis as absl does not use reference type in range loop while copying.
+  std::vector<absl::string_view> splitter =
+      absl::StrSplit(absl::string_view(message_).substr(4), absl::ByChar('\0'), absl::SkipEmpty());
+  // With Xcode12, StrSplit with map return type fails range-loop-analysis as absl does not use
+  // reference type in range loop while constructing map.
   // This is a workaround to use reference type to avoid that compilation error.
   bool insert = true;
   std::string key;
   for (const auto& sp : splitter) {
-        if (insert) {
-          key = std::string(sp);
-        } else {
-          attributes_[key] = std::string(sp);
-        }
-        insert = !insert;
-      }
+    if (insert) {
+      key = std::string(sp);
+    } else {
+      attributes_[key] = std::string(sp);
+    }
+    insert = !insert;
+  }
 
   // If "database" attribute is not found, default it to "user" attribute.
   if ((attributes_.find("database") == attributes_.end()) &&
