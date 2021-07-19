@@ -793,9 +793,8 @@ public:
     case envoy::config::core::v3::ApiVersion::AUTO:
       FALLTHRU;
     case envoy::config::core::v3::ApiVersion::V2:
-      return fmt::format(service_full_name_template, "v2",
-                         service_namespace);  
-    
+      return fmt::format(service_full_name_template, "v2", service_namespace);
+
     case envoy::config::core::v3::ApiVersion::V3:
       return fmt::format(service_full_name_template, "v3", service_namespace);
     default:
@@ -816,10 +815,10 @@ public:
                                             absl::string_view method_name,
                                             envoy::config::core::v3::ApiVersion api_version,
                                             const std::string& service_namespace = EMPTY_STRING) {
-    return absl::StrCat("/",
-                        getVersionedServiceFullName(service_full_name_template, api_version,
-                                                    service_namespace),
-                        "/", method_name);
+    return absl::StrCat(
+        "/",
+        getVersionedServiceFullName(service_full_name_template, api_version, service_namespace),
+        "/", method_name);
   }
 };
 
