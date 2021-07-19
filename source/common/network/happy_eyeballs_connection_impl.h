@@ -18,8 +18,11 @@ namespace Envoy {
 namespace Network {
 
 /**
- * Implementation of Network::Connection, Network::FilterManagerConnection and
- * Envoy::ScopeTrackedObject.
+ * Implementation of ClientConnection which transparently attempts connections to
+ * multiple different IP addresses, and use the first connection that succeeds.
+ * See the Happy Eyeballs RFC at https://datatracker.ietf.org/doc/html/rfc6555
+ * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
+ * either in the class or in the resolution code.
  */
 class HappyEyeballsConnectionImpl : public ClientConnection {
 public:
