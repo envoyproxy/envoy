@@ -808,8 +808,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://quiche.googlesource.com/quiche",
-        version = "664d69ff8ddab53aef1c2d757874e1c192052e0a",
-        sha256 = "69e66a8a21f09d460a40e161054aa3cb71134cb666d2deec42ae8211da42e91e",
+        version = "5dd7a030209f9a6b5043bebd8ac3ee54f18d1d08",
+        sha256 = "306342cb35cb9d8baea079c7b924b0133c53cbf182b251655e589d3b4604dc41",
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
