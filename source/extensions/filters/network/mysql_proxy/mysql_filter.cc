@@ -113,8 +113,8 @@ void MySQLFilter::onCommand(Command& command) {
   auto result = Common::SQLUtils::SQLUtils::setMetadata(command.getData(),
                                                         decoder_->getAttributes(), metadata);
 
-  ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}", read_callbacks_->connection(),
-                 command.getData());
+  ENVOY_CONN_LOG(trace, "mysql_proxy: query processed {}, result {}, cmd type {}",
+                 read_callbacks_->connection(), command.getData(), result, command.getCmd());
 
   if (!result) {
     config_->stats_.queries_parse_error_.inc();

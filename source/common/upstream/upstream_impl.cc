@@ -159,12 +159,6 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
 absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExtensionProtocolOptions(
     const envoy::config::cluster::v3::Cluster& config,
     Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
-  if (!config.typed_extension_protocol_options().empty() &&
-      !config.hidden_envoy_deprecated_extension_protocol_options().empty()) {
-    throw EnvoyException("Only one of typed_extension_protocol_options or "
-                         "extension_protocol_options can be specified");
-  }
-
   absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
 
   for (const auto& it : config.typed_extension_protocol_options()) {
@@ -175,19 +169,6 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
 
     auto object = createProtocolOptionsConfig(
         name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
-    if (object != nullptr) {
-      options[name] = std::move(object);
-    }
-  }
-
-  for (const auto& it : config.hidden_envoy_deprecated_extension_protocol_options()) {
-    // TODO(zuercher): canonicalization may be removed when deprecated filter names are removed
-    // We only handle deprecated network filter names here because no existing HTTP filter has
-    // protocol options.
-    auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
-
-    auto object = createProtocolOptionsConfig(name, ProtobufWkt::Any::default_instance(), it.second,
-                                              factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -733,8 +714,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
-      max_requests_per_connection_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
+          config.max_requests_per_connection().value())),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
@@ -788,6 +770,12 @@ ClusterInfoImpl::ClusterInfoImpl(
               : absl::nullopt),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+  if (config.has_max_requests_per_connection() &&
+      http_protocol_options_->common_http_protocol_options_.has_max_requests_per_connection()) {
+    throw EnvoyException("Only one of max_requests_per_connection from Cluster or "
+                         "HttpProtocolOptions can be specified");
+  }
+
   switch (config.lb_policy()) {
   case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

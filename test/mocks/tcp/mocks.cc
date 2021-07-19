@@ -7,7 +7,6 @@ using testing::ReturnRef;
 using testing::_;
 using testing::Invoke;
 using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Tcp {
@@ -28,7 +27,6 @@ MockInstance::MockInstance() {
     return newConnectionImpl(cb);
   }));
   ON_CALL(*this, host()).WillByDefault(Return(host_));
-  ON_CALL(*this, addIdleCallback(_)).WillByDefault(SaveArg<0>(&idle_cb_));
 }
 MockInstance::~MockInstance() = default;
 

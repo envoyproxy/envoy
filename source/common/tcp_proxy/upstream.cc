@@ -231,19 +231,10 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
                                Upstream::HostDescriptionConstSharedPtr host,
                                const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol>) {
   upstream_handle_ = nullptr;
-  Http::RequestEncoder* latched_encoder = &request_encoder;
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
-
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http_upstream_wait_connect_response")) {
-    upstream_->setConnPoolCallbacks(
-        std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
-  } else {
-    callbacks_->onGenericPoolReady(nullptr, std::move(upstream_), host,
-                                   latched_encoder->getStream().connectionLocalAddress(),
-                                   info.downstreamSslConnection());
-  }
+  upstream_->setConnPoolCallbacks(
+      std::make_unique<HttpConnPool::Callbacks>(*this, host, info.downstreamSslConnection()));
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
