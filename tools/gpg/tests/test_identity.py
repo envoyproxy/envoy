@@ -94,6 +94,34 @@ def test_identity_gnupg_home(patches):
     assert "gnupg_home" not in gpg.__dict__
 
 
+@pytest.mark.parametrize("gpg", [None, "GPG"])
+@pytest.mark.parametrize("gpg2", [None, "GPG2"])
+def test_identity_gpg_bin(patches, gpg, gpg2):
+    gpg = identity.GPGIdentity()
+    patched = patches(
+        "shutil",
+        prefix="tools.gpg.identity")
+
+    def _get_bin(_cmd):
+        if _cmd == "gpg2" and gpg2:
+            return gpg2
+        if _cmd == "gpg" and gpg:
+            return gpg
+
+    with patched as (m_shutil, ):
+        m_shutil.which.side_effect = _get_bin
+        assert gpg.gpg_bin == gpg2 or gpg
+
+    if gpg2:
+        assert (
+            list(list(c) for c in m_shutil.which.call_args_list)
+            == [[('gpg2',), {}]])
+        return
+    assert (
+        list(list(c) for c in m_shutil.which.call_args_list)
+        == [[('gpg2',), {}], [('gpg',), {}]])
+
+
 def test_identity_home(patches):
     gpg = identity.GPGIdentity()
     patched = patches(
