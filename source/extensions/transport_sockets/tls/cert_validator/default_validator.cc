@@ -215,8 +215,15 @@ int DefaultCertValidator::doVerifyCertChain(
     }
   }
 
-  return allow_untrusted_certificate_ ? 1
-                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
+  // sure the verification for other validation context configurations doesn't fail (i.e. either
+  // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure other
+  // configurations are verified and the verification succeed.
+  int validation_status = verify_trusted_ca_
+                              ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                              : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+
+  return allow_untrusted_certificate_ ? 1 : validation_status;
 }
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(

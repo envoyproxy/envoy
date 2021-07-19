@@ -45,7 +45,7 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
     new_routes->mutable_route()->set_cluster(country_name);
     auto headers_matcher = new_routes->mutable_match()->mutable_headers()->Add();
     headers_matcher->set_name(country_header_name.get());
-    headers_matcher->set_exact_match(country_name);
+    headers_matcher->mutable_string_match()->set_exact(country_name);
   }
   // Add the default route.
   auto new_routes = main_virtual_host->mutable_routes()->Add();

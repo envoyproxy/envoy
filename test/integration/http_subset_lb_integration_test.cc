@@ -120,7 +120,7 @@ public:
     // Match the x-type header against the given host_type (a/b).
     auto* match_header = match->add_headers();
     match_header->set_name(type_header_);
-    match_header->set_exact_match(host_type);
+    match_header->mutable_string_match()->set_exact(host_type);
 
     // Route to cluster_0, selecting metadata type=a or type=b.
     auto* action = route->mutable_route();

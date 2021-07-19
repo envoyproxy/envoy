@@ -3,9 +3,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/router/router.h"
+#include "envoy/tcp/conn_pool.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -83,6 +87,69 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+
+/**
+ * This interface is used by an upstream request to communicate its state.
+ */
+class RequestOwner : public ProtocolConverter {
+public:
+  ~RequestOwner() override = default;
+
+  /**
+   * @return ConnectionPool::UpstreamCallbacks& the handler for upstream data.
+   */
+  virtual Tcp::ConnectionPool::UpstreamCallbacks& upstreamCallbacks() PURE;
+
+  /**
+   * @return Buffer::OwnedImpl& the buffer used to serialize the upstream request.
+   */
+  virtual Buffer::OwnedImpl& buffer() PURE;
+
+  /**
+   * @return Event::Dispatcher& the dispatcher used for timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Converts message begin into the right protocol.
+   */
+  void convertMessageBegin(MessageMetadataSharedPtr metadata) {
+    ProtocolConverter::messageBegin(metadata);
+  }
+
+  /**
+   * Used to update the request size every time bytes are pushed out.
+   *
+   * @param size uint64_t the value of the increment.
+   */
+  virtual void addSize(uint64_t size) PURE;
+
+  /**
+   * Used to continue decoding if it was previously stopped.
+   */
+  virtual void continueDecoding() PURE;
+
+  /**
+   * Used to reset the downstream connection after an error.
+   */
+  virtual void resetDownstreamConnection() PURE;
+
+  /**
+   * Sends a locally generated response using the provided response object.
+   *
+   * @param response DirectResponse the response to send to the downstream client
+   * @param end_stream if true, the downstream connection should be closed after this response
+   */
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
+
+  /**
+   * Records the duration of the request.
+   *
+   * @param value uint64_t the value of the duration.
+   * @param unit Unit the unit of the duration.
+   */
+  virtual void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) PURE;
+};
 
 } // namespace Router
 } // namespace ThriftProxy
