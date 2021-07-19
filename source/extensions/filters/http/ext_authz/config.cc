@@ -58,6 +58,9 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
   } else {
     // Envoy gRPC client.
 
+    Grpc::RawAsyncClientSharedPtr raw_client =
+        context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+            proto_config.grpc_service(), context.scope(), true, Grpc::CacheOption::AlwaysCache);
     const uint32_t timeout_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, DefaultTimeout);
     callback = [raw_client, filter_config, timeout_ms,
