@@ -14,6 +14,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/status.h"
@@ -152,14 +153,14 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
   if (!options_clone.has_max_concurrent_streams()) {
     options_clone.mutable_max_concurrent_streams()->set_value(
-        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+        DefaultsProfile::get().http2.max_concurrent_streams);
   }
   ASSERT(
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&
       options_clone.max_concurrent_streams().value() <= OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
   if (!options_clone.has_initial_stream_window_size()) {
     options_clone.mutable_initial_stream_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
+        DefaultsProfile::get().http2.initial_stream_window_size);
   }
   ASSERT(options_clone.initial_stream_window_size().value() >=
              OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE &&
@@ -167,7 +168,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
              OptionsLimits::MAX_INITIAL_STREAM_WINDOW_SIZE);
   if (!options_clone.has_initial_connection_window_size()) {
     options_clone.mutable_initial_connection_window_size()->set_value(
-        OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+        DefaultsProfile::get().http2.initial_connection_window_size);
   }
   ASSERT(options_clone.initial_connection_window_size().value() >=
              OptionsLimits::MIN_INITIAL_CONNECTION_WINDOW_SIZE &&

@@ -18,6 +18,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/filter/http/filter_config_discovery_impl.h"
@@ -246,7 +247,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
-      use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, use_remote_address,
+          DefaultsProfileSingleton::get().httpConnectionManager.use_remote_address)),
       internal_address_config_(createInternalAddressConfig(config)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
@@ -274,11 +277,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
-      stream_idle_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
+      stream_idle_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, stream_idle_timeout,
+          DefaultsProfileSingleton::get().httpConnectionManager.stream_idle_timeout)),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
-      request_headers_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
+      request_headers_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, request_headers_timeout,
+          DefaultsProfileSingleton::get().httpConnectionManager.request_headers_timeout)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       preserve_external_request_id_(config.preserve_external_request_id()),
@@ -290,19 +295,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       stream_error_on_invalid_http_messaging_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stream_error_on_invalid_http_message, false)),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
-#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
-          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      100))),
-#else
-      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, normalize_path,
-          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      0))),
-#endif
+          DefaultsProfileSingleton::get().httpConnectionManager.normalize_path)),
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),

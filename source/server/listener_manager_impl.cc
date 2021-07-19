@@ -14,6 +14,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/version_converter.h"
@@ -987,8 +988,9 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
                                                                  *filter_chain_factory_context),
-      std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
+          filter_chain, transport_socket_connect_timeout,
+          DefaultsProfileSingleton::get().transport.transport_socket_connect_timeout)),
       filter_chain.name());
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));

@@ -396,6 +396,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:envoy_defaults_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",

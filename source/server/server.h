@@ -26,6 +26,7 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
+#include "source/common/common/envoy_defaults.h"
 #include "source/common/common/logger_delegates.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/grpc/context_impl.h"
@@ -324,6 +325,7 @@ private:
   // - There may be active clusters referencing it in config_.cluster_manager_.
   // - There may be active connections referencing it.
   std::unique_ptr<Secret::SecretManager> secret_manager_;
+  std::unique_ptr<ScopedDefaultsProfileSingleton> defaults_profile_;
   bool workers_started_;
   std::atomic<bool> live_;
   bool shutdown_;
