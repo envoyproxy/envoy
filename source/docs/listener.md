@@ -16,7 +16,7 @@ Envoy uses the following procedure for creating sockets and assigning them to wo
    drain process (in the race condition between assigning a queue and closing the listening
    socket on the old listener).
 3. In the case of hot restart, all sockets are requested by worker index. If the old process has
-   a match the socket is duplicated and sent to the new process. Thus, hot restart and a listener
+   a match, the socket is duplicated and sent to the new process. Thus, hot restart and a listener
    update effectively share the same update process. This is so that no connections are dropped
    when using reuse port.
 4. A consequence of every listener having dedicated sockets (whether duplicated or not) is that
