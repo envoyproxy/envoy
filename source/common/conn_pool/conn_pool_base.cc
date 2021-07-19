@@ -159,6 +159,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", client, client.numActiveStreams());
   ASSERT(num_active_streams_ > 0);
   // Reflect there's one less stream in flight.
+  bool had_negative_capacity = client.hadNegativeDeltaOnStreamClosed();
   state_.decrActiveStreams(1);
   num_active_streams_--;
   host_->stats().rq_active_.dec();
@@ -167,16 +168,14 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // If the effective client capacity was limited by concurrency, increase connecting capacity.
   // If the effective client capacity was limited by max total streams, this will not result in an
   // increment as no capacity is freed up.
-  if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1) {
+  if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1 ||
+      had_negative_capacity) {
     state_.incrConnectingStreamCapacity(1);
   }
   if (client.state_ == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
   } else if (client.state_ == ActiveClient::State::BUSY) {
-    // A stream was just ended, so we should be below the limit now.
-    ASSERT(client.numActiveStreams() < client.concurrent_stream_limit_);
-
     transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_stream) {
       onUpstreamReady();

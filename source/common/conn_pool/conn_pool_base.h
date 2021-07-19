@@ -51,8 +51,12 @@ public:
 
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
-  uint32_t currentUnusedCapacity() const {
-    return std::min(remaining_streams_, concurrent_stream_limit_ - numActiveStreams());
+
+  int64_t currentUnusedCapacity() const {
+    int64_t remaining_concurrent_streams =
+        static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+
+    return std::min<int64_t>(remaining_streams_, remaining_concurrent_streams);
   }
 
   // Closes the underlying connection.
@@ -63,6 +67,12 @@ public:
   virtual bool closingWithIncompleteStream() const PURE;
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
+
+  // This function is called onStreamClosed to see if there was a negative delta
+  // and (if necessary) update associated bookkeeping.
+  // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
+  // false. The HTTP/2 connection pool can have this state, so overrides this function.
+  virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
     CONNECTING, // Connection is not yet established.
@@ -75,7 +85,7 @@ public:
 
   ConnPoolImplBase& parent_;
   uint32_t remaining_streams_;
-  const uint32_t concurrent_stream_limit_;
+  uint32_t concurrent_stream_limit_;
   State state_{State::CONNECTING};
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
@@ -183,6 +193,8 @@ public:
     return transport_socket_options_;
   }
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
+
+  void decrClusterStreamCapacity(uint32_t delta) { state_.decrConnectingStreamCapacity(delta); }
 
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
