@@ -60,7 +60,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
-    "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
@@ -117,6 +116,10 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if
+    // CacheOption is CacheWhenRuntimeEnabled.
+    // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
+    "envoy.reloadable_features.enable_grpc_async_client_cache",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

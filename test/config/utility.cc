@@ -668,7 +668,7 @@ void ConfigHelper::setConnectConfig(
 
     auto* header = match->add_headers();
     header->set_name(":method");
-    header->set_exact_match("POST");
+    header->mutable_string_match()->set_exact("POST");
   } else {
     match->mutable_connect_matcher();
   }
@@ -1015,6 +1015,17 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
         ProtobufUtil::TimeUtil::MillisecondsToDuration(timeout.count()));
   }
   connect_timeout_set_ = true;
+}
+
+void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
+  addConfigModifier(
+      [max_requests_per_connection](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_common_http_protocol_options()
+            ->mutable_max_requests_per_connection()
+            ->set_value(max_requests_per_connection);
+      });
 }
 
 envoy::config::route::v3::VirtualHost
