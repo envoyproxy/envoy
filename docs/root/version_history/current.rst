@@ -25,6 +25,7 @@ Removed Config or Runtime
 
 * http: removed ``envoy.reloadable_features.http_upstream_wait_connect_response`` runtime guard and legacy code paths.
 * http: removed ``envoy.reloadable_features.allow_preconnect`` runtime guard and legacy code paths.
+* listener: removed ``envoy.reloadable_features.disable_tls_inspector_injection`` runtime guard and legacy code paths.
 
 New Features
 ------------

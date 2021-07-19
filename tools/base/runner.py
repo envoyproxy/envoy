@@ -7,10 +7,44 @@ import logging
 import os
 import subprocess
 import sys
-from functools import cached_property
+from functools import cached_property, wraps
+from typing import Callable, Tuple, Optional, Union
 
 LOG_LEVELS = (("debug", logging.DEBUG), ("info", logging.INFO), ("warn", logging.WARN),
               ("error", logging.ERROR))
+
+
+def catches(errors: Union[Tuple[Exception], Exception]) -> Callable:
+    """Method decorator to catch specified errors
+
+    logs and returns 1 for sys.exit if error/s are caught
+
+    can be used as so:
+
+    ```python
+
+    class MyRunner(runner.Runner):
+
+        @runner.catches((MyError, MyOtherError))
+        def run(self):
+            self.myrun()
+    ```
+
+    """
+
+    def wrapper(fun: Callable) -> Callable:
+
+        @wraps(fun)
+        def wrapped(self, *args, **kwargs) -> Optional[int]:
+            try:
+                return fun(self, *args, **kwargs)
+            except errors as e:
+                self.log.error(str(e) or repr(e))
+                return 1
+
+        return wrapped
+
+    return wrapper
 
 
 class BazelRunError(Exception):
