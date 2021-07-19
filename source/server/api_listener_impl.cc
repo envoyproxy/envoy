@@ -33,14 +33,14 @@ HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& co
                                  ListenerManagerImpl& parent, const std::string& name)
     : ApiListenerImplBase(config, parent, name) {
   TRY_ASSERT_MAIN_THREAD
-    auto typed_config = MessageUtil::anyConvertAndValidate<
-        envoy::extensions::filters::network::http_connection_manager::v3::
-            EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),
-                                              factory_context_.messageValidationVisitor());
+  auto typed_config = MessageUtil::anyConvertAndValidate<
+      envoy::extensions::filters::network::http_connection_manager::v3::
+          EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),
+                                            factory_context_.messageValidationVisitor());
 
-    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
-        HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-            typed_config.config(), factory_context_, read_callbacks_, false);
+  http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
+      HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+          typed_config.config(), factory_context_, read_callbacks_, false);
   END_TRY
   catch (const EnvoyException& e) {
     auto typed_config = MessageUtil::anyConvertAndValidate<
