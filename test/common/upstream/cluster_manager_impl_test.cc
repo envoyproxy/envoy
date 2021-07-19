@@ -805,13 +805,13 @@ public:
   ThreadAwareLoadBalancerPtr
   create(const PrioritySet&, ClusterStats&, Stats::Scope&, Runtime::Loader&,
          Random::RandomGenerator&,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy::Policy&) {
+         const ::envoy::config::cluster::v3::LoadBalancingPolicy::Policy&) override {
     return std::make_unique<ThreadAwareLbImpl>();
   }
 
 private:
   struct LbImpl : public LoadBalancer {
-    LbImpl() {}
+    LbImpl() = default;
 
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -822,13 +822,13 @@ private:
   };
 
   struct LbFactory : public LoadBalancerFactory {
-    LbFactory() {}
+    LbFactory() = default;
 
     Upstream::LoadBalancerPtr create() override { return std::make_unique<LbImpl>(); }
   };
 
   struct ThreadAwareLbImpl : public Upstream::ThreadAwareLoadBalancer {
-    ThreadAwareLbImpl() {}
+    ThreadAwareLbImpl() = default;
 
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LbFactory>();
