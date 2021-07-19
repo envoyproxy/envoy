@@ -19,6 +19,7 @@
 #include "source/common/http/http3/quic_client_connection_factory.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
