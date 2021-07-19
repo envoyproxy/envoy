@@ -9,9 +9,10 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* grpc stream: reduced log level for "Unable to establish new stream" to debug. The log level for
-  "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
-  retriable (``DeadlineExceeded`` or ``Unavailable``) for less than 30 seconds.
+* config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
+  for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
+  retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
+  seconds.
 * grpc: gRPC async client can be cached and shared accross filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
   which defines the minimal number of headers in a request/response/trailers required for using a

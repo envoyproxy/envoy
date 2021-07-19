@@ -65,7 +65,7 @@ public:
     }
     stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
-      ENVOY_LOG(debug, "Unable to establish new stream");
+      ENVOY_LOG(debug, "Unable to establish new stream to configuration server");
       callbacks_->onEstablishmentFailure();
       setRetryTimer();
       return;
@@ -136,14 +136,13 @@ public:
     return false;
   }
 
-  absl::optional<Grpc::Status::GrpcStatus> getCloseStatus() { return close_status_; }
+  absl::optional<Grpc::Status::GrpcStatus> getCloseStatus() { return last_close_status_; }
 
 private:
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
   }
 
-  // https://github.com/envoyproxy/envoy/issues/14591
   // Log level should be reduced when the remote close failure is `Ok` or is retriable and has only
   // been occurring for a short amount of time.
   void logClose(Grpc::Status::GrpcStatus status, const std::string& message) {
@@ -153,7 +152,7 @@ private:
       return;
     }
 
-    if (!onlyWarnOnRepeatedFailure(status)) {
+    if (!isNonRetriableFailure(status)) {
       // When the failure is considered non-retriable, warn.
       ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
                 message);
@@ -168,15 +167,15 @@ private:
       return;
     }
 
-    uint64_t ms_since_first_close = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                        time_source_.monotonicTime() - close_time_)
-                                        .count();
-    Grpc::Status::GrpcStatus close_status = close_status_.value();
+    const uint64_t ms_since_first_close = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              time_source_.monotonicTime() - last_close_time_)
+                                              .count();
+    const Grpc::Status::GrpcStatus close_status = last_close_status_.value();
 
     if (status != close_status) {
       // This is a different failure. Warn on both statuses and remember the new one.
       ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {} (previously {}, {} since {}ms ago)",
-                service_method_.name(), status, message, close_status, close_message_,
+                service_method_.name(), status, message, close_status, last_close_message_,
                 ms_since_first_close);
       setCloseStatus(status, message);
       return;
@@ -185,7 +184,7 @@ private:
     if (ms_since_first_close > RetryMaxDelayMs) {
       // Warn if we are over the time limit.
       ENVOY_LOG(warn, "{} gRPC config stream closed since {}ms ago: {}, {}", service_method_.name(),
-                ms_since_first_close, close_status, close_message_);
+                ms_since_first_close, close_status, last_close_message_);
       return;
     }
 
@@ -194,18 +193,26 @@ private:
               message);
   }
 
-  bool onlyWarnOnRepeatedFailure(Grpc::Status::GrpcStatus status) {
+  bool isNonRetriableFailure(Grpc::Status::GrpcStatus status) {
+    // Status codes from https://grpc.github.io/grpc/core/md_doc_statuscodes.html that potentially
+    // indicate a high likelihood of success after retrying with backoff.
+    //
+    // - DeadlineExceeded may be from a latency spike
+    // - ResourceExhausted may be from a rate limit with a short window or a transient period of too
+    //   many connections
+    // - Unavailable is meant to be used for a transient downtime
     return Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded == status ||
+           Grpc::Status::WellKnownGrpcStatus::ResourceExhausted == status ||
            Grpc::Status::WellKnownGrpcStatus::Unavailable == status;
   }
 
-  void clearCloseStatus() { close_status_ = absl::nullopt; }
-  bool isCloseStatusSet() { return close_status_.has_value(); }
+  void clearCloseStatus() { last_close_status_ = absl::nullopt; }
+  bool isCloseStatusSet() { return last_close_status_.has_value(); }
 
   void setCloseStatus(Grpc::Status::GrpcStatus status, const std::string& message) {
-    close_status_ = status;
-    close_time_ = time_source_.monotonicTime();
-    close_message_ = message;
+    last_close_status_ = status;
+    last_close_time_ = time_source_.monotonicTime();
+    last_close_message_ = message;
   }
 
   GrpcStreamCallbacks<ResponseProto>* const callbacks_;
@@ -228,9 +235,9 @@ private:
 
   // Records the initial message and timestamp of the most recent remote closes with the same
   // status.
-  absl::optional<Grpc::Status::GrpcStatus> close_status_ = absl::nullopt;
-  std::string close_message_;
-  MonotonicTime close_time_;
+  absl::optional<Grpc::Status::GrpcStatus> last_close_status_;
+  std::string last_close_message_;
+  MonotonicTime last_close_time_;
 };
 
 } // namespace Config
