@@ -746,7 +746,11 @@ message Cluster {
   // is respected by both the HTTP/1.1 and HTTP/2 connection pool
   // implementations. If not specified, there is no limit. Setting this
   // parameter to 1 will effectively disable keep alive.
-  google.protobuf.UInt32Value max_requests_per_connection = 9;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of the :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` field.
+  google.protobuf.UInt32Value max_requests_per_connection = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;

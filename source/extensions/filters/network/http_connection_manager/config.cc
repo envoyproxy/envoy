@@ -330,7 +330,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
-      strip_trailing_host_dot_(config.strip_trailing_host_dot()) {
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
