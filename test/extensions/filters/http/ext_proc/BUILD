@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_package",
+    "envoy_extension_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -10,7 +10,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_extension_package()
 
 envoy_extension_cc_test(
     name = "config_test",
