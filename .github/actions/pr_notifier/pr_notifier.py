@@ -153,7 +153,7 @@ def track_prs():
             pr_info.assignees, maintainers_and_prs, message, MAINTAINERS)
 
         # If there was no maintainer, track it as unassigned.
-        if not has_maintainer_assignee:
+        if not has_maintainer_assignee and pr_info.user.login != 'dependabot[bot]':
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications},
@@ -198,6 +198,8 @@ def post_to_oncall(client, unassigned_prs, out_slo_prs):
 
 if __name__ == '__main__':
     maintainers_and_messages, shephards_and_messages, stalled_prs = track_prs()
+
+    print(maintainers_and_messages['unassigned'])
 
     SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN')
     if not SLACK_BOT_TOKEN:
