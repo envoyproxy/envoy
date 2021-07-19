@@ -62,6 +62,11 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/tools/gpg"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/protodoc"
   schedule:
     interval: "daily"
