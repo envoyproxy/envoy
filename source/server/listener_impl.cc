@@ -77,7 +77,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     ASSERT(local_address_->type() == Network::Address::Type::Pipe);
     // Listeners with Unix domain socket always use shared socket.
     // TODO(mattklein123): This should be blocked at the config parsing layer instead of getting
-    // here and disabling reuse port.
+    // here and disabling reuse_port.
     if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
       bind_type_ = ListenerComponentFactory::BindType::NoReusePort;
     }
@@ -110,7 +110,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
       bind_type_(factory_to_clone.bind_type_) {
   for (auto& socket : factory_to_clone.sockets_) {
     // In the cloning case we always duplicate() the socket. This makes sure that during listener
-    // update/drain we don't lose any incoming connections when using reuse port. Specifically on
+    // update/drain we don't lose any incoming connections when using reuse_port. Specifically on
     // Linux the use of SO_REUSEPORT causes the kernel to allocate a separate queue for each socket
     // on the same address. Incoming connections are immediately assigned to one of these queues.
     // If connections are in the queue when the socket is closed, they are closed/reset, not sent to
@@ -800,10 +800,10 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
 #ifndef __linux__
   const auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
   if (initial_reuse_port_value && socket_type == Network::Socket::Type::Stream) {
-    // Reuse port is the default on Linux for TCP. On other platforms even if set it is disabled
+    // reuse_port is the default on Linux for TCP. On other platforms even if set it is disabled
     // and the user is warned. For UDP it's always the default even if not effective.
     ENVOY_LOG(warn,
-              "reuse port was configured for TCP listener '{}' and is being force disabled because "
+              "reuse_port was configured for TCP listener '{}' and is being force disabled because "
               "Envoy is not running on Linux. See the documentation for more information.",
               config.name());
     initial_reuse_port_value = false;

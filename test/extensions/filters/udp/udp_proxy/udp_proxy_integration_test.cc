@@ -116,7 +116,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// Make sure that we gracefully fail if the user does not configure reuse_port and concurrency is
 // > 1.
 TEST_P(UdpProxyIntegrationTest, NoReusePort) {
   concurrency_ = 2;

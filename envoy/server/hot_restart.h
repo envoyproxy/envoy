@@ -45,7 +45,7 @@ public:
    * Retrieve a listening socket on the specified address from the parent process. The socket will
    * be duplicated across process boundaries.
    * @param address supplies the address of the socket to duplicate, e.g. tcp://127.0.0.1:5000.
-   * @param worker_index supplies the socket/worker index to fetch. When using reuse port sockets
+   * @param worker_index supplies the socket/worker index to fetch. When using reuse_port sockets
    *        each socket is fetched individually to ensure no connection loss.
    * @return int the fd or -1 if there is no bound listen port in the parent.
    */

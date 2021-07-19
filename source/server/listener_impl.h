@@ -79,8 +79,8 @@ private:
   // One socket for each worker, pre-created before the workers fetch the sockets. There are
   // 3 different cases:
   // 1) All are null when doing config validation.
-  // 2) A single socket has been duplicated for each worker (no reuse port).
-  // 3) A unique socket for each worker (reuse port).
+  // 2) A single socket has been duplicated for each worker (no reuse_port).
+  // 3) A unique socket for each worker (reuse_port).
   //
   // TODO(mattklein123): If a listener does not bind, it still has a socket. This is confusing
   // and not needed and can be cleaned up.

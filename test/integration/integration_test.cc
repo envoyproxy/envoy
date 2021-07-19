@@ -57,9 +57,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -78,9 +78,9 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
-// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.

@@ -262,7 +262,7 @@ public:
   setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) PURE;
 
   /**
-   * Return the default for whether reuse port is enabled or not. This was added as part of
+   * Return the default for whether reuse_port is enabled or not. This was added as part of
    * fixing https://github.com/envoyproxy/envoy/issues/15794. It is required to know what the
    * default was of parent processes during hot restart was, because otherwise switching the
    * default on the fly will break existing deployments.

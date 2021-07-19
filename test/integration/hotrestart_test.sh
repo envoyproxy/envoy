@@ -62,7 +62,7 @@ sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" "${TEST_SRCDIR}/envoy"/test/config/in
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
 
-# Test reuse port listener.
+# Test reuse_port listener.
 HOT_RESTART_JSON_REUSE_PORT="${TEST_TMPDIR}"/hot_restart_v4.yaml
 echo "building ${HOT_RESTART_JSON_V4} ..."
 sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml | \

@@ -54,7 +54,7 @@ public:
     NoBind,
     // The listener will bind a socket shared by all workers.
     NoReusePort,
-    // The listener will use reuse port sockets independently on each worker.
+    // The listener will use reuse_port sockets independently on each worker.
     ReusePort
   };
 

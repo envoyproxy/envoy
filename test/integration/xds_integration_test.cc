@@ -578,7 +578,7 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   ConfigHelper new_config_helper(

@@ -4301,7 +4301,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress::UDP);
-  // For UDP, verify that we fail if reuse port is false and concurrency is > 1.
+  // For UDP, verify that we fail if reuse_port is false and concurrency is > 1.
   listener.mutable_enable_reuse_port()->set_value(false);
   server_.options_.concurrency_ = 2;
 
