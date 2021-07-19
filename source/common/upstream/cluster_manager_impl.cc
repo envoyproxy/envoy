@@ -831,6 +831,15 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::ClusterProvided) {
     cluster_entry_it->second->thread_aware_lb_ = std::move(new_cluster_pair.second);
+  } else if (cluster_reference.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig) {
+    const auto& policy = cluster_reference.info()->loadBalancingPolicy();
+    TypedLoadBalancerFactory* typed_lb_factory =
+        Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(policy.name());
+    RELEASE_ASSERT(typed_lb_factory != nullptr, "should have factory for selected LB policy");
+
+    cluster_entry_it->second->thread_aware_lb_ =
+        typed_lb_factory->create(cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+                                 cluster_reference.info()->statsScope(), runtime_, random_, policy);
   }
 
   updateClusterCounts();
@@ -1377,6 +1386,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
       break;
     }
     case LoadBalancerType::ClusterProvided:
+    case LoadBalancerType::LoadBalancingPolicyConfig:
     case LoadBalancerType::RingHash:
     case LoadBalancerType::Maglev:
     case LoadBalancerType::OriginalDst: {

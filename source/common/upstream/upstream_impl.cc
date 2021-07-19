@@ -808,6 +808,43 @@ ClusterInfoImpl::ClusterInfoImpl(
 
     lb_type_ = LoadBalancerType::ClusterProvided;
     break;
+  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+    if (config.has_lb_subset_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    if (config.has_common_lb_config()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    if (!config.has_load_balancing_policy()) {
+      throw EnvoyException(
+          fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
+                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    }
+
+    const auto& lb_policy =
+        std::find_if(config.load_balancing_policy().policies().begin(),
+                     config.load_balancing_policy().policies().end(),
+                     [](envoy::config::cluster::v3::LoadBalancingPolicy_Policy policy) {
+                       return Registry::FactoryRegistry<TypedLoadBalancerFactory>::getFactory(
+                                  policy.name()) != nullptr;
+                     });
+
+    if (lb_policy == config.load_balancing_policy().policies().end()) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered load balancer factory implementation for cluster: '{}'",
+          name_));
+    }
+
+    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
+    load_balancing_policy_ = *lb_policy;
+    break;
+  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
