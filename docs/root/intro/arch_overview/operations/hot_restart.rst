@@ -44,7 +44,7 @@ Socket handling
 By default, Envoy uses :ref:`reuse_port
 <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` sockets on Linux for better
 performance. This feature workers correctly during hot restart because Envoy passes each socket
-to the new process by worker index. Thus, no connections are dropped in the accept queue of
+to the new process by worker index. Thus, no connections are dropped in the accept queues of
 the draining process.
 
 .. attention::
