@@ -88,8 +88,8 @@ public:
   const Http::LowerCaseString& shouldEncodeSXGHeader() { return should_encode_sxg_header_; }
   const std::vector<std::string>& headerPrefixFilters() { return header_prefix_filters_; }
 
-  const std::string certificate() const { return secret_reader_->certificate(); }
-  const std::string privateKey() const { return secret_reader_->privateKey(); }
+  const std::string& certificate() const { return secret_reader_->certificate(); }
+  const std::string& privateKey() const { return secret_reader_->privateKey(); }
 
 private:
   static SignedExchangeStats generateStats(const std::string& prefix, Stats::Scope& scope) {

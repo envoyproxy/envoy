@@ -15,8 +15,8 @@ This filter generates a Signed HTTP Exchange (SXG) package from a downstream web
 
 Transaction flow:
 
-* check accept request header for whether client can accept SXG and set a flag. `x-envoy-client-can-accept-sxg` (or the header defined in `client_can_accept_sxg_header`) will be set on the request
-* If `x-envoy-should-encode-sxg` (or the header defined in `should_encode_sxg_header`) is present in the response headers set a flag
+* check accept request header for whether client can accept SXG and set a flag. ``x-envoy-client-can-accept-sxg`` (or the header defined in ``client_can_accept_sxg_header``) will be set on the request
+* If ``x-envoy-should-encode-sxg`` (or the header defined in ``should_encode_sxg_header``) is present in the response headers set a flag
 * If both flags are set, buffer response body until stream end and then replace response body with generated the SXG
 
 If there is an error generating the SXG package we fall back to the original HTML.
@@ -62,7 +62,7 @@ Instructions for generating a self-signed certificate and private key for testin
 Statistics
 ----------
 
-The SXG filter outputs statistics in the *<stat_prefix>.* namespace.
+The SXG filter outputs statistics in the *<stat_prefix>.sxg.* namespace.
 
 .. csv-table::
   :header: Name, Type, Description
