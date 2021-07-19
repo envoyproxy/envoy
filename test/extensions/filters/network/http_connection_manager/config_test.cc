@@ -886,6 +886,42 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
+// Checking that default max_requests_per_connection is 0.
+TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(0, config.maxRequestsPerConnection());
+}
+
+// Check that max_requests_per_connection is configured.
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestPerConnectionConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_requests_per_connection: 5
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(5, config.maxRequestsPerConnection());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ServerOverwrite) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -2414,6 +2450,41 @@ TEST_F(HcmUtilityTest, EnsureCreateSingletonsActuallyReturnsTheSameInstances) {
   EXPECT_EQ(singletons_two.scoped_routes_config_provider_manager_,
             singletons_one.scoped_routes_config_provider_manager_);
   EXPECT_EQ(singletons_two.http_tracer_manager_, singletons_one.http_tracer_manager_);
+}
+
+class HttpConnectionManagerMobileConfigTest : public HttpConnectionManagerConfigTest,
+                                              public Event::TestUsingSimulatedTime {};
+
+TEST_F(HttpConnectionManagerMobileConfigTest, Mobile) {
+  const std::string yaml_string = R"EOF(
+  config:
+    stat_prefix: ingress_http
+    route_config:
+      name: local_route
+    http_filters:
+    - name: envoy.filters.http.router
+  )EOF";
+
+  envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
+      config;
+  TestUtility::loadFromYamlAndValidate(yaml_string, config, false, true);
+
+  MobileHttpConnectionManagerFilterConfigFactory factory;
+  Network::FilterFactoryCb create_hcm_cb = factory.createFilterFactoryFromProto(config, context_);
+
+  NiceMock<Network::MockFilterManager> fm;
+  NiceMock<Network::MockReadFilterCallbacks> cb;
+  Network::ReadFilterSharedPtr hcm_filter;
+  Http::ConnectionManagerImpl* hcm = nullptr;
+  EXPECT_CALL(fm, addReadFilter(_))
+      .WillOnce(Invoke([&](Network::ReadFilterSharedPtr manager) -> void {
+        hcm_filter = manager;
+        hcm = dynamic_cast<Http::ConnectionManagerImpl*>(manager.get());
+      }));
+  create_hcm_cb(fm);
+  ASSERT(hcm != nullptr);
+  hcm->initializeReadFilterCallbacks(cb);
+  EXPECT_FALSE(hcm->clearHopByHopResponseHeaders());
 }
 
 } // namespace

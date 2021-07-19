@@ -211,6 +211,9 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
+  void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
+
   envoy::config::route::v3::VirtualHost createVirtualHost(const char* host, const char* route = "/",
                                                           const char* cluster = "cluster_0");
 
