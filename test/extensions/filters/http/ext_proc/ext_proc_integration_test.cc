@@ -1002,4 +1002,85 @@ TEST_P(ExtProcIntegrationTest, ResponseMessageTimeoutIgnoreError) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Test how the filter responds when asked to buffer a request body for a POST
+// request with an empty body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBody) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("", absl::nullopt);
+
+  // Handle request headers message by responding with body mode BUFFERED
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->startGrpcStream();
+  ProcessingResponse resp;
+  resp.mutable_request_headers();
+  auto* proc_mode = resp.mutable_mode_override();
+  proc_mode->set_request_body_mode(ProcessingMode::BUFFERED);
+  processor_stream_->sendGrpcMessage(resp);
+
+  // Handle request body message by immediately closing the stream
+  ProcessingRequest request_body_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_body_msg));
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a request body for a GET
+// request with no body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverrideGetRequestNoBody) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  // Handle request headers message by responding with body mode BUFFERED
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->startGrpcStream();
+  ProcessingResponse resp;
+  resp.mutable_request_headers();
+  auto* proc_mode = resp.mutable_mode_override();
+  proc_mode->set_request_body_mode(ProcessingMode::BUFFERED);
+  processor_stream_->sendGrpcMessage(resp);
+
+  // Handle request body message by immediately closing the stream
+  ProcessingRequest request_body_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_body_msg));
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Test how the filter responds when asked to buffer a request body for a POST
+// request with a body.
+TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithRequestBody) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Testing", absl::nullopt);
+
+  // Handle request headers message by responding with body mode BUFFERED
+  ProcessingRequest request_headers_msg;
+  waitForFirstMessage(request_headers_msg);
+  processor_stream_->startGrpcStream();
+  ProcessingResponse resp;
+  resp.mutable_request_headers();
+  auto* proc_mode = resp.mutable_mode_override();
+  proc_mode->set_request_body_mode(ProcessingMode::BUFFERED);
+  processor_stream_->sendGrpcMessage(resp);
+
+  // Handle request body message by immediately closing the stream
+  ProcessingRequest request_body_msg;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request_body_msg));
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  handleUpstreamRequest();
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
