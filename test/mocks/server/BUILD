@@ -121,6 +121,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/server:drain_manager_interface",
         "//envoy/server:listener_manager_interface",
+        "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",

@@ -169,10 +169,10 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
   }
 
   for (auto& socket : sockets_) {
-    // TODO(mattklein123): At some point we lost error handling on this call which I think can
-    // technically fail (at least according to lingering code comments). Add error handling on this
-    // in a follow up.
-    socket->ioHandle().listen(tcp_backlog_size_);
+    const auto rc = socket->ioHandle().listen(tcp_backlog_size_);
+    if (rc.rc_ != 0) {
+      throw EnvoyException(fmt::format("cannot listen() errno={}", rc.errno_));
+    }
 
     if (!Network::Socket::applyOptions(socket->options(), *socket,
                                        envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
