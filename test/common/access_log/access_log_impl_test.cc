@@ -783,7 +783,8 @@ filter:
   header_filter:
     header:
       name: test-header
-      exact_match: exact-match-value
+      string_match:
+        exact: exact-match-value
 
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
@@ -812,9 +813,10 @@ filter:
   header_filter:
     header:
       name: test-header
-      safe_regex_match:
-        google_re2: {}
-        regex: "\\d{3}"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "\\d{3}"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null

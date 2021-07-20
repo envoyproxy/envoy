@@ -4,6 +4,7 @@ package envoy.extensions.common.dynamic_forward_proxy.v4alpha;
 
 import "envoy/config/cluster/v4alpha/cluster.proto";
 import "envoy/config/core/v4alpha/address.proto";
+import "envoy/config/core/v4alpha/extension.proto";
 import "envoy/config/core/v4alpha/resolver.proto";
 
 import "google/protobuf/duration.proto";
@@ -32,7 +33,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig";
@@ -105,7 +106,24 @@ message DnsCacheConfig {
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
+  // *dns_resolution_config* will be deprecated once
+  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.typed_dns_resolver_config>'
+  // is fully supported.
   config.core.v4alpha.DnsResolutionConfig dns_resolution_config = 9;
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
+  // :ref:'dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>'
+  // configuration eventually.
+  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
+  // this configuration is optional.
+  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // [#not-implemented-hide:]
+  config.core.v4alpha.TypedExtensionConfig typed_dns_resolver_config = 12;
 
   // Hostnames that should be preresolved into the cache upon creation. This might provide a
   // performance improvement, in the form of cache hits, for hostnames that are going to be

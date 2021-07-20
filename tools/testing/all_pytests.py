@@ -55,9 +55,9 @@ class PytestChecker(checker.BazelChecker):
         for target in self.pytest_targets:
             try:
                 self.bazel.run(target, *self.pytest_bazel_args)
-                self.succeed("pytest", [target])
+                self.succeed("pytests", [target])
             except runner.BazelRunError:
-                self.error("pytest", [f"{target} failed"])
+                self.error("pytests", [f"{target} failed"])
 
     def on_checks_begin(self):
         if self.cov_path and os.path.exists(self.cov_path):
