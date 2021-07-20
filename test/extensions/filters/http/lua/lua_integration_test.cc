@@ -961,7 +961,7 @@ virtual_hosts:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("bar", 
+  EXPECT_EQ("bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
