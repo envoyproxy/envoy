@@ -914,7 +914,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
   cleanup();
 }
 
-TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata){
+TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata) {
   const std::string filter_config =
       R"EOF(
   name: lua
@@ -926,8 +926,8 @@ TEST_P(LuaIntegrationTest, DirectResponseLuaMetadata){
       end
 )EOF";
 
-std::string route_config =
-    R"EOF(
+  std::string route_config =
+      R"EOF(
 name: basic_lua_routes
 virtual_hosts:
 - name: rds_vhost_1
@@ -961,10 +961,8 @@ virtual_hosts:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
 
-  EXPECT_EQ("bar", response->headers()
-                         .get(Http::LowerCaseString("foo"))[0]
-                         ->value()
-                         .getStringView());
+  EXPECT_EQ("bar", 
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("hello", response->body());
