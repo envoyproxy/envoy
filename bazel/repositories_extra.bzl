@@ -48,6 +48,11 @@ def _python_deps():
         extra_pip_args = ["--require-hashes"],
     )
     pip_install(
+        name = "docker_pip3",
+        requirements = "@envoy//tools/docker:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "deps_pip3",
         requirements = "@envoy//tools/dependency:requirements.txt",
         extra_pip_args = ["--require-hashes"],
