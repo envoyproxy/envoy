@@ -109,12 +109,12 @@ std::string EngineBuilder::generateConfigStr() {
 }
 
 EngineSharedPtr EngineBuilder::build() {
+  envoy_logger null_logger;
+  null_logger.log = nullptr;
+  null_logger.release = envoy_noop_const_release;
+  null_logger.context = nullptr;
+
   auto config_str = this->generateConfigStr();
-  envoy_logger null_logger{
-      .log = nullptr,
-      .release = envoy_noop_const_release,
-      .context = nullptr,
-  };
   auto envoy_engine = init_engine(this->callbacks_->asEnvoyEngineCallbacks(), null_logger);
   run_engine(envoy_engine, config_str.c_str(), logLevelToString(this->log_level_).c_str());
 
