@@ -164,7 +164,7 @@ public:
   Router::ConfigConstSharedPtr
   getRouteConfig(const Http::HeaderMap&,
   const envoy::config::core::v3::Metadata&, 
-                                     const envoy::config::core::v3::Metadata&) const override;
+                                     const envoy::config::core::v3::Metadata&) const override {
     return std::make_shared<const NullConfigImpl>();
   }
 };

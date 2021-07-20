@@ -2428,7 +2428,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
 
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
-              getRouteConfig(_, _))
+              getRouteConfig(_, _, _))
       .Times(2)
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -2460,7 +2460,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
 
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
-              getRouteConfig(_, _))
+              getRouteConfig(_, _, _))
       .Times(3)
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))        // refreshCachedRoute first time.
@@ -2520,13 +2520,13 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
   EXPECT_CALL(*route_config2, route(_, _, _, _)).WillRepeatedly(Return(route2));
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
-              getRouteConfig(_, _))
+              getRouteConfig(_, _, _))
       // 1. Snap scoped route config;
       // 2. refreshCachedRoute (both in decodeHeaders(headers,end_stream);
       // 3. then refreshCachedRoute triggered by decoder_filters_[1]->callbacks_->route().
       .Times(3)
       .WillRepeatedly(
-          Invoke([&](const HeaderMap& headers, const auto&) -> Router::ConfigConstSharedPtr {
+          Invoke([&](const HeaderMap& headers, const auto&, const auto&) -> Router::ConfigConstSharedPtr {
             auto& test_headers = dynamic_cast<const TestRequestHeaderMapImpl&>(headers);
             if (test_headers.get_("scope_key") == "foo") {
               return route_config1;
@@ -2581,7 +2581,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*scopedRouteConfigProvider()->config<Router::MockScopedConfig>(),
-              getRouteConfig(_, _))
+              getRouteConfig(_, _, _))
       // 1. decodeHeaders() snapping route config.
       // 2. refreshCachedRoute() later in the same decodeHeaders().
       .Times(2);

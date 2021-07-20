@@ -61,8 +61,10 @@ FragmentBuilderImpl::computeFragment(const Http::HeaderMap& headers,
   switch (config_.type_case()) {
   case FragmentBuilderConfig::kHeaderValueExtractor:
     return computeFragmentFromHeader(headers, config_.header_value_extractor());
-  case FragmentBuilderConfig::kMetadataValueExtractor:
-    return computeFragmentFromMetadata(meta, config_.metadata_value_extractor());
+  case FragmentBuilderConfig::kConnMetadataValueExtractor:
+    return computeFragmentFromMetadata(conn_meta, config_.conn_metadata_value_extractor());
+  case FragmentBuilderConfig::kFilterMetadataValueExtractor:
+    return computeFragmentFromMetadata(filter_meta, config_.filter_metadata_value_extractor());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE; // Caught in constructor already.
   }
@@ -143,7 +145,8 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
   for (const auto& fragment_builder : config_.fragments()) {
     switch (fragment_builder.type_case()) {
     case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kHeaderValueExtractor:
-    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kMetadataValueExtractor:
+    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kConnMetadataValueExtractor:
+    case ScopedRoutes::ScopeKeyBuilder::FragmentBuilder::kFilterMetadataValueExtractor:
       fragment_builders_.emplace_back(std::make_unique<FragmentBuilderImpl>(
           ScopedRoutes::ScopeKeyBuilder::FragmentBuilder(fragment_builder)));
       break;

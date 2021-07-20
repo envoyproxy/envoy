@@ -526,7 +526,7 @@ public:
   ~MockScopedConfig() override;
 
   MOCK_METHOD(ConfigConstSharedPtr, getRouteConfig,
-              (const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& meta),
+              (const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& conn_meta, const envoy::config::core::v3::Metadata& filter_meta),
               (const));
 
   std::shared_ptr<MockConfig> route_config_{new NiceMock<MockConfig>()};

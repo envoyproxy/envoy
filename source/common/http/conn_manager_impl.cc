@@ -1182,7 +1182,7 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
   // NOTE: if a RDS subscription hasn't got a RouteConfiguration back, a Router::NullConfigImpl is
   // returned, in that case we let it pass.
   snapped_route_config_ = snapped_scoped_routes_config_->getRouteConfig(
-      *request_headers_, connection()->streamInfo().dynamicMetadata());
+      *request_headers_, connection()->streamInfo().dynamicMetadata(), streamInfo().dynamicMetadata());
   if (snapped_route_config_ == nullptr) {
     ENVOY_STREAM_LOG(trace, "can't find SRDS scope.", *this);
     // TODO(stevenzzzz): Consider to pass an error message to router filter, so that it can
