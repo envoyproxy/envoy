@@ -77,7 +77,6 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return true;
-
       } else if (body_mode_ == ProcessingMode::STREAMED) {
         if (complete_body_available_) {
           // All data came in before headers callback, so act just as if we were buffering
@@ -100,10 +99,8 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           filter_.sendBodyChunk(*this, buffered_chunk,
                                 ProcessorState::CallbackState::StreamedBodyCallback, false);
           enqueueStreamingChunk(buffered_chunk, false, true);
-          if (!queueOverBufferLimit()) {
-            clearWatermark();
-          }
-        } else {
+        }
+        if (queueBelowLowLimit()) {
           clearWatermark();
         }
         continueIfNecessary();
@@ -165,7 +162,7 @@ bool ProcessorState::handleBodyResponse(const BodyResponse& response) {
           injectDataToFilterChain(chunk->data, false);
         }
       }
-      if (!queueOverBufferLimit()) {
+      if (queueBelowLowLimit()) {
         clearWatermark();
       }
       if (chunks_for_processing_.empty()) {
@@ -218,7 +215,7 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
   next_chunk->end_stream = end_stream;
   next_chunk->delivered = delivered;
   chunks_for_processing_.push_back(std::move(next_chunk));
-  if (bytes_enqueued_ > bufferLimit() / 2) {
+  if (queueOverHighLimit()) {
     requestWatermark();
   }
 }
@@ -235,8 +232,6 @@ absl::optional<QueuedChunkPtr> ProcessorState::dequeueStreamingChunk(bool undeli
   bytes_enqueued_ -= chunk->data.length();
   return chunk;
 }
-
-bool ProcessorState::queueOverBufferLimit() const { return bytes_enqueued_ > bufferLimit(); }
 
 void ProcessorState::clearAsyncState() {
   cleanUpTimer();

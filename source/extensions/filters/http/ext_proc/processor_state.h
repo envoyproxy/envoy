@@ -102,7 +102,8 @@ public:
 
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
   absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only);
-  bool queueOverBufferLimit() const;
+  bool queueOverHighLimit() const { return bytes_enqueued_ > bufferLimit(); }
+  bool queueBelowLowLimit() const { return bytes_enqueued_ < bufferLimit() / 2; }
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
