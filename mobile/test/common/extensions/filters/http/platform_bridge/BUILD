@@ -11,7 +11,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "platform_bridge_filter_test",
     srcs = ["platform_bridge_filter_test.cc"],
-    extension_name = "envoy.filters.http.platform_bridge",
+    extension_names = ["envoy.filters.http.platform_bridge"],
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
     srcs = [
         "platform_bridge_filter_integration_test.cc",
     ],
-    extension_name = "envoy.filters.http.platform_bridge",
+    extension_names = ["envoy.filters.http.platform_bridge"],
     repository = "@envoy",
     deps = [
         "//library/common/api:external_api_lib",

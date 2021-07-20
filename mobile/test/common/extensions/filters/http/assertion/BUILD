@@ -11,7 +11,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "assertion_filter_test",
     srcs = ["assertion_filter_test.cc"],
-    extension_name = "envoy.filters.http.assertion",
+    extension_names = ["envoy.filters.http.assertion"],
     repository = "@envoy",
     deps = [
         "//library/common/extensions/filters/http/assertion:config",
