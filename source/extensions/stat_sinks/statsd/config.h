@@ -9,6 +9,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace Statsd {
 
+// Statsd sink
+constexpr char StatsdName[] = "envoy.stat_sinks.statsd";
+
 /**
  * Config registration for the tcp statsd sink. @see StatsSinkFactory.
  */

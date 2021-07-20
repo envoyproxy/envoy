@@ -25,6 +25,9 @@ namespace Network {
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
 
+class ListenSocketFactory;
+using ListenSocketFactoryPtr = std::unique_ptr<ListenSocketFactory>;
+
 /**
  * ListenSocketFactory is a member of ListenConfig to provide listen socket.
  * Listeners created from the same ListenConfig instance have listening sockets
@@ -36,10 +39,12 @@ public:
 
   /**
    * Called during actual listener creation.
+   * @param worker_index supplies the worker index to get the socket for. All sockets are created
+   *        ahead of time.
    * @return the socket to be used for a certain listener, which might be shared
    * with other listeners of the same config on other worker threads.
    */
-  virtual SocketSharedPtr getListenSocket() PURE;
+  virtual SocketSharedPtr getListenSocket(uint32_t worker_index) PURE;
 
   /**
    * @return the type of the socket getListenSocket() returns.
@@ -53,12 +58,23 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket shared by worker threads if any; otherwise return null.
+   * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
    */
-  virtual SocketOptRef sharedSocket() const PURE;
-};
+  virtual ListenSocketFactoryPtr clone() const PURE;
 
-using ListenSocketFactorySharedPtr = std::shared_ptr<ListenSocketFactory>;
+  /**
+   * Close all sockets. This is used during draining scenarios.
+   */
+  virtual void closeAllSockets() PURE;
+
+  /**
+   * Perform any initialization that must occur immediately prior to using the listen socket on
+   * workers. For example, the actual listen() call, post listen socket options, etc. This is done
+   * so that all error handling can occur on the main thread and the gap between performing these
+   * actions and using the socket is minimized.
+   */
+  virtual void doFinalPreWorkerInit() PURE;
+};
 
 /**
  * Configuration for a UDP listener.

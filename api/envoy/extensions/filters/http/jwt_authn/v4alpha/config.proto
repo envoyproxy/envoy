@@ -258,6 +258,37 @@ message RemoteJwks {
   // * Jwks is ready when the requests come, not need to wait for the Jwks fetching.
   //
   JwksAsyncFetch async_fetch = 3;
+
+  // Retry policy for fetching Jwks. optional. turned off by default.
+  //
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     retry_back_off:
+  //       base_interval: 0.01s
+  //       max_interval: 20s
+  //     num_retries: 10
+  //
+  // will yield a randomized truncated exponential backoff policy with an initial delay of 10ms
+  // 10 maximum attempts spaced at most 20s seconds.
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     num_retries:1
+  //
+  // uses the default :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
+  // with the default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.
+  //
+  // if num_retries is omitted, the default is to allow only one retry.
+  //
+  //
+  // If enabled, the retry policy will apply to all Jwks fetching approaches, e.g. on demand or asynchronously in background.
+  //
+  //
+  config.core.v4alpha.RetryPolicy retry_policy = 4;
 }
 
 // Fetch Jwks asynchronously in the main thread when the filter config is parsed.
