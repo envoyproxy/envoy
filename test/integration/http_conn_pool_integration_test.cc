@@ -7,7 +7,7 @@ using testing::HasSubstr;
 namespace Envoy {
 namespace {
 
-class ConnPoolIntegrationTest : public HttpProtocolIntegrationTest {
+class HttpConnPoolIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
@@ -27,12 +27,12 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, ConnPoolIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(Protocols, HttpConnPoolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // Tests that conn pools are cleaned up after becoming idle due to a LocalClose
-TEST_P(ConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
+TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Make Envoy close the upstream connection after a single request.
     bootstrap.mutable_static_resources()
@@ -64,7 +64,7 @@ TEST_P(ConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
 }
 
 // Tests that conn pools are cleaned up after becoming idle due to a RemoteClose
-TEST_P(ConnPoolIntegrationTest, PoolCleanupAfterRemoteClose) {
+TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterRemoteClose) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
