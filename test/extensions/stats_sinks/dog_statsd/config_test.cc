@@ -39,7 +39,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -74,7 +74,7 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -99,7 +99,7 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -128,7 +128,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   sink_config.set_prefix(customPrefix);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -145,7 +145,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
 // Test that the deprecated extension name still functions.
 TEST(DogStatsdConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         DogStatsd));
+                         DogStatsdName));
 }
 
 } // namespace

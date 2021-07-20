@@ -25,7 +25,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   envoy::config::metrics::v3::HystrixSink sink_config;
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Hystrix);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(HystrixName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

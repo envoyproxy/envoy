@@ -44,7 +44,7 @@ ProtobufTypes::MessagePtr StatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::StatsdSink>();
 }
 
-std::string StatsdSinkFactory::name() const { return Statsd; }
+std::string StatsdSinkFactory::name() const { return StatsdName; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

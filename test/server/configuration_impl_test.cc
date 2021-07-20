@@ -467,7 +467,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Statsd);
+  sink.set_name(Extensions::StatSinks::Statsd::StatsdName);
   addStatsdFakeClusterConfig(sink);
   server_.server_factory_context_->cluster_manager_.initializeClusters({"fake_cluster"}, {});
 

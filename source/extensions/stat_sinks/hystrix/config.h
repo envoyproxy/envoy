@@ -12,7 +12,7 @@ namespace StatSinks {
 namespace Hystrix {
 
 // Hystrix sink
-extern constexpr char Hystrix[] = "envoy.stat_sinks.hystrix";
+constexpr char HystrixName[] = "envoy.stat_sinks.hystrix";
 
 class HystrixSinkFactory : Logger::Loggable<Logger::Id::config>,
                            public Server::Configuration::StatsSinkFactory {

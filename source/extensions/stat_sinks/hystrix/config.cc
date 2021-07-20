@@ -27,7 +27,7 @@ ProtobufTypes::MessagePtr HystrixSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::HystrixSink>();
 }
 
-std::string HystrixSinkFactory::name() const { return Hystrix; }
+std::string HystrixSinkFactory::name() const { return HystrixName; }
 
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.

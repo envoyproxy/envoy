@@ -14,7 +14,7 @@ namespace StatSinks {
 namespace Wasm {
 
 // WebAssembly sink
-extern constexpr char Wasm[] = "envoy.stat_sinks.wasm";
+constexpr char WasmName[] = "envoy.stat_sinks.wasm";
 
 /**
  * Config registration for the Wasm statsd sink. @see StatSinkFactory.

@@ -15,7 +15,7 @@ namespace {
 // Test that the deprecated extension name still functions.
 TEST(MetricsServiceConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         MetricsService));
+                         MetricsServiceName));
 }
 
 } // namespace

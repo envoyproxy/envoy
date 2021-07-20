@@ -10,7 +10,7 @@ namespace StatSinks {
 namespace DogStatsd {
 
 // DogStatsD compatible statsd sink
-extern constexpr char DogStatsd[] = "envoy.stat_sinks.dog_statsd";
+constexpr char DogStatsdName[] = "envoy.stat_sinks.dog_statsd";
 
 /**
  * Config registration for the DogStatsD compatible statsd sink. @see StatsSinkFactory.

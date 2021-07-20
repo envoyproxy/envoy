@@ -29,7 +29,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -72,7 +72,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   EXPECT_EQ(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -103,7 +103,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   EXPECT_NE(sink_config.prefix(), "");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
@@ -123,7 +123,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(sink_config.prefix(), "");
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -147,7 +147,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   sink_config.set_prefix(prefix);
   EXPECT_EQ(sink_config.prefix(), prefix);
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -178,7 +178,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(Statsd);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(StatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

@@ -10,7 +10,7 @@ namespace StatSinks {
 namespace Statsd {
 
 // Statsd sink
-extern constexpr char Statsd[] = "envoy.stat_sinks.statsd";
+constexpr char StatsdName[] = "envoy.stat_sinks.statsd";
 
 /**
  * Config registration for the tcp statsd sink. @see StatsSinkFactory.
