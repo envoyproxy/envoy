@@ -24,6 +24,7 @@ envoy_py_binary(
     ],
     deps = [
         requirement("pytest"),
+        requirement("pytest-asyncio"),
         requirement("pytest-cov"),
     ],
 )

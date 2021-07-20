@@ -278,6 +278,55 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
+TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
+  ResolverData resolver(*dns_resolver_, dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 4s
+    dns_failure_refresh_rate:
+      base_interval: 7s
+      max_interval: 10s
+    wait_for_warm_on_init: false
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.com
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                               std::move(scope), false);
+
+  ReadyWatcher initialized;
+
+  // Initialized without completing DNS resolution.
+  EXPECT_CALL(initialized, ready());
+  cluster.initialize([&]() -> void { initialized.ready(); });
+
+  ReadyWatcher membership_updated;
+  auto priority_update_cb = cluster.prioritySet().addPriorityUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector&) -> void { membership_updated.ready(); });
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  EXPECT_CALL(membership_updated, ready());
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                         TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
+}
+
 TEST_F(StrictDnsClusterImplTest, Basic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, dispatcher_);
@@ -457,8 +506,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver2.expectResolve(*dns_resolver_);
   resolver2.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that host removal works correctly when hosts are being health checked
@@ -854,9 +905,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
@@ -993,9 +1047,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver3.expectResolve(*dns_resolver_);
   resolver3.timer_->invokeCallback();
 
-  EXPECT_CALL(resolver1.active_dns_query_, cancel());
-  EXPECT_CALL(resolver2.active_dns_query_, cancel());
-  EXPECT_CALL(resolver3.active_dns_query_, cancel());
+  EXPECT_CALL(resolver1.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver2.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(resolver3.active_dns_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails
@@ -1297,6 +1354,13 @@ TEST_F(HostImplTest, HealthPipeAddress) {
                                   simTime());
       },
       EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+}
+
+TEST_F(HostImplTest, HostAddressList) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  const std::vector<Network::Address::InstanceConstSharedPtr> address_list = {};
+  EXPECT_EQ(address_list, host->addressList());
 }
 
 // Test that hostname flag from the health check config propagates.
@@ -2484,28 +2548,6 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Didn't find a registered network or http filter or "
                             "protocol options implementation for name: 'no_such_filter'");
-}
-
-// This test case can't be converted for V3 API as it is specific for extension_protocol_options
-TEST_F(ClusterInfoImplTest,
-       DEPRECATED_FEATURE_TEST(OneofExtensionProtocolOptionsForUnknownFilter)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 0.25s
-    type: STRICT_DNS
-    lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
-    extension_protocol_options:
-      no_such_filter: { option: value }
-    typed_extension_protocol_options:
-      no_such_filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
-                            "Only one of typed_extension_protocol_options or "
-                            "extension_protocol_options can be specified");
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
@@ -3750,6 +3792,38 @@ TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
   EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
   EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
+}
+
+TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+  typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          max_requests_per_connection: 3
+        use_downstream_protocol_config: {}
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of max_requests_per_connection from Cluster or "
+                            "HttpProtocolOptions can be specified");
+}
+
+TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
 }
 
 } // namespace

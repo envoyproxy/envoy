@@ -550,6 +550,23 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, ResetIdleTimer) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(decoder_filter);
+      }));
+  filter_manager_->createFilterChain();
+
+  EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
+  decoder_filter->callbacks_->resetIdleTimer();
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

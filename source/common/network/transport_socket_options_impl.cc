@@ -58,7 +58,7 @@ void TransportSocketOptionsImpl::hashKey(std::vector<uint8_t>& key,
   commonHashKey(*this, key, factory);
 }
 
-TransportSocketOptionsSharedPtr
+TransportSocketOptionsConstSharedPtr
 TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& filter_state) {
   absl::string_view server_name;
   std::vector<std::string> application_protocols;

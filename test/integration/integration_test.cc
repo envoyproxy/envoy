@@ -57,9 +57,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -67,7 +67,6 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
@@ -79,9 +78,9 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
-// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -89,11 +88,26 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-listen socket option.
+TEST_P(IntegrationTest, BadPostListenSocketOption) {
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
     socket_option->set_level(10000);     // Invalid level.
     socket_option->set_int_value(10000); // Invalid value.
   });
@@ -369,7 +383,9 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
+  concurrency_ = 2;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
+
   config_helper_.addFilter(R"EOF(
 name: matcher
 typed_config:
@@ -405,18 +421,30 @@ typed_config:
     EXPECT_THAT(response->headers(), HttpStatusIs("403"));
   }
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
+        {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
+    auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  }
+
+  auto second_codec = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"match-header", "match"},   {"content-type", "application/grpc"}};
-  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+      {":method", "POST"},    {":path", "/test/long/url"},   {":scheme", "http"},
+      {":authority", "host"}, {"match-header", "not-match"}, {"content-type", "application/grpc"}};
+  auto response = second_codec->makeRequestWithBody(request_headers, 1024);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 
   codec_client_->close();
+  second_codec->close();
 }
 
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
@@ -426,9 +454,15 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     // Ensure we only have one connection upstream, one request active at a time.
-    cluster->mutable_max_requests_per_connection()->set_value(1);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_requests_per_connection()
+        ->set_value(1);
+    protocol_options.mutable_use_downstream_protocol_config();
     auto* circuit_breakers = cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
   initialize();
 

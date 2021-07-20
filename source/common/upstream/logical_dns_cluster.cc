@@ -57,10 +57,7 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
-      load_assignment_(
-          cluster.has_load_assignment()
-              ? convertPriority(cluster.load_assignment())
-              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
+      load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
       Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
           cluster, dns_refresh_rate_ms_.count(), factory_context.api().randomGenerator());
@@ -92,11 +89,16 @@ LogicalDnsCluster::LogicalDnsCluster(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
 
-void LogicalDnsCluster::startPreInit() { startResolve(); }
+void LogicalDnsCluster::startPreInit() {
+  startResolve();
+  if (!wait_for_warm_on_init_) {
+    onPreInitComplete();
+  }
+}
 
 LogicalDnsCluster::~LogicalDnsCluster() {
   if (active_dns_query_) {
-    active_dns_query_->cancel();
+    active_dns_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
 }
 

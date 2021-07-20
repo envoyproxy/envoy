@@ -27,7 +27,6 @@ static_resources:
                   operation: checkAvailability
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   - address:
       socket_address:
         address: 0.0.0.0
@@ -75,7 +74,6 @@ static_resources:
                   operation: checkStock
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
     type: strict_dns

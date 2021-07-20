@@ -289,7 +289,17 @@ public:
    */
   static AssertionResult waitUntilHistogramHasSamples(
       Stats::Store& store, const std::string& name, Event::TestTimeSystem& time_system,
+      Event::Dispatcher& main_dispatcher,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Read a histogram's sample count from the main thread.
+   * @param store supplies the stats store.
+   * @param name histogram name.
+   * @return uint64_t the sample count.
+   */
+  static uint64_t readSampleCount(Event::Dispatcher& main_dispatcher,
+                                  const Stats::ParentHistogram& histogram);
 
   /**
    * Find a readout in a stats store.
@@ -856,6 +866,33 @@ private:
   bool ready_ ABSL_GUARDED_BY(mutex_){false};
 };
 
+namespace Tracing {
+
+class TestTraceContextImpl : public Tracing::TraceContext {
+public:
+  TestTraceContextImpl(const std::initializer_list<std::pair<std::string, std::string>>& values) {
+    for (const auto& value : values) {
+      context_map_[value.first] = value.second;
+    }
+  }
+
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+    auto iter = context_map_.find(key);
+    if (iter == context_map_.end()) {
+      return absl::nullopt;
+    }
+    return iter->second;
+  }
+
+  void setTraceContext(absl::string_view key, absl::string_view val) override {
+    context_map_.insert({std::string(key), std::string(val)});
+  }
+
+  absl::flat_hash_map<std::string, std::string> context_map_;
+};
+
+} // namespace Tracing
+
 namespace Http {
 
 /**
@@ -1069,6 +1106,25 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
+
+  absl::optional<absl::string_view> getTraceContext(absl::string_view key) const override {
+    ASSERT(header_map_);
+    return header_map_->getTraceContext(key);
+  }
+  void setTraceContext(absl::string_view key, absl::string_view value) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContext(key, value);
+  }
+
+  void setTraceContextReferenceKey(absl::string_view key, absl::string_view val) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContextReferenceKey(key, val);
+  }
+
+  void setTraceContextReference(absl::string_view key, absl::string_view val) override {
+    ASSERT(header_map_);
+    header_map_->setTraceContextReference(key, val);
+  }
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

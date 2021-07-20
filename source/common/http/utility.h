@@ -241,6 +241,13 @@ QueryParams parseParameters(absl::string_view data, size_t start, bool decode_pa
 absl::string_view findQueryStringStart(const HeaderString& path);
 
 /**
+ * Returns the path without the query string.
+ * @param path supplies a HeaderString& possibly containing a query string.
+ * @return std::string the path without query string.
+ */
+std::string stripQueryString(const HeaderString& path);
+
+/**
  * Parse a particular value out of a cookie
  * @param headers supplies the headers to get the cookie from.
  * @param key the key for the particular cookie value to return
@@ -387,6 +394,15 @@ bool sanitizeConnectionHeader(Http::RequestHeaderMap& headers);
  * @return string representation of the protocol.
  */
 const std::string& getProtocolString(const Protocol p);
+
+/**
+ * Constructs the original URI sent from the client from
+ * the request headers.
+ * @param request headers from the original request
+ * @param length to truncate the constructed URI's path
+ */
+std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                             absl::optional<uint32_t> max_path_length);
 
 /**
  * Extract host and path from a URI. The host may contain port.

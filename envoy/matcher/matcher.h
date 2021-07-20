@@ -16,7 +16,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class FactoryContext;
+class ServerFactoryContext;
 }
 } // namespace Server
 
@@ -76,11 +76,12 @@ public:
 using ActionPtr = std::unique_ptr<Action>;
 using ActionFactoryCb = std::function<ActionPtr()>;
 
-class ActionFactory : public Config::TypedFactory {
+template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
 public:
   virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, const std::string& stats_prefix,
-                        Server::Configuration::FactoryContext& context) PURE;
+  createActionFactoryCb(const Protobuf::Message& config,
+                        ActionFactoryContext& action_factory_context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
@@ -146,15 +147,16 @@ public:
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
+using InputMatcherFactoryCb = std::function<InputMatcherPtr()>;
 
 /**
  * Factory for registering custom input matchers.
  */
 class InputMatcherFactory : public Config::TypedFactory {
 public:
-  virtual InputMatcherPtr
-  createInputMatcher(const Protobuf::Message& config,
-                     Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual InputMatcherFactoryCb
+  createInputMatcherFactoryCb(const Protobuf::Message& config,
+                              Server::Configuration::ServerFactoryContext& factory_context) PURE;
 
   std::string category() const override { return "envoy.matching.input_matchers"; }
 };
@@ -213,6 +215,7 @@ public:
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
+template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<DataType>()>;
 
 /**
  * Factory for data inputs.
@@ -222,9 +225,9 @@ public:
   /**
    * Creates a DataInput from the provided config.
    */
-  virtual DataInputPtr<DataType>
-  createDataInput(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual DataInputFactoryCb<DataType>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   /**
    * The category of this factory depends on the DataType, so we require a name() function to exist
@@ -248,6 +251,7 @@ public:
   virtual absl::optional<std::string> get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
+using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;
 
 /**
  * Factory for CommonProtocolInput.
@@ -257,9 +261,9 @@ public:
   /**
    * Creates a CommonProtocolInput from the provided config.
    */
-  virtual CommonProtocolInputPtr
-  createCommonProtocolInput(const Protobuf::Message& config,
-                            Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual CommonProtocolInputFactoryCb
+  createCommonProtocolInputFactoryCb(const Protobuf::Message& config,
+                                     ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.common_inputs"; }
 };

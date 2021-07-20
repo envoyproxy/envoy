@@ -37,6 +37,7 @@ statistics:
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
    downstream_cx_max_duration_reached, Counter, Total connections closed due to max connection duration
+   downstream_cx_max_requests_reached, Counter, Total connections closed due to max requests per connection
    downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload
    downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
    downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
@@ -165,6 +166,7 @@ On the upstream side all http2 statistics are rooted at *cluster.<name>.http2.*
    requests_rejected_with_underscores_in_headers, Counter, Total numbers of rejected requests due to header names containing underscores. This action is configured by setting the :ref:`headers_with_underscores_action config setting <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.headers_with_underscores_action>`.
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
+   stream_refused_errors, Counter, Total number of invalid frames received by Envoy with a `REFUSED_STREAM` error code
    trailers, Counter, Total number of trailers seen on requests coming from downstream
    tx_flush_timeout, Counter, Total number of :ref:`stream idle timeouts <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>` waiting for open stream window to flush the remainder of a stream
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
@@ -194,6 +196,12 @@ On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
    metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
+   quic_version_43, Counter, Total number of quic connections that use transport version 43. This is expected to be removed when this version is deprecated.
+   quic_version_46, Counter, Total number of quic connections that use transport version 46. This is expected to be removed when this version is deprecated.
+   quic_version_50, Counter, Total number of quic connections that use transport version 50. This is expected to be removed when this version is deprecated.
+   quic_version_51, Counter, Total number of quic connections that use transport version 51. This is expected to be removed when this version is deprecated.
+   quic_version_h3_29, Counter, Total number of quic connections that use transport version h3-29. This is expected to be removed when this version is deprecated.
+   quic_version_rfc_v1, Counter, Total number of quic connections that use transport version rfc-v1.
 
 
 Tracing statistics

@@ -14,6 +14,8 @@ class NetworkFilterNameValues {
 public:
   // Client ssl auth filter
   const std::string ClientSslAuth = "envoy.filters.network.client_ssl_auth";
+  // Connection limit filter
+  const std::string ConnectionLimit = "envoy.filters.network.connection_limit";
   // Echo filter
   const std::string Echo = "envoy.filters.network.echo";
   // Direct response filter

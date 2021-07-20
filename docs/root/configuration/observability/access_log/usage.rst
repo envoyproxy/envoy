@@ -323,6 +323,7 @@ The following command operators are supported:
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
     * **UMSDR**: The upstream request reached to max stream duration.
+    * **OM**: Overload Manager terminated the request.
 
 %ROUTE_NAME%
   Name of the route.
@@ -417,6 +418,8 @@ The following command operators are supported:
 %DOWNSTREAM_LOCAL_PORT%
     Similar to **%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%**, but only extracts the port portion of the **%DOWNSTREAM_LOCAL_ADDRESS%**
 
+.. _config_access_log_format_req:
+
 %REQ(X?Y):Z%
   HTTP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
@@ -447,7 +450,7 @@ The following command operators are supported:
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
-    can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
+    can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``

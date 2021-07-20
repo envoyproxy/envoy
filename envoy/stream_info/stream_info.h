@@ -86,8 +86,10 @@ enum ResponseFlag {
   UpstreamProtocolError = 0x800000,
   // No cluster found for a given request.
   NoClusterFound = 0x1000000,
+  // Overload Manager terminated the stream.
+  OverloadManager = 0x2000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = NoClusterFound,
+  LastFlag = OverloadManager,
 };
 
 /**
@@ -528,16 +530,6 @@ public:
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
 
   /**
-   * @param SNI value requested.
-   */
-  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
-
-  /**
-   * @return SNI value for downstream host.
-   */
-  virtual const std::string& requestedServerName() const PURE;
-
-  /**
    * @param failure_reason the upstream transport failure reason.
    */
   virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
@@ -591,16 +583,6 @@ public:
    * @return the trace reason for the stream.
    */
   virtual Tracing::Reason traceReason() const PURE;
-
-  /**
-   * @return Connection ID of the downstream connection, or unset if not available.
-   **/
-  virtual absl::optional<uint64_t> connectionID() const PURE;
-
-  /**
-   * @param id Connection ID of the downstream connection.
-   **/
-  virtual void setConnectionID(uint64_t id) PURE;
 
   /**
    * @param filter_chain_name Network filter chain name of the downstream connection.

@@ -75,9 +75,6 @@ public:
 
 class ActiveQuicListenerTest : public QuicMultiVersionTest {
 protected:
-  using Socket =
-      Network::NetworkListenSocket<Network::NetworkSocketTrait<Network::Socket::Type::Datagram>>;
-
   ActiveQuicListenerTest()
       : version_(GetParam().first), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
@@ -109,9 +106,11 @@ protected:
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
 
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
+    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -198,6 +197,9 @@ protected:
       read_filters_.push_back(std::move(read_filter));
       // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
       // calls for the same object.
+      EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(transport_socket_factory_));
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
@@ -205,7 +207,8 @@ protected:
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
+    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
+                                                                    local_address_, nullptr));
     Buffer::OwnedImpl payload = generateChloPacketToSend(
         quic_version_, quic_config_, ActiveQuicListenerPeer::cryptoConfig(*quic_listener_),
         connection_id, clock_, envoyIpAddressToQuicSocketAddress(local_address_->ip()),
@@ -314,13 +317,14 @@ protected:
   Init::MockManager init_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 
-  std::list<std::unique_ptr<Socket>> client_sockets_;
+  std::list<std::unique_ptr<Network::SocketImpl>> client_sockets_;
   std::list<std::shared_ptr<Network::MockReadFilter>> read_filters_;
   Network::MockFilterChainManager filter_chain_manager_;
   // The following two containers must guarantee pointer stability as addresses
   // of elements are saved in expectations before new elements are added.
   std::list<std::vector<Network::FilterFactoryCb>> filter_factories_;
   const Network::MockFilterChain* filter_chain_;
+  Network::MockTransportSocketFactory transport_socket_factory_;
   quic::ParsedQuicVersion quic_version_;
   uint32_t connection_window_size_{1024u};
   uint32_t stream_window_size_{1024u};
@@ -329,25 +333,6 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
-
-TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
-  initialize();
-  auto option = std::make_unique<Network::MockSocketOption>();
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
-      .WillOnce(Return(false));
-  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  options->emplace_back(std::move(option));
-  quic_listener_.reset();
-  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
-  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
-  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
-                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
-                              listener_config_, quic_config_, options, false,
-                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
-                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
-                          Network::CreateListenerException, "Failed to apply socket options.");
-}
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();

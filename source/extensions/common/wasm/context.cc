@@ -1,3 +1,5 @@
+#include "source/extensions/common/wasm/context.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -120,16 +122,11 @@ WasmResult Buffer::copyTo(WasmBase* wasm, size_t start, size_t length, uint64_t 
 WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) {
   if (buffer_instance_) {
     if (start == 0) {
-      if (length == 0) {
-        buffer_instance_->prepend(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else if (length >= buffer_instance_->length()) {
-        buffer_instance_->drain(buffer_instance_->length());
-        buffer_instance_->add(toAbslStringView(data));
-        return WasmResult::Ok;
-      } else {
-        return WasmResult::BadArgument;
+      if (length != 0) {
+        buffer_instance_->drain(length);
       }
+      buffer_instance_->prepend(toAbslStringView(data));
+      return WasmResult::Ok;
     } else if (start >= buffer_instance_->length()) {
       buffer_instance_->add(toAbslStringView(data));
       return WasmResult::Ok;
@@ -148,8 +145,8 @@ Context::Context(Wasm* wasm) : ContextBase(wasm) {}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
-Context::Context(Wasm* wasm, uint32_t root_context_id, const PluginSharedPtr& plugin)
-    : ContextBase(wasm, root_context_id, plugin) {}
+Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
@@ -659,14 +656,16 @@ Http::HeaderMap* Context::getMap(WasmHeaderMapType type) {
   case WasmHeaderMapType::RequestHeaders:
     return request_headers_;
   case WasmHeaderMapType::RequestTrailers:
-    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_) {
+    if (request_trailers_ == nullptr && request_body_buffer_ && end_of_stream_ &&
+        decoder_callbacks_) {
       request_trailers_ = &decoder_callbacks_->addDecodedTrailers();
     }
     return request_trailers_;
   case WasmHeaderMapType::ResponseHeaders:
     return response_headers_;
   case WasmHeaderMapType::ResponseTrailers:
-    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_) {
+    if (response_trailers_ == nullptr && response_body_buffer_ && end_of_stream_ &&
+        encoder_callbacks_) {
       response_trailers_ = &encoder_callbacks_->addEncodedTrailers();
     }
     return response_trailers_;
@@ -727,7 +726,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -802,7 +801,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -815,7 +814,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -829,7 +828,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
+  if (type == WasmHeaderMapType::RequestHeaders && decoder_callbacks_) {
     decoder_callbacks_->clearRouteCache();
   }
   return WasmResult::Ok;
@@ -860,7 +859,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     }
     return nullptr;
   case WasmBufferType::HttpRequestBody:
-    if (buffering_request_body_) {
+    if (buffering_request_body_ && decoder_callbacks_) {
       // We need the mutable version, so capture it using a callback.
       // TODO: consider adding a mutableDecodingBuffer() interface.
       ::Envoy::Buffer::Instance* buffer_instance{};
@@ -870,7 +869,7 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
     }
     return buffer_.set(request_body_buffer_);
   case WasmBufferType::HttpResponseBody:
-    if (buffering_response_body_) {
+    if (buffering_response_body_ && encoder_callbacks_) {
       // TODO: consider adding a mutableDecodingBuffer() interface.
       ::Envoy::Buffer::Instance* buffer_instance{};
       encoder_callbacks_->modifyEncodingBuffer(
@@ -1024,11 +1023,9 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
+      Grpc::CacheOption::CacheWhenRuntimeEnabled);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1095,11 +1092,9 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
-  auto grpc_client =
-      clusterManager()
-          .grpcAsyncClientManager()
-          .factoryForGrpcService(service_proto, *wasm()->scope_, true /* skip_cluster_check */)
-          ->create();
+  auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
+      service_proto, *wasm()->scope_, true /* skip_cluster_check */,
+      Grpc::CacheOption::CacheWhenRuntimeEnabled);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1598,7 +1593,8 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!decoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         decoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      decoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { decoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Response:
@@ -1606,19 +1602,26 @@ WasmResult Context::closeStream(WasmStreamType stream_type) {
       if (!encoder_callbacks_->streamInfo().responseCodeDetails().has_value()) {
         encoder_callbacks_->streamInfo().setResponseCodeDetails(CloseStreamResponseDetails);
       }
-      encoder_callbacks_->resetStream();
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] { encoder_callbacks_->resetStream(); });
     }
     return WasmResult::Ok;
   case WasmStreamType::Downstream:
     if (network_read_filter_callbacks_) {
-      network_read_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_read_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   case WasmStreamType::Upstream:
     if (network_write_filter_callbacks_) {
-      network_write_filter_callbacks_->connection().close(
-          Envoy::Network::ConnectionCloseType::FlushWrite);
+      // We are in a reentrant call, so defer.
+      wasm()->addAfterVmCallAction([this] {
+        network_write_filter_callbacks_->connection().close(
+            Envoy::Network::ConnectionCloseType::FlushWrite);
+      });
     }
     return WasmResult::Ok;
   }
@@ -1630,17 +1633,19 @@ constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
 void Context::failStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
-    if (decoder_callbacks_) {
+    if (decoder_callbacks_ && !local_reply_sent_) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
+      local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Response:
-    if (encoder_callbacks_) {
+    if (encoder_callbacks_ && !local_reply_sent_) {
       encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
+      local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Downstream:
