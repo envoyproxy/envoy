@@ -1,3 +1,5 @@
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+
 #include "test/common/http/common.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/integration.h"
@@ -19,14 +21,12 @@ namespace {
 
 // Based on Http::Utility::toRequestHeaders() but only used for these tests.
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
-  Http::ResponseHeaderMapPtr transformed_headers = Http::ResponseHeaderMapImpl::create();
-  for (envoy_map_size_t i = 0; i < headers.length; i++) {
-    transformed_headers->addCopy(
-        Http::LowerCaseString(Data::Utility::copyToString(headers.entries[i].key)),
-        Data::Utility::copyToString(headers.entries[i].value));
-  }
-  // The C envoy_headers struct can be released now because the headers have been copied.
-  release_envoy_headers(headers);
+  std::unique_ptr<Http::ResponseHeaderMapImpl> transformed_headers =
+      Http::ResponseHeaderMapImpl::create();
+  transformed_headers->setFormatter(
+      std::make_unique<
+          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>());
+  Http::Utility::toEnvoyHeaders(*transformed_headers, headers);
   return transformed_headers;
 }
 
@@ -36,6 +36,7 @@ typedef struct {
   uint32_t on_complete_calls;
   uint32_t on_error_calls;
   uint32_t on_cancel_calls;
+  std::string status;
   ConditionalInitializer* terminal_callback;
 } callbacks_called;
 
@@ -59,7 +60,34 @@ public:
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(
           Server::parseListenerFromV3Yaml(api_listener_config()));
     });
-    BaseIntegrationTest::initialize();
+
+    bridge_callbacks_.context = &cc_;
+    bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, void* context) -> void* {
+      Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_headers_calls++;
+      cc_->status = response_headers->Status()->value().getStringView();
+      return nullptr;
+    };
+    bridge_callbacks_.on_data = [](envoy_data c_data, bool, void* context) -> void* {
+      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_data_calls++;
+      c_data.release(c_data.context);
+      return nullptr;
+    };
+    bridge_callbacks_.on_complete = [](void* context) -> void* {
+      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_complete_calls++;
+      cc_->terminal_callback->setReady();
+      return nullptr;
+    };
+    bridge_callbacks_.on_error = [](envoy_error error, void* context) -> void* {
+      error.message.release(error.message.context);
+      callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+      cc_->on_error_calls++;
+      cc_->terminal_callback->setReady();
+      return nullptr;
+    };
   }
 
   void TearDown() override {
@@ -109,6 +137,9 @@ api_listener:
   std::atomic<envoy_network_t> preferred_network_{ENVOY_NET_GENERIC};
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   Http::ClientPtr http_client_{};
+  envoy_http_callbacks bridge_callbacks_;
+  ConditionalInitializer terminal_callback_;
+  callbacks_called cc_ = {0, 0, 0, 0, 0, "", &terminal_callback_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
@@ -116,6 +147,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ClientIntegrationTest, Basic) {
+  initialize();
+
   ConditionalInitializer server_started;
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
@@ -128,35 +161,15 @@ TEST_P(ClientIntegrationTest, Basic) {
   server_started.waitReady();
 
   envoy_stream_t stream = 1;
-  ConditionalInitializer terminal_callback;
-  // Setup bridge_callbacks to handle the response.
-  envoy_http_callbacks bridge_callbacks;
-  callbacks_called cc = {0, 0, 0, 0, 0, &terminal_callback};
-  bridge_callbacks.context = &cc;
-  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
-                                   void* context) -> void* {
-    EXPECT_FALSE(end_stream);
-    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
-    EXPECT_EQ(response_headers->Status()->value().getStringView(), "200");
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers_calls++;
-    return nullptr;
-  };
-  bridge_callbacks.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void* {
+  bridge_callbacks_.on_data = [](envoy_data c_data, bool end_stream, void* context) -> void* {
     if (end_stream) {
       EXPECT_EQ(Data::Utility::copyToString(c_data), "");
     } else {
       EXPECT_EQ(c_data.length, 10);
     }
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_data_calls++;
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_data_calls++;
     c_data.release(c_data.context);
-    return nullptr;
-  };
-  bridge_callbacks.on_complete = [](void* context) -> void* {
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete_calls++;
-    cc->terminal_callback->setReady();
     return nullptr;
   };
 
@@ -178,22 +191,25 @@ TEST_P(ClientIntegrationTest, Basic) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks);
+    http_client_->startStream(stream, bridge_callbacks_);
     http_client_->sendHeaders(stream, c_headers, false);
     http_client_->sendData(stream, c_data, false);
     http_client_->sendTrailers(stream, c_trailers);
   });
-  terminal_callback.waitReady();
+  terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc.on_headers_calls, 1);
-  ASSERT_EQ(cc.on_data_calls, 2);
-  ASSERT_EQ(cc.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
 
   // stream_success gets charged for 2xx status codes.
   test_server_->waitForCounterEq("http.client.stream_success", 1);
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
+  initialize();
+
   ConditionalInitializer server_started;
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
@@ -211,33 +227,6 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
           Http::TestResponseHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
 
   envoy_stream_t stream = 1;
-  // Setup bridge_callbacks to handle the response.
-  envoy_http_callbacks bridge_callbacks;
-  ConditionalInitializer terminal_callback;
-  callbacks_called cc = {0, 0, 0, 0, 0, &terminal_callback};
-  bridge_callbacks.context = &cc;
-  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool end_stream,
-                                   void* context) -> void* {
-    EXPECT_TRUE(end_stream);
-    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
-    EXPECT_EQ(response_headers->Status()->value().getStringView(), "503");
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_headers_calls++;
-    return nullptr;
-  };
-  bridge_callbacks.on_complete = [](void* context) -> void* {
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_complete_calls++;
-    cc->terminal_callback->setReady();
-    return nullptr;
-  };
-  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
-    error.message.release(error.message.context);
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error_calls++;
-    return nullptr;
-  };
-
   // Build a set of request headers.
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -245,20 +234,23 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks);
+    http_client_->startStream(stream, bridge_callbacks_);
     http_client_->sendHeaders(stream, c_headers, true);
   });
-  terminal_callback.waitReady();
+  terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc.on_error_calls, 0);
-  ASSERT_EQ(cc.on_headers_calls, 1);
-  ASSERT_EQ(cc.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_error_calls, 0);
+  ASSERT_EQ(cc_.status, "503");
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
 
   // stream_failure gets charged for all non-2xx status codes.
   test_server_->waitForCounterEq("http.client.stream_failure", 1);
 }
 
 TEST_P(ClientIntegrationTest, BasicReset) {
+  initialize();
+
   ConditionalInitializer server_started;
   test_server_->server().dispatcher().post([this, &server_started]() -> void {
     http_client_ = std::make_unique<Http::Client>(
@@ -271,23 +263,6 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   server_started.waitReady();
 
   envoy_stream_t stream = 1;
-  // Setup bridge_callbacks to handle the response.
-  envoy_http_callbacks bridge_callbacks;
-  ConditionalInitializer terminal_callback;
-  callbacks_called cc = {0, 0, 0, 0, 0, &terminal_callback};
-  bridge_callbacks.context = &cc;
-  bridge_callbacks.on_headers = [](envoy_headers c_headers, bool, void*) -> void* {
-    release_envoy_headers(c_headers);
-    ADD_FAILURE() << "unexpected call to on_headers";
-    return nullptr;
-  };
-  bridge_callbacks.on_error = [](envoy_error error, void* context) -> void* {
-    error.message.release(error.message.context);
-    callbacks_called* cc = static_cast<callbacks_called*>(context);
-    cc->on_error_calls++;
-    cc->terminal_callback->setReady();
-    return nullptr;
-  };
 
   // Build a set of request headers.
   Http::TestRequestHeaderMapImpl headers;
@@ -298,13 +273,13 @@ TEST_P(ClientIntegrationTest, BasicReset) {
 
   // Create a stream.
   dispatcher_->post([&]() -> void {
-    http_client_->startStream(stream, bridge_callbacks);
+    http_client_->startStream(stream, bridge_callbacks_);
     http_client_->sendHeaders(stream, c_headers, true);
   });
-  terminal_callback.waitReady();
+  terminal_callback_.waitReady();
 
-  ASSERT_EQ(cc.on_error_calls, 1);
-  ASSERT_EQ(cc.on_headers_calls, 0);
+  ASSERT_EQ(cc_.on_error_calls, 1);
+  ASSERT_EQ(cc_.on_headers_calls, 0);
   // Reset causes a charge to stream_failure.
   test_server_->waitForCounterEq("http.client.stream_failure", 1);
 }
@@ -312,6 +287,86 @@ TEST_P(ClientIntegrationTest, BasicReset) {
 // TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset
 // fired from the Http:ConnectionManager rather than the Http::Client. This cannot be done in
 // unit tests because the Http::ConnectionManager is mocked using a mock response encoder.
+
+// Test header key case sensitivity.
+TEST_P(ClientIntegrationTest, CaseSensitive) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto typed_extension_config = protocol_options.mutable_explicit_http_config()
+                                      ->mutable_http_protocol_options()
+                                      ->mutable_header_key_format()
+                                      ->mutable_stateful_formatter();
+    typed_extension_config->set_name("preserve_case");
+    typed_extension_config->mutable_typed_config()->set_type_url(
+        "type.googleapis.com/"
+        "envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig");
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+
+  autonomous_upstream_ = false;
+  initialize();
+
+  ConditionalInitializer server_started;
+  test_server_->server().dispatcher().post([this, &server_started]() -> void {
+    http_client_ = std::make_unique<Http::Client>(
+        test_server_->server().listenerManager().apiListener()->get().http()->get(), *dispatcher_,
+        test_server_->statStore(), preferred_network_,
+        test_server_->server().api().randomGenerator());
+    dispatcher_->drain(test_server_->server().dispatcher());
+    server_started.setReady();
+  });
+  server_started.waitReady();
+
+  envoy_stream_t stream = 1;
+  bridge_callbacks_.on_headers = [](envoy_headers c_headers, bool, void* context) -> void* {
+    Http::ResponseHeaderMapPtr response_headers = toResponseHeaders(c_headers);
+    callbacks_called* cc_ = static_cast<callbacks_called*>(context);
+    cc_->on_headers_calls++;
+    cc_->status = response_headers->Status()->value().getStringView();
+    EXPECT_EQ("My-ResponsE-Header",
+              response_headers->formatter().value().get().format("my-response-header"));
+    return nullptr;
+  };
+
+  // Build a set of request headers.
+  Http::TestRequestHeaderMapImpl headers{{"FoO", "bar"}};
+  headers.header_map_->setFormatter(
+      std::make_unique<
+          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>());
+  headers.header_map_->formatter().value().get().processKey("FoO");
+  HttpTestUtility::addDefaultHeaders(headers);
+  envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);
+
+  // Create a stream.
+  dispatcher_->post([&]() -> void {
+    http_client_->startStream(stream, bridge_callbacks_);
+    http_client_->sendHeaders(stream, c_headers, true);
+  });
+
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  // Verify that the upstream request has preserved cased headers.
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+  EXPECT_TRUE(absl::StrContains(upstream_request, "FoO: bar")) << upstream_request;
+
+  // Verify that the downstream response has preserved cased headers.
+  auto response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nMy-ResponsE-Header: foo\r\n\r\n";
+  ASSERT_TRUE(upstream_connection->write(response));
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+
+  // stream_success gets charged for 2xx status codes.
+  test_server_->waitForCounterEq("http.client.stream_success", 1);
+}
 
 } // namespace
 } // namespace Envoy
