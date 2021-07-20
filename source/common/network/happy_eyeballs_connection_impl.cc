@@ -122,9 +122,16 @@ void HappyEyeballsConnectionImpl::readDisable(bool disable) {
     connections_[0]->readDisable(disable);
     return;
   }
-  //  if (!per_connection_state_.read_disable_count_.has_value()) {
-  //  }
-  per_connection_state_.read_disable_count_.value()++;
+  if (!post_connect_state_.read_disable_count_.has_value()) {
+    post_connect_state_.read_disable_count_ = 0;
+  }
+
+  if (disable) {
+    post_connect_state_.read_disable_count_.value()++;
+  } else {
+    ASSERT(post_connect_state_.read_disable_count_ != 0);
+    post_connect_state_.read_disable_count_.value()--;
+  }
 }
 
 void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
@@ -138,8 +145,8 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
 
 bool HappyEyeballsConnectionImpl::readEnabled() const {
   if (!connect_finished_) {
-    return !per_connection_state_.read_disable_count_.has_value() ||
-           per_connection_state_.read_disable_count_ == 0;
+    return !post_connect_state_.read_disable_count_.has_value() ||
+        post_connect_state_.read_disable_count_ == 0;
 
   }
   return connections_[0]->readEnabled();
@@ -389,6 +396,10 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   if (per_connection_state_.delayed_close_timeout_.has_value()) {
     connection->setDelayedCloseTimeout(per_connection_state_.delayed_close_timeout_.value());
   }
+  if (per_connection_state_.start_secure_transport_.has_value()) {
+    ASSERT(per_connection_state_.start_secure_transport_);
+    connection->startSecureTransport();
+  }
 
   return connection;
 }
@@ -450,6 +461,12 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
   }
 
   if (event == ConnectionEvent::Connected) {
+    for (auto& filter : post_connect_state_.filters_) {
+      connections_[0]->addFilter(filter);
+    }
+    for (auto& filter : post_connect_state_.write_filters_) {
+      connections_[0]->addWriteFilter(filter);
+    }
     for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
     }
@@ -458,16 +475,18 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
       bool initialized = connections_[0]->initializeReadFilters();
       ASSERT(initialized);
     }
-    for (int i = 0; i < per_connection_state_.read_disable_count_.value(); ++i) {
-      connections_[0]->readDisable(true);
+    if (post_connect_state_.read_disable_count_.has_value()) {
+      for (int i = 0; i < post_connect_state_.read_disable_count_.value(); ++i) {
+        connections_[0]->readDisable(true);
+      }
     }
-  }
 
-  if (post_connect_state_.write_buffer_.has_value()) {
-    // write_buffer_ and end_stream_ are both set together in write().
-    ASSERT(post_connect_state_.end_stream_.has_value());
-    connections_[0]->write(*post_connect_state_.write_buffer_.value(),
-                           post_connect_state_.end_stream_.value());
+    if (post_connect_state_.write_buffer_.has_value()) {
+      // write_buffer_ and end_stream_ are both set together in write().
+      ASSERT(post_connect_state_.end_stream_.has_value());
+      connections_[0]->write(*post_connect_state_.write_buffer_.value(),
+                             post_connect_state_.end_stream_.value());
+    }
   }
 
   std::vector<ConnectionCallbacks*> cbs;

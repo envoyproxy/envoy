@@ -128,7 +128,6 @@ private:
     absl::optional<bool> enable_half_close_;
     OptRef<const ConnectionStats> connection_stats_;
     absl::optional<uint32_t> buffer_limits_;
-    absl::optional<int> read_disable_count_;
     absl::optional<bool> start_secure_transport_;
     absl::optional<std::chrono::milliseconds> delayed_close_timeout_;
   };
@@ -142,6 +141,7 @@ private:
     std::vector<WriteFilterSharedPtr> write_filters_;
     std::vector<FilterSharedPtr> filters_;
     absl::optional<Buffer::InstancePtr> write_buffer_;
+    absl::optional<int> read_disable_count_;
     absl::optional<bool> end_stream_;
     absl::optional<bool> initialize_read_filters_;
   };
