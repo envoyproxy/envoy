@@ -10,6 +10,16 @@ namespace Http {
 namespace Utility {
 
 /**
+ * Transform envoy_headers to the supplied HeaderMap
+ * This function copies the content.
+ * @param envoy_result_headers, the Envoy headers to fill in. These headers must have a formatter
+ *        set.
+ * @param headers, the envoy_headers to transform. headers is free'd. Use after function return is
+ * unsafe.
+ */
+void toEnvoyHeaders(HeaderMap& envoy_result_headers, envoy_headers headers);
+
+/**
  * Transform envoy_headers to RequestHeaderMap.
  * This function copies the content.
  * @param headers, the envoy_headers to transform. headers is free'd. Use after function return is

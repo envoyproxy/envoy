@@ -49,6 +49,7 @@ envoy_cc_library(
         "@envoy//envoy/buffer:buffer_interface",
         "@envoy//envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
+        "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",
     ],
 )
 
