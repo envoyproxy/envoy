@@ -660,7 +660,7 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
-              ->create(),
+              ->createUncachedRawAsyncClient(),
           Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
           Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
           access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
