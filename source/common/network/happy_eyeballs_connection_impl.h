@@ -76,7 +76,7 @@ public:
   void close(ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override;
   uint64_t id() const override;
-  void hashKey(std::vector<uint8_t>& hash) const override;
+  void hashKey(std::vector<uint8_t>& hash_key) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
 
@@ -125,18 +125,29 @@ private:
   struct PerConnectionState {
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
+    absl::optional<bool> enable_half_close_;
     OptRef<const ConnectionStats> connection_stats_;
     absl::optional<uint32_t> buffer_limits_;
+    absl::optional<int> read_disable_count_;
+    absl::optional<bool> start_secure_transport_;
+    absl::optional<std::chrono::milliseconds> delayed_close_timeout_;
   };
 
   // State which needs to be saved and applied only to the final connection
   // attempt.
   struct PostConnectState {
     std::vector<ConnectionCallbacks*> connection_callbacks_;
+    std::vector<Connection::BytesSentCb> bytes_sent_callbacks_;
     std::vector<ReadFilterSharedPtr> read_filters_;
+    std::vector<WriteFilterSharedPtr> write_filters_;
+    std::vector<FilterSharedPtr> filters_;
     absl::optional<Buffer::InstancePtr> write_buffer_;
     absl::optional<bool> end_stream_;
+    absl::optional<bool> initialize_read_filters_;
   };
+
+  // ID for this connection which is distinct from the ID of the underlying connections.
+  const uint64_t id_;
 
   Event::Dispatcher& dispatcher_;
   const std::vector<Address::InstanceConstSharedPtr>& address_list_;

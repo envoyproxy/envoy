@@ -10,7 +10,8 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    : dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
+    // XXX: get a real id.
+    : id_(42), dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
       socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
       options_(options),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
@@ -26,13 +27,19 @@ void HappyEyeballsConnectionImpl::connect() {
 }
 
 void HappyEyeballsConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->addWriteFilter(filter);
+  if (connect_finished_) {
+    connections_[0]->addWriteFilter(filter);
+    return;
+  }
+  post_connect_state_.write_filters_.push_back(filter);
 }
 
 void HappyEyeballsConnectionImpl::addFilter(FilterSharedPtr filter) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->addFilter(filter);
+  if (connect_finished_) {
+    connections_[0]->addFilter(filter);
+    return;
+  }
+  post_connect_state_.filters_.push_back(filter);
 }
 
 void HappyEyeballsConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
@@ -44,33 +51,61 @@ void HappyEyeballsConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 }
 
 void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->removeReadFilter(filter);
+  if (connect_finished_) {
+    connections_[0]->removeReadFilter(filter);
+    return;
+  }
+  auto i = post_connect_state_.read_filters_.begin();
+  while (i != post_connect_state_.read_filters_.end()) {
+    if (*i == filter) {
+      post_connect_state_.read_filters_.erase(i);
+      return;
+    }
+  }
+  ASSERT(false);
 }
 
 bool HappyEyeballsConnectionImpl::initializeReadFilters() {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  return connections_[0]->initializeReadFilters();
+  if (connect_finished_) {
+    return connections_[0]->initializeReadFilters();
+  }
+  if (!post_connect_state_.read_filters_.empty()) {
+    return false;
+  }
+  post_connect_state_.initialize_read_filters_.value() = true;
+  return true;
+
 }
 
 void HappyEyeballsConnectionImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->addBytesSentCallback(cb);
+  if (connect_finished_) {
+    connections_[0]->addBytesSentCallback(cb);
+    return;
+  }
+  post_connect_state_.bytes_sent_callbacks_.push_back(cb);
 }
 
 void HappyEyeballsConnectionImpl::enableHalfClose(bool enabled) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->enableHalfClose(enabled);
+  if (!connect_finished_) {
+    per_connection_state_.enable_half_close_ = enabled;
+  }
+  for (auto& connection : connections_) {
+    connection->enableHalfClose(enabled);
+  }
 }
 
 bool HappyEyeballsConnectionImpl::isHalfCloseEnabled() {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  return connections_[0]->isHalfCloseEnabled();
+  if (connect_finished_) {
+    return connections_[0]->isHalfCloseEnabled();
+  }
+  return per_connection_state_.enable_half_close_.has_value() && per_connection_state_.enable_half_close_.value();
 }
 
 std::string HappyEyeballsConnectionImpl::nextProtocol() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  return connections_[0]->nextProtocol();
+  if (connect_finished_) {
+    return connections_[0]->nextProtocol();
+  }
+  return "";
 }
 
 void HappyEyeballsConnectionImpl::noDelay(bool enable) {
@@ -83,8 +118,13 @@ void HappyEyeballsConnectionImpl::noDelay(bool enable) {
 }
 
 void HappyEyeballsConnectionImpl::readDisable(bool disable) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->readDisable(disable);
+  if (connect_finished_) {
+    connections_[0]->readDisable(disable);
+    return;
+  }
+  //  if (!per_connection_state_.read_disable_count_.has_value()) {
+  //  }
+  per_connection_state_.read_disable_count_.value()++;
 }
 
 void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
@@ -98,29 +138,31 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
 
 bool HappyEyeballsConnectionImpl::readEnabled() const {
   if (!connect_finished_) {
-    ASSERT(connections_[0]->readEnabled());
+    return !per_connection_state_.read_disable_count_.has_value() ||
+           per_connection_state_.read_disable_count_ == 0;
+
   }
   return connections_[0]->readEnabled();
 }
 
 const SocketAddressProvider& HappyEyeballsConnectionImpl::addressProvider() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->addressProvider();
 }
 
 SocketAddressProviderSharedPtr HappyEyeballsConnectionImpl::addressProviderSharedPtr() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->addressProviderSharedPtr();
 }
 
 absl::optional<Connection::UnixDomainSocketPeerCredentials>
 HappyEyeballsConnectionImpl::unixSocketPeerCredentials() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->unixSocketPeerCredentials();
 }
 
 Ssl::ConnectionInfoConstSharedPtr HappyEyeballsConnectionImpl::ssl() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->ssl();
 }
 
@@ -186,37 +228,43 @@ bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
 }
 
 const ConnectionSocket::OptionsSharedPtr& HappyEyeballsConnectionImpl::socketOptions() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->socketOptions();
 }
 
 absl::string_view HappyEyeballsConnectionImpl::requestedServerName() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->requestedServerName();
 }
 
 StreamInfo::StreamInfo& HappyEyeballsConnectionImpl::streamInfo() {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->streamInfo();
 }
 
 const StreamInfo::StreamInfo& HappyEyeballsConnectionImpl::streamInfo() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->streamInfo();
 }
 
 absl::string_view HappyEyeballsConnectionImpl::transportFailureReason() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->transportFailureReason();
 }
 
 bool HappyEyeballsConnectionImpl::startSecureTransport() {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  return connections_[0]->startSecureTransport();
+  if (!connect_finished_) {
+    per_connection_state_.start_secure_transport_ = true;
+  }
+  bool ret = false;
+  for (auto& connection : connections_) {
+    ret = connection->startSecureTransport();
+  }
+  return ret;
 }
 
 absl::optional<std::chrono::milliseconds> HappyEyeballsConnectionImpl::lastRoundTripTime() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
+  // Note, this might change before connect finishes.
   return connections_[0]->lastRoundTripTime();
 }
 
@@ -276,13 +324,15 @@ Event::Dispatcher& HappyEyeballsConnectionImpl::dispatcher() {
 }
 
 uint64_t HappyEyeballsConnectionImpl::id() const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  return connections_[0]->id();
+  return id_;
 }
 
-void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash) const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->hashKey(hash);
+void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  // Pack the id into sizeof(id_) uint8_t entries in the hash_key vector.
+  hash_key.reserve(hash_key.size() + sizeof(id_));
+  for (unsigned i = 0; i < sizeof(id_); ++i) {
+    hash_key.push_back(0xFF & (id_ >> (8 * i)));
+  }
 }
 
 void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
@@ -295,13 +345,21 @@ void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stat
 }
 
 void HappyEyeballsConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->setDelayedCloseTimeout(timeout);
+  if (!connect_finished_) {
+    per_connection_state_.delayed_close_timeout_ = timeout;
+  }
+  for (auto& connection : connections_) {
+    connection->setDelayedCloseTimeout(timeout);
+  }
 }
 
 void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
-  ENVOY_BUG(connect_finished_, "connect() has not finished");
-  connections_[0]->dumpState(os, indent_level);
+  const char* spaces = spacesForLevel(indent_level);
+  os << spaces << "HappyEyeballsConnectionImpl " << this << DUMP_MEMBER(id_) << DUMP_MEMBER(connect_finished_) << "\n";
+
+  for (auto& connection : connections_) {
+    DUMP_DETAILS(connection);
+  }
 }
 
 ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
@@ -325,6 +383,13 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   if (per_connection_state_.buffer_limits_.has_value()) {
     connection->setBufferLimits(per_connection_state_.buffer_limits_.value());
   }
+  if (per_connection_state_.enable_half_close_.has_value()) {
+    connection->enableHalfClose(per_connection_state_.enable_half_close_.value());
+  }
+  if (per_connection_state_.delayed_close_timeout_.has_value()) {
+    connection->setDelayedCloseTimeout(per_connection_state_.delayed_close_timeout_.value());
+  }
+
   return connection;
 }
 
@@ -379,9 +444,22 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
       connections_[0]->addConnectionCallbacks(*cb);
     }
   }
+
+  for (auto cb : post_connect_state_.bytes_sent_callbacks_) {
+    connections_[0]->addBytesSentCallback(cb);
+  }
+
   if (event == ConnectionEvent::Connected) {
     for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
+    }
+    if (post_connect_state_.initialize_read_filters_.has_value()  &&
+        post_connect_state_.initialize_read_filters_.value()) {
+      bool initialized = connections_[0]->initializeReadFilters();
+      ASSERT(initialized);
+    }
+    for (int i = 0; i < per_connection_state_.read_disable_count_.value(); ++i) {
+      connections_[0]->readDisable(true);
     }
   }
 
