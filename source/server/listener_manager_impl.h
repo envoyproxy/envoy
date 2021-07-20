@@ -234,8 +234,8 @@ private:
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
-  static bool hasListenerWithAddress(const ListenerList& list,
-                                     const Network::Address::Instance& address);
+  static bool hasListenerWithCompatibleAddress(const ListenerList& list,
+                                               const ListenerImpl& listener);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
