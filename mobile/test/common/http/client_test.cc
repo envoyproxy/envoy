@@ -305,6 +305,28 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers3), true));
   http_client_.sendHeaders(stream_, c_headers3, true);
 
+  // Setting ALPN
+  TestRequestHeaderMapImpl headers_alpn{{"x-envoy-mobile-upstream-protocol", "alpn"}};
+  HttpTestUtility::addDefaultHeaders(headers_alpn);
+  headers_alpn.setScheme("https");
+  envoy_headers c_headers_alpn = Utility::toBridgeHeaders(headers_alpn);
+
+  preferred_network_.store(ENVOY_NET_WWAN);
+  alt_cluster_ = 1;
+
+  TestResponseHeaderMapImpl expected_headers_alpn{
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":authority", "host"},
+      {":path", "/"},
+      {"x-envoy-mobile-cluster", "base_wwan_alpn_alt"},
+      {"x-forwarded-proto", "https"},
+  };
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers_alpn), true));
+  http_client_.sendHeaders(stream_, c_headers_alpn, true);
+
   // Setting http1.
   TestRequestHeaderMapImpl headers4{{"x-envoy-mobile-upstream-protocol", "http1"}};
   HttpTestUtility::addDefaultHeaders(headers4);
