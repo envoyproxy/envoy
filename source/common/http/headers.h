@@ -188,6 +188,7 @@ public:
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
+  const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
   const LowerCaseString GrpcTimeout{"grpc-timeout"};
@@ -214,7 +215,6 @@ public:
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
-  const LowerCaseString XForwardedProto{"x-forwarded-proto"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
 
   struct {

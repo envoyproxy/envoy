@@ -1233,7 +1233,7 @@ TEST(HttpUtility, TestRejectNominatedXForwardedHost) {
   EXPECT_EQ(sanitized_headers, request_headers);
 }
 
-TEST(HttpUtility, TestRejectNominatedXForwardedProto) {
+TEST(HttpUtility, TestRejectNominatedForwardedProto) {
   Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"},
       {":path", "/"},

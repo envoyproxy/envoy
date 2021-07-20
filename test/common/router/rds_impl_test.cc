@@ -121,7 +121,7 @@ http_filters:
 
   RouteConstSharedPtr route(Http::TestRequestHeaderMapImpl headers) {
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-    headers.addCopy(":scheme", "http");
+    headers.addCopy("x-forwarded-proto", "http");
     return rds_->config()->route(headers, stream_info, 0);
   }
 

@@ -45,11 +45,6 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::string_view getXFPOrScheme(const Http::RequestHeaderMap& headers) {
-  absl::string_view xfp = headers.getXForwardedProtoValue();
-  return xfp.empty() ? headers.getSchemeValue() : xfp;
-}
-
 const std::string DEPRECATED_ROUTER_NAME = "envoy.router";
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
@@ -758,7 +753,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
     // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPs
     // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
     // have the port stripped when served over TLS.
-    absl::string_view request_protocol = getXFPOrScheme(headers);
+    absl::string_view request_protocol = headers.getForwardedProtoValue();
     bool remove_port = !new_port.empty();
 
     if (new_scheme != request_protocol) {
@@ -1380,12 +1375,10 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
   // connection), force a redirect based on underlying protocol, rather than URL
   // scheme, so don't force a redirect for a http:// url served over a TLS
   // connection.
-  // TODO(alyssar, mattklein123) is the goal here to force TLS, or force https:
-  // scheme? Maybe upstreams will get confused if seeing an http url.
-  const absl::string_view scheme = getXFPOrScheme(headers);
+  const absl::string_view scheme = headers.getForwardedProtoValue();
   if (scheme.empty()) {
     // No scheme header. This normally only happens when ActiveStream::decodeHeaders
-    // bails early (as it rejects a request), so there is no routing is going to happen anyway.
+    // bails early (as it rejects a request), or a buggy filter removes the :scheme header.
     return nullptr;
   }
 

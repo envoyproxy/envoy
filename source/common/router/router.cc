@@ -83,7 +83,10 @@ void FilterUtility::setUpstreamScheme(Http::RequestHeaderMap& headers, bool down
     if (Http::HeaderUtility::schemeIsValid(headers.getSchemeValue())) {
       return;
     }
-    absl::string_view xfp = headers.getXForwardedProtoValue();
+    // After all the changes in https://github.com/envoyproxy/envoy/issues/14587
+    // this path should only occur if a buggy filter has removed the :scheme
+    // header. In that case best-effort set from X-Forwarded-Proto.
+    absl::string_view xfp = headers.getForwardedProtoValue();
     if (Http::HeaderUtility::schemeIsValid(xfp)) {
       headers.setScheme(xfp);
       return;

@@ -680,7 +680,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
 
     } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
                (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
-               (lcs_header_to_remove == Http::Headers::get().XForwardedProto) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
                !token_sv.find(':')) {
 
       // An attacker could nominate an X-Forwarded* header, and its removal may mask
@@ -769,11 +769,10 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
 }
 
 absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_scheme_header") &&
-      !headers.getSchemeValue().empty()) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_scheme_and_xfp")) {
     return headers.getSchemeValue();
   }
-  return headers.getXForwardedProtoValue();
+  return headers.getForwardedProtoValue();
 }
 
 std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,

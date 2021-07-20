@@ -13,6 +13,9 @@ Minor Behavior Changes
   which defines the minimal number of headers in a request/response/trailers required for using a
   dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
   feature to a non-negative number will override the default value.
+* http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
+  (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
+  can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
 
 Bug Fixes
 ---------

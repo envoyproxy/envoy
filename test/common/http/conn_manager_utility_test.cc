@@ -277,12 +277,12 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("https", headers.getXForwardedProtoValue());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
   // Given :scheme was not set, it will be set to X-Forwarded-Proto
   EXPECT_EQ("https", headers.getSchemeValue());
 
   // Make sure if x-forwarded-proto changes it doesn't cause problems.
-  headers.setXForwardedProto("ftp");
+  headers.setForwardedProto("ftp");
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
@@ -296,7 +296,7 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.getXForwardedProtoValue());
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
   // Given :scheme was not set, it will be set to X-Forwarded-Proto
   EXPECT_EQ("http", headers.getSchemeValue());
 }
@@ -313,7 +313,7 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetSch
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "foo"}};
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("foo", headers.getXForwardedProtoValue());
+  EXPECT_EQ("foo", headers.getForwardedProtoValue());
   // Given :scheme was not set, but X-Forwarded-Proto is not a valid scheme,
   // scheme will be set based on encryption level.
   EXPECT_EQ("http", headers.getSchemeValue());
@@ -329,7 +329,7 @@ TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
   ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
 
   callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.getXForwardedProtoValue());
+  EXPECT_EQ("http", headers.getForwardedProtoValue());
   // Given :scheme was set, it will not be changed.
   EXPECT_EQ("https", headers.getSchemeValue());
 }
@@ -348,7 +348,7 @@ TEST_F(ConnectionManagerUtilityTest, SchemeOverwrite) {
   config_.scheme_ = "https";
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("https", headers.getSchemeValue());
-  EXPECT_EQ("https", headers.getXForwardedProtoValue());
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is

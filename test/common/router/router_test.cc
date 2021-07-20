@@ -5561,7 +5561,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // With invalid x-forwarded-proto, still use scheme.
   {
     Http::TestRequestHeaderMapImpl headers;
-    headers.setXForwardedProto("foo");
+    headers.setForwardedProto("foo");
     FilterUtility::setUpstreamScheme(headers, true, true);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }
@@ -5569,7 +5569,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   // Use valid x-forwarded-proto.
   {
     Http::TestRequestHeaderMapImpl headers;
-    headers.setXForwardedProto(Http::Headers::get().SchemeValues.Http);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
     FilterUtility::setUpstreamScheme(headers, true, true);
     EXPECT_EQ("http", headers.get_(":scheme"));
   }
@@ -5578,7 +5578,7 @@ TEST(RouterFilterUtilityTest, SetUpstreamScheme) {
   {
     Http::TestRequestHeaderMapImpl headers;
     headers.setScheme(Http::Headers::get().SchemeValues.Https);
-    headers.setXForwardedProto(Http::Headers::get().SchemeValues.Http);
+    headers.setForwardedProto(Http::Headers::get().SchemeValues.Http);
     FilterUtility::setUpstreamScheme(headers, false, false);
     EXPECT_EQ("https", headers.get_(":scheme"));
   }

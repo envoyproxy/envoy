@@ -27,7 +27,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
       .Times(2)
       .WillRepeatedly(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_EQ("http", headers.getXForwardedProtoValue());
+        EXPECT_EQ("http", headers.getForwardedProtoValue());
         if (headers.Path()->value() == "/healthcheck") {
           filter->callbacks_->streamInfo().healthCheck(true);
         }
@@ -92,7 +92,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_EQ("http", headers.getXForwardedProtoValue());
+        EXPECT_EQ("http", headers.getForwardedProtoValue());
         return FilterHeadersStatus::StopIteration;
       }));
 
@@ -3662,7 +3662,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
         EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_EQ("https", headers.getXForwardedProtoValue());
+        EXPECT_EQ("https", headers.getForwardedProtoValue());
         return FilterHeadersStatus::StopIteration;
       }));
 

@@ -304,6 +304,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
+  HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcTimeout)                                                                         \
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(Method)                                                                              \
@@ -311,8 +312,7 @@ private:
   HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(Scheme)                                                                              \
   HEADER_FUNC(TE)                                                                                  \
-  HEADER_FUNC(UserAgent)                                                                           \
-  HEADER_FUNC(XForwardedProto)
+  HEADER_FUNC(UserAgent)
 
 #define INLINE_REQ_NUMERIC_HEADERS(HEADER_FUNC)                                                    \
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \

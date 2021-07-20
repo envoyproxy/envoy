@@ -60,6 +60,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.check_ocsp_policy",
+    "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
@@ -94,7 +95,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.upstream_http2_flood_checks",
-    "envoy.reloadable_features.use_scheme_header",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
 };
