@@ -908,26 +908,36 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-absl::optional<HttpPoolData>
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
+HttpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
-    LoadBalancerContext* context) {
+    LoadBalancerContext* context, bool fetch_pool_all_hosts) {
+  HttpPoolDataVector pool_set;
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = connPool(priority, protocol, context, false);
-  if (pool == nullptr) {
-    return absl::nullopt;
+  const auto& selected_hosts = selectHosts(context, false, fetch_pool_all_hosts);
+
+  for (const auto& host : selected_hosts) {
+    auto pool = connPool(host, priority, protocol, context);
+    if (pool == nullptr) {
+      continue;
+    }
+
+    pool_set.emplace_back(
+        [this, priority, protocol, context]() -> void {
+          // Now that a new stream is being established, attempt to preconnect.
+          maybePreconnect(*this, parent_.cluster_manager_state_,
+                          [this, &priority, &protocol, &context]() -> ConnectionPool::Instance* {
+                            const auto& selected_hosts = selectHosts(context, true, false);
+                            ASSERT(selected_hosts.size() < 2);
+                            if (selected_hosts.empty()) {
+                              return nullptr;
+                            }
+                            return connPool(selected_hosts[0], priority, protocol, context);
+                          });
+        },
+        pool);
   }
 
-  HttpPoolData data(
-      [this, priority, protocol, context]() -> void {
-        // Now that a new stream is being established, attempt to preconnect.
-        maybePreconnect(*this, parent_.cluster_manager_state_,
-                        [this, &priority, &protocol, &context]() {
-                          return connPool(priority, protocol, context, true);
-                        });
-      },
-      pool);
-  return data;
+  return pool_set;
 }
 
 absl::optional<TcpPoolData>
@@ -1400,19 +1410,36 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   }
 }
 
-Http::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-    LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
-  if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+std::vector<HostConstSharedPtr>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::selectHosts(
+    LoadBalancerContext* context, bool peek, bool fetch_all_hosts) {
+  std::vector<HostConstSharedPtr> hosts;
+
+  if (fetch_all_hosts) {
+    for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+      for (const HostSharedPtr& host : host_set->hosts()) {
+        hosts.emplace_back(host);
+      }
     }
-    return nullptr;
+  } else {
+    HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+    if (!host) {
+      if (!peek) {
+        ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+        cluster_info_->stats().upstream_cx_none_healthy_.inc();
+      }
+      return hosts;
+    }
+    hosts.emplace_back(host);
   }
 
+  return hosts;
+}
+
+Http::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
+    HostConstSharedPtr host, ResourcePriority priority,
+    absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context) {
   // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
   // We could do better here, and always use the ALPN pool and simply make sure
   // we end up on a connection of the correct protocol, but for simplicity we're

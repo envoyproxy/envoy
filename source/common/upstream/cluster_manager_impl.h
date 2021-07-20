@@ -402,10 +402,11 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
+      std::vector<HostConstSharedPtr> selectHosts(LoadBalancerContext* context, bool peek,
+                                                  bool fetch_all_hosts);
+      Http::ConnectionPool::Instance* connPool(HostConstSharedPtr host, ResourcePriority priority,
                                                absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context, bool peek);
-
+                                               LoadBalancerContext* context);
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
 
@@ -413,9 +414,10 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
-                                                absl::optional<Http::Protocol> downstream_protocol,
-                                                LoadBalancerContext* context) override;
+      HttpPoolDataVector httpConnPool(ResourcePriority priority,
+                                      absl::optional<Http::Protocol> downstream_protocol,
+                                      LoadBalancerContext* context,
+                                      bool fetch_pool_all_hosts) override;
       absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;

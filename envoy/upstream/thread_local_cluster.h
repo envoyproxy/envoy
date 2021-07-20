@@ -44,6 +44,8 @@ private:
   Http::ConnectionPool::Instance* pool_;
 };
 
+using HttpPoolDataVector = std::vector<HttpPoolData>;
+
 // Tcp pool returns information about a given pool, as well as a function to
 // create connections on that pool.
 class TcpPoolData {
@@ -105,9 +107,10 @@ public:
    *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
-  virtual absl::optional<HttpPoolData>
-  httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-               LoadBalancerContext* context) PURE;
+  virtual HttpPoolDataVector httpConnPool(ResourcePriority priority,
+                                          absl::optional<Http::Protocol> downstream_protocol,
+                                          LoadBalancerContext* context,
+                                          bool fetch_pool_all_hosts) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
