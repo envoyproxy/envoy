@@ -15,8 +15,8 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
   ON_CALL(*this, loadBalancer()).WillByDefault(ReturnRef(lb_));
   ON_CALL(*this, httpConnPool(_, _, _, _))
       .WillByDefault(Return(HttpPoolDataVector{Upstream::HttpPoolData([]() {}, &conn_pool_)}));
-  ON_CALL(*this, tcpConnPool(_, _))
-      .WillByDefault(Return(Upstream::TcpPoolData([]() {}, &tcp_conn_pool_)));
+  ON_CALL(*this, tcpConnPool(_, _, _))
+      .WillByDefault(Return(TcpPoolDataVector{Upstream::TcpPoolData([]() {}, &tcp_conn_pool_)}));
   ON_CALL(*this, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
 }
 

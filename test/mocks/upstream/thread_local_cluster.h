@@ -33,8 +33,8 @@ public:
   MOCK_METHOD(HttpPoolDataVector, httpConnPool,
               (ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
                LoadBalancerContext* context, bool fetch_pool_all_hosts));
-  MOCK_METHOD(absl::optional<TcpPoolData>, tcpConnPool,
-              (ResourcePriority priority, LoadBalancerContext* context));
+  MOCK_METHOD(TcpPoolDataVector, tcpConnPool,
+              (ResourcePriority priority, LoadBalancerContext* context, bool fetch_pool_all_hosts));
   MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConn_, (LoadBalancerContext * context));
   MOCK_METHOD(Http::AsyncClient&, httpAsyncClient, ());
 

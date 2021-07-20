@@ -402,13 +402,15 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      std::vector<HostConstSharedPtr> selectHosts(LoadBalancerContext* context, bool peek,
-                                                  bool fetch_all_hosts);
-      Http::ConnectionPool::Instance* connPool(HostConstSharedPtr host, ResourcePriority priority,
-                                               absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context);
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context, bool peek);
+      std::set<HostConstSharedPtr> selectHosts(LoadBalancerContext* context, bool peek,
+                                               bool fetch_all_hosts);
+      Http::ConnectionPool::Instance*
+      httpConnPoolInternal(HostConstSharedPtr host, ResourcePriority priority,
+                           absl::optional<Http::Protocol> downstream_protocol,
+                           LoadBalancerContext* context);
+      Tcp::ConnectionPool::Instance* tcpConnPoolInternal(HostConstSharedPtr host,
+                                                         ResourcePriority priority,
+                                                         LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
@@ -418,8 +420,8 @@ private:
                                       absl::optional<Http::Protocol> downstream_protocol,
                                       LoadBalancerContext* context,
                                       bool fetch_pool_all_hosts) override;
-      absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
-                                              LoadBalancerContext* context) override;
+      TcpPoolDataVector tcpConnPool(ResourcePriority priority, LoadBalancerContext* context,
+                                    bool fetch_pool_all_hosts) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
 

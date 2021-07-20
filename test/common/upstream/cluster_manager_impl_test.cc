@@ -34,9 +34,9 @@ public:
 
 class TcpPoolDataPeer {
 public:
-  static Tcp::ConnectionPool::MockInstance* getPool(absl::optional<TcpPoolData> data) {
-    ASSERT(data.has_value());
-    return dynamic_cast<Tcp::ConnectionPool::MockInstance*>(data.value().pool_);
+  static Tcp::ConnectionPool::MockInstance* getSingleHostConnPool(TcpPoolDataVector data_set) {
+    ASSERT(data_set.size() == 1);
+    return dynamic_cast<Tcp::ConnectionPool::MockInstance*>(data_set[0].pool_);
   }
 };
 
@@ -1638,15 +1638,16 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp));
-  EXPECT_EQ(cp, HttpPoolDataPeer::getSingleHostConnPool(
-                    cluster_manager_->getThreadLocalCluster("fake_cluster")
-                        ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr,
-                                       false)));
+  EXPECT_EQ(cp,
+            HttpPoolDataPeer::getSingleHostConnPool(
+                cluster_manager_->getThreadLocalCluster("fake_cluster")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr)));
 
   Tcp::ConnectionPool::MockInstance* cp2 = new Tcp::ConnectionPool::MockInstance();
   EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(cp2));
-  EXPECT_EQ(cp2, TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("fake_cluster")
-                                              ->tcpConnPool(ResourcePriority::Default, nullptr)));
+  EXPECT_EQ(cp2, TcpPoolDataPeer::getSingleHostConnPool(
+                     cluster_manager_->getThreadLocalCluster("fake_cluster")
+                         ->tcpConnPool(ResourcePriority::Default, nullptr)));
 
   Network::MockClientConnection* connection = new Network::MockClientConnection();
   ON_CALL(*cluster2->info_, features())
@@ -1798,7 +1799,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp1));
     cluster_manager_->getThreadLocalCluster("some_cluster")
-        ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+        ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
@@ -1809,7 +1810,7 @@ TEST_F(ClusterManagerImplTest, CloseHttpConnectionsOnHealthFailure) {
 
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(cp2));
     cluster_manager_->getThreadLocalCluster("some_cluster")
-        ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false);
+        ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr);
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
@@ -2078,16 +2079,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp1_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp2_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
 
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(cp1_high, cp2_high);
@@ -2104,17 +2105,17 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
 
   // This should provide us a CP for each of the above hosts.
   Tcp::ConnectionPool::MockInstance* tcp1 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp2 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp1_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp2_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
 
   EXPECT_NE(tcp1, tcp2);
   EXPECT_NE(tcp1_high, tcp2_high);
@@ -2142,19 +2143,19 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp3_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
   EXPECT_EQ(cp2, cp3);
   EXPECT_EQ(cp2_high, cp3_high);
 
   Tcp::ConnectionPool::MockInstance* tcp3 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp3_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
   EXPECT_EQ(tcp2, tcp3);
   EXPECT_EQ(tcp2_high, tcp3_high);
 
@@ -2243,16 +2244,16 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp1_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp2_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
 
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(cp1_high, cp2_high);
@@ -2269,31 +2270,31 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   // This should provide us a CP for each of the above hosts, and for different SNIs
   Tcp::ConnectionPool::MockInstance* tcp1 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp2 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp1_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp2_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
 
-  Tcp::ConnectionPool::MockInstance* tcp1_example_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &example_com_context));
-  Tcp::ConnectionPool::MockInstance* tcp2_example_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &example_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp1_example_com = TcpPoolDataPeer::getSingleHostConnPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(ResourcePriority::Default, &example_com_context, ));
+  Tcp::ConnectionPool::MockInstance* tcp2_example_com = TcpPoolDataPeer::getSingleHostConnPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(ResourcePriority::Default, &example_com_context));
 
-  Tcp::ConnectionPool::MockInstance* tcp1_ibm_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
-  Tcp::ConnectionPool::MockInstance* tcp2_ibm_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp1_ibm_com = TcpPoolDataPeer::getSingleHostConnPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp2_ibm_com = TcpPoolDataPeer::getSingleHostConnPool(
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
 
   EXPECT_NE(tcp1, tcp2);
   EXPECT_NE(tcp1_high, tcp2_high);
@@ -2358,32 +2359,34 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // Make sure we get back the same connection pool for the 2nd host as we did before the change.
   Http::ConnectionPool::MockInstance* cp3 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   Http::ConnectionPool::MockInstance* cp3_high = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::High, Http::Protocol::Http11, nullptr));
   EXPECT_EQ(cp2, cp3);
   EXPECT_EQ(cp2_high, cp3_high);
 
   Tcp::ConnectionPool::MockInstance* tcp3 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
   Tcp::ConnectionPool::MockInstance* tcp3_high =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::High, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::High, nullptr));
 
-  Tcp::ConnectionPool::MockInstance* tcp3_example_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &example_com_context));
-  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san = TcpPoolDataPeer::getPool(
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com = TcpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->tcpConnPool(ResourcePriority::Default, &example_com_context_with_san));
-  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 = TcpPoolDataPeer::getPool(
+          ->tcpConnPool(ResourcePriority::Default, &example_com_context));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san =
+      TcpPoolDataPeer::getSingleHostConnPool(
+          cluster_manager_->getThreadLocalCluster("cluster_1")
+              ->tcpConnPool(ResourcePriority::Default, &example_com_context_with_san));
+  Tcp::ConnectionPool::MockInstance* tcp3_example_com_with_san2 =
+      TcpPoolDataPeer::getSingleHostConnPool(
+          cluster_manager_->getThreadLocalCluster("cluster_1")
+              ->tcpConnPool(ResourcePriority::Default, &example_com_context_with_san2));
+  Tcp::ConnectionPool::MockInstance* tcp3_ibm_com = TcpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->tcpConnPool(ResourcePriority::Default, &example_com_context_with_san2));
-  Tcp::ConnectionPool::MockInstance* tcp3_ibm_com =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
+          ->tcpConnPool(ResourcePriority::Default, &ibm_com_context));
 
   EXPECT_EQ(tcp2, tcp3);
   EXPECT_EQ(tcp2_high, tcp3_high);
@@ -2821,11 +2824,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
 
   Http::ConnectionPool::MockInstance* cp = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Immediate drain, since this can happen with the HTTP codecs.
   EXPECT_CALL(*cp, addDrainedCallback(_))
@@ -2908,11 +2911,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
 
   Http::ConnectionPool::MockInstance* cp = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   // Remove the first host, this should lead to the cp being drained.
   Http::ConnectionPool::Instance::DrainedCb drained_cb;
@@ -2957,11 +2960,12 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Test for no hosts returning the correct values before we have hosts.
-  EXPECT_EQ(0, cluster_manager_->getThreadLocalCluster("cluster_1")
-                   ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false)
-                   .size());
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getThreadLocalCluster("cluster_1")
-                               ->tcpConnPool(ResourcePriority::Default, nullptr));
+  EXPECT_TRUE(cluster_manager_->getThreadLocalCluster("cluster_1")
+                  ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr)
+                  .empty());
+  EXPECT_TRUE(cluster_manager_->getThreadLocalCluster("cluster_1")
+                  ->tcpConnPool(ResourcePriority::Default, nullptr)
+                  .empty());
   EXPECT_EQ(nullptr,
             cluster_manager_->getThreadLocalCluster("cluster_1")->tcpConn(nullptr).connection_);
   EXPECT_EQ(3UL, factory_.stats_.counter("cluster.cluster_1.upstream_cx_none_healthy").value());
@@ -3359,7 +3363,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
                     ->tcpConnPool(ResourcePriority::Default, &context);
-  EXPECT_TRUE(opt_cp.has_value());
+  EXPECT_EQ(1, opt_cp.size());
 }
 
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
@@ -3373,9 +3377,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create));
 
-  auto opt_cp =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context, false);
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
   EXPECT_EQ(1, opt_cp.size());
 }
 
@@ -3397,21 +3400,21 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
 
   Http::ConnectionPool::Instance* cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create2));
   Http::ConnectionPool::Instance* cp2 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
 
   Http::ConnectionPool::Instance* should_be_cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context1));
   EXPECT_NE(nullptr, cp1);
   EXPECT_NE(nullptr, cp2);
   Http::ConnectionPool::Instance* should_be_cp2 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context2));
 
   // The different upstream options should lead to different hashKeys, thus different pools.
   EXPECT_NE(cp1, cp2);
@@ -3431,9 +3434,8 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsNullIsOkay) {
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(to_create));
 
-  auto opt_cp =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context, false);
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
   EXPECT_EQ(1, opt_cp.size());
 }
 
@@ -3446,9 +3448,8 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
 
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(pool_mock));
 
-  auto opt_cp =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context, false);
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context);
   ASSERT_EQ(1, opt_cp.size());
 
   EXPECT_CALL(*pool_mock, hasActiveConnections()).WillOnce(Return(true));
@@ -3457,6 +3458,97 @@ TEST_F(ClusterManagerImplTest, HttpPoolDataForwardsCallsToConnectionPool) {
   ConnectionPool::Instance::DrainedCb drained_cb = []() {};
   EXPECT_CALL(*pool_mock, addDrainedCallback(_));
   opt_cp[0].addDrainedCallback(drained_cb);
+}
+
+TEST_F(ClusterManagerImplTest, HttpPoolDataFetchForAllHosts) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
+  Http::ConnectionPool::MockInstance* pool_mock2 = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
+      .WillOnce(Return(pool_mock))
+      .WillOnce(Return(pool_mock2));
+
+  auto opt_cp =
+      cluster_manager_->getThreadLocalCluster("cluster_1")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context, true);
+  ASSERT_EQ(2, opt_cp.size());
+}
+
+TEST_F(ClusterManagerImplTest, HttpPoolDataFetchWithUnhealtyHost) {
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("fake_cluster")}));
+  std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  EXPECT_CALL(*cluster1, initialize(_));
+
+  create(parseBootstrapFromV3Json(json));
+
+  ReadyWatcher initialized;
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  EXPECT_CALL(initialized, ready());
+  cluster1->initialize_callback_();
+
+  // Set up the HostSet with 1 healthy, 1 degraded and 1 unhealthy.
+  HostSharedPtr host1 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  host1->healthFlagSet(HostImpl::HealthFlag::DEGRADED_ACTIVE_HC);
+  HostSharedPtr host2 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+  host2->healthFlagSet(HostImpl::HealthFlag::FAILED_ACTIVE_HC);
+  HostSharedPtr host3 = makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_);
+
+  HostVector hosts{host1, host2, host3};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  cluster1->priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      100);
+
+  // assure no duplicate hosts.
+  HostVector hosts2{host1};
+  auto hosts_ptr2 = std::make_shared<HostVector>(hosts2);
+
+  cluster1->priority_set_.updateHosts(
+      1, HostSetImpl::partitionHosts(hosts_ptr2, HostsPerLocalityImpl::empty()), nullptr, hosts2,
+      {}, 100);
+
+  NiceMock<MockLoadBalancerContext> context;
+  Http::ConnectionPool::MockInstance* pool_mock = new Http::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _)).WillOnce(Return(pool_mock));
+
+  auto opt_cp =
+      cluster_manager_->getThreadLocalCluster("fake_cluster")
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &context, true);
+  ASSERT_EQ(1, opt_cp.size());
+
+  factory_.tls_.shutdownThread();
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
+TEST_F(ClusterManagerImplTest, TcpPoolDataFetchForAllHosts) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  Tcp::ConnectionPool::MockInstance* pool_mock = new Tcp::ConnectionPool::MockInstance();
+  Tcp::ConnectionPool::MockInstance* pool_mock2 = new Tcp::ConnectionPool::MockInstance();
+  Network::Socket::OptionsSharedPtr options_to_return = nullptr;
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .WillOnce(Return(pool_mock))
+      .WillOnce(Return(pool_mock2));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context, true);
+  ASSERT_EQ(2, opt_cp.size());
 }
 
 class TestUpstreamNetworkFilter : public Network::WriteFilter {
@@ -4340,11 +4432,12 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_FALSE(all_clusters.active_clusters_.at("cluster_1").get().info()->addedViaApi());
 
   // Verify that we get no hosts when the HostSet is empty.
-  EXPECT_EQ(0, cluster_manager_->getThreadLocalCluster("cluster_1")
-                   ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false)
-                   .size());
-  EXPECT_EQ(absl::nullopt, cluster_manager_->getThreadLocalCluster("cluster_1")
-                               ->tcpConnPool(ResourcePriority::Default, nullptr));
+  EXPECT_TRUE(cluster_manager_->getThreadLocalCluster("cluster_1")
+                  ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr)
+                  .empty());
+  EXPECT_TRUE(cluster_manager_->getThreadLocalCluster("cluster_1")
+                  ->tcpConnPool(ResourcePriority::Default, nullptr)
+                  .empty());
   EXPECT_EQ(nullptr,
             cluster_manager_->getThreadLocalCluster("cluster_1")->tcpConn(nullptr).connection_);
 
@@ -4377,19 +4470,19 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
   // Create persistent connection for host2.
   Http::ConnectionPool::MockInstance* cp2 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http2, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http2, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp1 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp2 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   EXPECT_NE(cp1, cp2);
   EXPECT_NE(tcp1, tcp2);
@@ -4417,10 +4510,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolsDrainedOnHostSetChange) {
   // Recreate connection pool for host1.
   cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
 
-  tcp1 = TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                      ->tcpConnPool(ResourcePriority::Default, nullptr));
+  tcp1 =
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   HostSharedPtr host3 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82", time_system_);
 
@@ -4484,11 +4578,11 @@ TEST_F(ClusterManagerImplTest, ConnPoolsNotDrainedOnHostSetChange) {
   // This should provide us a CP for each of the above hosts.
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false));
+          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr));
 
   Tcp::ConnectionPool::MockInstance* tcp1 =
-      TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
-                                   ->tcpConnPool(ResourcePriority::Default, nullptr));
+      TcpPoolDataPeer::getSingleHostConnPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                                 ->tcpConnPool(ResourcePriority::Default, nullptr));
 
   HostSharedPtr host2 = makeTestHost(cluster.info(), "tcp://127.0.0.1:82", time_system_);
   HostVector hosts_added;
@@ -4615,22 +4709,21 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
         .WillOnce(Return(conn_pool_vector.back()));
     EXPECT_CALL(downstream_connection, hashKey)
         .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
-    EXPECT_EQ(conn_pool_vector.back(),
-              HttpPoolDataPeer::getSingleHostConnPool(
-                  cluster_manager_->getThreadLocalCluster("cluster_1")
-                      ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context,
-                                     false)));
+    EXPECT_EQ(
+        conn_pool_vector.back(),
+        HttpPoolDataPeer::getSingleHostConnPool(
+            cluster_manager_->getThreadLocalCluster("cluster_1")
+                ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context)));
   }
 
   // Check that the first entry is still in the pool map
   EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
     hash_key.push_back(0);
   }));
-  EXPECT_EQ(conn_pool_vector.front(),
-            HttpPoolDataPeer::getSingleHostConnPool(
-                cluster_manager_->getThreadLocalCluster("cluster_1")
-                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, &lb_context,
-                                   false)));
+  EXPECT_EQ(conn_pool_vector.front(), HttpPoolDataPeer::getSingleHostConnPool(
+                                          cluster_manager_->getThreadLocalCluster("cluster_1")
+                                              ->httpConnPool(ResourcePriority::Default,
+                                                             Http::Protocol::Http11, &lb_context)));
 }
 
 class PreconnectTest : public ClusterManagerImplTest {
@@ -4699,9 +4792,8 @@ TEST_F(PreconnectTest, PreconnectOff) {
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(1)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
-  auto http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
 
@@ -4710,8 +4802,8 @@ TEST_F(PreconnectTest, PreconnectOff) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
-  ASSERT_TRUE(tcp_handle.has_value());
-  tcp_handle.value().newConnection(tcp_callbacks_);
+  ASSERT_EQ(1, tcp_handle.size());
+  tcp_handle[0].newConnection(tcp_callbacks_);
 }
 
 TEST_F(PreconnectTest, PreconnectOn) {
@@ -4722,9 +4814,8 @@ TEST_F(PreconnectTest, PreconnectOn) {
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _))
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
-  auto http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
 
@@ -4733,8 +4824,8 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
-  ASSERT_TRUE(tcp_handle.has_value());
-  tcp_handle.value().newConnection(tcp_callbacks_);
+  ASSERT_EQ(1, tcp_handle.size());
+  tcp_handle[0].newConnection(tcp_callbacks_);
 }
 
 TEST_F(PreconnectTest, PreconnectHighHttp) {
@@ -4751,9 +4842,8 @@ TEST_F(PreconnectTest, PreconnectHighHttp) {
         }));
         return ret;
       }));
-  auto http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
   // Expect preconnect to be called 3 times across the four hosts.
@@ -4776,7 +4866,8 @@ TEST_F(PreconnectTest, PreconnectHighTcp) {
       }));
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
-  tcp_handle.value().newConnection(tcp_callbacks_);
+  ASSERT_EQ(1, tcp_handle.size());
+  tcp_handle[0].newConnection(tcp_callbacks_);
   // Expect preconnect to be called 3 times across the four hosts.
   EXPECT_EQ(3, tcp_preconnect);
 }
@@ -4795,9 +4886,8 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
         }));
         return ret;
       }));
-  auto http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
   // Expect preconnect to be called 3 times across the four hosts.
@@ -4808,9 +4898,8 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
   // do the full 3 as the number of outstanding preconnects is limited by the
   // number of healthy hosts.
   http_preconnect = 0;
-  http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
   EXPECT_EQ(2, http_preconnect);
@@ -4831,9 +4920,8 @@ TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
         }));
         return ret;
       }));
-  auto http_handle =
-      cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr, false);
+  auto http_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                         ->httpConnPool(ResourcePriority::Default, Http::Protocol::Http11, nullptr);
   ASSERT_EQ(1, http_handle.size());
   http_handle[0].newStream(decoder_, http_callbacks_);
   // Expect preconnect to be called once and then preconnecting is stopped.

@@ -281,7 +281,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool_data) {
+  if (conn_pool_data.empty()) {
     stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
@@ -300,8 +300,9 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     }
   }
 
+  ASSERT(conn_pool_data.size() == 1);
   upstream_request_ =
-      std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata, transport, protocol);
+      std::make_unique<UpstreamRequest>(*this, conn_pool_data[0], metadata, transport, protocol);
   return upstream_request_->start();
 }
 

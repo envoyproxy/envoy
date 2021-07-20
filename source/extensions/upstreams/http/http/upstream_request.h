@@ -26,7 +26,7 @@ public:
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
     ASSERT(!is_connect);
-    pool_data_ =
+    pool_data_set_ =
         thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
@@ -43,10 +43,17 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
   Upstream::HostDescriptionConstSharedPtr host() const override {
-    return pool_data_.value().host();
+    // TODO(shikugawa): Connection pool that holds multiple hosts. But this feature doesn't needed
+    // for now. We should introduce multiple host data set when ALS conn rotation is implemented.
+    return pool_data_set_[0].host();
   }
 
-  bool valid() { return pool_data_.has_value(); }
+  bool valid() {
+    // TODO(shikugawa): Valid HTTP connection pool must be that has more than one pool data.
+    // But it must be co-implemented with ALS rotation. As workaround, we specify valid data pool
+    // is that has valid connection.
+    return pool_data_set_.size() == 1;
+  }
 
 protected:
   // Points to the actual connection pool to create streams from.

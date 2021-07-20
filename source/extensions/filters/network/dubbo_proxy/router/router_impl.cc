@@ -66,7 +66,7 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
   }
 
   auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool_data) {
+  if (conn_pool_data.empty()) {
     callbacks_->sendLocalReply(
         AppException(
             ResponseStatus::ServerError,
@@ -111,7 +111,8 @@ FilterStatus Router::onMessageDecoded(MessageMetadataSharedPtr metadata, Context
     upstream_request_buffer_.move(ctx->originMessage(), ctx->messageSize());
   }
 
-  upstream_request_ = std::make_unique<UpstreamRequest>(*this, *conn_pool_data, metadata,
+  ASSERT(conn_pool_data.size() == 1);
+  upstream_request_ = std::make_unique<UpstreamRequest>(*this, conn_pool_data[0], metadata,
                                                         callbacks_->serializationType(),
                                                         callbacks_->protocolType());
   return upstream_request_->start();

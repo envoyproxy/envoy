@@ -69,6 +69,8 @@ private:
   Tcp::ConnectionPool::Instance* pool_;
 };
 
+using TcpPoolDataVector = std::vector<TcpPoolData>;
+
 /**
  * A thread local cluster instance that can be used for direct load balancing and host set
  * interactions. In general, an instance of ThreadLocalCluster can only be safely used in the
@@ -105,12 +107,14 @@ public:
    *        selection.
    * @param context the optional load balancer context. Must continue to be
    *        valid until newConnection is called on the pool (if it is to be called).
-   * @return the connection pool data or nullopt if there is no host available in the cluster.
+   * @param fetch_pool_all_hosts if true, the connection pool will attempt to fetch all hosts.
+   * @return the connection pool data vector, it will be empty if there is no host available in the
+   * cluster.
    */
   virtual HttpPoolDataVector httpConnPool(ResourcePriority priority,
                                           absl::optional<Http::Protocol> downstream_protocol,
                                           LoadBalancerContext* context,
-                                          bool fetch_pool_all_hosts) PURE;
+                                          bool fetch_pool_all_hosts = false) PURE;
 
   /**
    * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
@@ -120,10 +124,12 @@ public:
    * @param priority the connection pool priority.
    * @param context the optional load balancer context. Must continue to be
    *        valid until newConnection is called on the pool (if it is to be called).
-   * @return the connection pool data or nullopt if there is no host available in the cluster.
+   * @param fetch_pool_all_hosts if true, the connection pool will attempt to fetch all hosts.
+   * @return the connection pool data vector, it will be empty if there is no host available in the
+   * cluster.
    */
-  virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
-                                                  LoadBalancerContext* context) PURE;
+  virtual TcpPoolDataVector tcpConnPool(ResourcePriority priority, LoadBalancerContext* context,
+                                        bool fetch_pool_all_hosts = false) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already

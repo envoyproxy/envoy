@@ -22,7 +22,12 @@ public:
               Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks);
   ~TcpConnPool() override;
 
-  bool valid() const { return conn_pool_data_.has_value(); }
+  bool valid() const {
+    // TODO(shikugawa): Valid TCP connection pool must be that has more than one pool data.
+    // But it must be co-implemented with ALS rotation. As workaround, we specify valid data pool
+    // is that has valid connection.
+    return pool_data_set_.size() == 1;
+  }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -35,7 +40,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Upstream::TcpPoolData> conn_pool_data_{};
+  Upstream::TcpPoolDataVector pool_data_set_;
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -54,7 +59,12 @@ public:
   ~HttpConnPool() override;
 
   // HTTP/3 upstreams are not supported at the moment.
-  bool valid() const { return conn_pool_data_.has_value() && type_ <= Http::CodecType::HTTP2; }
+  bool valid() const {
+    // TODO(shikugawa): Valid HTTP connection pool must be that has more than one pool data.
+    // But it must be co-implemented with ALS rotation. As workaround, we specify valid data pool
+    // is that has valid connection.
+    return pool_data_set_.size() == 1 && type_ <= Http::CodecType::HTTP2;
+  }
 
   // GenericConnPool
   void newStream(GenericConnectionPoolCallbacks& callbacks) override;
@@ -99,7 +109,7 @@ private:
                           Ssl::ConnectionInfoConstSharedPtr ssl_info);
   const TunnelingConfig config_;
   Http::CodecType type_;
-  absl::optional<Upstream::HttpPoolData> conn_pool_data_{};
+  Upstream::HttpPoolDataVector pool_data_set_;
   Http::ConnectionPool::Cancellable* upstream_handle_{};
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
