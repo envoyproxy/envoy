@@ -64,10 +64,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
-        "http2_containers_impl.h",
         "http2_logging_impl.h",
         "http2_macros_impl.h",
-        "http2_string_utils_impl.h",
     ],
     external_deps = [
         "abseil_base",
@@ -90,7 +88,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
-    srcs = ["quic_logging_impl.cc"],
+    srcs = [
+        "quic_logging_impl.cc",
+        "quiche_bug_tracker_impl.cc",
+    ],
     hdrs = [
         "quic_logging_impl.h",
         "quiche_bug_tracker_impl.h",
@@ -115,7 +116,6 @@ envoy_cc_library(
         "quic_error_code_wrappers_impl.h",
         "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_map_util_impl.h",
         "quic_mem_slice_impl.h",
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
@@ -151,11 +151,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
-        "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
     ],
     hdrs = [
-        "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_pcc_sender_impl.h",
@@ -259,9 +257,7 @@ envoy_cc_library(
     name = "spdy_platform_impl_lib",
     hdrs = [
         "spdy_bug_tracker_impl.h",
-        "spdy_containers_impl.h",
         "spdy_logging_impl.h",
-        "spdy_string_utils_impl.h",
         "spdy_test_utils_prod_impl.h",
     ],
     external_deps = [

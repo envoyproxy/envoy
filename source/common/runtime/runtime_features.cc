@@ -73,6 +73,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
     "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
+    "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
