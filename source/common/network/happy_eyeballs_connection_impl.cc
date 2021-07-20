@@ -10,9 +10,9 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
-      socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
-      options_(options),
+    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list),
+      source_address_(source_address), socket_factory_(socket_factory),
+      transport_socket_options_(transport_socket_options), options_(options),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   connections_.push_back(createNextConnection());
 }
@@ -73,7 +73,6 @@ bool HappyEyeballsConnectionImpl::initializeReadFilters() {
   }
   post_connect_state_.initialize_read_filters_.value() = true;
   return true;
-
 }
 
 void HappyEyeballsConnectionImpl::addBytesSentCallback(Connection::BytesSentCb cb) {
@@ -97,7 +96,8 @@ bool HappyEyeballsConnectionImpl::isHalfCloseEnabled() {
   if (connect_finished_) {
     return connections_[0]->isHalfCloseEnabled();
   }
-  return per_connection_state_.enable_half_close_.has_value() && per_connection_state_.enable_half_close_.value();
+  return per_connection_state_.enable_half_close_.has_value() &&
+         per_connection_state_.enable_half_close_.value();
 }
 
 std::string HappyEyeballsConnectionImpl::nextProtocol() const {
@@ -145,8 +145,7 @@ void HappyEyeballsConnectionImpl::detectEarlyCloseWhenReadDisabled(bool value) {
 bool HappyEyeballsConnectionImpl::readEnabled() const {
   if (!connect_finished_) {
     return !post_connect_state_.read_disable_count_.has_value() ||
-        post_connect_state_.read_disable_count_ == 0;
-
+           post_connect_state_.read_disable_count_ == 0;
   }
   return connections_[0]->readEnabled();
 }
@@ -329,9 +328,7 @@ Event::Dispatcher& HappyEyeballsConnectionImpl::dispatcher() {
   return connections_[0]->dispatcher();
 }
 
-uint64_t HappyEyeballsConnectionImpl::id() const {
-  return id_;
-}
+uint64_t HappyEyeballsConnectionImpl::id() const { return id_; }
 
 void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
   // Pack the id into sizeof(id_) uint8_t entries in the hash_key vector.
@@ -361,7 +358,8 @@ void HappyEyeballsConnectionImpl::setDelayedCloseTimeout(std::chrono::millisecon
 
 void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << spaces << "HappyEyeballsConnectionImpl " << this << DUMP_MEMBER(id_) << DUMP_MEMBER(connect_finished_) << "\n";
+  os << spaces << "HappyEyeballsConnectionImpl " << this << DUMP_MEMBER(id_)
+     << DUMP_MEMBER(connect_finished_) << "\n";
 
   for (auto& connection : connections_) {
     DUMP_DETAILS(connection);
@@ -469,7 +467,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     for (auto& filter : post_connect_state_.read_filters_) {
       connections_[0]->addReadFilter(filter);
     }
-    if (post_connect_state_.initialize_read_filters_.has_value()  &&
+    if (post_connect_state_.initialize_read_filters_.has_value() &&
         post_connect_state_.initialize_read_filters_.value()) {
       bool initialized = connections_[0]->initializeReadFilters();
       ASSERT(initialized);

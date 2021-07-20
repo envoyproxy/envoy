@@ -800,7 +800,6 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadDisable) {
   // Read disable count should now be 2.
   impl_->readDisable(false);
 
-
   // readDisable() should be applied to the newly created connection.
   EXPECT_CALL(*created_connections_[1], readDisable(true)).Times(2);
   EXPECT_CALL(*failover_timer_, disableTimer());
@@ -816,17 +815,17 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadDisable) {
 
 TEST_F(HappyEyeballsConnectionImplTest, ReadEnabled) {
   EXPECT_TRUE(impl_->readEnabled());
-  impl_->readDisable(true);  // Disable count 1.
+  impl_->readDisable(true); // Disable count 1.
   EXPECT_FALSE(impl_->readEnabled());
 
   EXPECT_CALL(*created_connections_[0], connect());
   impl_->connect();
 
-  impl_->readDisable(true);  // Disable count 2
+  impl_->readDisable(true); // Disable count 2
   EXPECT_FALSE(impl_->readEnabled());
-  impl_->readDisable(false);  // Disable count 1
+  impl_->readDisable(false); // Disable count 1
   EXPECT_FALSE(impl_->readEnabled());
-  impl_->readDisable(false);  // Disable count 0
+  impl_->readDisable(false); // Disable count 0
   EXPECT_TRUE(impl_->readEnabled());
 }
 
