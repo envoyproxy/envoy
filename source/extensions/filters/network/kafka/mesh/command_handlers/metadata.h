@@ -2,6 +2,7 @@
 
 #include "source/extensions/filters/network/kafka/external/requests.h"
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +16,7 @@ public:
                         const UpstreamKafkaConfiguration& configuration,
                         const std::shared_ptr<Request<MetadataRequest>> request);
 
-  void invoke(UpstreamKafkaFacade&) override;
+  void startProcessing() override;
 
   bool finished() const override;
 

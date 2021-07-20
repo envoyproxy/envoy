@@ -14,7 +14,7 @@ MetadataRequestHolder::MetadataRequestHolder(
     : BaseInFlightRequest{filter}, configuration_{configuration}, request_{request} {}
 
 // Metadata requests are immediately ready for answer (as they do not need to reach upstream).
-void MetadataRequestHolder::invoke(UpstreamKafkaFacade&) { notifyFilter(); }
+void MetadataRequestHolder::startProcessing() { notifyFilter(); }
 
 bool MetadataRequestHolder::finished() const { return true; }
 

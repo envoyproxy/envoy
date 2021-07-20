@@ -9,22 +9,24 @@ namespace Kafka {
 namespace Mesh {
 
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           UpstreamKafkaFacade& kafka_facade,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
-    : ProduceRequestHolder{filter, RecordExtractorImpl{}, request} {};
+    : ProduceRequestHolder{filter, kafka_facade, RecordExtractorImpl{}, request} {};
 
 ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
+                                           UpstreamKafkaFacade& kafka_facade,
                                            const RecordExtractor& record_extractor,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
-    : BaseInFlightRequest{filter}, request_{request} {
+    : BaseInFlightRequest{filter}, kafka_facade_{kafka_facade}, request_{request} {
   outbound_records_ = record_extractor.extractRecords(request_->data_.topics_);
   expected_responses_ = outbound_records_.size();
 }
 
-void ProduceRequestHolder::invoke(UpstreamKafkaFacade& kafka_facade) {
+void ProduceRequestHolder::startProcessing() {
   // Main part of the proxy: for each outbound record we get the appropriate sink (effectively a
   // facade for upstream Kafka cluster), and send the record to it.
   for (auto& outbound_record : outbound_records_) {
-    RecordSink& producer = kafka_facade.getProducerForTopic(outbound_record.topic_);
+    RecordSink& producer = kafka_facade_.getProducerForTopic(outbound_record.topic_);
     // We need to provide our object as first argument, as we will want to be notified when the
     // delivery finishes.
     producer.send(shared_from_this(), outbound_record.topic_, outbound_record.partition_,

@@ -8,6 +8,7 @@
 
 #ifndef WIN32
 #include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 #include "source/extensions/filters/network/kafka/mesh/filter.h"
 #else
 #include "envoy/common/exception.h"

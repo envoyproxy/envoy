@@ -2,8 +2,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/kafka/kafka_response.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -47,8 +47,8 @@ public:
 class ProduceUnitTest : public testing::Test {
 protected:
   MockAbstractRequestListener filter_;
-  MockRecordExtractor extractor_;
   MockUpstreamKafkaFacade upstream_kafka_facade_;
+  MockRecordExtractor extractor_;
 };
 
 // This is very odd corner case, that should never happen
@@ -62,11 +62,11 @@ TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
   const RequestHeader header = {0, 0, 0, absl::nullopt};
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
-  ProduceRequestHolder testee = {filter_, extractor_, message};
+  ProduceRequestHolder testee = {filter_, upstream_kafka_facade_, extractor_, message};
 
   // when, then - invoking should immediately notify the filter.
   EXPECT_CALL(filter_, onRequestReadyForAnswer());
-  testee.invoke(upstream_kafka_facade_);
+  testee.startProcessing();
 
   // when, then - request is finished because there was nothing to do.
   const bool finished = testee.finished();
@@ -92,7 +92,7 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
-      std::make_shared<ProduceRequestHolder>(filter_, extractor_, message);
+      std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
   MockRecordSink record_sink1;
@@ -103,7 +103,7 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
       .WillOnce(ReturnRef(record_sink1));
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r2.topic_))
       .WillOnce(ReturnRef(record_sink2));
-  testee->invoke(upstream_kafka_facade_);
+  testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
@@ -150,14 +150,14 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
-      std::make_shared<ProduceRequestHolder>(filter_, extractor_, message);
+      std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
   MockRecordSink record_sink;
   EXPECT_CALL(record_sink, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
       .WillRepeatedly(ReturnRef(record_sink));
-  testee->invoke(upstream_kafka_facade_);
+  testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
@@ -204,14 +204,14 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
-      std::make_shared<ProduceRequestHolder>(filter_, extractor_, message);
+      std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - invoking should use producers to send records.
   MockRecordSink record_sink;
   EXPECT_CALL(record_sink, send(_, r1.topic_, r1.partition_, _, _)).Times(2);
   EXPECT_CALL(upstream_kafka_facade_, getProducerForTopic(r1.topic_))
       .WillRepeatedly(ReturnRef(record_sink));
-  testee->invoke(upstream_kafka_facade_);
+  testee->startProcessing();
 
   // when, then - request is not yet finished (2 records' delivery to be confirmed).
   EXPECT_FALSE(testee->finished());
@@ -254,7 +254,7 @@ TEST_F(ProduceUnitTest, ShouldIgnoreMementoFromAnotherRequest) {
   const ProduceRequest data = {0, 0, {}};
   const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
   std::shared_ptr<ProduceRequestHolder> testee =
-      std::make_shared<ProduceRequestHolder>(filter_, extractor_, message);
+      std::make_shared<ProduceRequestHolder>(filter_, upstream_kafka_facade_, extractor_, message);
 
   // when, then - this record will not match anything.
   const DeliveryMemento dm = {nullptr, RdKafka::ERR_NO_ERROR, 42};

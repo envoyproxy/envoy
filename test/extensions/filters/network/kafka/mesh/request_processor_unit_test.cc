@@ -1,10 +1,16 @@
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/api_versions.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/metadata.h"
+#include "source/extensions/filters/network/kafka/mesh/command_handlers/produce.h"
 #include "source/extensions/filters/network/kafka/mesh/request_processor.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -13,14 +19,83 @@ namespace Kafka {
 namespace Mesh {
 namespace {
 
+class MockAbstractRequestListener : public AbstractRequestListener {
+public:
+  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
+  MOCK_METHOD(void, onRequestReadyForAnswer, ());
+};
+
+class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
+public:
+  MOCK_METHOD(RecordSink&, getProducerForTopic, (const std::string&));
+};
+
+class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
+public:
+  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
+              (const));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+};
+
 class RequestProcessorTest : public testing::Test {
 protected:
-  RequestProcessor testee_ = {};
+  MockAbstractRequestListener listener_;
+  MockUpstreamKafkaConfiguration configuration_;
+  MockUpstreamKafkaFacade upstream_kafka_facade_;
+  RequestProcessor testee_ = {listener_, configuration_, upstream_kafka_facade_};
 };
+
+TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
+  // given
+  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const ProduceRequest data = {0, 0, {}};
+  const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<ProduceRequestHolder>(capture), nullptr);
+}
+
+TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
+  // given
+  const RequestHeader header = {3, 0, 0, absl::nullopt};
+  const MetadataRequest data = {absl::nullopt};
+  const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<MetadataRequestHolder>(capture), nullptr);
+}
+
+TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
+  // given
+  const RequestHeader header = {18, 0, 0, absl::nullopt};
+  const ApiVersionsRequest data = {};
+  const auto message = std::make_shared<Request<ApiVersionsRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<ApiVersionsRequestHolder>(capture), nullptr);
+}
 
 TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
   // given
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
+  const RequestHeader header = {2, 0, 0, absl::nullopt};
   const ListOffsetRequest data = {0, {}};
   const auto message = std::make_shared<Request<ListOffsetRequest>>(header, data);
 

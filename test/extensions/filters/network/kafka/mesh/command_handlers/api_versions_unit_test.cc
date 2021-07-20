@@ -16,11 +16,6 @@ public:
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
-class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
-public:
-  MOCK_METHOD(RichKafkaProducer&, getProducerForTopic, (const std::string&));
-};
-
 TEST(ApiVersionsTest, shouldBeAlwaysReadyForAnswer) {
   // given
   MockAbstractRequestListener filter;
@@ -31,8 +26,7 @@ TEST(ApiVersionsTest, shouldBeAlwaysReadyForAnswer) {
   ApiVersionsRequestHolder testee = {filter, message};
 
   // when, then - invoking should immediately notify the filter.
-  MockUpstreamKafkaFacade upstream_kafka_facade;
-  testee.invoke(upstream_kafka_facade);
+  testee.startProcessing();
 
   // when, then - should always be considered finished.
   const bool finished = testee.finished();

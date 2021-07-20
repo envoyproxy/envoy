@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "api_versions_unit_test",
     srcs = ["api_versions_unit_test.cc"],
-    extension_name = "envoy.filters.network.kafka_mesh",
+    extension_names = ["envoy.filters.network.kafka_broker"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/kafka/mesh/command_handlers:api_versions_lib",
@@ -26,7 +26,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "metadata_unit_test",
     srcs = ["metadata_unit_test.cc"],
-    extension_name = "envoy.filters.network.kafka_mesh",
+    extension_names = ["envoy.filters.network.kafka_broker"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/kafka/mesh/command_handlers:metadata_lib",
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "produce_unit_test",
     srcs = ["produce_unit_test.cc"],
-    extension_name = "envoy.filters.network.kafka_mesh",
+    extension_names = ["envoy.filters.network.kafka_broker"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/network/kafka/mesh/command_handlers:produce_lib",

@@ -14,7 +14,7 @@ public:
   ApiVersionsRequestHolder(AbstractRequestListener& filter,
                            const std::shared_ptr<Request<ApiVersionsRequest>> request);
 
-  void invoke(UpstreamKafkaFacade&) override;
+  void startProcessing() override;
 
   bool finished() const override;
 

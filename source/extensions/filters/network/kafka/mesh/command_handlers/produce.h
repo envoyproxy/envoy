@@ -2,6 +2,7 @@
 
 #include "source/extensions/filters/network/kafka/external/requests.h"
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
+#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -67,15 +68,16 @@ class ProduceRequestHolder : public BaseInFlightRequest,
                              public ProduceFinishCb,
                              public std::enable_shared_from_this<ProduceRequestHolder> {
 public:
-  ProduceRequestHolder(AbstractRequestListener& filter,
+  ProduceRequestHolder(AbstractRequestListener& filter, UpstreamKafkaFacade& kafka_facade,
                        const std::shared_ptr<Request<ProduceRequest>> request);
 
   // Visible for testing.
-  ProduceRequestHolder(AbstractRequestListener& filter, const RecordExtractor& record_extractor,
+  ProduceRequestHolder(AbstractRequestListener& filter, UpstreamKafkaFacade& kafka_facade,
+                       const RecordExtractor& record_extractor,
                        const std::shared_ptr<Request<ProduceRequest>> request);
 
   // AbstractInFlightRequest
-  void invoke(UpstreamKafkaFacade&) override;
+  void startProcessing() override;
 
   // AbstractInFlightRequest
   bool finished() const override;
@@ -87,6 +89,9 @@ public:
   bool accept(const DeliveryMemento& memento) override;
 
 private:
+  // Access to Kafka producers pointing to upstream Kafka clusters.
+  UpstreamKafkaFacade& kafka_facade_;
+
   // Original request.
   const std::shared_ptr<Request<ProduceRequest>> request_;
 

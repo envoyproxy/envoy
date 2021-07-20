@@ -22,7 +22,7 @@ ApiVersionsRequestHolder::ApiVersionsRequestHolder(
     : BaseInFlightRequest{filter}, request_{request} {}
 
 // Api Versions requests are immediately ready for answer (as they do not need to reach upstream).
-void ApiVersionsRequestHolder::invoke(UpstreamKafkaFacade&) { notifyFilter(); }
+void ApiVersionsRequestHolder::startProcessing() { notifyFilter(); }
 
 bool ApiVersionsRequestHolder::finished() const { return true; }
 

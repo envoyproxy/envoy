@@ -25,8 +25,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/kafka:kafka_response_parser_lib",
         "//source/extensions/filters/network/kafka:tagged_fields_lib",
         "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
-        "//source/extensions/filters/network/kafka/mesh:upstream_config_lib",
-        "//source/extensions/filters/network/kafka/mesh:upstream_kafka_facade_lib",
     ],
 )
 
@@ -45,7 +43,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/kafka:kafka_response_parser_lib",
         "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
         "//source/extensions/filters/network/kafka/mesh:upstream_config_lib",
-        "//source/extensions/filters/network/kafka/mesh:upstream_kafka_facade_lib",
     ],
 )
 
@@ -63,7 +60,6 @@ envoy_cc_library(
         "//source/extensions/filters/network/kafka:kafka_request_parser_lib",
         "//source/extensions/filters/network/kafka:kafka_response_parser_lib",
         "//source/extensions/filters/network/kafka/mesh:abstract_command_lib",
-        "//source/extensions/filters/network/kafka/mesh:upstream_config_lib",
         "//source/extensions/filters/network/kafka/mesh:upstream_kafka_facade_lib",
     ],
 )
