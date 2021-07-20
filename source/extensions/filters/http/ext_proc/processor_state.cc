@@ -61,7 +61,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       send_trailers_ = false;
 
     } else {
-      if (body_mode_ == ProcessingMode::BUFFERED) {
+      if (body_mode_ == ProcessingMode::BUFFERED && !no_body_) {
         if (complete_body_available_) {
           // If we get here, then all the body data came in before the header message
           // was complete, and the server wants the body. So, don't continue filter
