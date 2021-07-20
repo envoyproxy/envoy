@@ -750,7 +750,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::RequestHead
 
   if (host_end != absl::string_view::npos) {
     absl::string_view request_port = request_host.substr(host_end);
-    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPs
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
     // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
     // have the port stripped when served over TLS.
     absl::string_view request_protocol = headers.getForwardedProtoValue();
@@ -1371,7 +1371,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
                                                          const Http::RequestHeaderMap& headers,
                                                          const StreamInfo::StreamInfo& stream_info,
                                                          uint64_t random_value) const {
-  // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPs
+  // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
   // connection), force a redirect based on underlying protocol, rather than URL
   // scheme, so don't force a redirect for a http:// url served over a TLS
   // connection.
