@@ -26,7 +26,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
         NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
+        "envoy.filters.network.envoy_mobile_http_connection_manager",
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
