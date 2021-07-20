@@ -99,9 +99,7 @@ class ExtensionsChecker(checker.Checker):
         data = pathlib.Path(FUZZ_TEST_PATH).read_text()
         # Hack-ish! We only search the first 50 lines to capture the filters
         # in `filterNames()`.
-        # Add one for the mobile HCM: right now it's the same as the regular HCM
-        # so does not require explicit fuzzing.
-        return len(re.findall(FILTER_NAMES_PATTERN, "".join(data.splitlines()[:50]))) + 1
+        return len(re.findall(FILTER_NAMES_PATTERN, "".join(data.splitlines()[:50])))
 
     @cached_property
     def metadata(self) -> dict:

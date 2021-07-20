@@ -26,7 +26,7 @@ std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
     const std::vector<absl::string_view> supported_filter_names = {
         NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
-        "envoy.filters.network.envoy_mobile_http_connection_manager",
+        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
         // A dedicated http_connection_manager fuzzer can be found in
         // test/common/http/conn_manager_impl_fuzz_test.cc
         NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
@@ -82,7 +82,7 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
-             filter_name =="envoy.filters.network.envoy_mobile_http_connection_manager") {
+             filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -142,8 +142,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
           absl::StrCat("local_ratelimit trying to set a large fill_interval. Config:\n{}",
                        config.DebugString()));
     }
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
-             filter_name =="envoy.filters.network.envoy_mobile_http_connection_manager") {
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager&>(*config_message);
@@ -154,6 +153,19 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
       throw EnvoyException(absl::StrCat(
           "http_conn_manager trying to use Quiche which we won't fuzz here. Config:\n{}",
           config.DebugString()));
+    }
+  } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
+    envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& config =
+            dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
+                             EnvoyMobileHttpConnectionManager&>(*config_message);
+    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
+                                   HttpConnectionManager::HTTP3) {
+      // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
+      // So we won't fuzz it here with complex mocks.
+      throw EnvoyException(absl::StrCat("envoy_mobile_http_conn_manager trying to use Quiche which "
+                                        "we won't fuzz here. Config:\n{}",
+                                        config.DebugString()));
     }
   }
 }
