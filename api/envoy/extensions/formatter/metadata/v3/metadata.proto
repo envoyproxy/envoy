@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.extensions.formatter.metadata.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.formatter.metadata.v3";
+option java_outer_classname = "MetadataFormatterProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Formatter extension for printing various types of metadata.
+// [#extension: envoy.formatter.metadata]
+
+// Metadata formatter extension implements METADATA command operator that
+// prints all types of metadata. The first parameter taken by METADATA operator defines
+// type of metadata. The following types of metadata are supported (case sensitive):
+// - DYNAMIC
+// - CLUSTER
+// - ROUTE
+//
+// Note: DYNAMIC type is equivalent to DYNAMIC_METADATA operator and CLUSTER type is
+// equivalent to CLUSTER_METADATA.
+//
+// See :ref:`here <config_access_log>` for more information on access log configuration.
+
+// %METADATA(type:filter_namespace:key):Z%
+
+message Metadata {
+}
