@@ -81,7 +81,8 @@ void UberFilterFuzzer::perFilterSetup(const std::string& filter_name) {
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
         pipe_addr_);
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
+             filter_name =="envoy.filters.network.envoy_mobile_http_connection_manager") {
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setLocalAddress(
         pipe_addr_);
     read_filter_callbacks_->connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
@@ -141,7 +142,8 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
           absl::StrCat("local_ratelimit trying to set a large fill_interval. Config:\n{}",
                        config.DebugString()));
     }
-  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
+  } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager ||
+             filter_name =="envoy.filters.network.envoy_mobile_http_connection_manager") {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config = dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
                                   HttpConnectionManager&>(*config_message);
