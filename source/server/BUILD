@@ -320,7 +320,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/version:version_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
