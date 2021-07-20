@@ -115,9 +115,9 @@ slack-sdk==3.7.0 \
     --hash=sha256:50b9fd6d8f83af7e8ad6d8e76882d04931842241f85ccfd30da09b4a7b9b1516 \
     --hash=sha256:f0bf3e38ac393eba7fe1a99191b0e72f710860c6d2edc1271606fcfc08bea2e1
     # via -r .github/actions/pr_notifier/requirements.txt
-urllib3==1.26.5 \
-    --hash=sha256:753a0374df26658f99d826cfe40394a686d05985786d946fbe4165b5148f5a7c \
-    --hash=sha256:a7acd0977125325f516bda9735fa7142b909a8d01e8b2e4c8108d0984e6e0098
+urllib3==1.26.6 \
+    --hash=sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4 \
+    --hash=sha256:f57b4c16c62fa2760b7e3d97c35b255512fb6b59a259730f36ba32ce9f8e342f
     # via requests
 wrapt==1.12.1 \
     --hash=sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7

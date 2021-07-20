@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "aws_request_signing_filter_test",
     srcs = ["aws_request_signing_filter_test.cc"],
-    extension_name = "envoy.filters.http.aws_request_signing",
+    extension_names = ["envoy.filters.http.aws_request_signing"],
     deps = [
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -25,7 +25,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.aws_request_signing",
+    extension_names = ["envoy.filters.http.aws_request_signing"],
     deps = [
         "//source/extensions/filters/http/aws_request_signing:config",
         "//test/mocks/server:factory_context_mocks",

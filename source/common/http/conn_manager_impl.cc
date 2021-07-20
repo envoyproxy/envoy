@@ -284,6 +284,20 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   ActiveStreamPtr new_stream(new ActiveStream(*this, response_encoder.getStream().bufferLimit(),
                                               std::move(downstream_request_account)));
 
+  accumulated_requests_++;
+  if (config_.maxRequestsPerConnection() > 0 &&
+      accumulated_requests_ >= config_.maxRequestsPerConnection()) {
+    if (codec_->protocol() < Protocol::Http2) {
+      new_stream->state_.saw_connection_close_ = true;
+      // Prevent erroneous debug log of closing due to incoming connection close header.
+      drain_state_ = DrainState::Closing;
+    } else {
+      startDrainSequence();
+    }
+    ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
+    stats_.named_.downstream_cx_max_requests_reached_.inc();
+  }
+
   new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
@@ -650,9 +664,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 
   filter_manager_.streamInfo().setDownstreamSslConnection(
       connection_manager_.read_callbacks_->connection().ssl());
-
-  filter_manager_.streamInfo().setConnectionID(
-      connection_manager_.read_callbacks_->connection().id());
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
@@ -1332,8 +1343,9 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers_.get(),
-                                                  connection_manager_.config_, EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(
+      response_headers, request_headers_.get(), connection_manager_.config_, EMPTY_STRING,
+      connection_manager_.clear_hop_by_hop_response_headers_);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(response_headers);
@@ -1361,9 +1373,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
        headers.Server() == nullptr)) {
     headers.setReferenceServer(connection_manager_.config_.serverName());
   }
-  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
-                                                  connection_manager_.config_,
-                                                  connection_manager_.config_.via());
+  ConnectionManagerUtility::mutateResponseHeaders(
+      headers, request_headers_.get(), connection_manager_.config_,
+      connection_manager_.config_.via(), connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&

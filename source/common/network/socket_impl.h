@@ -49,6 +49,8 @@ public:
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     server_name_ = std::string(requested_server_name);
   }
+  absl::optional<uint64_t> connectionID() const override { return connection_id_; }
+  void setConnectionID(uint64_t id) override { connection_id_ = id; }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -56,6 +58,7 @@ private:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
+  absl::optional<uint64_t> connection_id_;
 };
 
 class SocketImpl : public virtual Socket {

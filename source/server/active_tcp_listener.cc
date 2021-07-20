@@ -26,12 +26,12 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config)
-    : ActiveTcpListener(
-          parent,
-          parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                             config.bindToPort(), config.tcpBacklogSize()),
-          config) {}
+                                     Network::ListenerConfig& config, uint32_t worker_index)
+    : ActiveTcpListener(parent,
+                        parent.dispatcher().createListener(
+                            config.listenSocketFactory().getListenSocket(worker_index), *this,
+                            config.bindToPort()),
+                        config) {}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,
@@ -199,8 +199,9 @@ void ActiveTcpSocket::newConnection() {
     if (socket_->detectedTransportProtocol().empty()) {
       socket_->setDetectedTransportProtocol("raw_buffer");
     }
-    // Clear the listener filter to ensure the file event registered by
-    // listener filter to be removed. reference https://github.com/envoyproxy/envoy/issues/8925.
+    // Reset the file events which are registered by listener filter.
+    // reference https://github.com/envoyproxy/envoy/issues/8925.
+    socket_->ioHandle().resetFileEvents();
     accept_filters_.clear();
     // Create a new connection on this listener.
     listener_.newConnection(std::move(socket_), std::move(stream_info_));
@@ -409,7 +410,6 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
-  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept

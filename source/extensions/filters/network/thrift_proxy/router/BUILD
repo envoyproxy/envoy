@@ -28,7 +28,10 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/router:router_interface",
+        "//envoy/tcp:conn_pool_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
     ],
 )
 

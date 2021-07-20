@@ -248,7 +248,7 @@ TEST_F(TsiSocketTest, HandshakeWithoutValidationAndTransferData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -260,7 +260,7 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -278,7 +278,7 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferInvalidData) {
 }
 
 TEST_F(TsiSocketTest, HandshakeValidationFail) {
-  auto validator = [](const tsi_peer&, std::string&) { return false; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return false; };
   initialize(validator, validator);
 
   InSequence s;
@@ -306,7 +306,7 @@ TEST_F(TsiSocketTest, HandshakerCreationFail) {
   client_.handshaker_factory_ =
       [](Event::Dispatcher&, const Network::Address::InstanceConstSharedPtr&,
          const Network::Address::InstanceConstSharedPtr&) { return nullptr; };
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -651,7 +651,7 @@ TEST_F(TsiSocketTest, DoReadDrainBufferTwice) {
 }
 
 TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -696,7 +696,7 @@ TEST_F(TsiSocketTest, DoWriteSmallFrameSize) {
 }
 
 TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -729,7 +729,7 @@ TEST_F(TsiSocketTest, DoWriteSingleShortWrite) {
 }
 
 TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -773,7 +773,7 @@ TEST_F(TsiSocketTest, DoWriteMultipleShortWrites) {
 }
 
 TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;
@@ -827,7 +827,7 @@ TEST_F(TsiSocketTest, DoWriteMixShortFullWrites) {
 }
 
 TEST_F(TsiSocketTest, DoWriteOutstandingHandshakeData) {
-  auto validator = [](const tsi_peer&, std::string&) { return true; };
+  auto validator = [](const tsi_peer&, TsiInfo&, std::string&) { return true; };
   initialize(validator, validator);
 
   InSequence s;

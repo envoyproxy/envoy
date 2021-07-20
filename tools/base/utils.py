@@ -4,6 +4,7 @@
 
 import io
 import os
+import tarfile
 import tempfile
 from configparser import ConfigParser
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
@@ -69,3 +70,30 @@ def buffered(
     if stderr is not None:
         _stderr.seek(0)
         stderr.extend(mangle(_stderr.read().strip().split("\n")))
+
+
+@contextmanager
+def untar(tarball: str) -> Iterator[str]:
+    """Untar a tarball into a temporary directory
+
+    for example to list the contents of a tarball:
+
+    ```
+    import os
+
+    from tooling.base.utils import untar
+
+
+    with untar("path/to.tar") as tmpdir:
+        print(os.listdir(tmpdir))
+
+    ```
+
+    the created temp directory will be cleaned up on
+    exiting the contextmanager
+
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with tarfile.open(tarball) as tarfiles:
+            tarfiles.extractall(path=tmpdir)
+            yield tmpdir
