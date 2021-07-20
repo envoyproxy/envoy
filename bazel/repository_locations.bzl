@@ -813,7 +813,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # Static snapshot of https://quiche.googlesource.com/quiche/+archive/{version}.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["dataplane_core"],
-        release_date = "2021-07-13",
+        release_date = "2021-07-16",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
