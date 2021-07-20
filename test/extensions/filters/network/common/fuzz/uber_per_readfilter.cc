@@ -159,8 +159,9 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
         EnvoyMobileHttpConnectionManager& config =
             dynamic_cast<envoy::extensions::filters::network::http_connection_manager::v3::
                              EnvoyMobileHttpConnectionManager&>(*config_message);
-    if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
-                                   HttpConnectionManager::HTTP3) {
+    if (config.config().codec_type() ==
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+            HTTP3) {
       // Quiche is still in progress and http_conn_manager has a dedicated fuzzer.
       // So we won't fuzz it here with complex mocks.
       throw EnvoyException(absl::StrCat("envoy_mobile_http_conn_manager trying to use Quiche which "
