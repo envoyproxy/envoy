@@ -19,6 +19,7 @@ Bug Fixes
 ---------
 
 * ext_authz: fix the ext_authz filter to correctly merge multiple same headers using the ',' as separator in the check request to the external authorization service.
+* http: limit use of deferred resets in the http2 codec to server-side connections. Use of deferred reset for client connections can result in incorrect behavior and performance problems.
 
 Removed Config or Runtime
 -------------------------
