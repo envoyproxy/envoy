@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec.h"
 #include "source/extensions/filters/network/mysql_proxy/mysql_codec_clogin.h"
@@ -556,178 +558,104 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPluginName) {
   EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), "");
 }
 
+class MySQL41LoginConnAttrTest : public MySQLCLoginTest {
+public:
+  MySQL41LoginConnAttrTest() {
+    login_encode = MySQLCLoginTest::getClientLogin(CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB |
+                                                   CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
+    incomplete_base_len = sizeof(login_encode.getClientCap()) +
+                          sizeof(login_encode.getMaxPacket()) + sizeof(login_encode.getCharset()) +
+                          UNSET_BYTES + login_encode.getUsername().size() + 1 +
+                          login_encode.getAuthResp().size() + 1 + login_encode.getDb().size() + 1 +
+                          login_encode.getAuthPluginName().length() + 1;
+  }
+  void prepareLoginDecode(int delta_len = 0) {
+    Buffer::OwnedImpl buffer;
+    login_encode.encode(buffer);
+    int incomplete_len = incomplete_base_len + delta_len;
+    Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
+
+    login_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+  }
+
+  void checkLoginDecode(const std::function<void()>& additional_check = nullptr) {
+    EXPECT_TRUE(login_decode.isConnectWithDb());
+    EXPECT_EQ(login_decode.getClientCap(), login_encode.getClientCap());
+    EXPECT_EQ(login_decode.getExtendedClientCap(), login_decode.getExtendedClientCap());
+    EXPECT_EQ(login_decode.getMaxPacket(), login_encode.getMaxPacket());
+    EXPECT_EQ(login_decode.getCharset(), login_encode.getCharset());
+    EXPECT_EQ(login_decode.getUsername(), login_encode.getUsername());
+    EXPECT_EQ(login_decode.getAuthResp(), login_encode.getAuthResp());
+    EXPECT_EQ(login_decode.getDb(), login_encode.getDb());
+    EXPECT_EQ(login_decode.getAuthPluginName(), login_encode.getAuthPluginName());
+    if (additional_check) {
+      additional_check();
+    }
+  }
+
+  ClientLogin login_encode;
+  ClientLogin login_decode;
+  int incomplete_base_len;
+};
+
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
- * Incomplete length of connection attributions
+ * Incomplete total length of connection attributions
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteConnAttrLength) {
-  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
-      CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB | CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-  Buffer::OwnedImpl buffer;
-  mysql_clogin_encode.encode(buffer);
-
-  int incomplete_len =
-      sizeof(mysql_clogin_encode.getClientCap()) + sizeof(mysql_clogin_encode.getMaxPacket()) +
-      sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
-      mysql_clogin_encode.getUsername().size() + 1 + mysql_clogin_encode.getAuthResp().size() + 1 +
-      mysql_clogin_encode.getDb().size() + mysql_clogin_encode.getAuthPluginName().length() + 1;
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
-
-  ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
-
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
-  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
-  EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), "");
-  EXPECT_EQ(mysql_clogin_decode.getConnectionAttribute().size(), 0);
+TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrLength) {
+  prepareLoginDecode();
+  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
 }
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete length of connection attribution key
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteConnAttrKeyLength) {
-  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
-      CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB | CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-  Buffer::OwnedImpl buffer;
-  mysql_clogin_encode.encode(buffer);
+TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKeyLength) {
+  prepareLoginDecode(
+      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()));
 
-  int incomplete_len =
-      sizeof(mysql_clogin_encode.getClientCap()) + sizeof(mysql_clogin_encode.getMaxPacket()) +
-      sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
-      mysql_clogin_encode.getUsername().size() + 1 + mysql_clogin_encode.getAuthResp().size() + 1 +
-      mysql_clogin_encode.getDb().size() + mysql_clogin_encode.getAuthPluginName().length() + 1 +
-      MySQLTestUtils::bytesOfConnAtrributeLength(mysql_clogin_encode.getConnectionAttribute());
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
-
-  ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
-
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
-  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
-  EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), mysql_clogin_encode.getAuthPluginName());
-  EXPECT_EQ(mysql_clogin_decode.getConnectionAttribute().size(), 0);
+  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
 }
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
- * Incomplete  connection attribution key
+ * Incomplete connection attribution key
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteConnAttrKey) {
-  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
-      CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB | CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-  Buffer::OwnedImpl buffer;
-  mysql_clogin_encode.encode(buffer);
-
-  int incomplete_len =
-      sizeof(mysql_clogin_encode.getClientCap()) + sizeof(mysql_clogin_encode.getMaxPacket()) +
-      sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
-      mysql_clogin_encode.getUsername().size() + 1 + mysql_clogin_encode.getAuthResp().size() + 1 +
-      mysql_clogin_encode.getDb().size() + mysql_clogin_encode.getAuthPluginName().length() + 1 +
-      MySQLTestUtils::bytesOfConnAtrributeLength(mysql_clogin_encode.getConnectionAttribute()) +
+TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKey) {
+  prepareLoginDecode(
+      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          mysql_clogin_encode.getConnectionAttribute()[0].first.length());
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
-
-  ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
-
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
-  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
-  EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), mysql_clogin_encode.getAuthPluginName());
-  EXPECT_EQ(mysql_clogin_decode.getConnectionAttribute().size(), 0);
+          login_encode.getConnectionAttribute()[0].first.length()));
+  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
 }
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete length of connection attribution val
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteConnAttrValLength) {
-  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
-      CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB | CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-  Buffer::OwnedImpl buffer;
-  mysql_clogin_encode.encode(buffer);
-
-  int incomplete_len =
-      sizeof(mysql_clogin_encode.getClientCap()) + sizeof(mysql_clogin_encode.getMaxPacket()) +
-      sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
-      mysql_clogin_encode.getUsername().size() + 1 + mysql_clogin_encode.getAuthResp().size() + 1 +
-      mysql_clogin_encode.getDb().size() + mysql_clogin_encode.getAuthPluginName().length() + 1 +
-      MySQLTestUtils::bytesOfConnAtrributeLength(mysql_clogin_encode.getConnectionAttribute()) +
+TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrValLength) {
+  prepareLoginDecode(
+      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          mysql_clogin_encode.getConnectionAttribute()[0].first.length()) +
-      mysql_clogin_encode.getConnectionAttribute()[0].first.length();
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
-
-  ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
-
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
-  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
-  EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), mysql_clogin_encode.getAuthPluginName());
-  EXPECT_EQ(mysql_clogin_decode.getConnectionAttribute().size(), 0);
+          login_encode.getConnectionAttribute()[0].first.length()) +
+      login_encode.getConnectionAttribute()[0].first.length());
+  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
 }
 
 /*
  * Negative Test the MYSQL Client Login 41 message parser:
  * Incomplete connection attribution val
  */
-TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteConnAttrVal) {
-  ClientLogin& mysql_clogin_encode = MySQLCLoginTest::getClientLogin(
-      CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB | CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-  Buffer::OwnedImpl buffer;
-  mysql_clogin_encode.encode(buffer);
-
-  int incomplete_len =
-      sizeof(mysql_clogin_encode.getClientCap()) + sizeof(mysql_clogin_encode.getMaxPacket()) +
-      sizeof(mysql_clogin_encode.getCharset()) + UNSET_BYTES +
-      mysql_clogin_encode.getUsername().size() + 1 + mysql_clogin_encode.getAuthResp().size() + 1 +
-      mysql_clogin_encode.getDb().size() + mysql_clogin_encode.getAuthPluginName().length() + 1 +
-      MySQLTestUtils::bytesOfConnAtrributeLength(mysql_clogin_encode.getConnectionAttribute()) +
+TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrVal) {
+  prepareLoginDecode(
+      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          mysql_clogin_encode.getConnectionAttribute()[0].first.length()) +
-      mysql_clogin_encode.getConnectionAttribute()[0].first.length() +
+          login_encode.getConnectionAttribute()[0].first.length()) +
+      login_encode.getConnectionAttribute()[0].first.length() +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          mysql_clogin_encode.getConnectionAttribute()[0].second.length());
-  Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
-
-  ClientLogin mysql_clogin_decode{};
-  mysql_clogin_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
-  EXPECT_TRUE(mysql_clogin_decode.isConnectWithDb());
-
-  EXPECT_EQ(mysql_clogin_decode.getClientCap(), mysql_clogin_encode.getClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getExtendedClientCap(), mysql_clogin_encode.getExtendedClientCap());
-  EXPECT_EQ(mysql_clogin_decode.getMaxPacket(), mysql_clogin_encode.getMaxPacket());
-  EXPECT_EQ(mysql_clogin_decode.getCharset(), mysql_clogin_encode.getCharset());
-  EXPECT_EQ(mysql_clogin_decode.getUsername(), mysql_clogin_encode.getUsername());
-  EXPECT_EQ(mysql_clogin_decode.getAuthResp(), mysql_clogin_encode.getAuthResp());
-  EXPECT_EQ(mysql_clogin_decode.getDb(), mysql_clogin_encode.getDb());
-  EXPECT_EQ(mysql_clogin_decode.getAuthPluginName(), mysql_clogin_encode.getAuthPluginName());
-  EXPECT_EQ(mysql_clogin_decode.getConnectionAttribute().size(), 0);
+          login_encode.getConnectionAttribute()[0].second.length()));
+  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
 }
 
 /*

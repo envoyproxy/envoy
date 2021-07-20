@@ -174,10 +174,9 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       uint64_t str_len;
       uint64_t prev_len = buffer.length();
       if (BufferHelper::readLengthEncodedInteger(buffer, str_len) != DecodeStatus::Success) {
-        ENVOY_LOG(
-            debug,
-            "error when parsing length of connection attribute key in connection attributes of "
-            "client login message");
+        ENVOY_LOG(debug, "error when parsing total length of connection attribute key in "
+                         "connection attributes of "
+                         "client login message");
         return DecodeStatus::Failure;
       }
       std::string key;
@@ -203,7 +202,7 @@ DecodeStatus ClientLogin::parseResponse41(Buffer::Instance& buffer) {
       kvs_len -= prev_len - buffer.length();
     }
   }
-  ENVOY_LOG(debug, "parse client login protocol 41, consumed len {}, remain {}",
+  ENVOY_LOG(debug, "parsed client login protocol 41, consumed len {}, remain len {}",
             total - buffer.length(), buffer.length());
   return DecodeStatus::Success;
 }
