@@ -214,7 +214,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_ = callbacks_->route();
   if (!route_) {
     ENVOY_STREAM_LOG(debug, "no route match for method '{}'", *callbacks_, metadata->methodName());
-    stats_.route_missing_.inc();
+    stats().route_missing_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
@@ -225,10 +225,10 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   route_entry_ = route_->routeEntry();
   const std::string& cluster_name = route_entry_->clusterName();
 
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
+  Upstream::ThreadLocalCluster* cluster = clusterManager().getThreadLocalCluster(cluster_name);
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
-    stats_.unknown_cluster_.inc();
+    stats().unknown_cluster_.inc();
     callbacks_->sendLocalReply(AppException(AppExceptionType::InternalError,
                                             fmt::format("unknown cluster '{}'", cluster_name)),
                                true);
@@ -240,20 +240,20 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    metadata->methodName());
   switch (metadata->messageType()) {
   case MessageType::Call:
-    incClusterScopeCounter({upstream_rq_call_});
+    incRequestCall(*cluster_);
     break;
 
   case MessageType::Oneway:
-    incClusterScopeCounter({upstream_rq_oneway_});
+    incRequestOneWay(*cluster_);
     break;
 
   default:
-    incClusterScopeCounter({upstream_rq_invalid_type_});
+    incRequestInvalid(*cluster_);
     break;
   }
 
   if (cluster_->maintenanceMode()) {
-    stats_.upstream_rq_maintenance_mode_.inc();
+    stats().upstream_rq_maintenance_mode_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("maintenance mode for cluster '{}'", cluster_name)),
@@ -282,7 +282,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 
   auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!conn_pool_data) {
-    stats_.no_healthy_upstream_.inc();
+    stats().no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("no healthy upstream for '{}'", cluster_name)),
@@ -316,7 +316,7 @@ FilterStatus Router::messageEnd() {
                                              upstream_request_buffer_);
 
   request_size_ += transport_buffer.length();
-  recordClusterScopeHistogram({upstream_rq_size_}, Stats::Histogram::Unit::Bytes, request_size_);
+  recordUpstreamRequestSize(*cluster_, request_size_);
 
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
@@ -355,31 +355,31 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
     if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
-      recordClusterScopeHistogram({upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
-                                  response_size_);
+
+      recordUpstreamResponseSize(*cluster_, response_size_);
 
       switch (callbacks_->responseMetadata()->messageType()) {
       case MessageType::Reply:
-        incClusterScopeCounter({upstream_resp_reply_});
+        incResponseReply(*cluster_);
         if (callbacks_->responseSuccess()) {
           upstream_request_->upstream_host_->outlierDetector().putResult(
               Upstream::Outlier::Result::ExtOriginRequestSuccess);
-          incClusterScopeCounter({upstream_resp_reply_success_});
+          incResponseReplySuccess(*cluster_);
         } else {
           upstream_request_->upstream_host_->outlierDetector().putResult(
               Upstream::Outlier::Result::ExtOriginRequestFailed);
-          incClusterScopeCounter({upstream_resp_reply_error_});
+          incResponseReplyError(*cluster_);
         }
         break;
 
       case MessageType::Exception:
         upstream_request_->upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestFailed);
-        incClusterScopeCounter({upstream_resp_exception_});
+        incResponseException(*cluster_);
         break;
 
       default:
-        incClusterScopeCounter({upstream_resp_invalid_type_});
+        incResponseInvalidType(*cluster_);
         break;
       }
       upstream_request_->onResponseComplete();

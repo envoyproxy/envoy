@@ -198,10 +198,10 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port, uint32_t backlog_size) {
+                                                    bool bind_to_port) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, backlog_size);
+  return std::make_unique<Network::TcpListenerImpl>(*this, api_.randomGenerator(),
+                                                    std::move(socket), cb, bind_to_port);
 }
 
 Network::UdpListenerPtr

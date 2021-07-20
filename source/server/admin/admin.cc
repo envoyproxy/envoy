@@ -127,7 +127,9 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
   null_overload_manager_.start();
   socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
-  socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
+  // TODO(mattklein123): We lost error handling along the way for the listen() call. Add it back.
+  socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE);
+  socket_factory_ = std::make_unique<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   ENVOY_LOG(info, "admin address: {}", socket().addressProvider().localAddress()->asString());
   if (!address_out_path.empty()) {
