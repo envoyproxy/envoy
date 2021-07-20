@@ -123,8 +123,13 @@ void CheckRequestUtils::setHttpRequest(
   headers.iterate([mutable_headers](const Envoy::Http::HeaderEntry& e) {
     // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
     if (e.key().getStringView() != Headers::get().EnvoyAuthPartialBody.get()) {
-      (*mutable_headers)[std::string(e.key().getStringView())] =
-          std::string(e.value().getStringView());
+      const std::string key(e.key().getStringView());
+      if (mutable_headers->find(key) == mutable_headers->end()) {
+        (*mutable_headers)[key] = std::string(e.value().getStringView());
+      } else {
+        // Merge duplicate headers.
+        (*mutable_headers)[key].append(",").append(std::string(e.value().getStringView()));
+      }
     }
     return Envoy::Http::HeaderMap::Iterate::Continue;
   });
