@@ -83,8 +83,9 @@ public:
     {
       testing::InSequence sequence;
       for (uint32_t i = 0; i < connections; i++) {
-        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-            .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)))
+        EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+            .WillOnce(
+                Return(Upstream::TcpPoolDataVector{Upstream::TcpPoolData([]() {}, &conn_pool_)}))
             .RetiresOnSaturation();
         EXPECT_CALL(conn_pool_, newConnection(_))
             .WillOnce(Invoke(
@@ -95,8 +96,8 @@ public:
                 }))
             .RetiresOnSaturation();
       }
-      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-          .WillRepeatedly(Return(absl::nullopt));
+      EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+          .WillRepeatedly(Return(Upstream::TcpPoolDataVector{}));
     }
 
     {
@@ -550,8 +551,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(0));
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-        .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(Upstream::TcpPoolDataVector{})));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -574,8 +575,8 @@ TEST_F(TcpProxyTest, WeightedClusterWithMetadataMatch) {
     Upstream::LoadBalancerContext* context;
 
     EXPECT_CALL(factory_context_.api_.random_, random()).WillOnce(Return(2));
-    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-        .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
+    EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+        .WillOnce(DoAll(SaveArg<1>(&context), Return(Upstream::TcpPoolDataVector{})));
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
     EXPECT_NE(nullptr, context);
@@ -613,8 +614,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(Upstream::TcpPoolDataVector{})));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);
@@ -667,8 +668,8 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
 
   Upstream::LoadBalancerContext* context;
 
-  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&context), Return(absl::nullopt)));
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+      .WillOnce(DoAll(SaveArg<1>(&context), Return(Upstream::TcpPoolDataVector{})));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_NE(nullptr, context);

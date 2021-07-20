@@ -913,7 +913,8 @@ HttpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
     LoadBalancerContext* context, bool fetch_pool_all_hosts) {
   HttpPoolDataVector pool_set;
   // Select a host and create a connection pool for it if it does not already exist.
-  const auto& selected_hosts = selectHosts(context, false, fetch_pool_all_hosts);
+  const auto& selected_hosts =
+      fetch_pool_all_hosts ? allHealthyHosts() : selectHost(context, false);
 
   for (const auto& host : selected_hosts) {
     auto pool = httpConnPoolInternal(host, priority, protocol, context);
@@ -926,7 +927,7 @@ HttpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
           // Now that a new stream is being established, attempt to preconnect.
           maybePreconnect(*this, parent_.cluster_manager_state_,
                           [this, &priority, &protocol, &context]() -> ConnectionPool::Instance* {
-                            const auto& selected_hosts = selectHosts(context, true, false);
+                            const auto& selected_hosts = selectHost(context, true);
                             ASSERT(selected_hosts.size() < 2);
                             if (selected_hosts.empty()) {
                               return nullptr;
@@ -945,7 +946,8 @@ TcpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntr
     ResourcePriority priority, LoadBalancerContext* context, bool fetch_pool_all_hosts) {
   TcpPoolDataVector pool_set;
   // Select a host and create a connection pool for it if it does not already exist.
-  const auto& selected_hosts = selectHosts(context, false, fetch_pool_all_hosts);
+  const auto& selected_hosts =
+      fetch_pool_all_hosts ? allHealthyHosts() : selectHost(context, false);
 
   for (const auto& host : selected_hosts) {
     auto pool = tcpConnPoolInternal(host, priority, context);
@@ -956,7 +958,7 @@ TcpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntr
         [this, priority, context]() -> void {
           maybePreconnect(*this, parent_.cluster_manager_state_,
                           [this, &priority, &context]() -> ConnectionPool::Instance* {
-                            const auto& selected_hosts = selectHosts(context, true, false);
+                            const auto& selected_hosts = selectHost(context, true);
                             ASSERT(selected_hosts.size() < 2);
                             if (selected_hosts.empty()) {
                               return nullptr;
@@ -1422,28 +1424,33 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 }
 
 std::set<HostConstSharedPtr>
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::selectHosts(
-    LoadBalancerContext* context, bool peek, bool fetch_all_hosts) {
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::selectHost(
+    LoadBalancerContext* context, bool peek) {
   std::set<HostConstSharedPtr> hosts;
 
-  if (fetch_all_hosts) {
-    for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
-      for (const HostSharedPtr& host : host_set->hosts()) {
-        if (host->health() == Upstream::Host::Health::Healthy) {
-          hosts.insert(host);
-        }
+  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  if (!host) {
+    if (!peek) {
+      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
+      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    }
+    return hosts;
+  }
+
+  hosts.insert(host);
+  return hosts;
+}
+
+std::set<HostConstSharedPtr>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::allHealthyHosts() {
+  std::set<HostConstSharedPtr> hosts;
+
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
+      if (host->health() == Upstream::Host::Health::Healthy) {
+        hosts.insert(host);
       }
     }
-  } else {
-    HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
-    if (!host) {
-      if (!peek) {
-        ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-        cluster_info_->stats().upstream_cx_none_healthy_.inc();
-      }
-      return hosts;
-    }
-    hosts.insert(host);
   }
 
   return hosts;

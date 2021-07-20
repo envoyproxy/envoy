@@ -2239,7 +2239,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
 
   Tcp::ConnectionPool::MockInstance* tcp1_example_com = TcpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
-          ->tcpConnPool(ResourcePriority::Default, &example_com_context, ));
+          ->tcpConnPool(ResourcePriority::Default, &example_com_context));
   Tcp::ConnectionPool::MockInstance* tcp2_example_com = TcpPoolDataPeer::getSingleHostConnPool(
       cluster_manager_->getThreadLocalCluster("cluster_1")
           ->tcpConnPool(ResourcePriority::Default, &example_com_context));

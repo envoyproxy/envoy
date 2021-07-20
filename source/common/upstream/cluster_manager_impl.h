@@ -402,8 +402,8 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      std::set<HostConstSharedPtr> selectHosts(LoadBalancerContext* context, bool peek,
-                                               bool fetch_all_hosts);
+      std::set<HostConstSharedPtr> selectHost(LoadBalancerContext* context, bool peek);
+      std::set<HostConstSharedPtr> allHealthyHosts();
       Http::ConnectionPool::Instance*
       httpConnPoolInternal(HostConstSharedPtr host, ResourcePriority priority,
                            absl::optional<Http::Protocol> downstream_protocol,
