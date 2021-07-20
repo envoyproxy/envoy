@@ -924,7 +924,8 @@ async def test_asynchecker_on_checks_complete(patches):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("raises", [True, False])
-async def test_asynchecker__run(patches, raises):
+@pytest.mark.parametrize("exiting", [True, False])
+async def test_asynchecker__run(patches, raises, exiting):
     _check1 = MagicMock()
     _check2 = MagicMock()
     _check3 = MagicMock()
@@ -952,21 +953,29 @@ async def test_asynchecker__run(patches, raises):
         "AsyncChecker.on_check_begin",
         "AsyncChecker.on_check_run",
         "AsyncChecker.on_checks_complete",
+        ("AsyncChecker.exiting", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_log, m_checks, m_begin, m_check, m_run, m_complete):
+    with patched as (m_log, m_checks, m_begin, m_check, m_run, m_complete, m_exit):
         m_checks.return_value = ["check1", "check2", "check3"]
+        m_exit.return_value = exiting
         if raises:
             m_begin.side_effect = SomeError("AN ERROR OCCURRED")
 
             with pytest.raises(SomeError):
                 await checker._run()
+        elif exiting:
+            assert await checker._run() == 1
         else:
             assert await checker._run() == m_complete.return_value
 
     assert (
         list(m_begin.call_args)
         == [(), {}])
+
+    if exiting:
+        return
+
     assert (
         list(m_complete.call_args)
         == [(), {}])

@@ -319,7 +319,10 @@ class AsyncChecker(Checker):
                 await getattr(self, f"check_{check}")()
                 await self.on_check_run(check)
         finally:
-            result = await self.on_checks_complete()
+            if self.exiting:
+                result = 1
+            else:
+                result = await self.on_checks_complete()
         return result
 
     def run(self) -> int:
