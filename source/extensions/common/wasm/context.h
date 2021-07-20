@@ -350,7 +350,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::AsyncRequest* request_;
   };
 
@@ -376,7 +376,7 @@ protected:
 
     Context* context_;
     uint32_t token_;
-    Grpc::RawAsyncClientPtr client_;
+    Grpc::RawAsyncClientSharedPtr client_;
     Grpc::RawAsyncStream* stream_;
     bool local_closed_ = false;
     bool remote_closed_ = false;
@@ -450,11 +450,12 @@ protected:
   const Http::ResponseTrailerMap* access_log_response_trailers_{};
 
   // Temporary state.
-  ProtobufWkt::Struct temporary_metadata_;
-  bool end_of_stream_;
+  Buffer buffer_;
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
-  Buffer buffer_;
+  bool end_of_stream_ = false;
+  bool local_reply_sent_ = false;
+  ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;

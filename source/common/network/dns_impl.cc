@@ -264,8 +264,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(*this, callback, dispatcher_, channel_, dns_name));
+  auto pending_resolution =
+      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name);
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }

@@ -416,6 +416,7 @@ private:
     StatType& safeMakeStat(StatName full_stat_name, StatName name_no_tags,
                            const absl::optional<StatNameTagVector>& stat_name_tags,
                            StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
+                           StatsMatcher::FastResult fast_reject_result,
                            StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -476,11 +477,14 @@ private:
   void clearHistogramsFromCaches();
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
-  bool rejects(StatName name) const;
+  bool slowRejects(StatsMatcher::FastResult fast_reject_result, StatName name) const;
+  bool rejects(StatName name) const { return stats_matcher_->rejects(name); }
+  StatsMatcher::FastResult fastRejects(StatName name) const;
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
+  bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
+                                 StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 

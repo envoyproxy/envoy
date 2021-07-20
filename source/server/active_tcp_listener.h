@@ -34,7 +34,8 @@ class ActiveTcpListener final : public Network::TcpListenerCallbacks,
                                 public Network::BalancedConnectionHandler,
                                 Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config);
+  ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerConfig& config,
+                    uint32_t worker_index);
   ActiveTcpListener(Network::TcpConnectionHandler& parent, Network::ListenerPtr&& listener,
                     Network::ListenerConfig& config);
   ~ActiveTcpListener() override;

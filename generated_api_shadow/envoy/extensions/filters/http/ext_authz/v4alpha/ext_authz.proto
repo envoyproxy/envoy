@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = NEXT_MAJOR_VERSIO
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.ext_authz.v3.ExtAuthz";
@@ -138,6 +138,11 @@ message ExtAuthz {
   //         stat_prefix: blocker # This emits ext_authz.blocker.ok, ext_authz.blocker.denied, etc.
   //
   string stat_prefix = 13;
+
+  // Optional labels that will be passed to :ref:`labels<envoy_v3_api_field_service.auth.v3.AttributeContext.Peer.labels>` in
+  // :ref:`destination<envoy_v3_api_field_service.auth.v3.AttributeContext.destination>`.
+  // The labels will be read from :ref:`metadata<envoy_v3_api_msg_config.core.v3.Node>` with the specified key.
+  string bootstrap_metadata_labels_key = 15;
 }
 
 // Configuration for buffering the request data.

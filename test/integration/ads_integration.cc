@@ -8,6 +8,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -259,20 +260,20 @@ void AdsIntegrationTest::testBasicFlow() {
 }
 
 envoy::admin::v3::ClustersConfigDump AdsIntegrationTest::getClustersConfigDump() {
-  auto message_ptr =
-      test_server_->server().admin().getConfigTracker().getCallbacksMap().at("clusters")();
+  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+      "clusters")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::ListenersConfigDump AdsIntegrationTest::getListenersConfigDump() {
-  auto message_ptr =
-      test_server_->server().admin().getConfigTracker().getCallbacksMap().at("listeners")();
+  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+      "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::RoutesConfigDump AdsIntegrationTest::getRoutesConfigDump() {
-  auto message_ptr =
-      test_server_->server().admin().getConfigTracker().getCallbacksMap().at("routes")();
+  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+      "routes")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 }
 

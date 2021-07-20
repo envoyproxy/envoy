@@ -663,7 +663,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("CONNECTION_ID");
     uint64_t id = 123;
-    EXPECT_CALL(stream_info, connectionID()).WillRepeatedly(Return(id));
+    stream_info.downstream_address_provider_->setConnectionID(id);
     EXPECT_EQ("123", upstream_format.format(request_headers, response_headers, response_trailers,
                                             stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -674,8 +674,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub_server";
-    EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+    stream_info.downstream_address_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ("stub_server", upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -686,8 +685,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name;
-    EXPECT_CALL(stream_info, requestedServerName())
-        .WillRepeatedly(ReturnRef(requested_server_name));
+    stream_info.downstream_address_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,

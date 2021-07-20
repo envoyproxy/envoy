@@ -13,11 +13,13 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 
+#include "matching/data_impl.h"
+
 namespace Envoy {
 namespace Http {
 
 namespace {
-REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory);
+REGISTER_FACTORY(SkipActionFactory, Matcher::ActionFactory<Matching::HttpFilterActionContext>);
 
 template <class T> using FilterList = std::list<std::unique_ptr<T>>;
 
@@ -266,6 +268,10 @@ void ActiveStreamFilterBase::setRoute(Router::RouteConstSharedPtr route) {
 
 void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
+}
+
+void ActiveStreamFilterBase::resetIdleTimer() {
+  parent_.filter_manager_callbacks_.resetIdleTimer();
 }
 
 void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {

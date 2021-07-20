@@ -43,6 +43,17 @@ routing PRs, questions, etc. to the right place.
   * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
+* Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
+  * Windows, low level networking.
+
+# Senior extension maintainers
+
+The following extension maintainers have final say over the extensions mentioned below. Once they
+approve an extension PR, it will be merged by the maintainer on-call (or any other maintainer)
+without further review.
+
+* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+  * Wasm
 
 # Envoy security team
 
