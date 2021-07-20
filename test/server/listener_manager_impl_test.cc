@@ -126,7 +126,8 @@ public:
   Network::MockListenSocket*
   expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
                           ListenerHandle* old_listener_handle,
-                          OptRef<Network::MockListenSocket> socket) {
+                          OptRef<Network::MockListenSocket> socket,
+                          ListenerComponentFactory::BindType bind_type = default_bind_type) {
     Network::MockListenSocket* new_socket;
     if (socket.has_value()) {
       new_socket = new NiceMock<Network::MockListenSocket>();
@@ -134,7 +135,7 @@ public:
           .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(new_socket))));
     } else {
       new_socket = listener_factory_.socket_.get();
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
@@ -5129,7 +5130,8 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAn
       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>());
+  expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>(),
+                          ListenerComponentFactory::BindType::ReusePort);
   expectRemove(new_listener_proto, listener_foo_update1, *listener_factory_.socket_);
 
   EXPECT_EQ(0UL, manager_->listeners().size());
