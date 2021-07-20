@@ -522,12 +522,23 @@ const char* ClearTextClusters[][3] = {{
                                           "base_wwan_clear_alt",
                                       }};
 
+const char* AlpnClusters[][3] = {{
+                                     "base_alpn",
+                                     "base_wlan_alpn",
+                                     "base_wwan_alpn",
+                                 },
+                                 {
+                                     "base_alpn_alt",
+                                     "base_wlan_alpn_alt",
+                                     "base_wwan_alpn_alt",
+                                 }};
+
 } // namespace
 
 void Client::setDestinationCluster(Http::RequestHeaderMap& headers, bool alternate) {
   // Determine upstream cluster:
   // - Use TLS by default.
-  // - Use http/2 if requested explicitly via x-envoy-mobile-upstream-protocol.
+  // - Use http/2 or ALPN if requested explicitly via x-envoy-mobile-upstream-protocol.
   // - Force http/1.1 if request scheme is http (cleartext).
   const char* cluster{};
   auto h2_header = headers.get(H2UpstreamHeader);
@@ -541,6 +552,8 @@ void Client::setDestinationCluster(Http::RequestHeaderMap& headers, bool alterna
     const auto value = h2_header[0]->value().getStringView();
     if (value == "http2") {
       cluster = H2Clusters[alternate][network];
+    } else if (value == "alpn") {
+      cluster = AlpnClusters[alternate][network];
     } else {
       RELEASE_ASSERT(value == "http1", fmt::format("using unsupported protocol version {}", value));
       cluster = BaseClusters[alternate][network];
