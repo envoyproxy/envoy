@@ -47,13 +47,12 @@ class ActiveClient;
 class HttpConnPoolImplBase : public Envoy::ConnectionPool::ConnPoolImplBase,
                              public Http::ConnectionPool::Instance {
 public:
-  HttpConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                       Event::Dispatcher& dispatcher,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                       Random::RandomGenerator& random_generator,
-                       Upstream::ClusterConnectivityState& state,
-                       std::vector<Http::Protocol> protocols);
+  HttpConnPoolImplBase(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      std::vector<Http::Protocol> protocols);
   ~HttpConnPoolImplBase() override;
 
   // ConnectionPool::Instance
@@ -143,13 +142,12 @@ public:
   using CreateCodecFn = std::function<CodecClientPtr(Upstream::Host::CreateConnectionData& data,
                                                      HttpConnPoolImplBase* pool)>;
 
-  FixedHttpConnPoolImpl(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                        Event::Dispatcher& dispatcher,
-                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                        const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
-                        Random::RandomGenerator& random_generator,
-                        Upstream::ClusterConnectivityState& state, CreateClientFn client_fn,
-                        CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
+  FixedHttpConnPoolImpl(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
                              random_generator, state, protocols),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]) {

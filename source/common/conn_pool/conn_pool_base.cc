@@ -21,7 +21,7 @@ namespace {
 ConnPoolImplBase::ConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state)
     : state_(state), host_(host), priority_(priority), dispatcher_(dispatcher),
       socket_options_(options), transport_socket_options_(transport_socket_options),
@@ -98,11 +98,7 @@ bool ConnPoolImplBase::shouldCreateNewConnection(float global_preconnect_ratio) 
 }
 
 float ConnPoolImplBase::perUpstreamPreconnectRatio() const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_preconnect")) {
-    return host_->cluster().perUpstreamPreconnectRatio();
-  } else {
-    return 1.0;
-  }
+  return host_->cluster().perUpstreamPreconnectRatio();
 }
 
 ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {

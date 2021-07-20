@@ -1,79 +1,41 @@
-1.19.0 (Pending)
+1.20.0 (Pending)
 ================
 
 Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter.
-  The behavior can be reverted by changing runtime key ``envoy.reloadable_features.grpc_bridge_stats_disabled``.
-* tracing: update Apache SkyWalking tracer version to be compatible with 8.4.0 data collect protocol. This change will introduce incompatibility with SkyWalking 8.3.0.
-
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* access_log: add new access_log command operator ``%REQUEST_TX_DURATION%``.
-* access_log: remove extra quotes on metadata string values. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.unquote_log_string_values`` to false.
-* admission control: added :ref:`admission control <envoy_v3_api_field_extensions.filters.http.admission_control.v3alpha.AdmissionControl.max_rejection_probability>` whose default value is 80%, which means that the upper limit of the default rejection probability of the filter is changed from 100% to 80%.
-* aws_request_signing: requests are now buffered by default to compute signatures which include the
-  payload hash, making the filter compatible with most AWS services. Previously, requests were
-  never buffered, which only produced correct signatures for requests without a body, or for
-  requests to S3, ES or Glacier, which used the literal string ``UNSIGNED-PAYLOAD``. Buffering can
-  be now be disabled in favor of using unsigned payloads with compatible services via the new
-  `use_unsigned_payload` filter option (default false).
-* cluster: added default value of 5 seconds for :ref:`connect_timeout <envoy_v3_api_field_config.cluster.v3.Cluster.connect_timeout>`.
-* http: disable the integration between :ref:`ExtensionWithMatcher <envoy_v3_api_msg_extensions.common.matching.v3.ExtensionWithMatcher>`
-  and HTTP filters by default to reflects its experimental status. This feature can be enabled by seting
-  ``envoy.reloadable_features.experimental_matching_api`` to true.
-* http: replaced setting ``envoy.reloadable_features.strict_1xx_and_204_response_headers`` with settings
-  ``envoy.reloadable_features.require_strict_1xx_and_204_response_headers``
-  (require upstream 1xx or 204 responses to not have Transfer-Encoding or non-zero Content-Length headers) and
-  ``envoy.reloadable_features.send_strict_1xx_and_204_response_headers``
-  (do not send 1xx or 204 responses with these headers). Both are true by default.
-* http: serve HEAD requests from cache.
-* http: stop sending the transfer-encoding header for 304. This behavior can be temporarily reverted by setting
-  ``envoy.reloadable_features.no_chunked_encoding_header_for_304`` to false.
-* http: the behavior of the *present_match* in route header matcher changed. The value of *present_match* is ignored in the past. The new behavior is *present_match* performed when value is true. absent match performed when the value is false. Please reference :ref:`present_match
-  <envoy_v3_api_field_config.route.v3.HeaderMatcher.present_match>`.
-* listener: respect the :ref:`connection balance config <envoy_v3_api_field_config.listener.v3.Listener.connection_balance_config>`
-  defined within the listener where the sockets are redirected to. Clear that field to restore the previous behavior.
-* tcp: switched to the new connection pool by default. Any unexpected behavioral changes can be reverted by setting runtime guard ``envoy.reloadable_features.new_tcp_connection_pool`` to false.
+* grpc: gRPC async client can be cached and shared accross filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
+* http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
+  which defines the minimal number of headers in a request/response/trailers required for using a
+  dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
+  feature to a non-negative number will override the default value.
+* listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
+  field and changed the default for reuse_port from false to true, as the feature is now well
+  supported on the majority of production Linux kernels in use. The default change is aware of hot
+  restart, as otherwise the change would not be backwards compatible between restarts. This means
+  that hot restarting on to a new binary will retain the default of false until the binary undergoes
+  a full restart. To retain the previous behavior, either explicitly set the new configuration
+  field to false, or set the runtime feature flag `envoy.reloadable_features.listener_reuse_port_default_enabled`
+  to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
+  Windows has been disabled due to suboptimal behavior. See the field documentation for more
+  information.
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* aws_lambda: if `payload_passthrough` is set to ``false``, the downstream response content-type header will now be set from the content-type entry in the JSON response's headers map, if present.
-* cluster: fixed the :ref:`cluster stats <config_cluster_manager_cluster_stats_request_response_sizes>` histograms by moving the accounting into the router
-  filter. This means that we now properly compute the number of bytes sent as well as handling retries which were previously ignored.
-* hot_restart: fix double counting of `server.seconds_until_first_ocsp_response_expiring` and `server.days_until_first_cert_expiring` during hot-restart. This stat was only incorrect until the parent process terminated.
-* http: fix erroneous handling of invalid nghttp2 frames with the `NGHTTP2_ERR_REFUSED_STREAM` error. Prior to the fix,
-  Envoy would close the entire connection when nghttp2 triggered the invalid frame callback for the said error. The fix
-  will cause Envoy to terminate just the refused stream and retain the connection. This behavior can be temporarily
-  reverted by setting the ``envoy.reloadable_features.http2_consume_stream_refused_errors`` runtime guard to false.
-* http: port stripping now works for CONNECT requests, though the port will be restored if the CONNECT request is sent upstream. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.strip_port_from_connect`` to false.
-* http: raise max configurable max_request_headers_kb limit to 8192 KiB (8MiB) from 96 KiB in http connection manager.
-* listener: fix the crash which could happen when the ongoing filter chain only listener update is followed by the listener removal or full listener update.
-* udp: limit each UDP listener to read maxmium 6000 packets per event loop. This behavior can be temporarily reverted by setting ``envoy.reloadable_features.udp_per_event_loop_read_limit`` to false.
-* validation: fix an issue that causes TAP sockets to panic during config validation mode.
-* xray: fix the default sampling 'rate' for AWS X-Ray tracer extension to be 5% as opposed to 50%.
-* zipkin: fix timestamp serializaiton in annotations. A prior bug fix exposed an issue with timestamps being serialized as strings.
-
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
-* event: removed ``envoy.reloadable_features.activate_timers_next_event_loop`` runtime guard and legacy code path.
-* gzip: removed legacy HTTP Gzip filter and runtime guard `envoy.deprecated_features.allow_deprecated_gzip_http_filter`.
-* http: removed ``envoy.reloadable_features.allow_500_after_100`` runtime guard and the legacy code path.
-* http: removed ``envoy.reloadable_features.always_apply_route_header_rules`` runtime guard and legacy code path.
-* http: removed ``envoy.reloadable_features.hcm_stream_error_on_invalid_message`` for disabling closing HTTP/1.1 connections on error. Connection-closing can still be disabled by setting the HTTP/1 configuration :ref:`override_stream_error_on_invalid_http_message <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.override_stream_error_on_invalid_http_message>`.
-* http: removed ``envoy.reloadable_features.http_set_copy_replace_all_headers`` runtime guard and legacy code paths.
-* http: removed ``envoy.reloadable_features.overload_manager_disable_keepalive_drain_http2``; Envoy will now always send GOAWAY to HTTP2 downstreams when the :ref:`disable_keepalive <config_overload_manager_overload_actions>` overload action is active.
-* http: removed ``envoy.reloadable_features.http_match_on_all_headers`` runtime guard and legacy code paths.
-* http: removed ``envoy.reloadable_features.unify_grpc_handling`` runtime guard and legacy code paths.
-* tls: removed ``envoy.reloadable_features.tls_use_io_handle_bio`` runtime guard and legacy code path.
+* http: removed ``envoy.reloadable_features.http_upstream_wait_connect_response`` runtime guard and legacy code paths.
+* http: removed ``envoy.reloadable_features.allow_preconnect`` runtime guard and legacy code paths.
+* listener: removed ``envoy.reloadable_features.disable_tls_inspector_injection`` runtime guard and legacy code paths.
 
 New Features
 ------------
@@ -115,12 +77,16 @@ New Features
 * tls: allow dual ECDSA/RSA certs via SDS. Previously, SDS only supported a single certificate per context, and dual cert was only supported via non-SDS.
 * udp_proxy: added :ref:`key <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.HashPolicy>` as another hash policy to support hash based routing on any given key.
 * windows container image: added user, EnvoyUser which is part of the Network Configuration Operators group to the container image.
+* http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
+* http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
 
 Deprecated
 ----------
+* cluster: :ref:`max_requests_per_connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` is deprecated in favor of :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>`.
+* http: the HeaderMatcher fields :ref:`exact_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.exact_match>`, :ref:`safe_regex_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.safe_regex_match>`,
+  :ref:`prefix_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.prefix_match>`, :ref:`suffix_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.suffix_match>` and
+  :ref:`contains_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.contains_match>` are deprecated by :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>`.
+* listener: :ref:`reuse_port <envoy_v3_api_field_config.listener.v3.Listener.reuse_port>` has been
+  deprecated in favor of :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`.
+  At the same time, the default has been changed from false to true. See above for more information.
 
-* bootstrap: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
-* cluster: the fields :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` and :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` are deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
-* dns_filter: the field :ref:`known_suffixes <envoy_v3_api_field_data.dns.v3.DnsTable.known_suffixes>` is deprecated. The internal data management of the filter has changed and the filter no longer uses the known_suffixes field.
-* dynamic_forward_proxy: the field :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.use_tcp_for_dns_lookups>` is deprecated in favor of :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` which aggregates all of the DNS resolver configuration in a single message.
-* http: :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` is deprecated in favor of :ref:`original IP detection extensions<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`.

@@ -398,6 +398,17 @@ TEST_P(IntegrationAdminTest, Admin) {
   TestUtility::loadFromJson(response->body(), config_dump_with_eds);
   EXPECT_EQ(7, config_dump_with_eds.configs_size());
 
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?name_regex=route_config_0", response));
+  EXPECT_EQ("application/json", ContentType(response));
+  envoy::admin::v3::ConfigDump name_filtered_config_dump;
+  TestUtility::loadFromJson(response->body(), name_filtered_config_dump);
+  EXPECT_EQ(6, config_dump.configs_size());
+
+  // SecretsConfigDump should have been totally filtered away.
+  secret_config_dump.Clear();
+  name_filtered_config_dump.configs(5).UnpackTo(&secret_config_dump);
+  EXPECT_EQ(secret_config_dump.static_secrets().size(), 0);
+
   // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",

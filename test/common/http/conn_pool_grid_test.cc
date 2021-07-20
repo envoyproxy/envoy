@@ -127,7 +127,7 @@ public:
   }
 
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
   Upstream::ClusterConnectivityState state_;
   NiceMock<Event::MockDispatcher> dispatcher_;

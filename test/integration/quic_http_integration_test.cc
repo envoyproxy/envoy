@@ -158,7 +158,6 @@ public:
 
   void testMultipleQuicConnections() {
     concurrency_ = 8;
-    set_reuse_port_ = true;
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
@@ -275,6 +274,13 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                    "error_code_QUIC_NO_ERROR",
                                    2u);
   }
+  if (GetParam().second == QuicVersionType::GquicQuicCrypto) {
+    test_server_->waitForCounterEq("http3.quic_version_50", 2u);
+  } else if (GetParam().second == QuicVersionType::GquicTls) {
+    test_server_->waitForCounterEq("http3.quic_version_51", 2u);
+  } else {
+    test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
@@ -294,7 +300,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicConnectionsNoBPF) {
 // worker.
 TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
   concurrency_ = 8;
-  set_reuse_port_ = true;
   initialize();
   // Setup 9-byte CID for the next connection.
   designated_connection_ids_.push_back(quic::test::TestConnectionIdNineBytesLong(2u));
@@ -303,7 +308,6 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
 
 TEST_P(QuicHttpIntegrationTest, PortMigration) {
   concurrency_ = 2;
-  set_reuse_port_ = true;
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);

@@ -134,10 +134,9 @@ protected:
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -200,7 +199,7 @@ protected:
     dispatcher_ = api_->allocateDispatcher("test_thread", Buffer::WatermarkFactoryPtr{factory});
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
-    EXPECT_CALL(*factory, create_(_, _, _))
+    EXPECT_CALL(*factory, createBuffer_(_, _, _))
         .Times(AnyNumber())
         .WillOnce(Invoke([&](std::function<void()> below_low, std::function<void()> above_high,
                              std::function<void()> above_overflow) -> Buffer::Instance* {
@@ -224,11 +223,11 @@ protected:
 
   ConnectionMocks createConnectionMocks(bool create_timer = true) {
     auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
-    EXPECT_CALL(dispatcher->buffer_factory_, create_(_, _, _))
+    EXPECT_CALL(dispatcher->buffer_factory_, createBuffer_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
-          // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls create_() and
-          // wraps the returned raw pointer below with a unique_ptr.
+          // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls createBuffer_()
+          // and wraps the returned raw pointer below with a unique_ptr.
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
         }));
 
@@ -376,8 +375,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
   if (socket_->addressProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
@@ -1340,10 +1339,9 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  listener_ =
-      dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->addressProvider().localAddress(), source_address_,
@@ -1621,7 +1619,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 
   NiceMock<MockConnectionCallbacks> callbacks;
   NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(dispatcher.buffer_factory_, create_(_, _, _))
+  EXPECT_CALL(dispatcher.buffer_factory_, createBuffer_(_, _, _))
       .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                 std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
@@ -1913,19 +1911,19 @@ TEST_P(ConnectionImplTest, NetworkSocketDumpsWithoutAllocatingMemory) {
   // Check socket dump
   const auto contents = ostream.contents();
   EXPECT_THAT(contents, HasSubstr("ListenSocketImpl"));
-  EXPECT_THAT(contents, HasSubstr("transport_protocol_: , server_name_: envoyproxy.io"));
+  EXPECT_THAT(contents, HasSubstr("transport_protocol_: "));
   EXPECT_THAT(contents, HasSubstr("SocketAddressSetterImpl"));
   if (GetParam() == Network::Address::IpVersion::v4) {
     EXPECT_THAT(
         contents,
         HasSubstr(
             "remote_address_: 1.1.1.1:80, direct_remote_address_: 1.1.1.1:80, local_address_: "
-            "1.2.3.4:56789"));
+            "1.2.3.4:56789, server_name_: envoyproxy.io"));
   } else {
     EXPECT_THAT(
         contents,
         HasSubstr("remote_address_: [::1]:80, direct_remote_address_: [::1]:80, local_address_: "
-                  "[::1:2:3:4]:56789"));
+                  "[::1:2:3:4]:56789, server_name_: envoyproxy.io"));
   }
 }
 
@@ -1984,7 +1982,7 @@ class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() : stream_info_(dispatcher_.timeSource(), nullptr) {
     EXPECT_CALL(dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
-    EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _, _))
+    EXPECT_CALL(dispatcher_.buffer_factory_, createBuffer_(_, _, _))
         .WillRepeatedly(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                   std::function<void()> above_overflow) -> Buffer::Instance* {
           return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
@@ -2811,10 +2809,9 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),

@@ -22,12 +22,17 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/docs"
+  directory: "/tools/base"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
   directory: "/tools/docs"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/tools/git"
   schedule:
     interval: "daily"
 

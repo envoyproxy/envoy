@@ -203,6 +203,14 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context) {
+  return createFilterFactoryFromProtoAndHopByHop(proto_config, context, true);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
   auto filter_config = Utility::createConfig(
@@ -214,12 +222,26 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
+  return [singletons, filter_config, &context,
+          clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
+    auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource())});
+        context.overloadManager(), context.dispatcher().timeSource());
+    if (!clear_hop_by_hop_headers) {
+      hcm->setClearHopByHopResponseHeaders(false);
+    }
+    filter_manager.addReadFilter(std::move(hcm));
   };
+}
+
+Network::FilterFactoryCb
+MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::
+        EnvoyMobileHttpConnectionManager& mobile_config,
+    Server::Configuration::FactoryContext& context) {
+  return HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
+      mobile_config.config(), context, false);
 }
 
 /**
@@ -308,7 +330,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.common_http_protocol_options().headers_with_underscores_action()),
       local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
-      strip_trailing_host_dot_(config.strip_trailing_host_dot()) {
+      strip_trailing_host_dot_(config.strip_trailing_host_dot()),
+      max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
   // TODO(asraa): Remove when idle_timeout is removed.
@@ -498,8 +522,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     random_sampling.set_numerator(random_sampling_numerator);
     random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     envoy::type::v3::FractionalPercent overall_sampling;
-    overall_sampling.set_numerator(
-        tracing_config.has_overall_sampling() ? tracing_config.overall_sampling().value() : 100);
+    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, overall_sampling, 10000, 10000)};
+    overall_sampling.set_numerator(overall_sampling_numerator);
+    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
 
     const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
         tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
@@ -517,6 +543,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   server_transformation_ = config.server_header_transformation();
+
+  if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
+    scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+  }
 
   if (!config.server_name().empty()) {
     server_name_ = config.server_name();

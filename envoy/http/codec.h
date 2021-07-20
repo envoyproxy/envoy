@@ -284,7 +284,9 @@ enum class StreamResetReason {
   // Either there was an early TCP error for a CONNECT request or the peer reset with CONNECT_ERROR
   ConnectError,
   // Received payload did not conform to HTTP protocol.
-  ProtocolError
+  ProtocolError,
+  // If the stream was locally reset by the Overload Manager.
+  OverloadManager
 };
 
 /**

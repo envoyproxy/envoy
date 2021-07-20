@@ -682,6 +682,7 @@ hackery
 hacky
 handshaker
 hardcoded
+hardcodes
 hardcoding
 hasher
 hashtagging
@@ -797,6 +798,7 @@ megamiss
 mem
 memcmp
 memcpy
+memoize
 mergeable
 messagename
 metadata
@@ -937,6 +939,8 @@ preorder
 prepend
 prepended
 prepends
+preresolve
+preresolved
 prev
 probabilistically
 proc

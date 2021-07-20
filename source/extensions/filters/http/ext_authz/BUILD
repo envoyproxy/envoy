@@ -45,7 +45,6 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
-        "//source/common/grpc:google_async_client_cache",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

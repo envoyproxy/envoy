@@ -469,7 +469,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
       dispatching_(false), no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
                                "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
-      output_buffer_(connection.dispatcher().getWatermarkFactory().create(
+      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
@@ -899,11 +899,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << DUMP_MEMBER_AS(active_request_.request_url_,
-                       active_request_.has_value() &&
-                               !active_request_.value().request_url_.getStringView().empty()
-                           ? active_request_.value().request_url_.getStringView()
-                           : "null");
+
+  DUMP_DETAILS(active_request_);
   os << '\n';
 
   // Dump header map, it may be null if it was moved to the request, and
@@ -1226,6 +1223,13 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
     }
   }
   return okStatus();
+}
+
+void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent_level) const {
+  (void)indent_level;
+  os << DUMP_MEMBER_AS(
+      request_url_, !request_url_.getStringView().empty() ? request_url_.getStringView() : "null");
+  os << DUMP_MEMBER(response_encoder_.local_end_stream_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,

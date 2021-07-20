@@ -300,7 +300,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   auto factory = std::make_unique<Network::MockTransportSocketFactory>();
   EXPECT_CALL(*factory, createTransportSocket(_))
       .WillOnce(Invoke(
-          [](Network::TransportSocketOptionsSharedPtr options) -> Network::TransportSocketPtr {
+          [](Network::TransportSocketOptionsConstSharedPtr options) -> Network::TransportSocketPtr {
             EXPECT_TRUE(options != nullptr);
             EXPECT_EQ(options->applicationProtocolFallback()[0],
                       Http::Utility::AlpnNames::get().Http11);

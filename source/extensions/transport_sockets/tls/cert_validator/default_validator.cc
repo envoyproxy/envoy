@@ -143,11 +143,6 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
   const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config = config_;
   if (cert_validation_config != nullptr) {
-    if (!cert_validation_config->verifySubjectAltNameList().empty()) {
-      verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
-      verify_mode = verify_mode_validation_context;
-    }
-
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::type::matcher::v3::StringMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
@@ -204,13 +199,12 @@ int DefaultCertValidator::doVerifyCertChain(
     }
   }
 
-  Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(
-      &leaf_cert,
-      transport_socket_options &&
-              !transport_socket_options->verifySubjectAltNameListOverride().empty()
-          ? transport_socket_options->verifySubjectAltNameListOverride()
-          : verify_subject_alt_name_list_,
-      subject_alt_name_matchers_);
+  Envoy::Ssl::ClientValidationStatus validated =
+      verifyCertificate(&leaf_cert,
+                        transport_socket_options != nullptr
+                            ? transport_socket_options->verifySubjectAltNameListOverride()
+                            : std::vector<std::string>{},
+                        subject_alt_name_matchers_);
 
   if (ssl_extended_info) {
     if (ssl_extended_info->certificateValidationStatus() ==
@@ -221,8 +215,15 @@ int DefaultCertValidator::doVerifyCertChain(
     }
   }
 
-  return allow_untrusted_certificate_ ? 1
-                                      : (validated != Envoy::Ssl::ClientValidationStatus::Failed);
+  // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
+  // sure the verification for other validation context configurations doesn't fail (i.e. either
+  // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure other
+  // configurations are verified and the verification succeed.
+  int validation_status = verify_trusted_ca_
+                              ? validated != Envoy::Ssl::ClientValidationStatus::Failed
+                              : validated == Envoy::Ssl::ClientValidationStatus::Validated;
+
+  return allow_untrusted_certificate_ ? 1 : validation_status;
 }
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
@@ -238,9 +239,12 @@ Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
-  if (!subject_alt_name_matchers.empty() && !matchSubjectAltName(cert, subject_alt_name_matchers)) {
-    stats_.fail_verify_san_.inc();
-    return Envoy::Ssl::ClientValidationStatus::Failed;
+  if (!subject_alt_name_matchers.empty()) {
+    if (!matchSubjectAltName(cert, subject_alt_name_matchers)) {
+      stats_.fail_verify_san_.inc();
+      return Envoy::Ssl::ClientValidationStatus::Failed;
+    }
+    validated = Envoy::Ssl::ClientValidationStatus::Validated;
   }
 
   if (!verify_certificate_hash_list_.empty() || !verify_certificate_spki_list_.empty()) {
@@ -381,12 +385,6 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 
     rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-
-    // verify_subject_alt_name_list_ can only be set with a ca_cert
-    for (const std::string& name : verify_subject_alt_name_list_) {
-      rc = EVP_DigestUpdate(md.get(), name.data(), name.size());
-      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
-    }
   }
 
   for (const auto& hash : verify_certificate_hash_list_) {
