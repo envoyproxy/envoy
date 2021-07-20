@@ -10,8 +10,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    // XXX: get a real id.
-    : id_(42), dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
+    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list), source_address_(source_address),
       socket_factory_(socket_factory), transport_socket_options_(transport_socket_options),
       options_(options),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {

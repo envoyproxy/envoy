@@ -213,6 +213,16 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, Id) {
+  uint64_t id = ConnectionImpl::nextGlobalIdForTest() - 1;
+  EXPECT_EQ(id, impl_->id());
+
+  EXPECT_CALL(*created_connections_[0], connect());
+  impl_->connect();
+
+  EXPECT_EQ(id, impl_->id());
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
   EXPECT_CALL(*created_connections_[0], noDelay(true));
   impl_->noDelay(true);
