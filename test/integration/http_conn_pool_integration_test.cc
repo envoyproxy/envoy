@@ -76,7 +76,6 @@ TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterRemoteClose) {
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(response->waitForReset());
 
   // Validate that the pool is deleted when it becomes idle.
   test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.cx_pool_open", 0);
