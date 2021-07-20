@@ -16,18 +16,6 @@ namespace Kafka {
 namespace Mesh {
 namespace {
 
-class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
-public:
-  MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
-              (const));
-  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
-};
-
-class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
-public:
-  MOCK_METHOD(RichKafkaProducer&, getProducerForTopic, (const std::string&));
-};
-
 class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder() : RequestDecoder{{}} {};
@@ -39,7 +27,7 @@ using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
 
 class MockInFlightRequest : public InFlightRequest {
 public:
-  MOCK_METHOD(void, invoke, (UpstreamKafkaFacade&));
+  MOCK_METHOD(void, startProcessing, ());
   MOCK_METHOD(bool, finished, (), (const));
   MOCK_METHOD(AbstractResponseSharedPtr, computeAnswer, (), (const));
   MOCK_METHOD(void, abandon, ());
@@ -56,10 +44,8 @@ public:
 
 class FilterUnitTest : public testing::Test {
 protected:
-  MockUpstreamKafkaConfiguration configuration_;
-  MockUpstreamKafkaFacade upstream_kafka_facade_;
   MockRequestDecoderSharedPtr request_decoder_ = std::make_shared<MockRequestDecoder>();
-  KafkaMeshFilter testee_{configuration_, upstream_kafka_facade_, request_decoder_};
+  KafkaMeshFilter testee_{request_decoder_};
 
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
 
@@ -133,7 +119,7 @@ TEST_F(FilterUnitTest, ShouldAcceptAndProcessRequests) {
   // given
   initialize();
   Request request = std::make_shared<Request::element_type>();
-  EXPECT_CALL(*request, invoke(_));
+  EXPECT_CALL(*request, startProcessing());
   EXPECT_CALL(*request, finished()).WillOnce(Return(true));
   EXPECT_CALL(*request, computeAnswer()).WillOnce(Return(computed_response_));
 

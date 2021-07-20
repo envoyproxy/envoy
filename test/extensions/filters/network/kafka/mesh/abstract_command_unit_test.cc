@@ -16,19 +16,26 @@ public:
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
-class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
-public:
-  MOCK_METHOD(RichKafkaProducer&, getProducerForTopic, (const std::string&));
-};
-
 class Testee : public BaseInFlightRequest {
 public:
   Testee(AbstractRequestListener& filter) : BaseInFlightRequest{filter} {};
-  void testFilterNotification() { BaseInFlightRequest::notifyFilter(); }
-  void invoke(UpstreamKafkaFacade&) override { throw "not interesting"; }
+  void startProcessing() override { throw "not interesting"; }
   bool finished() const override { throw "not interesting"; }
   AbstractResponseSharedPtr computeAnswer() const override { throw "not interesting"; }
+  void finishRequest() { BaseInFlightRequest::notifyFilter(); }
 };
+
+TEST(AbstractCommandTest, shouldNotifyFilter) {
+  // given
+  MockAbstractRequestListener filter;
+  EXPECT_CALL(filter, onRequestReadyForAnswer());
+  Testee testee = {filter};
+
+  // when
+  testee.finishRequest();
+
+  // then - filter got notified that a requested has finished processing.
+}
 
 TEST(AbstractCommandTest, shouldHandleBeingAbandoned) {
   // given
@@ -37,7 +44,7 @@ TEST(AbstractCommandTest, shouldHandleBeingAbandoned) {
   testee.abandon();
 
   // when, then - abandoned request does not notify filter even after it finishes.
-  testee.testFilterNotification();
+  testee.finishRequest();
 }
 
 } // namespace

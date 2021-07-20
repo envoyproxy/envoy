@@ -16,20 +16,11 @@ namespace Mesh {
  */
 class RequestProcessor : public RequestCallback, private Logger::Loggable<Logger::Id::kafka> {
 public:
-  RequestProcessor(AbstractRequestListener& origin,
-                   const UpstreamKafkaConfiguration& configuration);
+  RequestProcessor() = default;
 
   // RequestCallback
   void onMessage(AbstractRequestSharedPtr arg) override;
   void onFailedParse(RequestParseFailureSharedPtr) override;
-
-private:
-  void process(const std::shared_ptr<Request<ProduceRequest>> request) const;
-  void process(const std::shared_ptr<Request<MetadataRequest>> request) const;
-  void process(const std::shared_ptr<Request<ApiVersionsRequest>> request) const;
-
-  AbstractRequestListener& origin_;
-  const UpstreamKafkaConfiguration& configuration_;
 };
 
 } // namespace Mesh

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -8,8 +9,6 @@
 #include "source/extensions/filters/network/kafka/external/requests.h"
 #include "source/extensions/filters/network/kafka/mesh/abstract_command.h"
 #include "source/extensions/filters/network/kafka/mesh/request_processor.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_config.h"
-#include "source/extensions/filters/network/kafka/mesh/upstream_kafka_facade.h"
 #include "source/extensions/filters/network/kafka/request_codec.h"
 
 namespace Envoy {
@@ -20,44 +19,27 @@ namespace Mesh {
 /**
  * Main entry point.
  * Decoded request bytes are passed to processor, that calls us back with enriched request.
- * Request then gets invoked with upstream Kafka facade, which maintains thread-local list of
- * (enriched) Kafka producers. Filter is going to maintain a list of in-flight-request so it can
- * send responses when they finish.
+ * Request then gets invoked with upstream Kafka facade, which will (in future) maintain
+ * thread-local list of (enriched) Kafka producers. Filter is going to maintain a list of
+ * in-flight-request so it can send responses when they finish.
  *
  *
  * +----------------+    <creates>    +-----------------------+
  * |RequestProcessor+----------------->AbstractInFlightRequest|
- * +-------^--------+                 +------^--^-------------+
- *         |                                 |  |
- *         |                                 |  |
- * +-------+-------+   <in-flight-reference> |  |
- * |KafkaMeshFilter+-------------------------+  |
- * +-------+-------+                            |
- *         |                                    |
- *         |                                    |
- * +-------v-----------+                        |<in-flight-reference>
- * |UpstreamKafkaFacade|                        |(for callback when finished)
- * +-------+-----------+                        |
- *         |                                    |
- *         |                                    |
- * +-------v--------------+       +-------------+---+       +-----------------+
- * |<<ThreadLocalObject>> +------->RichKafkaProducer+-------><<librdkafka>>   |
- * |ThreadLocalKafkaFacade|       +-----------------+       |RdKafka::Producer|
- * +----------------------+                                 +-----------------+
+ * +-------^--------+                 +------^----------------+
+ *         |                                 |
+ *         |                                 |
+ * +-------+-------+   <in-flight-reference> |
+ * |KafkaMeshFilter+-------------------------+
+ * +-------+-------+
  **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,
                         public AbstractRequestListener,
                         private Logger::Loggable<Logger::Id::kafka> {
 public:
-  // Main constructor.
-  KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
-                  UpstreamKafkaFacade& upstream_kafka_facade);
-
   // Visible for testing.
-  KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
-                  UpstreamKafkaFacade& upstream_kafka_facade,
-                  RequestDecoderSharedPtr request_decoder);
+  KafkaMeshFilter(RequestDecoderSharedPtr request_decoder);
 
   // Non-trivial. See 'abandonAllInFlightRequests'.
   ~KafkaMeshFilter() override;
@@ -80,15 +62,14 @@ public:
 
 private:
   // Helper method invoked when connection gets dropped.
-  // Request references are stored in 2 places: this filter (request's origin) and in
+  // Request references are going to be stored in 2 places: this filter (request's origin) and in
   // UpstreamKafkaClient instances (to match pure-Kafka confirmations to the requests). Because
   // filter can be destroyed before confirmations from Kafka are received, we are just going to mark
-  // related requests as abandoned, so they do not attempt to reference this filter anymore. Impl
-  // note: this is similar to what Redis filter does.
+  // related requests as abandoned, so they do not attempt to reference this filter anymore.
+  // Impl note: this is similar to what Redis filter does.
   void abandonAllInFlightRequests();
 
   const RequestDecoderSharedPtr request_decoder_;
-  UpstreamKafkaFacade& upstream_kafka_facade_;
 
   Network::ReadFilterCallbacks* read_filter_callbacks_;
 

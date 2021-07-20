@@ -19,10 +19,21 @@ class InFlightRequest {
 public:
   virtual ~InFlightRequest() = default;
 
-  virtual void invoke(UpstreamKafkaFacade&) PURE;
+  /**
+   * Begins processing of given request with context provided.
+   */
+  virtual void startProcessing() PURE;
 
+  /**
+   * Whether the given request has finished processing.
+   * E.g. produce requests need to be forwarded upstream and get a response from Kafka cluster for
+   * this to be true.
+   */
   virtual bool finished() const PURE;
 
+  /**
+   * Creates a Kafka answer object that can be sent downstream.
+   */
   virtual AbstractResponseSharedPtr computeAnswer() const PURE;
 
   /**

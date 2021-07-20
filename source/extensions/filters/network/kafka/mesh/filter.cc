@@ -13,16 +13,8 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-KafkaMeshFilter::KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
-                                 UpstreamKafkaFacade& upstream_kafka_facade)
-    : KafkaMeshFilter{configuration, upstream_kafka_facade,
-                      std::make_shared<RequestDecoder>(std::vector<RequestCallbackSharedPtr>(
-                          {std::make_shared<RequestProcessor>(*this, configuration)}))} {}
-
-KafkaMeshFilter::KafkaMeshFilter(const UpstreamKafkaConfiguration&,
-                                 UpstreamKafkaFacade& upstream_kafka_facade,
-                                 RequestDecoderSharedPtr request_decoder)
-    : request_decoder_{request_decoder}, upstream_kafka_facade_{upstream_kafka_facade} {}
+KafkaMeshFilter::KafkaMeshFilter(RequestDecoderSharedPtr request_decoder)
+    : request_decoder_{request_decoder} {}
 
 KafkaMeshFilter::~KafkaMeshFilter() { abandonAllInFlightRequests(); }
 
@@ -50,6 +42,7 @@ Network::FilterStatus KafkaMeshFilter::onData(Buffer::Instance& data, bool) {
 void KafkaMeshFilter::onEvent(Network::ConnectionEvent event) {
   if (Network::ConnectionEvent::RemoteClose == event ||
       Network::ConnectionEvent::LocalClose == event) {
+    // Connection is being closed but there might be some requests in flight, abandon them.
     abandonAllInFlightRequests();
   }
 }
@@ -63,7 +56,7 @@ void KafkaMeshFilter::onBelowWriteBufferLowWatermark() {}
  */
 void KafkaMeshFilter::onRequest(InFlightRequestSharedPtr request) {
   requests_in_flight_.push_back(request);
-  request->invoke(upstream_kafka_facade_);
+  request->startProcessing();
 }
 
 /**
