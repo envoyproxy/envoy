@@ -26,12 +26,12 @@ void emitLogs(Network::ListenerConfig& config, StreamInfo::StreamInfo& stream_in
 } // namespace
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config)
-    : ActiveTcpListener(
-          parent,
-          parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                             config.bindToPort(), config.tcpBacklogSize()),
-          config) {}
+                                     Network::ListenerConfig& config, uint32_t worker_index)
+    : ActiveTcpListener(parent,
+                        parent.dispatcher().createListener(
+                            config.listenSocketFactory().getListenSocket(worker_index), *this,
+                            config.bindToPort()),
+                        config) {}
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
                                      Network::ListenerPtr&& listener,

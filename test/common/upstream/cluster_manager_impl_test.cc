@@ -502,32 +502,7 @@ static_resources:
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
       "cluster: LB policy ROUND_ROBIN is not valid for Cluster type ORIGINAL_DST. Only "
-      "'CLUSTER_PROVIDED' or 'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'");
-}
-
-TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(OriginalDstLbRestriction2)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: static
-    lb_policy: original_dst_lb
-    load_assignment:
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11001
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
-                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not "
-                            "valid for Cluster type STATIC. "
-                            "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
+      "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'");
 }
 
 class ClusterManagerSubsetInitializationTest
@@ -545,7 +520,9 @@ public:
     for (int i = first; i <= last; i++) {
       if (envoy::config::cluster::v3::Cluster::LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
-        if (policy != envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+        if (policy !=
+                envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&
+            policy != envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
           policies.push_back(policy);
         }
       }
@@ -591,16 +568,14 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   const std::string& policy_name = envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam());
 
   std::string cluster_type = "type: STATIC";
-  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB) {
-    cluster_type = "type: ORIGINAL_DST";
-  } else if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+
+  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
     cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
-      GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
@@ -626,26 +601,6 @@ INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
                          ClusterManagerSubsetInitializationTest,
                          testing::ValuesIn(ClusterManagerSubsetInitializationTest::lbPolicies()),
                          ClusterManagerSubsetInitializationTest::paramName);
-
-TEST_F(ClusterManagerImplTest, DEPRECATED_FEATURE_TEST(SubsetLoadBalancerOriginalDstRestriction)) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const std::string yaml = R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: original_dst
-    lb_policy: original_dst_lb
-    lb_subset_config:
-      fallback_policy: ANY_ENDPOINT
-      subset_selectors:
-        - keys: [ "x" ]
-  )EOF";
-
-  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml, false)), EnvoyException,
-                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be "
-                            "combined with lb_subset_config");
-}
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
   const std::string yaml = R"EOF(

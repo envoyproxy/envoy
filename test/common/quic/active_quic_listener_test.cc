@@ -106,9 +106,11 @@ protected:
         std::make_shared<Network::UdpListenSocket>(local_address_, nullptr, /*bind*/ true);
     listen_socket_->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+    ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
+                                              envoy::config::core::v3::SocketOption::STATE_BOUND));
 
     ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket()).WillByDefault(Return(listen_socket_));
+    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -331,25 +333,6 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(ActiveQuicListenerTests, ActiveQuicListenerTest,
                          testing::ValuesIn(generateTestParam()), testParamsToString);
-
-TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
-  initialize();
-  auto option = std::make_unique<Network::MockSocketOption>();
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
-      .WillOnce(Return(false));
-  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  options->emplace_back(std::move(option));
-  quic_listener_.reset();
-  EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory;
-  EnvoyQuicProofSourceFactoryImpl proof_source_factory;
-  EXPECT_THROW_WITH_REGEX((void)std::make_unique<ActiveQuicListener>(
-                              0, 1, *dispatcher_, connection_handler_, listen_socket_,
-                              listener_config_, quic_config_, options, false,
-                              ActiveQuicListenerFactoryPeer::runtimeEnabled(
-                                  static_cast<ActiveQuicListenerFactory*>(listener_factory_.get())),
-                              quic_stat_names_, 32u, crypto_stream_factory, proof_source_factory),
-                          Network::CreateListenerException, "Failed to apply socket options.");
-}
 
 TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
   initialize();

@@ -3794,6 +3794,38 @@ TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
 }
 
+TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+  typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          max_requests_per_connection: 3
+        use_downstream_protocol_config: {}
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Only one of max_requests_per_connection from Cluster or "
+                            "HttpProtocolOptions can be specified");
+}
+
+TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  max_requests_per_connection: 3
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
