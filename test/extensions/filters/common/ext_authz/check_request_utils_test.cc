@@ -164,6 +164,33 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
   EXPECT_TRUE(request_.attributes().request().has_time());
 }
 
+// Verify that check request merges the duplicate headers.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithDuplicateHeaders) {
+  const uint64_t size = 0;
+  envoy::service::auth::v3::CheckRequest request_;
+
+  // A client supplied duplicate header should be merged.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-duplicate-header", ""}, {"x-duplicate-header", "foo"}, {"x-duplicate-header", "bar"},
+      {"x-normal-header", "foo"}, {"x-empty-header", ""},
+  };
+
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+  expectBasicHttp();
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
+                                     Protobuf::Map<std::string, std::string>(),
+                                     envoy::config::core::v3::Metadata(), request_, size,
+                                     /*pack_as_bytes=*/false, /*include_peer_certificate=*/false);
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+  EXPECT_EQ(",foo,bar", request_.attributes().request().http().headers().at("x-duplicate-header"));
+  EXPECT_EQ("foo", request_.attributes().request().http().headers().at("x-normal-header"));
+  EXPECT_EQ("", request_.attributes().request().http().headers().at("x-empty-header"));
+  EXPECT_TRUE(request_.attributes().request().has_time());
+}
+
 // Verify that check request object has only a portion of the request data.
 TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
   const uint64_t size = 4049;
