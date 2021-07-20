@@ -94,7 +94,7 @@ public:
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               Network::Socket::Type socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
-                                              const ListenSocketCreationParams& params) override;
+                                              BindType bind_type, uint32_t worker_index) override;
 
   DrainManagerPtr
   createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override;
@@ -228,6 +228,7 @@ private:
     uint64_t workers_pending_removal_;
   };
 
+  bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
   void addListenerToWorker(Worker& worker, absl::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
 
@@ -235,9 +236,6 @@ private:
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,
                                      const Network::Address::Instance& address);
-  static bool
-  shareSocketWithOtherListener(const ListenerList& list,
-                               const Network::ListenSocketFactorySharedPtr& socket_factory);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
     // restart.
@@ -251,6 +249,12 @@ private:
     return stop_listeners_type_ == StopListenersType::All ||
            (stop_listeners_type_ == StopListenersType::InboundOnly &&
             config.traffic_direction() == envoy::config::core::v3::INBOUND);
+  }
+  void incListenerCreateFailureStat() {
+    // TODO(mattklein123): Now that we no longer create sockets and apply options on workers,
+    // this stat is confusingly named and should be more specific, however it's unclear if it's
+    // worth changing.
+    stats_.listener_create_failure_.inc();
   }
 
   /**
@@ -289,10 +293,10 @@ private:
 
   void setNewOrDrainingSocketFactory(const std::string& name,
                                      const envoy::config::core::v3::Address& proto_address,
-                                     ListenerImpl& listener, bool reuse_port);
-  Network::ListenSocketFactorySharedPtr
+                                     ListenerImpl& listener);
+  Network::ListenSocketFactoryPtr
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
-                            ListenerImpl& listener, bool reuse_port);
+                            ListenerImpl& listener);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
