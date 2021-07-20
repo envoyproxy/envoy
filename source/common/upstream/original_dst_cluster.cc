@@ -183,14 +183,12 @@ OriginalDstClusterFactory::createClusterImpl(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  if (cluster.lb_policy() !=
-          envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&
-      cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-    throw EnvoyException(fmt::format(
-        "cluster: LB policy {} is not valid for Cluster type {}. Only 'CLUSTER_PROVIDED' or "
-        "'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'",
-        envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
-        envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
+  if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
+                    "'CLUSTER_PROVIDED' is allowed with cluster type 'ORIGINAL_DST'",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
+                    envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead
