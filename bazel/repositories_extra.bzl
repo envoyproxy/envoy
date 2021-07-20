@@ -8,6 +8,11 @@ def _python_deps():
     py_repositories()
 
     pip_install(
+        name = "base_pip3",
+        requirements = "@envoy//tools/base:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
+    )
+    pip_install(
         name = "config_validation_pip3",
         requirements = "@envoy//tools/config_validation:requirements.txt",
         extra_pip_args = ["--require-hashes"],

@@ -69,7 +69,9 @@ class Checker(runner.Runner):
     @property
     def show_summary(self) -> bool:
         """Show a summary at the end or not"""
-        return bool(self.args.summary or self.error_count or self.warning_count)
+        return bool(
+            not "exiting" in self.errors
+            and (self.args.summary or self.error_count or self.warning_count))
 
     @property
     def status(self) -> dict:
@@ -163,13 +165,18 @@ class Checker(runner.Runner):
             "Paths to check. At least one path must be specified, or the `path` argument should be provided"
         )
 
-    def error(self, name: str, errors: list, log: bool = True) -> int:
+    def error(self, name: str, errors: list, log: bool = True, log_type: str = "error") -> int:
         """Record (and log) errors for a check type"""
         self.errors[name] = self.errors.get(name, [])
         self.errors[name].extend(errors)
-        if log:
-            self.log.error("\n".join(errors))
+        if not log:
+            return 1
+        for message in errors:
+            getattr(self.log, log_type)(f"[{name}] {message}")
         return 1
+
+    def exiting(self):
+        return self.error("exiting", ["Keyboard exit"], log_type="fatal")
 
     def get_checks(self) -> Sequence[str]:
         """Get list of checks for this checker class filtered according to user args"""
@@ -177,9 +184,19 @@ class Checker(runner.Runner):
             self.checks if not self.args.check else
             [check for check in self.args.check if check in self.checks])
 
+    def on_check_begin(self, check: str) -> None:
+        self.log.notice(f"[{check}] Running check")
+
     def on_check_run(self, check: str) -> None:
         """Callback hook called after each check run"""
-        pass
+        if check in self.errors:
+            self.log.error(f"[{check}] Check failed")
+        elif "exiting" in self.errors:
+            pass
+        elif check in self.warnings:
+            self.log.warning(f"[{check}] Check has warnings")
+        else:
+            self.log.success(f"[{check}] Check completed successfully")
 
     def on_checks_begin(self) -> None:
         """Callback hook called before all checks"""
@@ -194,28 +211,35 @@ class Checker(runner.Runner):
     def run(self) -> int:
         """Run all configured checks and return the sum of their error counts"""
         checks = self.get_checks()
-        self.on_checks_begin()
-        for check in checks:
-            self.log.info(f"[CHECKS:{self.name}] {check}")
-            getattr(self, f"check_{check}")()
-            self.on_check_run(check)
-        return self.on_checks_complete()
+        try:
+            self.on_checks_begin()
+            for check in checks:
+                self.on_check_begin(check)
+                getattr(self, f"check_{check}")()
+                self.on_check_run(check)
+        except KeyboardInterrupt as e:
+            self.exiting()
+        finally:
+            result = self.on_checks_complete()
+        return result
 
     def succeed(self, name: str, success: list, log: bool = True) -> None:
         """Record (and log) success for a check type"""
-
         self.success[name] = self.success.get(name, [])
         self.success[name].extend(success)
-        if log:
-            self.log.info("\n".join(success))
+        if not log:
+            return
+        for message in success:
+            self.log.success(f"[{name}] {message}")
 
     def warn(self, name: str, warnings: list, log: bool = True) -> None:
         """Record (and log) warnings for a check type"""
-
         self.warnings[name] = self.warnings.get(name, [])
         self.warnings[name].extend(warnings)
-        if log:
-            self.log.warning("\n".join(warnings))
+        if not log:
+            return
+        for message in warnings:
+            self.log.warning(f"[{name}] {message}")
 
 
 class ForkingChecker(runner.ForkingRunner, Checker):
@@ -245,19 +269,26 @@ class CheckerSummary(object):
         _out = []
         _max = getattr(self, f"max_{problem_type}")
         for check, problems in getattr(self.checker, problem_type).items():
-            _msg = f"[{problem_type.upper()}:{self.checker.name}] {check}"
+            _msg = f"{self.checker.name} {check}"
             _max = (min(len(problems), _max) if _max >= 0 else len(problems))
             msg = (
                 f"{_msg}: (showing first {_max} of {len(problems)})" if
                 (len(problems) > _max and _max > 0) else (f"{_msg}:" if _max != 0 else _msg))
             _out.extend(self._section(msg, problems[:_max]))
-        if _out:
-            self.checker.log.error("\n".join(_out))
+        if not _out:
+            return
+        output = (
+            self.checker.log.warning if problem_type == "warnings" else self.checker.log.error)
+        output("\n".join(_out + [""]))
 
     def print_status(self) -> None:
         """Print summary status to stderr"""
-        self.checker.log.warning(
-            "\n".join(self._section(f"[SUMMARY:{self.checker.name}] {self.checker.status}")))
+        if self.checker.errors:
+            self.checker.log.error(f"{self.checker.status}")
+        elif self.checker.warnings:
+            self.checker.log.warning(f"{self.checker.status}")
+        else:
+            self.checker.log.info(f"{self.checker.status}")
 
     def print_summary(self) -> None:
         """Write summary to stderr"""
@@ -267,9 +298,9 @@ class CheckerSummary(object):
 
     def _section(self, message: str, lines: list = None) -> list:
         """Print a summary section"""
-        section = ["", "-" * 80, "", f"{message}"]
+        section = ["Summary", "-" * 80, f"{message}"]
         if lines:
-            section += lines
+            section += [line.split("\n")[0] for line in lines]
         return section
 
 
@@ -278,21 +309,34 @@ class AsyncChecker(Checker):
 
     async def _run(self) -> int:
         checks = self.get_checks()
-        await self.on_checks_begin()
-        for check in checks:
-            self.log.info(f"[CHECKS:{self.name}] {check}")
-            await getattr(self, f"check_{check}")()
-            await self.on_check_run(check)
-        return await self.on_checks_complete()
+        try:
+            await self.on_checks_begin()
+            for check in checks:
+                await self.on_check_begin(check)
+                await getattr(self, f"check_{check}")()
+                await self.on_check_run(check)
+        finally:
+            result = await self.on_checks_complete()
+        return result
 
     def run(self) -> int:
-        return asyncio.get_event_loop().run_until_complete(self._run())
+        try:
+            return asyncio.get_event_loop().run_until_complete(self._run())
+        except KeyboardInterrupt as e:
+            # This needs to be outside the loop to catch the a keyboard interrupt
+            # This means that a new loop has to be created to cleanup
+            result = self.exiting()
+            result = asyncio.get_event_loop().run_until_complete(self.on_checks_complete())
+            return result
+
+    async def on_check_begin(self, check: str) -> None:
+        super().on_check_begin(check)
 
     async def on_check_run(self, check: str) -> None:
-        pass
+        super().on_check_run(check)
 
     async def on_checks_begin(self) -> None:
-        pass
+        super().on_checks_begin()
 
     async def on_checks_complete(self) -> int:
         return super().on_checks_complete()

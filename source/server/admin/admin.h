@@ -205,6 +205,7 @@ public:
       return runCallback(path_and_query, response_headers, response, filter);
     };
   }
+  uint64_t maxRequestsPerConnection() const override { return 0; }
 
 private:
   /**
