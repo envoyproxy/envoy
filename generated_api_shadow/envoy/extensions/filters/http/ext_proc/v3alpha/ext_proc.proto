@@ -33,6 +33,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // As designed, the filter supports up to six different processing steps, which are in the
 // process of being implemented:
+//
 // * Request headers: IMPLEMENTED
 // * Request body: BUFFERED_PARTIAL processing mode is not yet implemented
 // * Request trailers: IMPLEMENTED
