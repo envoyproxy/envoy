@@ -68,6 +68,8 @@ protected:
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).WillRepeatedly(Return(BufferSize));
+    HttpTestUtility::addDefaultHeaders(request_headers_);
+    request_headers_.setMethod("POST");
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
@@ -234,7 +236,6 @@ TEST_F(HttpFilterTest, SimplestPost) {
   EXPECT_TRUE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 10);
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
@@ -295,7 +296,6 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
   request_headers_.addCopy(LowerCaseString("x-do-we-want-this"), "no");
 
@@ -379,8 +379,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
-
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
@@ -442,8 +440,6 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
-
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   processRequestHeaders(false, absl::nullopt);
@@ -503,7 +499,6 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -568,7 +563,6 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesFast) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -636,7 +630,6 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesALittleFast) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -704,7 +697,6 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -778,7 +770,6 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -865,7 +856,6 @@ TEST_F(HttpFilterTest, PostAndIgnoreStreamedBodiesUntilImplemented) {
   )EOF");
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   request_headers_.addCopy(LowerCaseString("content-length"), 100);
 
@@ -1268,8 +1258,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyDefault) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
-
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
@@ -1305,8 +1293,6 @@ TEST_F(HttpFilterTest, RespondImmediatelyGrpcError) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   )EOF");
-
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
@@ -1348,7 +1334,6 @@ TEST_F(HttpFilterTest, PostAndFail) {
   EXPECT_FALSE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Oh no! The remote server had a failure!
@@ -1393,7 +1378,6 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_FALSE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
@@ -1451,7 +1435,6 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
   EXPECT_TRUE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   // Oh no! The remote server had a failure which we will ignore
@@ -1489,7 +1472,6 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_FALSE(config_->failureModeAllow());
 
   // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
@@ -1533,7 +1515,6 @@ TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
     response_trailer_mode: "SKIP"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   EXPECT_FALSE(last_request_.async_mode());
@@ -1579,7 +1560,6 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
 
   processRequestHeaders(
@@ -1629,7 +1609,6 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnly) {
     response_trailer_mode: "SKIP"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_, "POST");
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
   Buffer::OwnedImpl first_chunk("foo");
@@ -1671,9 +1650,6 @@ TEST_F(HttpFilterTest, ClearRouteCache) {
     response_body_mode: "BUFFERED"
   )EOF");
 
-  // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_, "GET");
-
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
@@ -1711,7 +1687,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
       cluster_name: "ext_proc_server"
   )EOF");
 
-  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("GET");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   Buffer::OwnedImpl req_buffer;

@@ -813,6 +813,12 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
+bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
+  return *address() == *other.address() &&
+         Network::Utility::protobufAddressSocketType(config_.address()) ==
+             Network::Utility::protobufAddressSocketType(other.config_.address());
+}
+
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                                 const envoy::config::listener::v3::Listener& rhs) {
   Protobuf::util::MessageDifferencer differencer;
