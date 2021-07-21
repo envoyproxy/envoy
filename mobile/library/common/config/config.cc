@@ -70,7 +70,12 @@ const std::string config_header = R"(
       "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
       auto_config:
         http2_protocol_options: {}
-        http_protocol_options: {}
+        http_protocol_options:
+          header_key_format:
+            stateful_formatter:
+              name: preserve_case
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig
 
 !ignore tls_socket_defs: &base_tls_socket
   name: envoy.transport_sockets.tls

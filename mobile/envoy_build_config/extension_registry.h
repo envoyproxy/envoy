@@ -8,6 +8,7 @@
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
 #include "source/extensions/stat_sinks/metrics_service/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
