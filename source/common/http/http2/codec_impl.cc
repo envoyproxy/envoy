@@ -1004,6 +1004,10 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
 int ConnectionImpl::onBeforeFrameSend(const nghttp2_frame* frame) {
   ENVOY_CONN_LOG(trace, "about to send frame type={}, flags={}", connection_,
                  static_cast<uint64_t>(frame->hd.type), static_cast<uint64_t>(frame->hd.flags));
+  StreamImpl* stream = getStream(frame->hd.stream_id);
+  if (stream != nullptr) {
+    stream->updateSentBytes(frame->hd.length + 9);
+  }
   ASSERT(!is_outbound_flood_monitored_control_frame_);
   // Flag flood monitored outbound control frames.
   is_outbound_flood_monitored_control_frame_ =
