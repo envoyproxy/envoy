@@ -179,7 +179,7 @@ Save the following snippet to ``envoy-override.yaml``:
    admin:
      address:
        socket_address:
-         address: 0.0.0.0
+         address: 127.0.0.1
          port_value: 9902
 
 Next, start the Envoy server using the override configuration:
