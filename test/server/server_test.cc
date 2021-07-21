@@ -386,6 +386,44 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
       Http::CustomInlineHeaderRegistry::getInlineHeader<Http::ResponseTrailerMap::header_map_type>(
           Http::LowerCaseString("test4"))
           .has_value());
+
+  {
+    Http::TestRequestHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is registered as the inline request header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(1, test1_headers.size());
+    EXPECT_EQ("test1_value1,test1_value2", headers.get_("test1"));
+
+    // 'test3' is not registered as an inline request header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(2, test3_headers.size());
+    EXPECT_EQ("test3_value1", headers.get_("test3"));
+  }
+
+  {
+    Http::TestResponseHeaderMapImpl headers{
+        {"test1", "test1_value1"},
+        {"test1", "test1_value2"},
+        {"test3", "test3_value1"},
+        {"test3", "test3_value2"},
+    };
+
+    // 'test1' is not registered as the inline response header.
+    auto test1_headers = headers.get(Http::LowerCaseString("test1"));
+    EXPECT_EQ(2, test1_headers.size());
+    EXPECT_EQ("test1_value1", headers.get_("test1"));
+
+    // 'test3' is registered as an inline response header.
+    auto test3_headers = headers.get(Http::LowerCaseString("test3"));
+    EXPECT_EQ(1, test3_headers.size());
+    EXPECT_EQ("test3_value1,test3_value2", headers.get_("test3"));
+  }
 }
 
 // Validates that server stats are flushed even when server is stuck with initialization.
