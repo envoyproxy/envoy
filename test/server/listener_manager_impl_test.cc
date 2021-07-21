@@ -384,16 +384,44 @@ test: a
                           EnvoyException, "test: Cannot find field");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfigNoFilterChains) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadQuicFilterChain) {
   const std::string yaml = R"EOF(
 address:
   socket_address:
     address: 127.0.0.1
+    protocol: UDP
     port_value: 1234
+udp_listener_config:
+    quic_options: {}
+filter_chains:
+  filters: []
+  transport_socket:
+    name: tls
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                          EnvoyException, "no filter chains specified");
+                          EnvoyException,
+                          "QUIC filter chain not configured with QUIC transport socket.");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadQuicDefaultFilterChain) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+udp_listener_config:
+    quic_options: {}
+default_filter_chain:
+  filters: []
+  transport_socket:
+    name: tls
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                          EnvoyException,
+                          "QUIC filter chain not configured with QUIC transport socket.");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig2UDPListenerFilters) {

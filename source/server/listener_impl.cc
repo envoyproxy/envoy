@@ -518,6 +518,26 @@ void ListenerImpl::validateFilterChains(Network::Socket::Type socket_type) {
                                        address_->asString()));
     }
   }
+  if (config_.udp_listener_config().has_quic_options()) {
+    for (auto& filter_chain : config_.filter_chains()) {
+      if (!filter_chain.has_transport_socket() ||
+          filter_chain.transport_socket().name() != "envoy.transport_sockets.quic") {
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': QUIC filter chain not configured with "
+                        "QUIC transport socket.",
+                        address_->asString()));
+      }
+    }
+    if (config_.has_default_filter_chain() &&
+        (!config_.default_filter_chain().has_transport_socket() ||
+         config_.default_filter_chain().transport_socket().name() !=
+             "envoy.transport_sockets.quic")) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': QUIC filter chain not configured with "
+                      "QUIC transport socket.",
+                      address_->asString()));
+    }
+  }
 }
 
 void ListenerImpl::buildFilterChains() {
