@@ -453,7 +453,16 @@ void InstanceImpl::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
-  restarter_.sendParentAdminShutdownRequest(original_start_time_);
+  const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
+  if (parent_admin_shutdown_response.has_value()) {
+    original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
+    enable_reuse_port_default_ = parent_admin_shutdown_response.value().enable_reuse_port_default_
+                                     ? ReusePortDefault::True
+                                     : ReusePortDefault::False;
+  } else {
+    // This is needed so that we don't read the value until runtime is fully initialized.
+    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+  }
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
 
   loadServerFlags(initial_config.flagsPath());
@@ -660,7 +669,7 @@ void InstanceImpl::onRuntimeReady() {
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
-              ->create(),
+              ->createUncachedRawAsyncClient(),
           Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
           Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
           access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
@@ -927,6 +936,21 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;
+}
+
+bool InstanceImpl::enableReusePortDefault() {
+  ASSERT(enable_reuse_port_default_.has_value());
+  switch (enable_reuse_port_default_.value()) {
+  case ReusePortDefault::True:
+    return true;
+  case ReusePortDefault::False:
+    return false;
+  case ReusePortDefault::Runtime:
+    return Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.listener_reuse_port_default_enabled");
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

@@ -816,18 +816,20 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   HttpIntegrationTest::initialize();
 
   int expected_grpc_client_creation_count = 0;
+
+  initiateClientConnection(4, Headers{}, Headers{});
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+                       Http::TestRequestHeaderMapImpl{}, Headers{});
+
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
+
     // Make sure Google grpc client is created before the request coming in.
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.
     expected_grpc_client_creation_count =
         test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
   }
-
-  initiateClientConnection(4, Headers{}, Headers{});
-  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP2));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{}, Headers{});
 
   waitForSuccessfulUpstreamResponse("200");
 

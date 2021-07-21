@@ -63,8 +63,8 @@ message StringMatcher {
     string contains = 7 [(validate.rules).string = {min_len: 1}];
   }
 
-  // If true, indicates the exact/prefix/suffix matching should be case insensitive. This has no
-  // effect for the safe_regex match.
+  // If true, indicates the exact/prefix/suffix/contains matching should be case insensitive. This
+  // has no effect for the safe_regex match.
   // For example, the matcher *data* will match both input string *Data* and *data* if set to true.
   bool ignore_case = 6;
 }

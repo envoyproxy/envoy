@@ -25,6 +25,8 @@ This default behavior can be overridden via the :ref:`scheme_header_transformati
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
 configuration option.
 
+The *:scheme* header will be used by Envoy over *x-forwarded-proto* where the URI scheme is wanted, for example serving content from cache based on the *:scheme* header rather than X-Forwarded-Proto, or setting the scheme of redirects based on the scheme of the original URI. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
 .. [1] Edge Envoys often have plaintext HTTP/1.1 listeners. If Envoy trusts absolute URL scheme from fully qualfied URLs, a MiTM can adjust relative URLs to https absolute URLs, and inadvertantly cause the Envoy's upstream to send PII or other sensitive data over what it then believes is a secure connection.
 .. [2] Unlike HTTP/1.1, HTTP/2 is in practice always served over TLS via ALPN for edge Envoys. In mesh networks using insecure HTTP/2, if the downstream is not trusted to set scheme, the :ref:`scheme_header_transformation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>` should be used.
 
@@ -367,6 +369,8 @@ will be set to http or https based on if the downstream connection is TLS or not
 If the scheme is changed via the :ref:`scheme_header_transformation
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
 configuration option, *x-forwarded-proto* will be updated as well.
+
+The *x-forwarded-proto* header will be used by Envoy over *:scheme* where the underlying encryption is wanted, for example clearing default ports based on *x-forwarded-proto*. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
 
 .. _config_http_conn_man_headers_x-request-id:
 

@@ -96,31 +96,17 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   }
 }
 
-void TcpListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& socket) {
-  ASSERT(bind_to_port_);
-
-  socket.ioHandle().listen(backlog_size_);
-
-  // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
-  // loss of the trigger due to transient accept errors.
-  socket.ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::FileTriggerType::Level, Event::FileReadyType::Read);
-
-  if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::config::core::v3::SocketOption::STATE_LISTENING)) {
-    throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
-                                              socket.addressProvider().localAddress()->asString()));
-  }
-}
-
 TcpListenerImpl::TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                                  SocketSharedPtr socket, TcpListenerCallbacks& cb,
-                                 bool bind_to_port, uint32_t backlog_size)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), backlog_size_(backlog_size),
-      random_(random), bind_to_port_(bind_to_port), reject_fraction_(0.0) {
+                                 bool bind_to_port)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), random_(random),
+      bind_to_port_(bind_to_port), reject_fraction_(0.0) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, *socket_);
+    // Although onSocketEvent drains to completion, use level triggered mode to avoid potential
+    // loss of the trigger due to transient accept errors.
+    socket_->ioHandle().initializeFileEvent(
+        dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
+        Event::FileTriggerType::Level, Event::FileReadyType::Read);
   }
 }
 
