@@ -459,6 +459,8 @@ watchdog:
   megamiss_timeout: 60s
   miss_timeout: 60s
 node:
+  id: envoy-mobile
+  cluster: envoy-mobile
   metadata: *metadata
 # Needed due to warning in https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
 layered_runtime:
