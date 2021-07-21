@@ -87,11 +87,15 @@ public class AndroidNetworkMonitor extends BroadcastReceiver {
       }
     };
 
-    connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
+    try {
+      connectivityManager.registerNetworkCallback(networkRequest, networkCallback);
 
-    context.registerReceiver(this, new IntentFilter() {
-      { addAction(ConnectivityManager.CONNECTIVITY_ACTION); }
-    });
+      context.registerReceiver(this, new IntentFilter() {
+        { addAction(ConnectivityManager.CONNECTIVITY_ACTION); }
+      });
+    } catch (Throwable t) {
+      // no-op
+    }
   }
 
   @Override
