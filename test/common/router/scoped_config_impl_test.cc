@@ -564,7 +564,7 @@ TEST_F(ScopedConfigImplTest, Update) {
 class ScopedConfigImplMetadataTest : public testing::Test {
 public:
   void SetUp() override {
-    std::string yaml_plain = R"EOF(
+    const std::string conn_yaml_plain = R"EOF(
   fragments:
   - conn_metadata_value_extractor:
       metadata_key:
@@ -581,7 +581,26 @@ public:
           # This is the lookup key whose value we extract for the fragment.
         - key: test.key.bar
 )EOF";
-    TestUtility::loadFromYaml(yaml_plain, key_builder_config_);
+    TestUtility::loadFromYaml(conn_yaml_plain, conn_md_key_builder_config_);
+
+    const std::string filter_yaml_plain = R"EOF(
+  fragments:
+  - filter_metadata_value_extractor:
+      metadata_key:
+        # This is the filter metadata namespace.
+        key: unit.test.xxx
+        path:
+          # This is the lookup key whose value we extract for the fragment.
+        - key: test.key.foo
+  - filter_metadata_value_extractor:
+      metadata_key:
+        # This is the filter metadata namespace.
+        key: unit.test.xxx
+        path:
+          # This is the lookup key whose value we extract for the fragment.
+        - key: test.key.bar
+)EOF";
+    TestUtility::loadFromYaml(filter_yaml_plain, filter_md_key_builder_config_);
 
     scope_info_a_ = makeScopedRouteInfo(R"EOF(
     name: foo_scope
@@ -610,8 +629,6 @@ public:
         - string_key: bar_val
         - string_key: baz_val
 )EOF");
-
-    metadata_.mutable_filter_metadata()->clear();
   }
 
   std::shared_ptr<ScopedRouteInfo> makeScopedRouteInfo(const std::string& route_config_yaml) {
@@ -627,7 +644,13 @@ public:
   std::shared_ptr<ScopedRouteInfo> scope_info_a_;
   std::shared_ptr<ScopedRouteInfo> scope_info_a_v2_;
   std::shared_ptr<ScopedRouteInfo> scope_info_b_;
-  ScopedRoutes::ScopeKeyBuilder key_builder_config_;
+
+  // Uses connection metadata.
+  ScopedRoutes::ScopeKeyBuilder conn_md_key_builder_config_;
+
+  // Uses filter metadata.
+  ScopedRoutes::ScopeKeyBuilder filter_md_key_builder_config_;
+
   std::unique_ptr<ScopedConfigImpl> scoped_config_impl_;
   TestRequestHeaderMapImpl header_map_{};
   envoy::config::core::v3::Metadata metadata_;
@@ -635,45 +658,67 @@ public:
 
 // Test a metadata-based ScopedConfigImpl returns the correct route Config.
 TEST_F(ScopedConfigImplMetadataTest, SimplePickRoute) {
-  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
-  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
-  scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
+    // We'll start off with a scoped config that looks for conn metadata.
+    scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(conn_md_key_builder_config_));
+    scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
+    scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
 
-  // Populate filter metadata, but for a filter not specified in the config. This should result in
-  // no route config being returned.
-  auto kvs =
-      MessageUtil::keyValueStruct({{"test.key.foo", "foo_val"}, {"test.key.bar", "bar_val"}});
-  (*metadata_.mutable_filter_metadata())["the.wrong.filter"].MergeFrom(kvs);
-  ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
-  EXPECT_EQ(route_config, nullptr);
+    // Populate filter metadata, but for a filter not specified in the config. This should result in
+    // no route config being returned.
+    auto kvs =
+        MessageUtil::keyValueStruct({{"test.key.foo", "foo_val"}, {"test.key.bar", "bar_val"}});
+    (*metadata_.mutable_filter_metadata())["the.wrong.filter"].MergeFrom(kvs);
+    ConfigConstSharedPtr route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
+    EXPECT_EQ(route_config, nullptr);
 
-  // We now put those kv pairs in the correct filter, so now the route config should be returned.
-  (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
+    // We now put those kv pairs in the correct filter, so now the route config should be returned.
+    (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
 
-  // Key (foo_val, bar_val) maps to scope_info_a_.
-  route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
-  EXPECT_EQ(route_config, scope_info_a_->routeConfig());
+    // Key (foo_val, bar_val) maps to scope_info_a_.
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
+    EXPECT_EQ(route_config, scope_info_a_->routeConfig());
 
-  // Update filter metadata to select a different scope config.
-  kvs = MessageUtil::keyValueStruct({{"test.key.foo", "bar_val"}, {"test.key.bar", "baz_val"}});
-  (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
+    // Let's verify it looks in the correct metadata by passing the conn metadata as filter
+    // metadata. We should get no route.
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, {} /* conn */, metadata_ /* filter */);
+    EXPECT_EQ(route_config, nullptr);
 
-  // Key (bar_val, baz_val) maps to scope_info_b_.
-  route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
-  EXPECT_EQ(route_config, scope_info_b_->routeConfig());
+    // Update filter metadata to select a different scope config.
+    kvs = MessageUtil::keyValueStruct({{"test.key.foo", "bar_val"}, {"test.key.bar", "baz_val"}});
+    (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
 
-  // Update filter metadata to bogus values so nothing gets picked again.
-  kvs = MessageUtil::keyValueStruct(
-      {{"test.key.foo", "bogus_val_1"}, {"test.key.bar", "bogus_val_2"}});
-  (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
+    // Key (bar_val, baz_val) maps to scope_info_b_.
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
+    EXPECT_EQ(route_config, scope_info_b_->routeConfig());
 
-  route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
-  EXPECT_EQ(route_config, nullptr);
+    // Let's reset the scope config to something that expects filter metadata.
+    scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(filter_md_key_builder_config_));
+    scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
+    scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_b_});
+
+    // Same as the previous call to getRouteConfig above, but now it should be looking for it in the
+    // filter metadata. It should return no route, since the populated metadata is passed as conn
+    // metadata.
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, metadata_, {});
+    EXPECT_EQ(route_config, nullptr);
+
+    // Passing the metadata as filter metadata should result in a route being chosen.
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, {} /* conn */, metadata_ /* filter */);
+    EXPECT_EQ(route_config, scope_info_b_->routeConfig());
+
+    // Update filter metadata to bogus values so nothing gets picked again.
+    kvs = MessageUtil::keyValueStruct(
+        {{"test.key.foo", "bogus_val_1"}, {"test.key.bar", "bogus_val_2"}});
+    (*metadata_.mutable_filter_metadata())["unit.test.xxx"].MergeFrom(kvs);
+
+    route_config = scoped_config_impl_->getRouteConfig(header_map_, {}, metadata_);
+    EXPECT_EQ(route_config, nullptr);
 }
 
 // Test a metadata-based ScopedConfigImpl honors route updates.
 TEST_F(ScopedConfigImplMetadataTest, UpdateRoute) {
-  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(key_builder_config_));
+  // We'll start off with a scoped config that looks for conn metadata.
+  scoped_config_impl_ = std::make_unique<ScopedConfigImpl>(std::move(conn_md_key_builder_config_));
   scoped_config_impl_->addOrUpdateRoutingScopes({scope_info_a_});
 
   // There's no metadata, so nothing gets picked.
