@@ -10,6 +10,15 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 wasm_rust_binary(
+    name = "close_stream_rust.wasm",
+    srcs = ["close_stream_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
+wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
     deps = [
@@ -21,6 +30,15 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "panic_rust.wasm",
     srcs = ["panic_rust.rs"],
+    deps = [
+        "@proxy_wasm_rust_sdk//:proxy_wasm",
+        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+    ],
+)
+
+wasm_rust_binary(
+    name = "resume_call_rust.wasm",
+    srcs = ["resume_call_rust.rs"],
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
         "@proxy_wasm_rust_sdk//bazel/cargo:log",

@@ -863,7 +863,7 @@ TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
 
-# Running clang-format without docker
+# Running format linting without docker
 
 The easiest way to run the clang-format check/fix commands is to run them via
 docker, which helps ensure the right toolchain is set up. However you may prefer
@@ -875,6 +875,8 @@ to run clang-format scripts on your workstation directly:
 To run the tools directly, you must install the correct version of clang. This
 may change over time, check the version of clang in the docker image. You must
 also have 'buildifier' installed from the bazel distribution.
+
+Note that if you run the `check_spelling.py` script you will need to have `aspell` installed.
 
 Edit the paths shown here to reflect the installation locations on your system:
 

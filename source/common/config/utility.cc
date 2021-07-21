@@ -44,12 +44,8 @@ void Utility::translateApiConfigSource(
     envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
     grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
   } else {
-    if (api_type == ApiType::get().UnsupportedRestLegacy) {
-      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::
-                                         hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
-    } else if (api_type == ApiType::get().Rest) {
-      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
-    }
+    ASSERT(api_type == ApiType::get().Rest);
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names(cluster);
   }
 
@@ -227,8 +223,9 @@ Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootst
 }
 
 Stats::StatsMatcherPtr
-Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
+Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                            Stats::SymbolTable& symbol_table) {
+  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config(), symbol_table);
 }
 
 Stats::HistogramSettingsConstPtr
