@@ -110,6 +110,9 @@ const char* config_template = R"(
 #{fake_remote_responses}
               - match: { prefix: "/" }
                 direct_response: { status: 404, body: { inline_string: "not found" } }
+                request_headers_to_remove:
+                - x-forwarded-proto
+                - x-envoy-mobile-cluster
           http_filters:
           - name: envoy.router
             typed_config:
