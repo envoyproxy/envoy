@@ -161,6 +161,9 @@ private:
   bool sent_immediate_response_ = false;
 };
 
+extern std::string responseCaseToString(
+    const envoy::service::ext_proc::v3alpha::ProcessingResponse::ResponseCase response_case);
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

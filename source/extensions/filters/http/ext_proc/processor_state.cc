@@ -71,7 +71,6 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           filter_.sendBufferedData(*this, ProcessorState::CallbackState::BufferedBodyCallback,
                                    true);
         }
-
         // Otherwise, we're not ready to continue processing because then
         // we won't be able to modify the headers any more, so do nothing and
         // let the doData callback handle body chunks until the end is reached.
@@ -87,7 +86,6 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
           clearWatermark();
           return true;
         }
-
         if (hasBufferedData()) {
           // We now know that we need to process what we have buffered in streaming mode.
           // Move the current buffer into the queue for remote processing and clear the
@@ -106,7 +104,6 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         continueIfNecessary();
         return true;
       }
-
       if (send_trailers_ && trailers_available_) {
         // Trailers came in while we were waiting for this response, and the server
         // is not interested in the body, so send them now.

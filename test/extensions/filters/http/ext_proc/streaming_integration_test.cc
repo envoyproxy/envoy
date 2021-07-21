@@ -348,7 +348,6 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
             // Return before we get the end of stream
             return;
           }
-
           ProcessingResponse resp;
           resp.mutable_request_body();
           stream->Write(resp);
@@ -437,7 +436,6 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
           body_resp.mutable_response_body();
           stream->Write(body_resp);
         } while (!body_req.response_body().end_of_stream());
-
         processor_response_hash_ = HashUtil::xxHash64(allData.toString());
         ASSERT_EQ(total_response_size, response_size);
       });
@@ -497,7 +495,6 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
                         SingleProtoHeaderValueIs(":status", "200"));
             saw_response_headers = true;
             response.mutable_response_headers();
-
           } else if (message.has_request_body()) {
             // Expect a number of request body messages. Make sure that we
             // don't get a duplicate EOF, count the size, and store the chunks
@@ -511,7 +508,6 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
               processor_request_hash_ = HashUtil::xxHash64(allRequestData.toString());
             }
             response.mutable_request_body();
-
           } else if (message.has_response_body()) {
             // Count ans hash the response body like we did for the request body.
             total_response_size += message.response_body().body().size();
@@ -526,7 +522,6 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
           } else {
             FAIL() << "unexpected stream message";
           }
-
           stream->Write(response);
         } while (!(saw_response_headers && saw_request_eof && saw_response_eof));
       });
@@ -583,7 +578,6 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
                         SingleProtoHeaderValueIs(":status", "200"));
             saw_response_headers = true;
             response.mutable_response_headers();
-
           } else if (message.has_request_body()) {
             // Replace the first chunk with a new message, and zero out the rest
             auto* new_body = response.mutable_request_body()->mutable_response();
@@ -596,7 +590,6 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
             if (message.request_body().end_of_stream()) {
               saw_request_eof = true;
             }
-
           } else if (message.has_response_body()) {
             // Replace the last chunk with a new message and zero out the rest
             auto* new_body = response.mutable_response_body()->mutable_response();
@@ -607,11 +600,9 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
             } else {
               new_body->mutable_body_mutation()->set_clear_body(true);
             }
-
           } else {
             FAIL() << "unexpected stream message";
           }
-
           stream->Write(response);
         } while (!saw_response_headers || !saw_request_eof || !saw_response_eof);
       });
