@@ -861,6 +861,10 @@ TEST_F(HappyEyeballsConnectionImplTest, StartSecureTransport) {
   EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
   failover_timer_->invokeCallback();
 
+  EXPECT_CALL(*created_connections_[0], startSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(*created_connections_[1], startSecureTransport()).WillOnce(Return(true));
+  EXPECT_FALSE(impl_->startSecureTransport());
+
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));

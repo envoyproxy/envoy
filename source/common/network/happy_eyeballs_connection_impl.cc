@@ -11,8 +11,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
     : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list),
-      source_address_(source_address), socket_factory_(socket_factory),
-      transport_socket_options_(transport_socket_options), options_(options),
+      connection_construction_state_({source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   connections_.push_back(createNextConnection());
 }
@@ -30,6 +29,8 @@ void HappyEyeballsConnectionImpl::addWriteFilter(WriteFilterSharedPtr filter) {
     connections_[0]->addWriteFilter(filter);
     return;
   }
+  // Filters should only be notified of events on the final connection, so defer adding
+  // filters until the final connection has been determined.
   post_connect_state_.write_filters_.push_back(filter);
 }
 
@@ -38,6 +39,8 @@ void HappyEyeballsConnectionImpl::addFilter(FilterSharedPtr filter) {
     connections_[0]->addFilter(filter);
     return;
   }
+  // Filters should only be notified of events on the final connection, so defer adding
+  // filters until the final connection has been determined.
   post_connect_state_.filters_.push_back(filter);
 }
 
@@ -46,6 +49,8 @@ void HappyEyeballsConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
     connections_[0]->addReadFilter(filter);
     return;
   }
+  // Filters should only be notified of events on the final connection, so defer adding
+  // filters until the final connection has been determined.
   post_connect_state_.read_filters_.push_back(filter);
 }
 
@@ -54,6 +59,8 @@ void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
     connections_[0]->removeReadFilter(filter);
     return;
   }
+  // Filters should only be notified of events on the final connection, so remove
+  // the filters from the list of deferred filters.
   auto i = post_connect_state_.read_filters_.begin();
   while (i != post_connect_state_.read_filters_.end()) {
     if (*i == filter) {
@@ -68,6 +75,8 @@ bool HappyEyeballsConnectionImpl::initializeReadFilters() {
   if (connect_finished_) {
     return connections_[0]->initializeReadFilters();
   }
+  // Filters should only be notified of events on the final connection, so defer
+  // initialization of the filters until the final connection has been determined.
   if (!post_connect_state_.read_filters_.empty()) {
     return false;
   }
@@ -80,6 +89,8 @@ void HappyEyeballsConnectionImpl::addBytesSentCallback(Connection::BytesSentCb c
     connections_[0]->addBytesSentCallback(cb);
     return;
   }
+  // Callbacks should only be notified of events on the final connection, so defer adding
+  // callbacks until the final connection has been determined.
   post_connect_state_.bytes_sent_callbacks_.push_back(cb);
 }
 
@@ -182,6 +193,8 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
     return;
   }
 
+  // Data should only be written on the final connection, so defer actually writing
+  // until the final connection has been determined.
   if (!post_connect_state_.write_buffer_.has_value()) {
     post_connect_state_.end_stream_ = false;
     post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
@@ -270,6 +283,8 @@ void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb
     connections_[0]->addConnectionCallbacks(cb);
     return;
   }
+  // Callbacks should only be notified of events on the final connection, so defer adding
+  // callbacks until the final connection has been determined.
   post_connect_state_.connection_callbacks_.push_back(&cb);
 }
 
@@ -278,6 +293,8 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
     connections_[0]->removeConnectionCallbacks(cb);
     return;
   }
+  // Callbacks should only be notified of events on the final connection, so remove
+  // the callback from the list of deferred callbacks.
   auto i = post_connect_state_.connection_callbacks_.begin();
   while (i != post_connect_state_.connection_callbacks_.end()) {
     if (*i == &cb) {
@@ -361,8 +378,8 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
 ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   ASSERT(next_address_ < address_list_.size());
   auto connection = dispatcher_.createClientConnection(
-      address_list_[next_address_++], source_address_,
-      socket_factory_.createTransportSocket(transport_socket_options_), options_);
+      address_list_[next_address_++], connection_construction_state_.source_address_,
+      connection_construction_state_.socket_factory_.createTransportSocket(connection_construction_state_.transport_socket_options_), connection_construction_state_.options_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
@@ -410,21 +427,27 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
   wrapper->connection().removeConnectionCallbacks(*wrapper);
   if (event != ConnectionEvent::Connected) {
+    // This connection attempt has failed. If possible, start another connection attempt
+    // immediately, instead of waiting for the timer.
     if (next_address_ < address_list_.size()) {
       next_attempt_timer_->disableTimer();
       tryAnotherConnection();
     }
+    // If there is at least one more attempt running then the current attempt can be destroyed.
     if (connections_.size() > 1) {
       // Nuke this connection and associated callbacks and let a subsequent attempt proceed.
       cleanupWrapperAndConnection(wrapper);
       return;
     }
+    // This connection attempt failed but there are no more attempts to be made, so pass
+    // the failure up.
+    ASSERT(connections_.size() == 1);
   }
 
   connect_finished_ = true;
   next_attempt_timer_->disableTimer();
 
-  // Close and delete up other connections.
+  // Close and delete any other connections.
   auto it = connections_.begin();
   while (it != connections_.end()) {
     if (it->get() != &(wrapper->connection())) {
@@ -450,6 +473,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
   }
 
   if (event == ConnectionEvent::Connected) {
+    // Apply post-connect state which is only connections which have succeeded.
     for (auto& filter : post_connect_state_.filters_) {
       connections_[0]->addFilter(filter);
     }
@@ -477,9 +501,6 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                              post_connect_state_.end_stream_.value());
     }
   }
-
-  std::vector<ConnectionCallbacks*> cbs;
-  cbs.swap(post_connect_state_.connection_callbacks_);
 }
 
 void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallbacksWrapper* wrapper) {
