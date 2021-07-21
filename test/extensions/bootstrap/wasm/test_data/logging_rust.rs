@@ -27,7 +27,7 @@ impl RootContext for TestRoot {
         trace!("test trace logging");
         debug!("test debug logging");
         error!("test error logging");
-        if let Some(value) = self.get_configuration() {
+        if let Some(value) = self.get_plugin_configuration() {
             warn!("warn {}", String::from_utf8(value).unwrap());
         }
         true

@@ -117,3 +117,24 @@ def test_util_coverage_with_data_file(patches):
     assert (
         list(m_config.return_value.write.call_args)
         == [(m_open.return_value.__enter__.return_value,), {}])
+
+
+def test_util_untar(patches):
+    patched = patches(
+        "tempfile.TemporaryDirectory",
+        "tarfile.open",
+        prefix="tools.base.utils")
+
+    with patched as (m_tmp, m_open):
+        with utils.untar("PATH") as tmpdir:
+            assert tmpdir == m_tmp.return_value.__enter__.return_value
+
+    assert (
+        list(m_tmp.call_args)
+        == [(), {}])
+    assert (
+        list(m_open.call_args)
+        == [('PATH',), {}])
+    assert (
+        list(m_open.return_value.__enter__.return_value.extractall.call_args)
+        == [(), {'path': tmpdir}])

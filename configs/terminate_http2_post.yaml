@@ -32,7 +32,8 @@ static_resources:
                   prefix: "/"
                   headers:
                   - name: ":method"
-                    exact_match: "POST"
+                    string_match:
+                      exact: "POST"
                 route:
                   cluster: service_google
                   upgrade_configs:
