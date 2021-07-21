@@ -19,6 +19,7 @@
 #include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/test_accessor/config.h"
+#include "library/common/extensions/filters/http/test_event_tracker/config.h"
 
 namespace Envoy {
 
@@ -36,6 +37,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::HttpFilters::TestAccessor::forceRegisterTestAccessorFilterFactory();
+  Envoy::Extensions::HttpFilters::TestEventTracker::forceRegisterTestEventTrackerFilterFactory();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();

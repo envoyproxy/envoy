@@ -259,6 +259,22 @@ Specify a closure to be called when Envoy's engine emits a log message.
     NSLog("Envoy log: \(msg)")
   }
 
+~~~~~~~~~~~~~~~~~~~
+``setEventTracker``
+~~~~~~~~~~~~~~~~~~~
+
+Specify a closure to be called when Envoy's engine emits an event.
+
+**Example**::
+
+  // Kotlin
+  // This interface is pending for Kotlin
+
+  // Swift
+  builder.setEventTracker { event in
+    NSLog("Envoy log: \(event)")
+  }
+
 ~~~~~~~~~~~~~~~~~~~~~
 ``addStringAccessor``
 ~~~~~~~~~~~~~~~~~~~~~

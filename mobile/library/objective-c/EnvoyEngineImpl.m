@@ -365,12 +365,27 @@ static envoy_data ios_get_string(const void *context) {
   return toManagedNativeString(accessor.getEnvoyString());
 }
 
+static void ios_track_event(envoy_map map, const void *context) {
+  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+  // is necessary to act as a breaker for any Objective-C allocation that happens.
+  @autoreleasepool {
+    EnvoyEventTracker *eventTracker = (__bridge EnvoyEventTracker *)context;
+    // `to_ios_map` method releases `map`'s memory. Call it even if the tracking closure
+    // is not provided.
+    EnvoyEvent *platformMap = to_ios_map(map);
+    if (eventTracker.track) {
+      eventTracker.track(platformMap);
+    }
+  }
+}
+
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
-                                 logger:(nullable void (^)(NSString *))logger {
+                                 logger:(nullable void (^)(NSString *))logger
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker {
   self = [super init];
   if (!self) {
     return nil;
@@ -388,6 +403,9 @@ static envoy_data ios_get_string(const void *context) {
     native_logger.context = CFBridgingRetain(objcLogger);
   }
 
+  EnvoyEventTracker *objcEventTracker =
+      [[EnvoyEventTracker alloc] initWithEventTrackingClosure:eventTracker];
+  [self registerEventTracker:objcEventTracker];
   _engineHandle = init_engine(native_callbacks, native_logger);
   [EnvoyNetworkMonitor startReachabilityIfNeeded];
   return self;
@@ -423,13 +441,23 @@ static envoy_data ios_get_string(const void *context) {
 }
 
 - (int)registerStringAccessor:(NSString *)name accessor:(EnvoyStringAccessor *)accessor {
-  // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
+  // TODO(goaway): Everything here leaks, but it's all tied to the life of the engine.
   // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
   envoy_string_accessor *accessorStruct = safe_malloc(sizeof(envoy_string_accessor));
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
 
   return register_platform_api(name.UTF8String, accessorStruct);
+}
+
+- (int)registerEventTracker:(EnvoyEventTracker *)eventTracker {
+  // TODO(Augustyniak): Everything here leaks, but it's all tied to the life of the engine.
+  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+  envoy_event_tracker *eventTrackerStruct = safe_malloc(sizeof(envoy_event_tracker));
+  eventTrackerStruct->track = ios_track_event;
+  eventTrackerStruct->context = CFBridgingRetain(eventTracker);
+
+  return register_platform_api(envoy_event_tracker_api_name, eventTrackerStruct);
 }
 
 - (int)runWithConfig:(EnvoyConfiguration *)config logLevel:(NSString *)logLevel {

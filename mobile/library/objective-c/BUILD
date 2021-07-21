@@ -11,6 +11,7 @@ objc_library(
     srcs = [
         "EnvoyConfiguration.m",
         "EnvoyEngineImpl.m",
+        "EnvoyEventTracker.m",
         "EnvoyHTTPCallbacks.m",
         "EnvoyHTTPFilter.m",
         "EnvoyHTTPFilterCallbacksImpl.h",
