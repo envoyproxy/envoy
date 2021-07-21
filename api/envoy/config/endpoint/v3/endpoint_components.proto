@@ -134,14 +134,11 @@ message LocalityLbEndpoints {
   core.v3.Locality locality = 1;
 
   // The group of endpoints belonging to the locality specified.
-  repeated LbEndpoint lb_endpoints = 2
-      [(udpa.annotations.field_migrate).oneof_promotion = "lb_config"];
+  repeated LbEndpoint lb_endpoints = 2;
 
-  oneof lb_config {
-    // [#not-implemented-hide:]
-    // LEDS Configuration for the current locality.
-    LedsClusterLocalityConfig leds_cluster_locality_config = 7;
-  }
+  // [#not-implemented-hide:]
+  // LEDS Configuration for the current locality.
+  LedsClusterLocalityConfig leds_cluster_locality_config = 7;
 
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all

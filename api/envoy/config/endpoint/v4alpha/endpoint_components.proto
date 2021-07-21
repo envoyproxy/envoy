@@ -136,14 +136,12 @@ message LocalityLbEndpoints {
   // Identifies location of where the upstream hosts run.
   core.v4alpha.Locality locality = 1;
 
-  oneof lb_config {
-    // The group of endpoints belonging to the locality specified.
-    repeated LbEndpoint lb_endpoints = 2;
+  // The group of endpoints belonging to the locality specified.
+  repeated LbEndpoint lb_endpoints = 2;
 
-    // [#not-implemented-hide:]
-    // LEDS Configuration for the current locality.
-    LedsClusterLocalityConfig leds_cluster_locality_config = 7;
-  }
+  // [#not-implemented-hide:]
+  // LEDS Configuration for the current locality.
+  LedsClusterLocalityConfig leds_cluster_locality_config = 7;
 
   // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
   // balancing weight for a locality is divided by the sum of the weights of all
