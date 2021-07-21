@@ -74,9 +74,6 @@ public:
   void onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                       bool hand_off_restored_destination_connections, bool rebalanced) override;
 
-  /**
-   * Create active connection from the server connection.
-   */
   void newActiveConnection(const Network::FilterChain& filter_chain,
                            Network::ServerConnectionPtr server_conn_ptr,
                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) override;
@@ -92,10 +89,7 @@ public:
    */
   void updateListenerConfig(Network::ListenerConfig& config);
 
-  /**
-   * Schedule to remove and destroy the active connection owned by the filter chain.
-   */
-  void deferRemoveFilterChain(const Network::FilterChain* filter_chain) override;
+  void removeFilterChain(const Network::FilterChain* filter_chain) override;
 
   /**
    * Remove and destroy an active connection.

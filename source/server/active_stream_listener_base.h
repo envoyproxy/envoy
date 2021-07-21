@@ -19,10 +19,10 @@
 namespace Envoy {
 namespace Server {
 
-// The base class of the stream listener. It owns the the active sockets that drive itself through
-// the listener filters. After the active socket passes all the listener filters, a server
-// connection is created. The derived listener must override ``newActiveConnection`` to take the
-// ownership of that server connection.
+// The base class of the stream listener. It owns listener filter handling of active sockets.
+// After the active socket passes all the listener filters, a server connection is created. The
+// derived listener must override ``newActiveConnection`` to take the ownership of that server
+// connection.
 class ActiveStreamListenerBase : public ActiveListenerImplBase,
                                  protected Logger::Loggable<Logger::Id::conn_handler> {
 public:
@@ -42,7 +42,7 @@ public:
     const bool was_deleting = is_deleting_;
     is_deleting_ = true;
     for (const auto* filter_chain : draining_filter_chains) {
-      deferRemoveFilterChain(filter_chain);
+      removeFilterChain(filter_chain);
     }
     is_deleting_ = was_deleting;
   }
@@ -56,9 +56,9 @@ public:
   void newConnection(Network::ConnectionSocketPtr&& socket,
                      std::unique_ptr<StreamInfo::StreamInfo> stream_info);
   /**
-   * Schedule to remove and destroy the active connections owned by the filter chain.
+   * Schedule removal and destruction of all active connections owned by a filter chain.
    */
-  virtual void deferRemoveFilterChain(const Network::FilterChain* filter_chain) PURE;
+  virtual void removeFilterChain(const Network::FilterChain* filter_chain) PURE;
 
   virtual Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
@@ -106,9 +106,14 @@ protected:
   virtual void newActiveConnection(const Network::FilterChain& filter_chain,
                                    Network::ServerConnectionPtr server_conn_ptr,
                                    std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
-  Event::Dispatcher& dispatcher_;
   Network::ListenerPtr listener_;
+  // True if the follow up connection deletion is raised by the connection collection deletion is performing.
+  // Otherwise, the collection should be deleted when the last connection in the collection is removed.
+  // This state is maintained in base class because this state is independent from concrete connection type.
   bool is_deleting_{false};
+
+private:
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Server

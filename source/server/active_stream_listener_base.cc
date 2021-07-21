@@ -12,7 +12,7 @@ ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& p
     : ActiveListenerImplBase(parent, &config), parent_(parent),
       listener_filters_timeout_(config.listenerFiltersTimeout()),
       continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
-      dispatcher_(dispatcher), listener_(std::move(listener)) {}
+      listener_(std::move(listener)), dispatcher_(dispatcher) {}
 
 void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
                                         StreamInfo::StreamInfo& stream_info) {

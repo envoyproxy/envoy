@@ -33,9 +33,8 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 }
 
 ActiveTcpListener::~ActiveTcpListener() {
-  config_->connectionBalancer().unregisterHandler(*this);
-
   is_deleting_ = true;
+  config_->connectionBalancer().unregisterHandler(*this);
 
   // Purge sockets that have not progressed to connections. This should only happen when
   // a listener filter stops iteration and never resumes.
@@ -44,9 +43,9 @@ ActiveTcpListener::~ActiveTcpListener() {
     dispatcher().deferredDelete(std::move(removed));
   }
 
-  for (auto& chain_and_connections : connections_by_context_) {
-    ASSERT(chain_and_connections.second != nullptr);
-    auto& connections = chain_and_connections.second->connections_;
+  for (auto& [chain, active_connections] : connections_by_context_) {
+    ASSERT(active_connections != nullptr);
+    auto& connections = active_connections->connections_;
     while (!connections.empty()) {
       connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -88,7 +87,7 @@ void ActiveTcpListener::updateListenerConfig(Network::ListenerConfig& config) {
   config_ = &config;
 }
 
-void ActiveTcpListener::deferRemoveFilterChain(const Network::FilterChain* filter_chain) {
+void ActiveTcpListener::removeFilterChain(const Network::FilterChain* filter_chain) {
   auto iter = connections_by_context_.find(filter_chain);
   if (iter == connections_by_context_.end()) {
     // It is possible when listener is stopping.
