@@ -45,6 +45,8 @@ void release_envoy_error(envoy_error error) { error.message.release(error.messag
 
 void release_envoy_stats_tags(envoy_stats_tags stats_tags) { release_envoy_data_map(stats_tags); }
 
+void release_envoy_map(envoy_map event) { release_envoy_data_map(event); }
+
 envoy_map copy_envoy_data_map(envoy_map src) {
   envoy_map_entry* dst_entries =
       static_cast<envoy_map_entry*>(safe_malloc(sizeof(envoy_map_entry) * src.length));
@@ -72,3 +74,5 @@ const envoy_data envoy_nodata = {0, NULL, envoy_noop_release, NULL};
 const envoy_headers envoy_noheaders = {0, NULL};
 
 const envoy_stats_tags envoy_stats_notags = {0, NULL};
+
+const char* envoy_event_tracker_api_name = "event_tracker_api";

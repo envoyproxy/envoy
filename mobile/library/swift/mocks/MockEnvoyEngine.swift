@@ -3,7 +3,8 @@ import Foundation
 
 /// Mock implementation of `EnvoyEngine`. Used internally for testing the bridging layer & mocking.
 final class MockEnvoyEngine: NSObject {
-  init(runningCallback onEngineRunning: (() -> Void)? = nil, logger: ((String) -> Void)? = nil) {}
+  init(runningCallback onEngineRunning: (() -> Void)? = nil, logger: ((String) -> Void)? = nil,
+       eventTracker: (([String: String]) -> Void)? = nil) {}
 
   /// Closure called when `run(withConfig:)` is called.
   static var onRunWithConfig: ((_ config: EnvoyConfiguration, _ logLevel: String?) -> Void)?

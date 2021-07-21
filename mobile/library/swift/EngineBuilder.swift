@@ -26,6 +26,7 @@ public class EngineBuilder: NSObject {
   private var virtualClusters: String = "[]"
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
+  private var eventTracker: (([String: String]) -> Void)?
   private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
@@ -216,6 +217,17 @@ public class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a closure to be called when the engine emits an event.
+  ///
+  /// - parameter closure: The closure to be called.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setEventTracker(closure: @escaping ([String: String]) -> Void) -> Self {
+    self.eventTracker = closure
+    return self
+  }
+
   /// Add the App Version of the App using this Envoy Client.
   ///
   /// - parameter appVersion: The version.
@@ -252,7 +264,8 @@ public class EngineBuilder: NSObject {
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
   public func build() -> Engine {
-    let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger)
+    let engine = self.engineType.init(runningCallback: self.onEngineRunning, logger: self.logger,
+                                      eventTracker: self.eventTracker)
     let config = EnvoyConfiguration(
       grpcStatsDomain: self.grpcStatsDomain,
       connectTimeoutSeconds: self.connectTimeoutSeconds,
