@@ -2525,8 +2525,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
       // 2. refreshCachedRoute (both in decodeHeaders(headers,end_stream);
       // 3. then refreshCachedRoute triggered by decoder_filters_[1]->callbacks_->route().
       .Times(3)
-      .WillRepeatedly(
-          Invoke([&](const HeaderMap& headers, const auto&, const auto&) -> Router::ConfigConstSharedPtr {
+      .WillRepeatedly(Invoke(
+          [&](const HeaderMap& headers, const auto&, const auto&) -> Router::ConfigConstSharedPtr {
             auto& test_headers = dynamic_cast<const TestRequestHeaderMapImpl&>(headers);
             if (test_headers.get_("scope_key") == "foo") {
               return route_config1;

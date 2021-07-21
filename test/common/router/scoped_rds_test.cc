@@ -593,11 +593,12 @@ key:
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
-  EXPECT_THAT(getScopedRdsProvider()
-                  ->config<ScopedConfigImpl>()
-                  ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}, {}, {})
-                  ->name(),
-              "");
+  EXPECT_THAT(
+      getScopedRdsProvider()
+          ->config<ScopedConfigImpl>()
+          ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}, {}, {})
+          ->name(),
+      "");
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
   EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
             1UL);

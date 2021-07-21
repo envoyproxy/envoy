@@ -55,8 +55,8 @@ FragmentBuilderImpl::FragmentBuilderImpl(ScopedRoutes::ScopeKeyBuilder::Fragment
 }
 
 std::unique_ptr<ScopeKeyFragmentBase>
-FragmentBuilderImpl::computeFragment(const Http::HeaderMap& headers, 
-                                     const envoy::config::core::v3::Metadata& conn_meta, 
+FragmentBuilderImpl::computeFragment(const Http::HeaderMap& headers,
+                                     const envoy::config::core::v3::Metadata& conn_meta,
                                      const envoy::config::core::v3::Metadata& filter_meta) const {
   switch (config_.type_case()) {
   case FragmentBuilderConfig::kHeaderValueExtractor:
@@ -158,12 +158,13 @@ ScopeKeyBuilderImpl::ScopeKeyBuilderImpl(ScopedRoutes::ScopeKeyBuilder&& config)
 
 ScopeKeyPtr
 ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers,
-                                     const envoy::config::core::v3::Metadata& conn_meta, 
+                                     const envoy::config::core::v3::Metadata& conn_meta,
                                      const envoy::config::core::v3::Metadata& filter_meta) const {
   ScopeKey key;
   for (const auto& builder : fragment_builders_) {
     // returns nullopt if a null fragment is found.
-    std::unique_ptr<ScopeKeyFragmentBase> fragment = builder->computeFragment(headers, conn_meta, filter_meta);
+    std::unique_ptr<ScopeKeyFragmentBase> fragment =
+        builder->computeFragment(headers, conn_meta, filter_meta);
 
     if (fragment == nullptr) {
       return nullptr;
@@ -199,8 +200,8 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
 
 Router::ConfigConstSharedPtr
 ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers,
-                                     const envoy::config::core::v3::Metadata& conn_meta, 
-                                     const envoy::config::core::v3::Metadata& filter_meta) const {
+                                 const envoy::config::core::v3::Metadata& conn_meta,
+                                 const envoy::config::core::v3::Metadata& filter_meta) const {
   ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers, conn_meta, filter_meta);
   if (scope_key == nullptr) {
     return nullptr;
@@ -212,9 +213,10 @@ ScopedConfigImpl::getRouteConfig(const Http::HeaderMap& headers,
   return nullptr;
 }
 
-ScopeKeyPtr ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers,
-                                     const envoy::config::core::v3::Metadata& conn_meta, 
-                                     const envoy::config::core::v3::Metadata& filter_meta) const {
+ScopeKeyPtr
+ScopedConfigImpl::computeScopeKey(const Http::HeaderMap& headers,
+                                  const envoy::config::core::v3::Metadata& conn_meta,
+                                  const envoy::config::core::v3::Metadata& filter_meta) const {
   ScopeKeyPtr scope_key = scope_key_builder_.computeScopeKey(headers, conn_meta, filter_meta);
   if (scope_key &&
       scoped_route_info_by_key_.find(scope_key->hash()) != scoped_route_info_by_key_.end()) {

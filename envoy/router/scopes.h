@@ -90,25 +90,28 @@ public:
    * Based on the incoming HTTP request headers, returns the configuration to use for selecting a
    * target route.
    * @param headers the request headers to match the scoped routing configuration against.
-   * @param conn_meta the dynamic connection metadata to match the scoped routing configuration against.
-   * @param filter_meta the dynamic filter metadata to match the scoped routing configuration against.
+   * @param conn_meta the dynamic connection metadata to match the scoped routing configuration
+   * against.
+   * @param filter_meta the dynamic filter metadata to match the scoped routing configuration
+   * against.
    * @return ConfigConstSharedPtr the router's Config matching the request headers.
    */
   virtual ConfigConstSharedPtr
-  getRouteConfig(const Http::HeaderMap& headers,
-                 const envoy::config::core::v3::Metadata& conn_meta, 
+  getRouteConfig(const Http::HeaderMap& headers, const envoy::config::core::v3::Metadata& conn_meta,
                  const envoy::config::core::v3::Metadata& filter_meta) const PURE;
 
   /**
    * Based on the incoming HTTP request headers, returns the hash value of its scope key.
    * @param headers the request headers to match the scoped routing configuration against.
-   * @param conn_meta the dynamic connection metadata to match the scoped routing configuration against.
-   * @param filter_meta the dynamic filter metadata to match the scoped routing configuration against.
+   * @param conn_meta the dynamic connection metadata to match the scoped routing configuration
+   * against.
+   * @param filter_meta the dynamic filter metadata to match the scoped routing configuration
+   * against.
    * @return unique_ptr of the scope key computed from header.
    */
-  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap& ,
-                                      const envoy::config::core::v3::Metadata& , 
-                                      const envoy::config::core::v3::Metadata& ) const {
+  virtual ScopeKeyPtr computeScopeKey(const Http::HeaderMap&,
+                                      const envoy::config::core::v3::Metadata&,
+                                      const envoy::config::core::v3::Metadata&) const {
     return {};
   }
 };
