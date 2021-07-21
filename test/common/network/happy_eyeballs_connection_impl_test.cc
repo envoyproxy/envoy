@@ -35,7 +35,7 @@ public:
         transport_socket_options_, options_);
   }
 
-  // Called by the disptacher to return a MockClientConnection. In order to allow expections to
+  // Called by the dispatcher to return a MockClientConnection. In order to allow expectations to
   // be set on this connection, the object must exist. So instead of allocating a new
   // MockClientConnection in this method, it instead pops the first entry from
   // next_connections_ and returns that. It also saves a pointer to that connection into
@@ -70,8 +70,8 @@ public:
   void timeoutAndStartNextAttempt() {
     EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
-        .WillOnce(
-            testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
+        .WillOnce(testing::InvokeWithoutArgs(
+            this, &HappyEyeballsConnectionImplTest::createNextConnection));
     EXPECT_CALL(*next_connections_.back(), connect());
     EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
     failover_timer_->invokeCallback();
@@ -101,9 +101,7 @@ protected:
   std::unique_ptr<HappyEyeballsConnectionImpl> impl_;
 };
 
-TEST_F(HappyEyeballsConnectionImplTest, Connect) {
-  startConnect();
-}
+TEST_F(HappyEyeballsConnectionImplTest, Connect) { startConnect(); }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
   startConnect();

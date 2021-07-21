@@ -11,7 +11,8 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
     : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list),
-      connection_construction_state_({source_address, socket_factory, transport_socket_options, options}),
+      connection_construction_state_(
+          {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   connections_.push_back(createNextConnection());
 }
@@ -379,7 +380,9 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   ASSERT(next_address_ < address_list_.size());
   auto connection = dispatcher_.createClientConnection(
       address_list_[next_address_++], connection_construction_state_.source_address_,
-      connection_construction_state_.socket_factory_.createTransportSocket(connection_construction_state_.transport_socket_options_), connection_construction_state_.options_);
+      connection_construction_state_.socket_factory_.createTransportSocket(
+          connection_construction_state_.transport_socket_options_),
+      connection_construction_state_.options_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
