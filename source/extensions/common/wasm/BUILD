@@ -24,8 +24,8 @@ envoy_cc_library(
     hdrs = [
         "context.h",
         "plugin.h",
+        "stats_handler.h",
         "wasm.h",
-        "wasm_extension.h",
         "wasm_vm.h",
     ],
     visibility = ["//visibility:public"],
@@ -56,8 +56,8 @@ envoy_cc_library(
         "context.cc",
         "foreign.cc",
         "plugin.cc",
+        "stats_handler.cc",
         "wasm.cc",
-        "wasm_extension.cc",
         "wasm_vm.cc",
     ],
     copts = select({

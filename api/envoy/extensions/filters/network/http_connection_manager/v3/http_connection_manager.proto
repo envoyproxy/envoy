@@ -1005,3 +1005,11 @@ message RequestIDExtension {
   // Request ID extension specific configuration.
   google.protobuf.Any typed_config = 1;
 }
+
+// [#protodoc-title: Envoy Mobile HTTP connection manager]
+// HTTP connection manager for use in Envoy mobile.
+message EnvoyMobileHttpConnectionManager {
+  // The configuration for the underlying HttpConnectionManager which will be
+  // instantiated for Envoy mobile.
+  HttpConnectionManager config = 1;
+}

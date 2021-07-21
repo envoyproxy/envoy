@@ -42,6 +42,15 @@ public:
   MOCK_METHOD(void, cancel, (CancelReason reason));
 };
 
+class MockFilterManager : public FilterManager {
+public:
+  MOCK_METHOD(void, addWriteFilter, (WriteFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (FilterSharedPtr filter));
+  MOCK_METHOD(void, addReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(void, removeReadFilter, (ReadFilterSharedPtr filter));
+  MOCK_METHOD(bool, initializeReadFilters, ());
+};
+
 class MockDnsResolver : public DnsResolver {
 public:
   MockDnsResolver();
@@ -350,8 +359,11 @@ public:
 
   MOCK_METHOD(Network::Socket::Type, socketType, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, localAddress, (), (const));
-  MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, ());
-  MOCK_METHOD(SocketOptRef, sharedSocket, (), (const));
+  MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
+  MOCK_METHOD(bool, reusePort, (), (const));
+  MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
+  MOCK_METHOD(void, closeAllSockets, ());
+  MOCK_METHOD(void, doFinalPreWorkerInit, ());
 };
 
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {

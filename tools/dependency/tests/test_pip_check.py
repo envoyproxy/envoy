@@ -148,10 +148,7 @@ def test_pip_checker_dependabot_success(patches):
     assert (
         list(m_succeed.call_args)
         == [('dependabot',
-             [f'Correct dependabot config for {m_fname.return_value} in dir: A',
-              f'Correct dependabot config for {m_fname.return_value} in dir: B',
-              f'Correct dependabot config for {m_fname.return_value} in dir: C',
-              f'Correct dependabot config for {m_fname.return_value} in dir: D']), {}])
+             [f"{m_fname.return_value}: {x}" for x in sorted(success)]),  {}])
 
 
 def test_pip_checker_dependabot_errors(patches):
@@ -169,12 +166,8 @@ def test_pip_checker_dependabot_errors(patches):
         checker.dependabot_errors(errors, MSG)
 
     assert (
-        list(m_error.call_args)
-        == [('dependabot',
-             [f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: A",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: B",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: C",
-              f"[ERROR:{m_name.return_value}] (dependabot) {MSG}: D"]), {}])
+        list(list(c) for c in list(m_error.call_args_list))
+        == [[('dependabot', [f'ERROR MESSAGE: {x}']), {}] for x in sorted(errors)])
 
 
 def test_pip_checker_main():
