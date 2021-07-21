@@ -19,7 +19,7 @@ namespace Network {
 
 /**
  * Implementation of ClientConnection which transparently attempts connections to
- * multiple different IP addresses, and use the first connection that succeeds.
+ * multiple different IP addresses, and uses the first connection that succeeds.
  * See the Happy Eyeballs RFC at https://datatracker.ietf.org/doc/html/rfc6555
  * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
  * either in the class or in the resolution code.
@@ -35,17 +35,21 @@ public:
 
   ~HappyEyeballsConnectionImpl() override;
 
+  // After a connection is established, these methods simply delegate to the
+  // underlying connection. Before the connection is established, however
+  // their behavior depends on their semantics. For anything which can result
+  // in up-call (e.g. filter registration) or which must only happen once (e.g.
+  // writing data) the context is saved in until the connection completes, at
+  // which point they are replayed to the underlying connection. For simple methods
+  // they are applied to each open connection and applied when creating new ones.
+
   // Network::ClientConnection
   void connect() override;
-
-  // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;
   void addFilter(FilterSharedPtr filter) override;
   void addReadFilter(ReadFilterSharedPtr filter) override;
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
-
-  // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;
@@ -79,8 +83,6 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
-
-  // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
@@ -99,7 +101,6 @@ private:
 
     void onBelowWriteBufferLowWatermark() override { parent_.onBelowWriteBufferLowWatermark(this); }
 
-    // Not needed? interesting.
     ClientConnection& connection() { return connection_; }
 
   private:

@@ -93,18 +93,11 @@ void HappyEyeballsConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 bool HappyEyeballsConnectionImpl::isHalfCloseEnabled() {
-  if (connect_finished_) {
-    return connections_[0]->isHalfCloseEnabled();
-  }
-  return per_connection_state_.enable_half_close_.has_value() &&
-         per_connection_state_.enable_half_close_.value();
+  return connections_[0]->isHalfCloseEnabled();
 }
 
 std::string HappyEyeballsConnectionImpl::nextProtocol() const {
-  if (connect_finished_) {
-    return connections_[0]->nextProtocol();
-  }
-  return "";
+  return connections_[0]->nextProtocol();
 }
 
 void HappyEyeballsConnectionImpl::noDelay(bool enable) {
@@ -189,14 +182,19 @@ void HappyEyeballsConnectionImpl::write(Buffer::Instance& data, bool end_stream)
     return;
   }
 
-  post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
-      []() -> void { ASSERT(false); }, [this]() -> void { this->onWriteBufferHighWatermark(); },
-      []() -> void { ASSERT(false); });
-  if (per_connection_state_.buffer_limits_.has_value()) {
-    post_connect_state_.write_buffer_.value()->setWatermarks(
-        per_connection_state_.buffer_limits_.value());
+  if (!post_connect_state_.write_buffer_.has_value()) {
+    post_connect_state_.end_stream_ = false;
+    post_connect_state_.write_buffer_ = dispatcher_.getWatermarkFactory().createBuffer(
+        []() -> void { ASSERT(false); }, [this]() -> void { this->onWriteBufferHighWatermark(); },
+        []() -> void { ASSERT(false); });
+    if (per_connection_state_.buffer_limits_.has_value()) {
+      post_connect_state_.write_buffer_.value()->setWatermarks(
+          per_connection_state_.buffer_limits_.value());
+    }
   }
+
   post_connect_state_.write_buffer_.value()->move(data);
+  ASSERT(!post_connect_state_.end_stream_.value()); // Don't write after end_stream.
   post_connect_state_.end_stream_ = end_stream;
 }
 
@@ -215,12 +213,6 @@ void HappyEyeballsConnectionImpl::setBufferLimits(uint32_t limit) {
 }
 
 uint32_t HappyEyeballsConnectionImpl::bufferLimit() const {
-  if (!connect_finished_) {
-    if (per_connection_state_.buffer_limits_.has_value()) {
-      return per_connection_state_.buffer_limits_.value();
-    }
-    return 0;
-  }
   return connections_[0]->bufferLimit();
 }
 
@@ -261,9 +253,11 @@ bool HappyEyeballsConnectionImpl::startSecureTransport() {
   if (!connect_finished_) {
     per_connection_state_.start_secure_transport_ = true;
   }
-  bool ret = false;
+  bool ret = true;
   for (auto& connection : connections_) {
-    ret = connection->startSecureTransport();
+    if (!connection->startSecureTransport()) {
+      ret = false;
+    }
   }
   return ret;
 }

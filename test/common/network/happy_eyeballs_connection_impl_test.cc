@@ -428,6 +428,28 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnect) {
   connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
 }
 
+TEST_F(HappyEyeballsConnectionImplTest, WriteTwiceBeforeConnect) {
+  Buffer::OwnedImpl data1("hello world");
+  Buffer::OwnedImpl data2("goodbye");
+
+  impl_->write(data1, false);
+  impl_->write(data2, true);
+
+  EXPECT_CALL(*created_connections_[0], connect());
+  impl_->connect();
+
+  EXPECT_CALL(*failover_timer_, disableTimer());
+  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+  // The call to write() will be replayed on the underlying connection.
+  EXPECT_CALL(*created_connections_[0], write(_, _))
+      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ("hello worldgoodbye", data.toString());
+        EXPECT_TRUE(end_stream);
+        ;
+      }));
+  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+}
+
 TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
   EXPECT_CALL(*created_connections_[0], connect());
   impl_->connect();
@@ -480,22 +502,6 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
         ;
       }));
   connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-}
-
-TEST_F(HappyEyeballsConnectionImplTest, BufferLimit) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
-
-  // Always returns 0 until connected.
-  EXPECT_EQ(0, impl_->bufferLimit());
-
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
-
-  // Delegates to the connection once connected.
-  EXPECT_CALL(*created_connections_[0], bufferLimit()).WillOnce(Return(42));
-  EXPECT_EQ(42, impl_->bufferLimit());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, AboveHighWatermark) {
@@ -761,10 +767,10 @@ TEST_F(HappyEyeballsConnectionImplTest, EnableHalfCloseAfterConnect) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, IsHalfCloseEnabled) {
+  EXPECT_CALL(*created_connections_[0], isHalfCloseEnabled()).WillOnce(Return(false));
   EXPECT_FALSE(impl_->isHalfCloseEnabled());
 
-  EXPECT_CALL(*created_connections_[0], enableHalfClose(true));
-  impl_->enableHalfClose(true);
+  EXPECT_CALL(*created_connections_[0], isHalfCloseEnabled()).WillOnce(Return(true));
   EXPECT_TRUE(impl_->isHalfCloseEnabled());
 
   connectFirstAttempt();
@@ -874,6 +880,13 @@ TEST_F(HappyEyeballsConnectionImplTest, StartSecureTransportAfterConnect) {
 }
 
 // Tests for HappyEyeballsConnectionImpl methods which simply delegate to the first connection.
+
+TEST_F(HappyEyeballsConnectionImplTest, BufferLimit) {
+  connectFirstAttempt();
+
+  EXPECT_CALL(*created_connections_[0], bufferLimit()).WillOnce(Return(42));
+  EXPECT_EQ(42, impl_->bufferLimit());
+}
 
 TEST_F(HappyEyeballsConnectionImplTest, NextProtocol) {
   connectFirstAttempt();
