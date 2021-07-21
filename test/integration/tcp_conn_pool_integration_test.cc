@@ -222,20 +222,24 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
 }
 
 TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle", "true");
-  initialize();
+  // The test first does two requests concurrently, resulting in a single pool (it is never idle
+  // between the first two), followed by going idle, then another request, which should create a
+  // second pool, which is why the log message is expected 2 times. If the initial pool was not
+  // cleaned up, only 1 pool would be created.
+  EXPECT_LOG_CONTAINS_N_TIMES("debug", "Allocating TCP conn pool", 2, {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.conn_pool_delete_when_idle",
+                                      "true");
+    initialize();
 
-  std::string request1("request1");
-  std::string request2("request2");
-  std::string request3("request3");
-  std::string response1("response1");
-  std::string response2("response2");
-  std::string response3("response3");
+    std::string request1("request1");
+    std::string request2("request2");
+    std::string request3("request3");
+    std::string response1("response1");
+    std::string response2("response2");
+    std::string response3("response3");
 
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+    IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
 
-  // The two requests were concurrent, so the pool was not idle, so only 1 pool has been created.
-  EXPECT_LOG_CONTAINS("debug", "Allocating TCP conn pool", {
     // Send request 1.
     ASSERT_TRUE(tcp_client->write(request1));
     FakeRawConnectionPtr fake_upstream_connection1;
@@ -251,6 +255,8 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
     EXPECT_EQ(request2, data);
 
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 2);
+
     // Send response 2.
     ASSERT_TRUE(fake_upstream_connection2->write(response2));
     ASSERT_TRUE(fake_upstream_connection2->close());
@@ -260,24 +266,31 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
     ASSERT_TRUE(fake_upstream_connection1->write(response1));
     ASSERT_TRUE(fake_upstream_connection1->close());
     tcp_client->waitForData(response1, false);
-  });
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
 
-  // After both requests were completed, the pool went idle and was cleaned up. Request 3 causes a
-  // new pool to be created. Seeing a new pool created is a proxy for directly observing that an old
-  // pool was cleaned up.
-  // TODO(ggreenway): if pool circuit breakers are implemented for tcp pools, verify cleanup by
-  // looking at stats such as `cluster.cluster_0.circuit_breakers.default.cx_pool_open`.
-  EXPECT_LOG_CONTAINS("debug", "Allocating TCP conn pool", {
+    // After both requests were completed, the pool went idle and was cleaned up. Request 3 causes a
+    // new pool to be created. Seeing a new pool created is a proxy for directly observing that an
+    // old pool was cleaned up.
+    //
+    // TODO(ggreenway): if pool circuit breakers are implemented for tcp pools, verify cleanup by
+    // looking at stats such as `cluster.cluster_0.circuit_breakers.default.cx_pool_open`.
+
     // Send request 3.
     ASSERT_TRUE(tcp_client->write(request3));
     FakeRawConnectionPtr fake_upstream_connection3;
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection3));
-    std::string data;
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 1);
     ASSERT_TRUE(fake_upstream_connection3->waitForData(request3.size(), &data));
     EXPECT_EQ(request3, data);
-  });
 
-  tcp_client->close();
+    ASSERT_TRUE(fake_upstream_connection3->write(response3));
+    ASSERT_TRUE(fake_upstream_connection3->close());
+    tcp_client->waitForData(response3, false);
+
+    test_server_->waitForGaugeEq("cluster.cluster_0.upstream_cx_active", 0);
+
+    tcp_client->close();
+  });
 }
 
 } // namespace Envoy
