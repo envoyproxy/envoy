@@ -85,8 +85,8 @@ protected:
   sendClientRequestHeaders(absl::optional<std::function<void(Http::HeaderMap&)>> cb) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers;
-    HttpTestUtility::addDefaultHeaders(headers, std::string("POST"));
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
+    HttpTestUtility::addDefaultHeaders(headers, false);
     if (cb) {
       (*cb)(headers);
     }
