@@ -468,7 +468,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     }
   }
 
-  for (auto cb : post_connect_state_.bytes_sent_callbacks_) {
+  for (const auto& cb : post_connect_state_.bytes_sent_callbacks_) {
     connections_[0]->addBytesSentCallback(cb);
   }
 
