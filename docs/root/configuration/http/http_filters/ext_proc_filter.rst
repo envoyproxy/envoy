@@ -21,7 +21,7 @@ Configuration options are provided to control which events are sent to the proce
 This way, the processor may receive headers, body, and trailers for both
 request and response in any combination. The processor may also change this configuration
 on a message-by-message basis. This allows for the construction of sophisticated processors
-that decide how to respond to each message individually to eliminate unnecessary 
+that decide how to respond to each message individually to eliminate unnecessary
 stream requests from the proxy.
 
 This filter is a work in progress. Most of the major bits of functionality
