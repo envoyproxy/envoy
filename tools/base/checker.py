@@ -32,6 +32,10 @@ class Checker(runner.Runner):
         return sum(len(e) for e in self.errors.values())
 
     @property
+    def exiting(self):
+        return "exiting" in self.errors
+
+    @property
     def failed(self) -> dict:
         """Dictionary of errors per check"""
         return dict((k, (len(v))) for k, v in self.errors.items())
@@ -70,8 +74,7 @@ class Checker(runner.Runner):
     def show_summary(self) -> bool:
         """Show a summary at the end or not"""
         return bool(
-            not "exiting" in self.errors
-            and (self.args.summary or self.error_count or self.warning_count))
+            not self.exiting and (self.args.summary or self.error_count or self.warning_count))
 
     @property
     def status(self) -> dict:
@@ -175,7 +178,7 @@ class Checker(runner.Runner):
             getattr(self.log, log_type)(f"[{name}] {message}")
         return 1
 
-    def exiting(self):
+    def exit(self):
         return self.error("exiting", ["Keyboard exit"], log_type="fatal")
 
     def get_checks(self) -> Sequence[str]:
@@ -189,10 +192,10 @@ class Checker(runner.Runner):
 
     def on_check_run(self, check: str) -> None:
         """Callback hook called after each check run"""
-        if check in self.errors:
+        if self.exiting:
+            return
+        elif check in self.errors:
             self.log.error(f"[{check}] Check failed")
-        elif "exiting" in self.errors:
-            pass
         elif check in self.warnings:
             self.log.warning(f"[{check}] Check has warnings")
         else:
@@ -218,7 +221,7 @@ class Checker(runner.Runner):
                 getattr(self, f"check_{check}")()
                 self.on_check_run(check)
         except KeyboardInterrupt as e:
-            self.exiting()
+            self.exit()
         finally:
             result = self.on_checks_complete()
         return result
@@ -316,7 +319,10 @@ class AsyncChecker(Checker):
                 await getattr(self, f"check_{check}")()
                 await self.on_check_run(check)
         finally:
-            result = await self.on_checks_complete()
+            if self.exiting:
+                result = 1
+            else:
+                result = await self.on_checks_complete()
         return result
 
     def run(self) -> int:
@@ -325,7 +331,7 @@ class AsyncChecker(Checker):
         except KeyboardInterrupt as e:
             # This needs to be outside the loop to catch the a keyboard interrupt
             # This means that a new loop has to be created to cleanup
-            result = self.exiting()
+            result = self.exit()
             result = asyncio.get_event_loop().run_until_complete(self.on_checks_complete())
             return result
 
