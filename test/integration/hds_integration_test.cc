@@ -280,7 +280,7 @@ transport_socket_matches:
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
                                                     "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+                                                    serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
@@ -335,7 +335,7 @@ transport_socket_matches:
       EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
       EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.{1}.{0}.HealthDiscoveryService",
                                                     "StreamHealthCheck", apiVersion(),
-                                                    /*use_alpha=*/false, serviceNamespace()),
+                                                    serviceNamespace()),
                 hds_stream_->headers().getPathValue());
       EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
     }
