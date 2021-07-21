@@ -40,10 +40,10 @@ message SXG {
 
   // The URI of certificate CBOR file published. Since it is required that the certificate CBOR file
   // be served from the same domain as the SXG document, this should be a relative URI.
-  string cbor_url = 5 [(validate.rules).string = {min_bytes: 1 prefix: "/"}];
+  string cbor_url = 5 [(validate.rules).string = {min_len: 1 prefix: "/"}];
 
   // URL to retrieve validity data for signature, a CBOR map. See specification [here](https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-00#section-3.6)
-  string validity_url = 6 [(validate.rules).string = {min_bytes: 1 prefix: "/"}];
+  string validity_url = 6 [(validate.rules).string = {min_len: 1 prefix: "/"}];
 
   // Header that will be set if it is determined that the client can accept SXG (typically `accept: application/signed-exchange;v=b3)
   // If not set, filter will default to: `x-client-can-accept-sxg`
