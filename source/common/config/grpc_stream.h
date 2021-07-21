@@ -71,7 +71,6 @@ public:
       return;
     }
     control_plane_stats_.connected_state_.set(1);
-    clearCloseStatus();
     callbacks_->onStreamEstablished();
   }
 
@@ -91,6 +90,9 @@ public:
   void onReceiveMessage(ResponseProtoPtr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
+    // Clear here instead of on stream establishment in case streams are immediately closed
+    // repeatedly.
+    clearCloseStatus();
     // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.

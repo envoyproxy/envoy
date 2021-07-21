@@ -150,11 +150,18 @@ TEST_F(GrpcStreamTest, LogClose) {
               Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
   }
 
-  // Successful establishment clears close status.
+  // Successfully receiving a message clears close status.
   {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
     EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
+    EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
+    // Status isn't cleared yet.
+    EXPECT_EQ(grpc_stream_.getCloseStatus().value(),
+              Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded);
+
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    grpc_stream_.onReceiveMessage(std::move(response));
     EXPECT_FALSE(grpc_stream_.getCloseStatus().has_value());
   }
 }
