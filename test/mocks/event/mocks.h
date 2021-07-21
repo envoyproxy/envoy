@@ -67,9 +67,9 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
-                                      uint32_t backlog_size) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port, backlog_size)};
+                                      Network::TcpListenerCallbacks& cb,
+                                      bool bind_to_port) override {
+    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port)};
   }
 
   Network::UdpListenerPtr
@@ -138,7 +138,7 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               bool bind_to_port, uint32_t backlog_size));
+               bool bind_to_port));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                const envoy::config::core::v3::UdpSocketConfig& config));

@@ -57,9 +57,9 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verify that we gracefully handle an invalid pre-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -67,7 +67,6 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
@@ -79,9 +78,9 @@ TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
   test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
 }
 
-// Verify that we gracefully handle an invalid post-bind socket option when using reuse port.
+// Verify that we gracefully handle an invalid post-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
-  // Reserve a port that we can then use on the integration listener with reuse port.
+  // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
   // Do not wait for listeners to start as the listener will fail.
@@ -89,11 +88,26 @@ TEST_P(IntegrationTest, BadPostbindSocketOptionWithReusePort) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->set_reuse_port(true);
     listener->mutable_address()->mutable_socket_address()->set_port_value(
         addr_socket.second->addressProvider().localAddress()->ip()->port());
     auto socket_option = listener->add_socket_options();
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_BOUND);
+    socket_option->set_level(10000);     // Invalid level.
+    socket_option->set_int_value(10000); // Invalid value.
+  });
+  initialize();
+  test_server_->waitForCounterGe("listener_manager.listener_create_failure", 1);
+}
+
+// Verify that we gracefully handle an invalid post-listen socket option.
+TEST_P(IntegrationTest, BadPostListenSocketOption) {
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto socket_option = listener->add_socket_options();
+    socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
     socket_option->set_level(10000);     // Invalid level.
     socket_option->set_int_value(10000); // Invalid value.
   });
