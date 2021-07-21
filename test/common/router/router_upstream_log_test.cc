@@ -84,6 +84,11 @@ public:
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
 
+    cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+    ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef("cluster_0"));
+    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef("cluster_0"));
+    ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
@@ -245,6 +250,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<TestFilter> router_;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
@@ -363,6 +369,28 @@ typed_config:
   // Response trailers:
   // response-trailer-name: response-trailer-val
   EXPECT_EQ(output_.front(), "110 49 41");
+}
+
+// Test UPSTREAM_CLUSTER log formatter.
+TEST_F(RouterUpstreamLogTest, UpstreamCluster) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%UPSTREAM_CLUSTER%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  run();
+
+  EXPECT_EQ(output_.size(), 1U);
+  EXPECT_EQ(output_.front(), "cluster_0");
 }
 
 } // namespace Router
