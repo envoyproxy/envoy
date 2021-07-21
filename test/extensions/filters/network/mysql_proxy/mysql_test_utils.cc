@@ -123,7 +123,7 @@ std::string MySQLTestUtils::encodeMessage(uint32_t packet_len, uint8_t it, uint8
 }
 
 int MySQLTestUtils::bytesOfConnAtrributeLength(
-    const std::vector<std::pair<std::string, std::string>> conn_attrs) {
+    const std::vector<std::pair<std::string, std::string>>& conn_attrs) {
   int64_t total_len = 0;
   for (const auto& kv : conn_attrs) {
     total_len += sizeOfLengthEncodeInteger(kv.first.length());
