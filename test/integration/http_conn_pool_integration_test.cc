@@ -2,8 +2,6 @@
 
 #include "test/integration/http_protocol_integration.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace {
 
