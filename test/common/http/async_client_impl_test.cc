@@ -1570,7 +1570,6 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_EQ(absl::nullopt, route_impl_.routeEntry()->grpcTimeoutOffset());
   EXPECT_TRUE(route_impl_.routeEntry()->opaqueConfig().empty());
   EXPECT_TRUE(route_impl_.routeEntry()->includeVirtualHostRateLimits());
-  EXPECT_TRUE(route_impl_.routeEntry()->metadata().filter_metadata().empty());
   EXPECT_EQ(nullptr,
             route_impl_.routeEntry()->typedMetadata().get<Config::TypedMetadata::Object>("bar"));
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->perFilterConfig("bar"));

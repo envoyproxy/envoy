@@ -114,8 +114,6 @@ public:
 
   void setupMetadata(const std::string& yaml) {
     TestUtility::loadFromYaml(yaml, metadata_);
-    ON_CALL(decoder_callbacks_.route_->route_entry_, metadata())
-        .WillByDefault(testing::ReturnRef(metadata_));
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 

@@ -898,12 +898,6 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
-   * this route.
-   */
-  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
-
-  /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
    * tls context match criteria, nullptr is returned.
    */

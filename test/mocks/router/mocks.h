@@ -388,7 +388,6 @@ public:
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
               (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
