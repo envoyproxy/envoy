@@ -14,7 +14,6 @@ MetadataFormatterFactory::createCommandParserFromProto(const Protobuf::Message&)
 }
 
 ProtobufTypes::MessagePtr MetadataFormatterFactory::createEmptyConfigProto() {
-  // return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   return std::make_unique<envoy::extensions::formatter::metadata::v3::Metadata>();
 }
 
