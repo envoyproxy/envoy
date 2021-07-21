@@ -100,6 +100,18 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
 
+  // Sanitize referer field if exists.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
+    auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+    if (!result.empty()) {
+      Utility::Url url;
+      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+        // A request header shouldn't have multiple referer field.
+        request_headers.remove(Http::CustomHeaders::get().Referer);
+      }
+    }
+  }
+
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
   // our peer to have already properly set XFF, etc.
