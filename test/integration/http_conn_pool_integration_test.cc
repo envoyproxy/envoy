@@ -33,10 +33,12 @@ INSTANTIATE_TEST_SUITE_P(Protocols, HttpConnPoolIntegrationTest,
 TEST_P(HttpConnPoolIntegrationTest, PoolCleanupAfterLocalClose) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Make Envoy close the upstream connection after a single request.
-    bootstrap.mutable_static_resources()
-        ->mutable_clusters(0)
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
         ->mutable_max_requests_per_connection()
         ->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
   });
 
   initialize();
