@@ -43,17 +43,26 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   if (doStatTracking()) {
     chargeStat(headers);
   }
+  if (!do_bridging_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
-  if (!do_bridging_ || end_stream) {
+  response_headers_ = &headers;
+  if (end_stream) {
+    setupHttp1Status(response_headers_.GrpcStatus(), response_headers_.GrpcMessage());
     return Http::FilterHeadersStatus::Continue;
   } else {
-    response_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 }
 
 Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end_stream) {
-  if (!do_bridging_ || end_stream) {
+  if (!do_bridging_){
+    return Http::FilterDataStatus::Continue;
+  }
+
+  if (end_stream) {
+    setupHttp1Status(response_headers_.GrpcStatus(), response_headers_.GrpcMessage());
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.
@@ -67,28 +76,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   }
 
   if (do_bridging_) {
-    // Here we check for grpc-status. If it's not zero, we change the response code. We assume
-    // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
-    // of exception/error that the response was not complete.
-    const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
-    if (grpc_status_header) {
-      uint64_t grpc_status_code;
-      if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
-          grpc_status_code != 0) {
-        response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
-      }
-      response_headers_->setGrpcStatus(grpc_status_header->value().getStringView());
-    }
-
-    const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
-    if (grpc_message_header) {
-      response_headers_->setGrpcMessage(grpc_message_header->value().getStringView());
-    }
-
-    // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
-    // if this is a complete response.
-    response_headers_->setContentLength(
-        encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
+    setupHttp1Status(trailers.GrpcStatus(), trailers.GrpcMessage());
   }
 
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
@@ -102,6 +90,29 @@ void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers)
     return;
   }
   request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
+}
+
+void Http1BridgeFilter::setupHttp1Status(const Http::HeaderEntry* grpc_status, const Http::HeaderEntry* grpc_message){
+  // Here we check for grpc-status. If it's not zero, we change the response code. We assume
+  // that if a reset comes in and we disconnect the HTTP/1.1 client it will raise some type
+  // of exception/error that the response was not complete.
+  if (grpc_status) {
+    uint64_t grpc_status_code;
+    if (!absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) ||
+      grpc_status_code != 0) {
+      response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
+    }
+      response_headers_->setGrpcStatus(grpc_status->value().getStringView());
+  }
+
+  if (grpc_message) {
+    response_headers_->setGrpcMessage(grpc_message->value().getStringView());
+  }
+
+  // Since we are buffering, set content-length so that HTTP/1.1 callers can better determine
+  // if this is a complete response.
+  response_headers_->setContentLength(
+  encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
 }
 
 } // namespace GrpcHttp1Bridge
