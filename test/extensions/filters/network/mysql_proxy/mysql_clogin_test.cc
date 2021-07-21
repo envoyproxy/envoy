@@ -561,41 +561,45 @@ TEST_F(MySQLCLoginTest, MySQLClientLogin41IncompleteAuthPluginName) {
 class MySQL41LoginConnAttrTest : public MySQLCLoginTest {
 public:
   MySQL41LoginConnAttrTest() {
-    login_encode = MySQLCLoginTest::getClientLogin(CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB |
-                                                   CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
-    incomplete_base_len = sizeof(login_encode.getClientCap()) +
-                          sizeof(login_encode.getMaxPacket()) + sizeof(login_encode.getCharset()) +
-                          UNSET_BYTES + login_encode.getUsername().size() + 1 +
-                          login_encode.getAuthResp().size() + 1 + login_encode.getDb().size() + 1 +
-                          login_encode.getAuthPluginName().length() + 1;
+    login_encode_ = MySQLCLoginTest::getClientLogin(CLIENT_PROTOCOL_41 | CLIENT_CONNECT_WITH_DB |
+                                                    CLIENT_PLUGIN_AUTH | CLIENT_CONNECT_ATTRS);
+    incomplete_base_len_ =
+        sizeof(login_encode_.getClientCap()) + sizeof(login_encode_.getMaxPacket()) +
+        sizeof(login_encode_.getCharset()) + UNSET_BYTES + login_encode_.getUsername().size() + 1 +
+        login_encode_.getAuthResp().size() + 1 + login_encode_.getDb().size() + 1 +
+        login_encode_.getAuthPluginName().length() + 1;
   }
+
   void prepareLoginDecode(int delta_len = 0) {
     Buffer::OwnedImpl buffer;
-    login_encode.encode(buffer);
-    int incomplete_len = incomplete_base_len + delta_len;
+    login_encode_.encode(buffer);
+    int incomplete_len = incomplete_base_len_ + delta_len;
     Buffer::OwnedImpl decode_data(buffer.toString().data(), incomplete_len);
 
-    login_decode.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
+    login_decode_.decode(decode_data, CHALLENGE_SEQ_NUM, decode_data.length());
   }
 
   void checkLoginDecode(const std::function<void()>& additional_check = nullptr) {
-    EXPECT_TRUE(login_decode.isConnectWithDb());
-    EXPECT_EQ(login_decode.getClientCap(), login_encode.getClientCap());
-    EXPECT_EQ(login_decode.getExtendedClientCap(), login_decode.getExtendedClientCap());
-    EXPECT_EQ(login_decode.getMaxPacket(), login_encode.getMaxPacket());
-    EXPECT_EQ(login_decode.getCharset(), login_encode.getCharset());
-    EXPECT_EQ(login_decode.getUsername(), login_encode.getUsername());
-    EXPECT_EQ(login_decode.getAuthResp(), login_encode.getAuthResp());
-    EXPECT_EQ(login_decode.getDb(), login_encode.getDb());
-    EXPECT_EQ(login_decode.getAuthPluginName(), login_encode.getAuthPluginName());
-    if (additional_check) {
+    EXPECT_TRUE(login_decode_.isConnectWithDb());
+    EXPECT_EQ(login_decode_.getClientCap(), login_encode_.getClientCap());
+    EXPECT_EQ(login_decode_.getExtendedClientCap(), login_decode_.getExtendedClientCap());
+    EXPECT_EQ(login_decode_.getMaxPacket(), login_encode_.getMaxPacket());
+    EXPECT_EQ(login_decode_.getCharset(), login_encode_.getCharset());
+    EXPECT_EQ(login_decode_.getUsername(), login_encode_.getUsername());
+    EXPECT_EQ(login_decode_.getAuthResp(), login_encode_.getAuthResp());
+    EXPECT_EQ(login_decode_.getDb(), login_encode_.getDb());
+    EXPECT_EQ(login_decode_.getAuthPluginName(), login_encode_.getAuthPluginName());
+    if (additional_check != nullptr) {
       additional_check();
     }
   }
+  const ClientLogin& loginEncode() const { return login_encode_; }
+  const ClientLogin& loginDecode() const { return login_decode_; }
 
-  ClientLogin login_encode;
-  ClientLogin login_decode;
-  int incomplete_base_len;
+private:
+  ClientLogin login_encode_;
+  ClientLogin login_decode_;
+  int incomplete_base_len_;
 };
 
 /*
@@ -604,7 +608,7 @@ public:
  */
 TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrLength) {
   prepareLoginDecode();
-  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
+  checkLoginDecode([&]() { EXPECT_EQ(loginDecode().getConnectionAttribute().size(), 0); });
 }
 
 /*
@@ -613,9 +617,9 @@ TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrLength) {
  */
 TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKeyLength) {
   prepareLoginDecode(
-      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()));
+      MySQLTestUtils::bytesOfConnAtrributeLength(loginEncode().getConnectionAttribute()));
 
-  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
+  checkLoginDecode([&]() { EXPECT_EQ(loginDecode().getConnectionAttribute().size(), 0); });
 }
 
 /*
@@ -624,10 +628,10 @@ TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKeyLength) 
  */
 TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKey) {
   prepareLoginDecode(
-      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
+      MySQLTestUtils::bytesOfConnAtrributeLength(loginEncode().getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          login_encode.getConnectionAttribute()[0].first.length()));
-  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
+          loginEncode().getConnectionAttribute()[0].first.length()));
+  checkLoginDecode([&]() { EXPECT_EQ(loginDecode().getConnectionAttribute().size(), 0); });
 }
 
 /*
@@ -636,11 +640,11 @@ TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrKey) {
  */
 TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrValLength) {
   prepareLoginDecode(
-      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
+      MySQLTestUtils::bytesOfConnAtrributeLength(loginEncode().getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          login_encode.getConnectionAttribute()[0].first.length()) +
-      login_encode.getConnectionAttribute()[0].first.length());
-  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
+          loginEncode().getConnectionAttribute()[0].first.length()) +
+      loginEncode().getConnectionAttribute()[0].first.length());
+  checkLoginDecode([&]() { EXPECT_EQ(loginDecode().getConnectionAttribute().size(), 0); });
 }
 
 /*
@@ -649,13 +653,13 @@ TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrValLength) 
  */
 TEST_F(MySQL41LoginConnAttrTest, MySQLClientLogin41IncompleteConnAttrVal) {
   prepareLoginDecode(
-      MySQLTestUtils::bytesOfConnAtrributeLength(login_encode.getConnectionAttribute()) +
+      MySQLTestUtils::bytesOfConnAtrributeLength(loginEncode().getConnectionAttribute()) +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          login_encode.getConnectionAttribute()[0].first.length()) +
-      login_encode.getConnectionAttribute()[0].first.length() +
+          loginEncode().getConnectionAttribute()[0].first.length()) +
+      loginEncode().getConnectionAttribute()[0].first.length() +
       MySQLTestUtils::sizeOfLengthEncodeInteger(
-          login_encode.getConnectionAttribute()[0].second.length()));
-  checkLoginDecode([&]() { EXPECT_EQ(login_decode.getConnectionAttribute().size(), 0); });
+          loginEncode().getConnectionAttribute()[0].second.length()));
+  checkLoginDecode([&]() { EXPECT_EQ(loginDecode().getConnectionAttribute().size(), 0); });
 }
 
 /*
