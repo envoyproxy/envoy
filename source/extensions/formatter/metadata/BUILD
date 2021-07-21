@@ -9,9 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-# Access log formatter that strips query string from request path
-# Public docs: docs/root/TODO(tsaarni)
-
 envoy_cc_library(
     name = "metadata_lib",
     srcs = ["metadata.cc"],
@@ -29,6 +26,6 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//source/extensions/formatter/metadata:metadata_lib",
-        "@envoy_api//envoy/extensions/formatter/metadata/v3:pkg_cc_proto"
+        "@envoy_api//envoy/extensions/formatter/metadata/v3:pkg_cc_proto",
     ],
 )

@@ -444,6 +444,8 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+.. _config_access_log_format_dynamic_metadata:
+
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
@@ -472,6 +474,8 @@ The following command operators are supported:
     when the referenced key is a simple value. If the referenced key is a struct or list value, a
     JSON struct or list is rendered. Structs and lists may be nested. In any event, the maximum
     length is ignored
+
+.. _config_access_log_format_cluster_metadata:
 
 %CLUSTER_METADATA(NAMESPACE:KEY*):Z%
   HTTP

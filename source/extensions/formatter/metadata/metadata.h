@@ -43,7 +43,11 @@ public:
 
 private:
   static const size_t MetadataFormatterParamStart{sizeof("METADATA(") - 1};
-    std::map<std::string, std::function<::Envoy::Formatter::FormatterProviderPtr(const std::string& filter_namespace, const std::vector<std::string>& path, absl::optional<size_t> max_length)>> metadata_formatter_providers_;
+  std::map<std::string,
+           std::function<::Envoy::Formatter::FormatterProviderPtr(
+               const std::string& filter_namespace, const std::vector<std::string>& path,
+               absl::optional<size_t> max_length)>>
+      metadata_formatter_providers_;
 };
 
 } // namespace Formatter

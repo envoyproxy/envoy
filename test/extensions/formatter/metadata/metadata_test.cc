@@ -71,15 +71,14 @@ TEST(SubstitutionFormatterTest, DISABLED_StructFormatterDynamicMetadataTest) {
 class MetadataFormatterTest : public ::testing::Test {
 public:
   MetadataFormatterTest() {
-  ProtobufWkt::Struct struct_obj;
-  auto& fields_map = *struct_obj.mutable_fields();
-  fields_map["test_key"] = ValueUtil::stringValue("test_value");
-  (*metadata_.mutable_filter_metadata())["dynamic.test"] = struct_obj;
-
+    ProtobufWkt::Struct struct_obj;
+    auto& fields_map = *struct_obj.mutable_fields();
+    fields_map["test_key"] = ValueUtil::stringValue("test_value");
+    (*metadata_.mutable_filter_metadata())["dynamic.test"] = struct_obj;
   }
 
   ::Envoy::Formatter::FormatterPtr getTestMetadataFormatter(std::string type) {
-  const std::string yaml = fmt::format(R"EOF(
+    const std::string yaml = fmt::format(R"EOF(
   text_format_source:
     inline_string: "%METADATA({}:dynamic.test:test_key)%"
   formatters:
@@ -87,10 +86,9 @@ public:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.formatter.metadata.v3.Metadata
 )EOF",
-  type);
-  TestUtility::loadFromYaml(yaml, config_);
-  return 
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+                                         type);
+    TestUtility::loadFromYaml(yaml, config_);
+    return Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_{
@@ -111,8 +109,7 @@ TEST_F(MetadataFormatterTest, NonExistingMetadataProvider) {
   EXPECT_THROW(getTestMetadataFormatter("BLAH"), EnvoyException);
 }
 
-
-// Full and extensive testing of Dynamic Metadata formatter is in 
+// Full and extensive testing of Dynamic Metadata formatter is in
 // test/common/formatter/substitution_formatter_test.cc file.
 // Here just make sure that METADATA(DYNAMIC .... returns
 // Dynamic Metadata formatter and run simple test.
@@ -130,8 +127,9 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
 #endif
 
   // Make sure that formatter accesses dynamic metadata.
-  //EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata_));
-  EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata_));
+  // EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata_));
+  EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(metadata_));
 
 #if 0
   auto formatter =
@@ -139,9 +137,8 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
 #endif
 
   EXPECT_EQ("test_value",
-  getTestMetadataFormatter("DYNAMIC")->format(request_headers_, response_headers_,
-                                               response_trailers_, stream_info_, body_));
-
+            getTestMetadataFormatter("DYNAMIC")->format(request_headers_, response_headers_,
+                                                        response_trailers_, stream_info_, body_));
 }
 
 TEST_F(MetadataFormatterTest, ClusterMetadata) {
@@ -162,7 +159,8 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   EXPECT_CALL(**cluster, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
   EXPECT_CALL(stream_info_, upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
-//  EXPECT_CALL(testing::Const(stream_info_), upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
+  //  EXPECT_CALL(testing::Const(stream_info_),
+  //  upstreamClusterInfo()).WillRepeatedly(testing::ReturnPointee(cluster));
 
 #if 0
   auto formatter =
@@ -170,9 +168,8 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
 #endif
 
   EXPECT_EQ("test_value",
-  getTestMetadataFormatter("CLUSTER")->format(request_headers_, response_headers_,
-                                               response_trailers_, stream_info_, body_));
-
+            getTestMetadataFormatter("CLUSTER")->format(request_headers_, response_headers_,
+                                                        response_trailers_, stream_info_, body_));
 }
 
 TEST_F(MetadataFormatterTest, RouteMetadata) {
@@ -196,7 +193,8 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
   NiceMock<Router::MockRouteEntry> route;
   EXPECT_CALL(route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
   EXPECT_CALL(stream_info_, routeEntry()).WillRepeatedly(testing::Return(&route));
-  //EXPECT_CALL(testing::Const(stream_info_), routeEntry()).WillRepeatedly(testing::Return(&route));
+  // EXPECT_CALL(testing::Const(stream_info_),
+  // routeEntry()).WillRepeatedly(testing::Return(&route));
 #if 0
 
   auto formatter =
@@ -204,9 +202,8 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
 #endif
 
   EXPECT_EQ("test_value",
-  getTestMetadataFormatter("ROUTE")->format(request_headers_, response_headers_,
-                                               response_trailers_, stream_info_, body_));
-
+            getTestMetadataFormatter("ROUTE")->format(request_headers_, response_headers_,
+                                                      response_trailers_, stream_info_, body_));
 }
 
 TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
@@ -231,17 +228,16 @@ TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
   NiceMock<Router::MockRouteEntry> route;
   EXPECT_CALL(route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
   EXPECT_CALL(stream_info_, routeEntry()).WillRepeatedly(testing::Return(nullptr));
-  //EXPECT_CALL(testing::Const(stream_info_), routeEntry()).WillRepeatedly(testing::Return(&route));
+  // EXPECT_CALL(testing::Const(stream_info_),
+  // routeEntry()).WillRepeatedly(testing::Return(&route));
 #if 0
 
   auto formatter =
       Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
 #endif
 
-  EXPECT_EQ("-",
-  getTestMetadataFormatter("ROUTE")->format(request_headers_, response_headers_,
-                                               response_trailers_, stream_info_, body_));
-
+  EXPECT_EQ("-", getTestMetadataFormatter("ROUTE")->format(
+                     request_headers_, response_headers_, response_trailers_, stream_info_, body_));
 }
 
 } // namespace Formatter

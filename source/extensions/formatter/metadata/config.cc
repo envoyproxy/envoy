@@ -13,10 +13,9 @@ MetadataFormatterFactory::createCommandParserFromProto(const Protobuf::Message&)
   return std::make_unique<MetadataFormatterCommandParser>();
 }
 
-
 ProtobufTypes::MessagePtr MetadataFormatterFactory::createEmptyConfigProto() {
-//return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()}; 
-return std::make_unique<envoy::extensions::formatter::metadata::v3::Metadata>();
+  // return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  return std::make_unique<envoy::extensions::formatter::metadata::v3::Metadata>();
 }
 
 std::string MetadataFormatterFactory::name() const { return "envoy.formatter.metadata"; }
