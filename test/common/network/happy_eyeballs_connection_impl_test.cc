@@ -29,16 +29,17 @@ public:
         .WillOnce(testing::InvokeWithoutArgs(
             this, &HappyEyeballsConnectionImplTest::createNextConnection));
 
-    // This timer will be returned and armed as the happy eyeballs connection creates the next
-    // connection timer.
-    EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-    EXPECT_CALL(*failover_timer_, enabled()).WillRepeatedly(Return(true));
     next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
     impl_ = std::make_unique<HappyEyeballsConnectionImpl>(
         dispatcher_, address_list_, Address::InstanceConstSharedPtr(), transport_socket_factory_,
         transport_socket_options_, options_);
   }
 
+  // Called by the disptacher to return a MockClientConnection. In order to allow expections to
+  // be set on this connection, the object must exist. So instead of allocating a new
+  // MockClientConnection in this method, it instead pops the first entry from
+  // next_connections_ and returns that. It also saves a pointer to that connection into
+  // created_connections_ so that it can be interacted with after it has been returned.
   MockClientConnection* createNextConnection() {
     created_connections_.push_back(next_connections_.front().release());
     next_connections_.pop_front();
@@ -48,13 +49,43 @@ public:
     return created_connections_.back();
   }
 
-  void connectFirstAttempt() {
+  // Calls connect() on the impl and verifies that the timer is started.
+  void startConnect() {
+    EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
+    EXPECT_CALL(*failover_timer_, enabled()).WillRepeatedly(Return(true));
     EXPECT_CALL(*created_connections_[0], connect());
     impl_->connect();
+  }
+
+  // Connects the first (and only attempt).
+  void connectFirstAttempt() {
+    startConnect();
 
     EXPECT_CALL(*failover_timer_, disableTimer());
     EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
     connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  }
+
+  // First the failover timer and creates the next connection.
+  void timeoutAndStartNextAttempt() {
+    EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
+    EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
+        .WillOnce(
+            testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
+    EXPECT_CALL(*next_connections_.back(), connect());
+    EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
+    failover_timer_->invokeCallback();
+  }
+
+  // Have the second connection attempt succeed which should disable the fallback timer,
+  // and close the first attempt.
+  void connectSecondAttempt() {
+    ASSERT_EQ(2, created_connections_.size());
+    EXPECT_CALL(*failover_timer_, disableTimer());
+    EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
+    EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
+    EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
+    connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
   }
 
 protected:
@@ -71,23 +102,14 @@ protected:
 };
 
 TEST_F(HappyEyeballsConnectionImplTest, Connect) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
   // Let the second attempt timeout to start the third and final attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
@@ -102,8 +124,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeout) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   // When the first connection attempt fails, the next attempt will be immediately
   // started and the timer will be armed for the third attempt.
@@ -121,8 +142,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectFirstSuccess) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -130,19 +150,12 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFirstSuccess) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
+  // Connect the first attempt and verify that the second is closed.
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
@@ -155,19 +168,12 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenFirstSuccess) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
+  // Connect the second attempt and verify that the first is closed.
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -180,18 +186,10 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondSuccess) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSucceeds) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[1], _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
   // When the second attempt fails, the third and final attempt will be started.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
@@ -200,10 +198,11 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectTimeoutThenSecondFailsAndFirstSuc
       .WillOnce(
           testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
   EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, disableTimer());
   // Since there are no more address to connect to, the fallback timer will not
   // be rescheduled.
+  EXPECT_CALL(*failover_timer_, disableTimer());
   ASSERT_EQ(2, created_connections_.size());
+
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
   connection_callbacks_[1]->onEvent(ConnectionEvent::RemoteClose);
@@ -217,8 +216,7 @@ TEST_F(HappyEyeballsConnectionImplTest, Id) {
   uint64_t id = ConnectionImpl::nextGlobalIdForTest() - 1;
   EXPECT_EQ(id, impl_->id());
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_EQ(id, impl_->id());
 }
@@ -227,26 +225,14 @@ TEST_F(HappyEyeballsConnectionImplTest, NoDelay) {
   EXPECT_CALL(*created_connections_[0], noDelay(true));
   impl_->noDelay(true);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // noDelay() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), noDelay(true));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that noDelay calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], noDelay(false));
@@ -257,26 +243,14 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
   EXPECT_CALL(*created_connections_[0], detectEarlyCloseWhenReadDisabled(true));
   impl_->detectEarlyCloseWhenReadDisabled(true);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // detectEarlyCloseWhenReadDisabled() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), detectEarlyCloseWhenReadDisabled(true));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that detectEarlyCloseWhenReadDisabled() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], detectEarlyCloseWhenReadDisabled(false));
@@ -284,25 +258,16 @@ TEST_F(HappyEyeballsConnectionImplTest, DetectEarlyCloseWhenReadDisabled) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, CloseDuringAttempt) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*created_connections_[1], close(ConnectionCloseType::NoFlush));
-
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -320,26 +285,14 @@ TEST_F(HappyEyeballsConnectionImplTest, AddReadFilter) {
   // The filter will be captured by the impl and not passed to the connection until it completes.
   impl_->addReadFilter(filter);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  // addReadFilter() should be applied to the newly created connection.
+  // addReadFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addReadFilter(filter));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   ReadFilterSharedPtr filter2 = std::make_shared<MockReadFilter>();
   filter2->initializeReadFilterCallbacks(callbacks);
@@ -353,27 +306,15 @@ TEST_F(HappyEyeballsConnectionImplTest, AddConnectionCallbacks) {
   // The filter will be captured by the impl and not passed to the connection until it completes.
   impl_->addConnectionCallbacks(callbacks);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  // addConnectionCallbacks() should be applied to the newly created connection.
+  // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addConnectionCallbacks(_))
       .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   MockConnectionCallbacks callbacks2;
   // Verify that addConnectionCallbacks() calls are delegated to the remaining connection.
@@ -389,17 +330,14 @@ TEST_F(HappyEyeballsConnectionImplTest, RemoveConnectionCallbacks) {
   impl_->addConnectionCallbacks(callbacks);
   impl_->addConnectionCallbacks(callbacks2);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   impl_->removeConnectionCallbacks(callbacks);
 
-  // addConnectionCallbacks() should be applied to the newly created connection.
+  // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[0], addConnectionCallbacks(_))
       .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); }));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_))
@@ -413,8 +351,7 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnect) {
 
   impl_->write(data, end_stream);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -435,8 +372,7 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteTwiceBeforeConnect) {
   impl_->write(data1, false);
   impl_->write(data2, true);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
@@ -451,29 +387,17 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteTwiceBeforeConnect) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*created_connections_[0], setBufferLimits(42));
   impl_->setBufferLimits(42);
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // setBufferLimits() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), setBufferLimits(42));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], setBufferLimits(420));
@@ -481,8 +405,7 @@ TEST_F(HappyEyeballsConnectionImplTest, SetBufferLimits) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   Buffer::OwnedImpl data("hello world");
   bool end_stream = false;
@@ -492,28 +415,21 @@ TEST_F(HappyEyeballsConnectionImplTest, WriteBeforeConnectOverLimit) {
 
   impl_->write(data, end_stream);
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*created_connections_[0], write(_, _))
       .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_FALSE(end_stream);
-        ;
       }));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, AboveHighWatermark) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_FALSE(impl_->aboveHighWatermark());
 
-  // The call to write() will be replayed on the underlying connection.
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   // Delegates to the connection once connected.
   EXPECT_CALL(*created_connections_[0], aboveHighWatermark()).WillOnce(Return(true));
@@ -534,27 +450,15 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats) {
       .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
   impl_->setConnectionStats(cs);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // setConnectionStats() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), setConnectionStats(_))
       .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that setConnectionStats calls are delegated to the remaining connection.
   Connection::ConnectionStats cs2 = {rx_total,   rx_current,   tx_total,
@@ -565,30 +469,24 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats) {
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, State) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*created_connections_[0], state()).WillRepeatedly(Return(Connection::State::Open));
   EXPECT_EQ(Connection::State::Open, impl_->state());
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], state()).WillOnce(Return(Connection::State::Closing));
   EXPECT_EQ(Connection::State::Closing, impl_->state());
 }
 
 TEST_F(HappyEyeballsConnectionImplTest, Connecting) {
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   EXPECT_CALL(*created_connections_[0], connecting()).WillRepeatedly(Return(true));
   EXPECT_TRUE(impl_->connecting());
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  connection_callbacks_[0]->onEvent(ConnectionEvent::Connected);
+  connectFirstAttempt();
 
   EXPECT_CALL(*created_connections_[0], connecting()).WillRepeatedly(Return(false));
   EXPECT_FALSE(impl_->connecting());
@@ -601,26 +499,14 @@ TEST_F(HappyEyeballsConnectionImplTest, AddWriteFilter) {
   // The filter will be captured by the impl and not passed to the connection until it completes.
   impl_->addWriteFilter(filter);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  // addWriteFilter() should be applied to the newly created connection.
+  // addWriteFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addWriteFilter(filter));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   WriteFilterSharedPtr filter2 = std::make_shared<MockWriteFilter>();
   filter2->initializeWriteFilterCallbacks(callbacks);
@@ -648,26 +534,14 @@ TEST_F(HappyEyeballsConnectionImplTest, AddFilter) {
   // The filter will be captured by the impl and not passed to the connection until it completes.
   impl_->addFilter(filter);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  // addFilter() should be applied to the newly created connection.
+  // addFilter() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addFilter(filter));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   FilterSharedPtr filter2 = std::make_shared<MockFilter>();
   filter2->initializeReadFilterCallbacks(read_callbacks);
@@ -694,26 +568,14 @@ TEST_F(HappyEyeballsConnectionImplTest, AddBytesSentCallback) {
   // The filter will be captured by the impl and not passed to the connection until it completes.
   impl_->addBytesSentCallback(callback);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  // addBytesSentCallback() should be applied to the newly created connection.
+  // addBytesSentCallback() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], addBytesSentCallback(_));
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   Connection::BytesSentCb callback2 = [](uint64_t) { return true; };
   // Verify that addBytesSentCallback() calls are delegated to the remaining connection.
@@ -733,26 +595,14 @@ TEST_F(HappyEyeballsConnectionImplTest, EnableHalfClose) {
   EXPECT_CALL(*created_connections_[0], enableHalfClose(true));
   impl_->enableHalfClose(true);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // enableHalfClose() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), enableHalfClose(true));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that enableHalfClose calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], enableHalfClose(false));
@@ -787,18 +637,10 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadDisable) {
   // The disables will be captured by the impl and not passed to the connection until it completes.
   impl_->readDisable(true);
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
   // The disables will be captured by the impl and not passed to the connection until it completes.
   impl_->readDisable(true);
@@ -806,13 +648,9 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadDisable) {
   // Read disable count should now be 2.
   impl_->readDisable(false);
 
-  // readDisable() should be applied to the newly created connection.
+  // readDisable() should be applied to the now final connection.
   EXPECT_CALL(*created_connections_[1], readDisable(true)).Times(2);
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that addBytesSentCallback() calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], readDisable(false));
@@ -824,8 +662,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ReadEnabled) {
   impl_->readDisable(true); // Disable count 1.
   EXPECT_FALSE(impl_->readEnabled());
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
   impl_->readDisable(true); // Disable count 2
   EXPECT_FALSE(impl_->readEnabled());
@@ -846,30 +683,18 @@ TEST_F(HappyEyeballsConnectionImplTest, StartSecureTransport) {
   EXPECT_CALL(*created_connections_[0], startSecureTransport()).WillOnce(Return(true));
   EXPECT_TRUE(impl_->startSecureTransport());
 
-  EXPECT_CALL(*created_connections_[0], connect());
-  impl_->connect();
+  startConnect();
 
-  // Let the first attempt timeout to start the second attempt.
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
-  EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
-      .WillOnce(
-          testing::InvokeWithoutArgs(this, &HappyEyeballsConnectionImplTest::createNextConnection));
-  EXPECT_CALL(*next_connections_.back(), connect());
   // startSecureTransport() should be applied to the newly created connection.
   EXPECT_CALL(*next_connections_.back(), startSecureTransport()).WillOnce(Return(true));
-  EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
-  failover_timer_->invokeCallback();
+  timeoutAndStartNextAttempt();
 
   EXPECT_CALL(*created_connections_[0], startSecureTransport()).WillOnce(Return(false));
   EXPECT_CALL(*created_connections_[1], startSecureTransport()).WillOnce(Return(true));
   EXPECT_FALSE(impl_->startSecureTransport());
 
-  EXPECT_CALL(*failover_timer_, disableTimer());
-  EXPECT_CALL(*created_connections_[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
-  EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
-  connection_callbacks_[1]->onEvent(ConnectionEvent::Connected);
+  connectSecondAttempt();
 
   // Verify that startSecureTransport calls are delegated to the remaining connection.
   EXPECT_CALL(*created_connections_[1], startSecureTransport()).WillOnce(Return(false));
