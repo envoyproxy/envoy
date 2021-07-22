@@ -45,9 +45,9 @@ Removed Config or Runtime
 New Features
 ------------
 
-* router: added functionality for filter metadata-based scope key derivation in :ref:`ScopedRoutes <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes>`.
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
+* router: added functionality for filter metadata-based scope key derivation in :ref:`ScopedRoutes <envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.ScopedRoutes>`.
 
 Deprecated
 ----------
