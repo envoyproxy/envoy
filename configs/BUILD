@@ -11,6 +11,8 @@ envoy_package()
 
 exports_files([
     "google-vrp/envoy-edge.yaml",
+    "envoyproxy_io_proxy.yaml",
+    "google_com_http3_upstream_proxy.yaml",
 ])
 
 py_binary(

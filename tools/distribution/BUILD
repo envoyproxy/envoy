@@ -20,15 +20,6 @@ envoy_py_library(
 )
 
 envoy_py_binary(
-    name = "tools.distribution.sign",
-    deps = [
-        "//tools/base:runner",
-        "//tools/base:utils",
-        "//tools/gpg:identity",
-    ],
-)
-
-envoy_py_binary(
     name = "tools.distribution.push",
     deps = [
         "//tools/base:runner",
