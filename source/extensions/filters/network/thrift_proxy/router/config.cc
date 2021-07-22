@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/shadow_writer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +18,13 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(proto_config);
 
-  return [&context, stat_prefix](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(
-        std::make_shared<Router>(context.clusterManager(), stat_prefix, context.scope()));
+  auto shadow_writer = std::make_shared<ShadowWriterImpl>(context.clusterManager(), stat_prefix,
+                                                          context.scope(), context.dispatcher());
+
+  return [&context, stat_prefix,
+          shadow_writer](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addDecoderFilter(std::make_shared<Router>(
+        context.clusterManager(), stat_prefix, context.scope(), context.runtime(), *shadow_writer));
   };
 }
 

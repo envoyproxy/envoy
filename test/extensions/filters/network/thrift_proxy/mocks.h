@@ -14,6 +14,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -321,6 +322,17 @@ public:
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_entry_;
 };
 
+class MockRequestMirrorPolicy : public RequestMirrorPolicy {
+public:
+  MockRequestMirrorPolicy(const std::string& cluster_name);
+  ~MockRequestMirrorPolicy() override;
+
+  MOCK_METHOD(const std::string&, clusterName, (), (const));
+  MOCK_METHOD(bool, enabled, (Runtime::Loader&), (const));
+
+  std::string cluster_name_;
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -333,10 +345,13 @@ public:
   MOCK_METHOD(RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(bool, stripServiceName, (), (const));
   MOCK_METHOD(const Http::LowerCaseString&, clusterHeader, (), (const));
+  MOCK_METHOD(const std::vector<std::shared_ptr<RequestMirrorPolicy>>&, requestMirrorPolicies, (),
+              (const));
 
   std::string cluster_name_{"fake_cluster"};
   Http::LowerCaseString cluster_header_{""};
   NiceMock<MockRateLimitPolicy> rate_limit_policy_;
+  std::vector<std::shared_ptr<RequestMirrorPolicy>> policies_;
 };
 
 class MockRoute : public Route {
@@ -348,6 +363,77 @@ public:
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
 
   NiceMock<MockRouteEntry> route_entry_;
+};
+
+class MockShadowWriter : public ShadowWriter {
+public:
+  MockShadowWriter();
+  ~MockShadowWriter() override;
+
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
+  MOCK_METHOD(std::string&, statPrefix, (), (const));
+  MOCK_METHOD(Stats::Scope&, scope, (), ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
+  MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
+              (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());
+
+  absl::optional<std::reference_wrapper<ShadowRouterHandle>> router_handle_{absl::nullopt};
+};
+
+class MockRequestOwner : public RequestOwner {
+public:
+  MockRequestOwner(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+                   Stats::Scope& scope);
+  ~MockRequestOwner() override;
+
+  MOCK_METHOD(Tcp::ConnectionPool::UpstreamCallbacks&, upstreamCallbacks, (), ());
+  MOCK_METHOD(Buffer::OwnedImpl&, buffer, (), ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
+  MOCK_METHOD(void, addSize, (uint64_t), ());
+  MOCK_METHOD(void, continueDecoding, (), ());
+  MOCK_METHOD(void, resetDownstreamConnection, (), ());
+  MOCK_METHOD(void, sendLocalReply, (const ThriftProxy::DirectResponse& response, bool end_stream),
+              ());
+  MOCK_METHOD(void, recordResponseDuration, (uint64_t value, Stats::Histogram::Unit unit), ());
+
+  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr), ());
+  MOCK_METHOD(FilterStatus, transportEnd, (), ());
+  MOCK_METHOD(FilterStatus, messageEnd, (), ());
+  MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data), ());
+  MOCK_METHOD(FilterStatus, structBegin, (absl::string_view name), ());
+  MOCK_METHOD(FilterStatus, structEnd, (), ());
+  MOCK_METHOD(FilterStatus, fieldBegin,
+              (absl::string_view name, FieldType& field_type, int16_t& field_id), ());
+  MOCK_METHOD(FilterStatus, fieldEnd, (), ());
+  MOCK_METHOD(FilterStatus, boolValue, (bool& value), ());
+  MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value), ());
+  MOCK_METHOD(FilterStatus, int16Value, (int16_t & value), ());
+  MOCK_METHOD(FilterStatus, int32Value, (int32_t & value), ());
+  MOCK_METHOD(FilterStatus, int64Value, (int64_t & value), ());
+  MOCK_METHOD(FilterStatus, doubleValue, (double& value), ());
+  MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value), ());
+  MOCK_METHOD(FilterStatus, mapBegin, (FieldType & key_type, FieldType& value_type, uint32_t& size),
+              ());
+  MOCK_METHOD(FilterStatus, mapEnd, (), ());
+  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size), ());
+  MOCK_METHOD(FilterStatus, listEnd, (), ());
+  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size), ());
+  MOCK_METHOD(FilterStatus, setEnd, (), ());
+};
+
+class MockShadowRouter : public ShadowRouterHandle {
+public:
+  MockShadowRouter();
+  ~MockShadowRouter() override;
+
+  MOCK_METHOD(void, onRouterDestroy, (), ());
+  MOCK_METHOD(bool, waitingForConnection, (), (const));
+  MOCK_METHOD(RequestOwner&, requestOwner, (), ());
+
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  std::string stat_prefix_{"test"};
+  NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  std::shared_ptr<NiceMock<MockRequestOwner>> request_owner_;
 };
 
 } // namespace Router

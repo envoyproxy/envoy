@@ -126,15 +126,37 @@ MockRateLimitPolicy::MockRateLimitPolicy() {
 }
 MockRateLimitPolicy::~MockRateLimitPolicy() = default;
 
+MockRequestMirrorPolicy::MockRequestMirrorPolicy(const std::string& cluster_name)
+    : cluster_name_(cluster_name) {}
+MockRequestMirrorPolicy::~MockRequestMirrorPolicy() = default;
+
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, clusterHeader()).WillByDefault(ReturnRef(cluster_header_));
+  ON_CALL(*this, requestMirrorPolicies()).WillByDefault(ReturnRef(policies_));
 }
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() = default;
+
+MockShadowWriter::MockShadowWriter() {
+  ON_CALL(*this, submit(_, _, _, _)).WillByDefault(Return(router_handle_));
+}
+MockShadowWriter::~MockShadowWriter() = default;
+
+MockRequestOwner::MockRequestOwner(Upstream::ClusterManager& cluster_manager,
+                                   const std::string& stat_prefix, Stats::Scope& scope)
+    : RequestOwner(cluster_manager, stat_prefix, scope) {}
+MockRequestOwner::~MockRequestOwner() = default;
+
+MockShadowRouter::MockShadowRouter() {
+  request_owner_ =
+      std::make_shared<NiceMock<MockRequestOwner>>(cluster_manager_, stat_prefix_, scope_);
+  ON_CALL(*this, requestOwner()).WillByDefault(ReturnRef(*request_owner_));
+}
+MockShadowRouter::~MockShadowRouter() = default;
 
 } // namespace Router
 } // namespace ThriftProxy

@@ -47,8 +47,8 @@ public:
     return *metadata_;
   }
 
-  std::unique_ptr<ThriftProxy::ConfigImpl> config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<ThriftProxy::ConfigImpl> config_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
   MessageMetadataSharedPtr metadata_;
 };

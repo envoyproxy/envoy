@@ -90,7 +90,8 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
+                                       context_.runtime(), shadow_writer_);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -353,6 +354,7 @@ public:
   NiceMock<Upstream::MockHostDescription>* host_{};
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
+  MockShadowWriter shadow_writer_;
   RouteConstSharedPtr route_ptr_;
   std::unique_ptr<Router> router_;
 
@@ -1385,6 +1387,47 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, ShadowRequests) {
+  initializeRouter();
+
+  // Set up policies.
+  const std::vector<std::string> shadow_clusters = {"shadow_cluster_1", "shadow_cluster_2"};
+  for (int i = 0; i < 2; ++i) {
+    auto policy = std::make_shared<MockRequestMirrorPolicy>(shadow_clusters[i]);
+    EXPECT_CALL(*policy, clusterName()).WillOnce(ReturnRef(shadow_clusters[i]));
+    EXPECT_CALL(*policy, enabled(_)).WillOnce(Return(true));
+    route_entry_.policies_.push_back(policy);
+  }
+
+  // Set up shadow requests.
+  std::vector<std::shared_ptr<MockShadowRouter>> shadow_routers;
+  for (int i = 0; i < 2; ++i) {
+    auto shadow_router = std::make_shared<NiceMock<MockShadowRouter>>();
+    EXPECT_CALL(*shadow_router, onRouterDestroy());
+    shadow_routers.push_back(std::move(shadow_router));
+  }
+
+  EXPECT_CALL(shadow_writer_, submit(_, _, _, _))
+      .WillOnce(
+          Invoke([&](const std::string& cluster, MessageMetadataSharedPtr, TransportType,
+                     ProtocolType) -> absl::optional<std::reference_wrapper<ShadowRouterHandle>> {
+            EXPECT_EQ(cluster, shadow_clusters.front());
+            return *shadow_routers.front();
+          }))
+      .WillOnce(
+          Invoke([&](const std::string& cluster, MessageMetadataSharedPtr, TransportType,
+                     ProtocolType) -> absl::optional<std::reference_wrapper<ShadowRouterHandle>> {
+            EXPECT_EQ(cluster, shadow_clusters.back());
+            return *shadow_routers.back();
+          }));
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
