@@ -717,6 +717,7 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   ASSERT_EQ("", span_ptr->getBaggage("baggage_key"));
   ASSERT_EQ(span_ptr->getTraceIdAsHex(), "");
   span_ptr->injectContext(request_headers);
+  span_ptr->log(SystemTime(), "fake_event");
 
   EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
