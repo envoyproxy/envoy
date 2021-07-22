@@ -24,7 +24,9 @@ using ::google::jwt_verify::Jwks;
 using ::google::jwt_verify::Status;
 using ::testing::_;
 using ::testing::Invoke;
+using ::testing::MockFunction;
 using ::testing::NiceMock;
+using ::testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -646,6 +648,110 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
 
   Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
+}
+
+class AuthenticatorJwtCacheTest : public testing::Test {
+public:
+  void SetUp() override {
+    jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
+    extractor_ = Extractor::create(jwks_cache_.jwks_data_.jwt_provider_);
+    // Not to use jwks_fetcher, mocked that JwksObj already has Jwks
+    EXPECT_CALL(jwks_cache_.jwks_data_, getJwksObj()).WillRepeatedly(Return(jwks_.get()));
+    EXPECT_CALL(mock_fetcher_, Call(_, _)).Times(0);
+  }
+
+  void createAuthenticator(const absl::optional<std::string>& provider) {
+    auth_ = Authenticator::create(nullptr, provider, false, false, jwks_cache_, cm_,
+                                  mock_fetcher_.AsStdFunction(), time_system_);
+  }
+
+  void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers) {
+    std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
+      ASSERT_EQ(status, expected_status);
+    };
+    auto set_payload_cb = [this](const std::string& name, const ProtobufWkt::Struct& payload) {
+      out_name_ = name;
+      out_payload_ = payload;
+    };
+    auto tokens = extractor_->extract(headers);
+    auth_->verify(headers, parent_span_, std::move(tokens), set_payload_cb, on_complete_cb);
+  }
+
+  ::google::jwt_verify::JwksPtr jwks_;
+  NiceMock<MockJwksCache> jwks_cache_;
+  MockFunction<Common::JwksFetcherPtr(Upstream::ClusterManager&, const RemoteJwks&)> mock_fetcher_;
+  AuthenticatorPtr auth_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  Event::SimulatedTimeSystem time_system_;
+  ExtractorConstPtr extractor_;
+  NiceMock<Tracing::MockSpan> parent_span_;
+  std::string out_name_;
+  ProtobufWkt::Struct out_payload_;
+};
+
+TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {
+  createAuthenticator(absl::nullopt);
+
+  // For invalid provider, jwt_cache is not called.
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).Times(0);
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(GoodToken, _)).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+}
+
+TEST_F(AuthenticatorJwtCacheTest, TestCacheMissGoodToken) {
+  createAuthenticator("provider");
+
+  // jwt_cache miss: lookup return nullptr
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr));
+  // jwt_cache insert is called for a good jwt.
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(GoodToken, _));
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+}
+
+TEST_F(AuthenticatorJwtCacheTest, TestCacheMissExpiredToken) {
+  createAuthenticator("provider");
+
+  // jwt_cache miss: lookup return nullptr
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(nullptr));
+  // jwt_cache insert is not called for a bad Jwt
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(_, _)).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+  expectVerifyStatus(Status::JwtExpired, headers);
+}
+
+TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
+  jwks_cache_.jwks_data_.jwt_provider_.set_forward_payload_header("jwt-payload");
+  jwks_cache_.jwks_data_.jwt_provider_.set_forward(true);
+  jwks_cache_.jwks_data_.jwt_provider_.set_payload_in_metadata("my_payload");
+
+  createAuthenticator("provider");
+
+  ::google::jwt_verify::Jwt cached_jwt;
+  cached_jwt.parseFromString(GoodToken);
+  // jwt_cache hit: lookup return a cached jwt.
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, lookup(_)).WillOnce(Return(&cached_jwt));
+  // jwt_cache insert is not called.
+  EXPECT_CALL(jwks_cache_.jwks_data_.jwt_cache_, insert(_, _)).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Verify post processing of a good Jwt with a cache hit.
+  EXPECT_EQ(headers.get_("jwt-payload"), ExpectedPayloadValue);
+  // Verify the token is not removed.
+  EXPECT_TRUE(headers.has(Http::CustomHeaders::get().Authorization));
+
+  // Payload is set
+  EXPECT_EQ(out_name_, "my_payload");
+
+  ProtobufWkt::Struct expected_payload;
+  TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
 }
 
 } // namespace
