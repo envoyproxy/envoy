@@ -265,6 +265,7 @@ envoy_cc_library(
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
+        ":quic_stat_names_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:codes_lib",

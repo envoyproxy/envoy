@@ -134,10 +134,9 @@ protected:
     if (dispatcher_ == nullptr) {
       dispatcher_ = api_->allocateDispatcher("test_thread");
     }
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
     client_connection_ = std::make_unique<Network::TestClientConnectionImpl>(
         *dispatcher_, socket_->addressProvider().localAddress(), source_address_,
         Network::Test::createRawBufferSocket(), socket_options_);
@@ -376,8 +375,8 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
   if (socket_->addressProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
     broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
   } else {
@@ -1340,10 +1339,9 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
         new Network::Address::Ipv6Instance(address_string, 0, nullptr)};
   }
   dispatcher_ = api_->allocateDispatcher("test_thread");
-  socket_ = std::make_shared<Network::TcpListenSocket>(
-      Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-  listener_ =
-      dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
   client_connection_ = dispatcher_->createClientConnection(
       socket_->addressProvider().localAddress(), source_address_,
@@ -2811,10 +2809,9 @@ public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    socket_ = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
-    listener_ =
-        dispatcher_->createListener(socket_, listener_callbacks_, true, ENVOY_TCP_BACKLOG_SIZE);
+    socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
+    listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true);
 
     client_connection_ = dispatcher_->createClientConnection(
         socket_->addressProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),

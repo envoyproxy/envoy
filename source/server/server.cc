@@ -88,7 +88,8 @@ InstanceImpl::InstanceImpl(
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
-      hooks_(hooks), server_contexts_(*this), stats_flush_in_progress_(false) {
+      hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
+      stats_flush_in_progress_(false) {
   TRY_ASSERT_MAIN_THREAD {
     if (!options.logPath().empty()) {
       TRY_ASSERT_MAIN_THREAD {
@@ -453,7 +454,16 @@ void InstanceImpl::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap_, options);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
-  restarter_.sendParentAdminShutdownRequest(original_start_time_);
+  const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
+  if (parent_admin_shutdown_response.has_value()) {
+    original_start_time_ = parent_admin_shutdown_response.value().original_start_time_;
+    enable_reuse_port_default_ = parent_admin_shutdown_response.value().enable_reuse_port_default_
+                                     ? ReusePortDefault::True
+                                     : ReusePortDefault::False;
+  } else {
+    // This is needed so that we don't read the value until runtime is fully initialized.
+    enable_reuse_port_default_ = ReusePortDefault::Runtime;
+  }
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
 
   loadServerFlags(initial_config.flagsPath());
@@ -508,8 +518,9 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
+  listener_manager_ =
+      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
+                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -583,7 +594,7 @@ void InstanceImpl::initialize(const Options& options,
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
-      access_log_manager_, *singleton_manager_, options_);
+      access_log_manager_, *singleton_manager_, options_, quic_stat_names_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -927,6 +938,21 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;
+}
+
+bool InstanceImpl::enableReusePortDefault() {
+  ASSERT(enable_reuse_port_default_.has_value());
+  switch (enable_reuse_port_default_.value()) {
+  case ReusePortDefault::True:
+    return true;
+  case ReusePortDefault::False:
+    return false;
+  case ReusePortDefault::Runtime:
+    return Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.listener_reuse_port_default_enabled");
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

@@ -10,7 +10,6 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
-#include "source/extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +47,7 @@ ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
       std::make_unique<envoy::config::metrics::v3::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() const { return StatsSinkNames::get().MetricsService; }
+std::string MetricsServiceSinkFactory::name() const { return MetricsServiceName; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

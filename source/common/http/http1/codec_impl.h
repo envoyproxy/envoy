@@ -440,6 +440,7 @@ protected:
         : response_encoder_(connection,
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
+    void dumpState(std::ostream& os, int indent_level) const;
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
     ResponseEncoderImpl response_encoder_;
