@@ -69,10 +69,10 @@ public:
     };
   }
 
-  TestMap::PoolFactory getFactoryExpectDrainedCb(Http::ConnectionPool::Instance::DrainedCb* cb) {
+  TestMap::PoolFactory getFactoryExpectIdleCb(Http::ConnectionPool::Instance::IdleCb* cb) {
     return [this, cb]() {
       auto pool = std::make_unique<NiceMock<Http::ConnectionPool::MockInstance>>();
-      EXPECT_CALL(*pool, addDrainedCallback(_)).WillOnce(SaveArg<0>(cb));
+      EXPECT_CALL(*pool, addIdleCallback(_)).WillOnce(SaveArg<0>(cb));
       mock_pools_.push_back(pool.get());
       return pool;
     };
@@ -153,13 +153,14 @@ TEST_F(ConnPoolMapImplTest, CallbacksPassedToPools) {
 
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  EXPECT_CALL(*mock_pools_[0], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cb1));
-  Http::ConnectionPool::Instance::DrainedCb cb2;
-  EXPECT_CALL(*mock_pools_[1], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cb2));
+  Http::ConnectionPool::Instance::IdleCb cb1;
+  EXPECT_CALL(*mock_pools_[0], addIdleCallback(_)).WillOnce(SaveArg<0>(&cb1));
+  Http::ConnectionPool::Instance::IdleCb cb2;
+  EXPECT_CALL(*mock_pools_[1], addIdleCallback(_)).WillOnce(SaveArg<0>(&cb2));
 
   ReadyWatcher watcher;
-  test_map->addDrainedCallback([&watcher] { watcher.ready(); });
+  test_map->addIdleCallback([&watcher]() { watcher.ready(); });
+  test_map->startDrain();
 
   EXPECT_CALL(watcher, ready()).Times(2);
   cb1();
@@ -171,13 +172,14 @@ TEST_F(ConnPoolMapImplTest, CallbacksCachedAndPassedOnCreation) {
   TestMapPtr test_map = makeTestMap();
 
   ReadyWatcher watcher;
-  test_map->addDrainedCallback([&watcher] { watcher.ready(); });
+  test_map->addIdleCallback([&watcher]() { watcher.ready(); });
+  test_map->startDrain();
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
-  test_map->getPool(1, getFactoryExpectDrainedCb(&cb1));
+  Http::ConnectionPool::Instance::IdleCb cb1;
+  test_map->getPool(1, getFactoryExpectIdleCb(&cb1));
 
-  Http::ConnectionPool::Instance::DrainedCb cb2;
-  test_map->getPool(2, getFactoryExpectDrainedCb(&cb2));
+  Http::ConnectionPool::Instance::IdleCb cb2;
+  test_map->getPool(2, getFactoryExpectIdleCb(&cb2));
 
   EXPECT_CALL(watcher, ready()).Times(2);
   cb1();
@@ -205,7 +207,7 @@ TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
 TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
   TestMapPtr test_map = makeTestMap();
 
-  Http::ConnectionPool::Instance::DrainedCb cb1;
+  Http::ConnectionPool::Instance::IdleCb cb1;
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
   test_map->clear();
@@ -390,6 +392,19 @@ TEST_F(ConnPoolMapImplTest, CircuitBreakerUsesProvidedPriorityHigh) {
   test_map->getPool(2, getBasicFactory());
 }
 
+TEST_F(ConnPoolMapImplTest, ErasePool) {
+  TestMapPtr test_map = makeTestMap();
+  auto* pool_ptr = &test_map->getPool(1, getBasicFactory()).value().get();
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_EQ(pool_ptr, &test_map->getPool(1, getNeverCalledFactory()).value().get());
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_FALSE(test_map->erasePool(2));
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_TRUE(test_map->erasePool(1));
+  EXPECT_EQ(0, test_map->size());
+  EXPECT_NE(pool_ptr, &test_map->getPool(1, getBasicFactory()).value().get());
+}
+
 // The following tests only die in debug builds, so don't run them if this isn't one.
 #if !defined(NDEBUG)
 class ConnPoolMapImplDeathTest : public ConnPoolMapImplTest {};
@@ -398,10 +413,10 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryClearTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  ON_CALL(*mock_pools_[0], addIdleCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->clear(); }),
+  EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
 }
 
@@ -409,11 +424,11 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryGetPoolTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  ON_CALL(*mock_pools_[0], addIdleCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
 
   EXPECT_DEATH(
-      test_map->addDrainedCallback([&test_map, this] { test_map->getPool(2, getBasicFactory()); }),
+      test_map->addIdleCallback([&test_map, this]() { test_map->getPool(2, getBasicFactory()); }),
       ".*Details: A resource should only be entered once");
 }
 
@@ -421,10 +436,10 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryDrainConnectionsTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  ON_CALL(*mock_pools_[0], addIdleCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->drainConnections(); }),
+  EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->clear(); }),
                ".*Details: A resource should only be entered once");
 }
 
@@ -432,10 +447,10 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(1, getBasicFactory());
-  ON_CALL(*mock_pools_[0], addDrainedCallback(_))
-      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::DrainedCb cb) { cb(); }));
+  ON_CALL(*mock_pools_[0], addIdleCallback(_))
+      .WillByDefault(Invoke([](Http::ConnectionPool::Instance::IdleCb cb) { cb(); }));
 
-  EXPECT_DEATH(test_map->addDrainedCallback([&test_map] { test_map->addDrainedCallback([]() {}); }),
+  EXPECT_DEATH(test_map->addIdleCallback([&test_map]() { test_map->addIdleCallback([]() {}); }),
                ".*Details: A resource should only be entered once");
 }
 #endif // !defined(NDEBUG)

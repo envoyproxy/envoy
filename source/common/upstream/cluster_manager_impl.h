@@ -359,15 +359,18 @@ private:
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool ready_to_drain_{false};
-      uint64_t drains_remaining_{};
+      bool draining_{false};
+
+      // Protect from deletion while iterating through pools_. See comments and usage
+      // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
+      bool do_not_delete_{false};
     };
 
     struct TcpConnPoolsContainer {
       using ConnPools = std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr>;
 
       ConnPools pools_;
-      uint64_t drains_remaining_{};
+      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -409,6 +412,10 @@ private:
       Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
                                                  LoadBalancerContext* context, bool peek);
 
+      void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
+                              const std::vector<uint8_t>& hash_key);
+      void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
+
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
@@ -445,8 +452,7 @@ private:
     ~ThreadLocalClusterManagerImpl() override;
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
+    void drainTcpConnPools(TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,

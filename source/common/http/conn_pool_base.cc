@@ -141,7 +141,7 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
   if (!closed_with_active_rq_) {
-    parent().checkForDrained();
+    parent().checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 

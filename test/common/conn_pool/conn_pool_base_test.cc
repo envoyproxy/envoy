@@ -60,7 +60,8 @@ public:
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
     ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
-      auto ret = std::make_unique<TestActiveClient>(pool_, stream_limit_, concurrent_streams_);
+      auto ret =
+          std::make_unique<NiceMock<TestActiveClient>>(pool_, stream_limit_, concurrent_streams_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
@@ -88,7 +89,7 @@ public:
       Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;
   AttachContext context_;
-  std::vector<ActiveClient*> clients_;
+  std::vector<TestActiveClient*> clients_;
 };
 
 TEST_F(ConnPoolImplBaseTest, DumpState) {
@@ -199,6 +200,62 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
   // Preconnect won't occur if the host is not healthy.
   host_->healthFlagSet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH);
   EXPECT_FALSE(pool_.maybePreconnect(1));
+}
+
+// Remote close simulates the peer closing the connection.
+TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredRemoteClose) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStream(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Emulate the new upstream connection establishment
+  EXPECT_CALL(pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  // The pool now has no requests/streams, but has an open connection, so it is not yet idle.
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+
+  // Now that the last connection is closed, while there are no requests, the pool becomes idle.
+  testing::MockFunction<void()> idle_pool_callback;
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
+  dispatcher_.clearDeferredDeleteList();
+  clients_.back()->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.startDrainImpl();
+}
+
+// Local close simulates what would happen for an idle timeout on a connection.
+TEST_F(ConnPoolImplBaseTest, PoolIdleCallbackTriggeredLocalClose) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).Times(AnyNumber());
+
+  // Create a new stream using the pool
+  EXPECT_CALL(pool_, instantiateActiveClient);
+  pool_.newStream(context_);
+  ASSERT_EQ(1, clients_.size());
+
+  // Emulate the new upstream connection establishment
+  EXPECT_CALL(pool_, onPoolReady);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+
+  // The pool now has no requests/streams, but has an open connection, so it is not yet idle.
+  clients_.back()->active_streams_ = 0;
+  pool_.onStreamClosed(*clients_.back(), false);
+
+  // Now that the last connection is closed, while there are no requests, the pool becomes idle.
+  testing::MockFunction<void()> idle_pool_callback;
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.addIdleCallbackImpl(idle_pool_callback.AsStdFunction());
+  dispatcher_.clearDeferredDeleteList();
+  clients_.back()->onEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_CALL(idle_pool_callback, Call());
+  pool_.startDrainImpl();
 }
 
 } // namespace ConnectionPool

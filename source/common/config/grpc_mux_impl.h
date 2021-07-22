@@ -39,6 +39,17 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
 
+  ~GrpcMuxImpl() override;
+
+  // Causes all GrpcMuxImpl objects to stop sending any messages on `grpc_stream_` to fix a crash
+  // on Envoy shutdown due to dangling pointers. This may not be the ideal fix; it is probably
+  // preferable for the `ServerImpl` to cause all configuration subscriptions to be shutdown, which
+  // would then cause all `GrpcMuxImpl` to be destructed.
+  // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
+  static void shutdownAll();
+
+  void shutdown() { shutdown_ = true; }
+
   void start() override;
 
   // GrpcMux
@@ -179,6 +190,10 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
+
+  // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
+  // true because it may contain dangling pointers.
+  std::atomic<bool> shutdown_{false};
 };
 
 using GrpcMuxImplPtr = std::unique_ptr<GrpcMuxImpl>;

@@ -36,6 +36,13 @@ public:
     };
   }
 
+  TestMap::PoolFactory getNeverCalledFactory() {
+    return []() {
+      EXPECT_TRUE(false);
+      return nullptr;
+    };
+  }
+
 protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<NiceMock<Http::ConnectionPool::MockInstance>*> mock_pools_;
@@ -104,6 +111,24 @@ TEST_F(PriorityConnPoolMapImplTest, TestClearEmptiesOut) {
   EXPECT_EQ(test_map->size(), 0);
 }
 
+TEST_F(PriorityConnPoolMapImplTest, TestErase) {
+  TestMapPtr test_map = makeTestMap();
+
+  auto* pool_ptr = &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get();
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_EQ(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getNeverCalledFactory()).value().get());
+  EXPECT_FALSE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::Default, 1, getBasicFactory()).value().get());
+  EXPECT_EQ(2, test_map->size());
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::High, 1));
+  EXPECT_EQ(0, test_map->size());
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get());
+}
+
 // Show that the drained callback is invoked once for the high priority pool, and once for
 // the default priority pool.
 TEST_F(PriorityConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
@@ -112,13 +137,13 @@ TEST_F(PriorityConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
   test_map->getPool(ResourcePriority::Default, 0, getBasicFactory());
 
-  Http::ConnectionPool::Instance::DrainedCb cbHigh;
-  EXPECT_CALL(*mock_pools_[0], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cbHigh));
-  Http::ConnectionPool::Instance::DrainedCb cbDefault;
-  EXPECT_CALL(*mock_pools_[1], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cbDefault));
+  Http::ConnectionPool::Instance::IdleCb cbHigh;
+  EXPECT_CALL(*mock_pools_[0], addIdleCallback(_)).WillOnce(SaveArg<0>(&cbHigh));
+  Http::ConnectionPool::Instance::IdleCb cbDefault;
+  EXPECT_CALL(*mock_pools_[1], addIdleCallback(_)).WillOnce(SaveArg<0>(&cbDefault));
 
   ReadyWatcher watcher;
-  test_map->addDrainedCallback([&watcher] { watcher.ready(); });
+  test_map->addIdleCallback([&watcher]() { watcher.ready(); });
 
   EXPECT_CALL(watcher, ready()).Times(2);
   cbHigh();

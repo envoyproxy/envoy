@@ -28,8 +28,13 @@ public:
 
   ~OriginalConnPoolImpl() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deferred_deleting_ = true; }
+
   // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override;
+  void addIdleCallback(IdleCb cb) override;
+  bool isIdle() const override;
+  void startDrain() override;
   void drainConnections() override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
@@ -148,7 +153,7 @@ protected:
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
-  void checkForDrained();
+  void checkForIdleAndCloseIdleConnsIfDraining();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
@@ -160,10 +165,13 @@ protected:
   std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
   std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
-  std::list<DrainedCb> drained_callbacks_;
+  std::list<IdleCb> idle_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+
   bool upstream_ready_enabled_{false};
+  bool is_draining_{false};
+  bool deferred_deleting_{false};
 };
 
 } // namespace Tcp
