@@ -30,6 +30,24 @@ public:
 };
 using QueuedChunkPtr = std::unique_ptr<QueuedChunk>;
 
+class ChunkQueue {
+public:
+  ChunkQueue() = default;
+  ChunkQueue(const ChunkQueue&) = delete;
+  ChunkQueue& operator=(const ChunkQueue&) = delete;
+  uint32_t bytesEnqueued() const { return bytes_enqueued_; }
+  bool empty() const { return queue_.empty(); }
+  void push(Buffer::Instance& data, bool end_stream, bool delivered);
+  absl::optional<QueuedChunkPtr> pop(bool undelivered_only);
+  const QueuedChunk& consolidate(bool delivered);
+
+private:
+  // A queue of chunks that were sent in streaming mode
+  std::deque<QueuedChunkPtr> queue_;
+  // The total size of chunks in the queue
+  uint32_t bytes_enqueued_{};
+};
+
 class ProcessorState : public Logger::Loggable<Logger::Id::filter> {
 public:
   // This describes whether the filter is waiting for a response to a gRPC message.
@@ -49,6 +67,8 @@ public:
     // in which the processing mode was changed while there were outstanding
     // messages sent to the processor.
     StreamedBodyCallbackFinishing,
+    // Waiting for a body callback in "buffered partial" mode.
+    BufferedPartialBodyCallback,
     // Waiting for a "trailers" response.
     TrailersCallback,
   };
@@ -56,7 +76,7 @@ public:
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        bytes_enqueued_(0) {}
+        partial_limit_reached_(false) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
@@ -70,6 +90,7 @@ public:
   void setHasNoBody(bool b) { no_body_ = b; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
+  bool partialLimitReached() const { return partial_limit_reached_; }
 
   virtual void setProcessingMode(
       const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
@@ -101,10 +122,18 @@ public:
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
+  // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream, bool delivered);
-  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only);
-  bool queueOverHighLimit() const { return bytes_enqueued_ > bufferLimit(); }
-  bool queueBelowLowLimit() const { return bytes_enqueued_ < bufferLimit() / 2; }
+  // If the queue has chunks, return the head of the queue.
+  absl::optional<QueuedChunkPtr> dequeueStreamingChunk(bool undelivered_only) {
+    return chunk_queue_.pop(undelivered_only);
+  }
+  // Consolidate all the chunks on the queue into a single one and return a reference.
+  const QueuedChunk& consolidateStreamedChunks(bool delivered) {
+    return chunk_queue_.consolidate(delivered);
+  }
+  bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
+  bool queueBelowLowLimit() const { return chunk_queue_.bytesEnqueued() < bufferLimit() / 2; }
 
   virtual Http::HeaderMap* addTrailers() PURE;
 
@@ -141,6 +170,9 @@ protected:
   bool trailers_available_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
+  // If true, we are in "buffered partial" mode and already got back
+  // the response to the buffer.
+  bool partial_limit_reached_ : 1;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
@@ -153,10 +185,7 @@ protected:
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
   Event::TimerPtr message_timer_;
-  // A queue of chunks that were sent in streaming mode
-  std::deque<QueuedChunkPtr> chunks_for_processing_;
-  // The total size of chunks in the queue
-  uint32_t bytes_enqueued_;
+  ChunkQueue chunk_queue_;
 };
 
 class DecodingProcessorState : public ProcessorState {
