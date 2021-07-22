@@ -130,6 +130,9 @@ public:
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
     return nullptr;
   }
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
+    return nullptr;
+  }
 
 private:
   static const SslRedirector SSL_REDIRECTOR;
@@ -587,6 +590,11 @@ public:
   const Decorator* decorator() const override { return decorator_.get(); }
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const override {
+    auto* config = perFilterConfig(name);
+    return config ? config : virtualHost().perFilterConfig(name);
+  }
 
 protected:
   const bool case_sensitive_;
@@ -736,6 +744,10 @@ private:
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override {
       return parent_->perFilterConfig(name);
     };
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      return parent_->mostSpecificPerFilterConfig(name);
+    }
 
   private:
     const RouteEntryImplBase* parent_;
@@ -785,6 +797,12 @@ private:
                                                     bool do_formatting = true) const override;
 
     const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const override;
+
+    const RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string& name) const override {
+      auto* config = per_filter_configs_.get(name);
+      return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
+    }
 
   private:
     const std::string runtime_key_;

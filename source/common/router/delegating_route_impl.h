@@ -26,6 +26,11 @@ public:
   const Router::RouteTracing* tracingConfig() const override;
   const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
 
+  const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const override {
+    return base_route_->mostSpecificPerFilterConfig(name);
+  }
+
 private:
   const Router::RouteConstSharedPtr base_route_;
 };

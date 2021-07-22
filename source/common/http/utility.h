@@ -503,10 +503,10 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
                                                      const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  if (!route || !route->routeEntry()) {
+  if (!route) {
     return nullptr;
   }
-  return route->routeEntry()->mostSpecificPerFilterConfigTyped<ConfigType>(filter_name);
+  return dynamic_cast<const ConfigType*>(route->mostSpecificPerFilterConfig(filter_name));
 }
 
 /**
