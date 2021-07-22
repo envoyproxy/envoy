@@ -81,9 +81,6 @@ public:
                            ControlPlaneStats& control_plane_stats) override {
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
 protected:
   virtual GrpcStreamBase& grpcStream() PURE;
@@ -205,6 +202,11 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
               bool skip_subsequent_node);
+
+  // GrpcStreamCallbacks
+  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
              envoy::service::discovery::v3::DiscoveryResponse>&
