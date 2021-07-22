@@ -25,16 +25,17 @@ public:
   }
 
   // Method creates a yaml config for specific access log METADATA type.
-  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatter(std::string type) {
+  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatter(std::string type,
+                                                            std::string tag = "METADATA") {
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
-    inline_string: "%METADATA({}:metadata.test:test_key)%"
+    inline_string: "%{}({}:metadata.test:test_key)%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.formatter.metadata.v3.Metadata
 )EOF",
-                                         type);
+                                         tag, type);
     TestUtility::loadFromYaml(yaml, config_);
     return Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   }
@@ -49,6 +50,11 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   envoy::config::core::v3::Metadata metadata_;
 };
+
+// Exception should be thrown for tags different than METADATA.
+TEST_F(MetadataFormatterTest, IncorrectTag) {
+  EXPECT_THROW(getTestMetadataFormatter("ROUTE", "BLAH_BLAH"), EnvoyException);
+}
 
 // Exception should be thrown for unknown type of metadata.
 TEST_F(MetadataFormatterTest, NonExistingMetadataProvider) {
