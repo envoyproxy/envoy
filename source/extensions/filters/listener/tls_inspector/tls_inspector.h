@@ -21,7 +21,6 @@ namespace TlsInspector {
 #define ALL_TLS_INSPECTOR_STATS(COUNTER)                                                           \
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
-  COUNTER(read_error)                                                                              \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
   COUNTER(alpn_found)                                                                              \
@@ -77,10 +76,12 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  Network::FilterStatus onInspectData(Buffer::Instance& buffer) override;
+
+  size_t inspectSize() override { return config_->maxClientHelloSize(); }
+
 private:
   ParseState parseClientHello(const void* data, size_t len);
-  ParseState onRead();
-  void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
 
@@ -91,8 +92,6 @@ private:
   uint64_t read_{0};
   bool alpn_found_{false};
   bool clienthello_success_{false};
-
-  static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
 
   // Allows callbacks on the SSL_CTX to set fields in this class.
   friend class Config;

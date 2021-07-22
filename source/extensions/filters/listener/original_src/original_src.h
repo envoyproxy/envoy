@@ -23,6 +23,10 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  Network::FilterStatus onInspectData(Buffer::Instance&) override {
+    return Network::FilterStatus::Continue;
+  };
+
 private:
   Config config_;
 };

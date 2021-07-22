@@ -172,7 +172,11 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
         iter_(accept_filters_.end()),
         stream_info_(std::make_unique<StreamInfo::StreamInfoImpl>(
             listener_.parent_.dispatcher().timeSource(), socket_->addressProviderSharedPtr(),
-            StreamInfo::FilterState::LifeSpan::Connection)) {
+            StreamInfo::FilterState::LifeSpan::Connection)),
+        inspect_buffer_(listener_.parent_.dispatcher().getWatermarkFactory().createBuffer(
+            []() -> void { /* TODO(soulxu) handle watermark*/ },
+            []() -> void { /* TODO(soulxu) handle watermark*/ },
+            []() -> void { /* TODO(soulxu) handle watermark*/ })) {
     listener_.stats_.downstream_pre_cx_active_.inc();
   }
   ~ActiveTcpSocket() override {
@@ -195,6 +199,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   void startTimer();
   void unlink();
   void newConnection();
+  void onFileEvent(uint32_t events);
 
   class GenericListenerFilter : public Network::ListenerFilter {
   public:
@@ -206,6 +211,9 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
         return Network::FilterStatus::Continue;
       }
       return listener_filter_->onAccept(cb);
+    }
+    Network::FilterStatus onInspectData(Buffer::Instance& buffer) override {
+      return listener_filter_->onInspectData(buffer);
     }
     /**
      * Check if this filter filter should be disabled on the incoming socket.
@@ -228,6 +236,9 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   // Network::ListenerFilterManager
   void addAcceptFilter(const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
                        Network::ListenerFilterPtr&& filter) override {
+    if (filter->inspectSize() > inspect_buffer_size_) {
+      inspect_buffer_size_ = filter->inspectSize();
+    }
     accept_filters_.emplace_back(
         std::make_unique<GenericListenerFilter>(listener_filter_matcher, std::move(filter)));
   }
@@ -254,6 +265,8 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   Event::TimerPtr timer_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool connected_{false};
+  Buffer::InstancePtr inspect_buffer_;
+  size_t inspect_buffer_size_{0};
 };
 using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
 

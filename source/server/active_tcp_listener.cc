@@ -129,11 +129,60 @@ void ActiveTcpSocket::unlink() {
   listener_.parent_.dispatcher().deferredDelete(std::move(removed));
 }
 
+void ActiveTcpSocket::onFileEvent(uint32_t events) {
+  if (events & Event::FileReadyType::Closed) {
+    continueFilterChain(false);
+  }
+
+  // The ioHandle::recv method need a continuous memory space.
+  Buffer::ReservationSingleSlice reserved =
+      inspect_buffer_->reserveSingleSlice(inspect_buffer_size_);
+  const auto result =
+      socket_->ioHandle().recv(reserved.slice().mem_, inspect_buffer_size_, MSG_PEEK);
+  ENVOY_LOG(trace, "recv inspect data: {}", result.rc_);
+  if (!result.ok()) {
+    if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      return;
+    }
+    continueFilterChain(false);
+    return;
+  }
+  reserved.commit(result.rc_);
+  inspect_buffer_size_ -= result.rc_;
+
+  Network::FilterStatus status = (*iter_)->onInspectData(*inspect_buffer_);
+  if (status == Network::FilterStatus::StopIteration) {
+    if (!socket().ioHandle().isOpen() ||
+        static_cast<uint64_t>(result.rc_) >= inspect_buffer_size_) {
+      socket_->ioHandle().resetFileEvents();
+      continueFilterChain(false);
+    }
+    return;
+  }
+
+  // already reach the max peek data size the filter expected,
+  // no more data need to be peek anymore.
+  if (static_cast<uint64_t>(result.rc_) >= inspect_buffer_size_) {
+    socket_->ioHandle().resetFileEvents();
+  }
+  continueFilterChain(true);
+}
+
 void ActiveTcpSocket::continueFilterChain(bool success) {
   if (success) {
     bool no_error = true;
     if (iter_ == accept_filters_.end()) {
       iter_ = accept_filters_.begin();
+      // TODO(soulxu) This is for PoC, but we should initialize and reset file event
+      // for each filter, then we can back-compatible with existing filter. After all
+      // filter switch to the new method to get peek data, then we can change to this way.
+      if (inspect_buffer_size_ > 0) {
+        socket_->ioHandle().resetFileEvents();
+        socket_->ioHandle().initializeFileEvent(
+            listener_.parent_.dispatcher(), [this](uint32_t events) { onFileEvent(events); },
+            Event::PlatformDefaultTriggerType,
+            Event::FileReadyType::Read | Event::FileReadyType::Closed);
+      }
     } else {
       iter_ = std::next(iter_);
     }
@@ -148,6 +197,10 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           no_error = false;
           break;
         } else {
+          // There may already have data peeked due to previous filter.
+          if ((*iter_)->inspectSize() > 0 && inspect_buffer_->length() > 0) {
+            (*iter_)->onInspectData(*inspect_buffer_);
+          }
           // Blocking at the filter but no error
           return;
         }

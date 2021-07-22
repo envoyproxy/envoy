@@ -26,6 +26,10 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  Network::FilterStatus onInspectData(Buffer::Instance&) override {
+    return Network::FilterStatus::Continue;
+  };
+
 private:
   envoy::config::core::v3::TrafficDirection traffic_direction_;
 };

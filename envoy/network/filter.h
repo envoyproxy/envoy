@@ -330,6 +330,20 @@ public:
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onAccept(ListenerFilterCallbacks& cb) PURE;
+
+  /**
+   * Called when data peeked from the connection. If the filter chain doesn't get
+   * enough data, the filter chain can be stopped, then waiting for more data.
+   * @param buffer the buffer of peek data.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onInspectData(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Return the size of data the filter want to inspect from the connection.
+   @return the size of data inspect from the connection. 0 means filter needn't any data.
+   */
+  virtual size_t inspectSize() { return 0; }
 };
 
 using ListenerFilterPtr = std::unique_ptr<ListenerFilter>;
