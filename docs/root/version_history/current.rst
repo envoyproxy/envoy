@@ -10,6 +10,9 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * grpc: gRPC async client can be cached and shared accross filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
+* http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
+  (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
+  can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
 * http: set the default :ref:`lazy headermap threshold <arch_overview_http_header_map_settings>` to 3,
   which defines the minimal number of headers in a request/response/trailers required for using a
   dictionary in addition to the list. Setting the `envoy.http.headermap.lazy_map_min_size` runtime
@@ -28,6 +31,8 @@ Minor Behavior Changes
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+* xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under 'annotations' section of the segment data.
 
 Removed Config or Runtime
 -------------------------

@@ -125,10 +125,18 @@ public:
 
   Network::MockListenSocket*
   expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
-                          ListenerHandle* old_listener_handle, Network::MockListenSocket& socket) {
-    auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
-    EXPECT_CALL(socket, duplicate())
-        .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+                          ListenerHandle* old_listener_handle,
+                          OptRef<Network::MockListenSocket> socket,
+                          ListenerComponentFactory::BindType bind_type = default_bind_type) {
+    Network::MockListenSocket* new_socket;
+    if (socket.has_value()) {
+      new_socket = new NiceMock<Network::MockListenSocket>();
+      EXPECT_CALL(socket.value().get(), duplicate())
+          .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(new_socket))));
+    } else {
+      new_socket = listener_factory_.socket_.get();
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, 0));
+    }
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
     EXPECT_CALL(*old_listener_handle->drain_manager_, startDrainSequence(_));
@@ -140,7 +148,7 @@ public:
 
     EXPECT_CALL(*old_listener_handle, onDestroy());
     worker_->callRemovalCompletion();
-    return duplicated_socket;
+    return new_socket;
   }
 
   void expectRemove(const envoy::config::listener::v3::Listener& listener_proto,
@@ -5105,6 +5113,8 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
+// This case also verifies that listeners that share port but do not share socket type (TCP vs. UDP)
+// do not share a listener.
 TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
   EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
@@ -5120,10 +5130,9 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAn
       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  auto duplicated_socket =
-      expectUpdateToThenDrain(new_listener_proto, listener_foo, *listener_factory_.socket_);
-
-  expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
+  expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>(),
+                          ListenerComponentFactory::BindType::ReusePort);
+  expectRemove(new_listener_proto, listener_foo_update1, *listener_factory_.socket_);
 
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());

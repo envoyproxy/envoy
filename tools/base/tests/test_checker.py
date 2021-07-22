@@ -61,6 +61,16 @@ def test_checker_diff():
     assert "diff" not in checker.__dict__
 
 
+@pytest.mark.parametrize(
+    "errors",
+    [{}, dict(exiting="EEK"), dict(notexiting="OK")])
+def test_checker_exiting(errors):
+    checker = Checker("path1", "path2", "path3")
+    checker.errors = errors
+    assert checker.exiting == bool("exiting" in errors)
+    assert "exiting" not in checker.__dict__
+
+
 def test_checker_error_count():
     checker = Checker("path1", "path2", "path3")
     checker.errors = dict(foo=["err"] * 3, bar=["err"] * 5, baz=["err"] * 7)
@@ -168,21 +178,26 @@ def test_checker_paths(patches, paths):
 @pytest.mark.parametrize("summary", [True, False])
 @pytest.mark.parametrize("error_count", [0, 1])
 @pytest.mark.parametrize("warning_count", [0, 1])
-def test_checker_show_summary(patches, summary, error_count, warning_count):
+@pytest.mark.parametrize("exiting", [True, False])
+def test_checker_show_summary(patches, summary, error_count, warning_count, exiting):
     checker = Checker("path1", "path2", "path3")
     patched = patches(
         ("Checker.args", dict(new_callable=PropertyMock)),
+        ("Checker.exiting", dict(new_callable=PropertyMock)),
         ("Checker.error_count", dict(new_callable=PropertyMock)),
         ("Checker.warning_count", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_args, m_errors, m_warnings):
+    with patched as (m_args, m_exit, m_errors, m_warnings):
         m_args.return_value.summary = summary
         m_errors.return_value = error_count
         m_warnings.return_value = warning_count
+        m_exit.return_value = exiting
         result = checker.show_summary
 
-    if summary or error_count or warning_count:
+    if exiting:
+        assert result is False
+    elif summary or error_count or warning_count:
         assert result is True
     else:
         assert result is False
@@ -362,14 +377,14 @@ def test_checker_error(log, log_type, errors):
         assert not getattr(m_log.return_value, log_type or "error").called
 
 
-def test_checker_exiting(patches):
+def test_checker_exit(patches):
     checker = Checker("path1", "path2", "path3")
     patched = patches(
         "Checker.error",
         prefix="tools.base.checker")
 
     with patched as (m_error, ):
-        assert checker.exiting() == m_error.return_value
+        assert checker.exit() == m_error.return_value
 
     assert (
         list(m_error.call_args)
@@ -419,9 +434,11 @@ def test_checker_on_check_begin(patches):
 
 @pytest.mark.parametrize("errors", [[], ["CHECK1", "CHECK2", "CHECK3"], ["CHECK2", "CHECK3"]])
 @pytest.mark.parametrize("warnings", [[], ["CHECK1", "CHECK2", "CHECK3"], ["CHECK2", "CHECK3"]])
-def test_checker_on_check_run(patches, errors, warnings):
+@pytest.mark.parametrize("exiting", [True, False])
+def test_checker_on_check_run(patches, errors, warnings, exiting):
     checker = Checker("path1", "path2", "path3")
     patched = patches(
+        ("Checker.exiting", dict(new_callable=PropertyMock)),
         ("Checker.log", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
@@ -429,8 +446,13 @@ def test_checker_on_check_run(patches, errors, warnings):
     checker.errors = errors
     checker.warnings = warnings
 
-    with patched as (m_log, ):
+    with patched as (m_exit, m_log):
+        m_exit.return_value = exiting
         assert not checker.on_check_run(check)
+
+    if exiting:
+        assert not m_log.called
+        return
 
     if check in errors:
         assert (
@@ -487,7 +509,7 @@ def test_checker_on_checks_complete(patches, failed, show_summary):
 def test_checker_run(patches, raises):
     checker = DummyCheckerWithChecks("path1", "path2", "path3")
     patched = patches(
-        "Checker.exiting",
+        "Checker.exit",
         "Checker.get_checks",
         "Checker.on_check_begin",
         "Checker.on_check_run",
@@ -789,7 +811,7 @@ def test_asynchecker_run(patches, raises):
 
     patched = patches(
         "asyncio",
-        "Checker.exiting",
+        "Checker.exit",
         ("AsyncChecker._run", dict(new_callable=MagicMock)),
         ("AsyncChecker.on_checks_complete", dict(new_callable=MagicMock)),
         prefix="tools.base.checker")
@@ -902,7 +924,8 @@ async def test_asynchecker_on_checks_complete(patches):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("raises", [True, False])
-async def test_asynchecker__run(patches, raises):
+@pytest.mark.parametrize("exiting", [True, False])
+async def test_asynchecker__run(patches, raises, exiting):
     _check1 = MagicMock()
     _check2 = MagicMock()
     _check3 = MagicMock()
@@ -930,21 +953,29 @@ async def test_asynchecker__run(patches, raises):
         "AsyncChecker.on_check_begin",
         "AsyncChecker.on_check_run",
         "AsyncChecker.on_checks_complete",
+        ("AsyncChecker.exiting", dict(new_callable=PropertyMock)),
         prefix="tools.base.checker")
 
-    with patched as (m_log, m_checks, m_begin, m_check, m_run, m_complete):
+    with patched as (m_log, m_checks, m_begin, m_check, m_run, m_complete, m_exit):
         m_checks.return_value = ["check1", "check2", "check3"]
+        m_exit.return_value = exiting
         if raises:
             m_begin.side_effect = SomeError("AN ERROR OCCURRED")
 
             with pytest.raises(SomeError):
                 await checker._run()
+        elif exiting:
+            assert await checker._run() == 1
         else:
             assert await checker._run() == m_complete.return_value
 
     assert (
         list(m_begin.call_args)
         == [(), {}])
+
+    if exiting:
+        return
+
     assert (
         list(m_complete.call_args)
         == [(), {}])

@@ -448,7 +448,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    if (*(*existing_warming_listener)->address() != *new_listener->address()) {
+    if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
@@ -457,7 +457,7 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (*(*existing_active_listener)->address() != *new_listener->address()) {
+    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
       setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
     } else {
       new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
@@ -495,10 +495,10 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
-                                                 const Network::Address::Instance& address) {
-  for (const auto& listener : list) {
-    if (*listener->address() == address) {
+bool ListenerManagerImpl::hasListenerWithCompatibleAddress(const ListenerList& list,
+                                                           const ListenerImpl& listener) {
+  for (const auto& existing_listener : list) {
+    if (existing_listener->hasCompatibleAddress(listener)) {
       return true;
     }
   }
@@ -962,8 +962,8 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   // is an edge case and nothing will explicitly break, but there is no possibility that two
   // listeners that do not bind will ever be used. Only the first one will be used when searched for
   // by address. Thus we block it.
-  if (!listener.bindToPort() && (hasListenerWithAddress(warming_listeners_, *listener.address()) ||
-                                 hasListenerWithAddress(active_listeners_, *listener.address()))) {
+  if (!listener.bindToPort() && (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
+                                 hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, listener.address()->asString());
@@ -980,8 +980,7 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
       draining_listeners_.cbegin(), draining_listeners_.cend(),
       [&listener](const DrainingListener& draining_listener) {
         return draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
-               *listener.address() ==
-                   *draining_listener.listener_->listenSocketFactory().localAddress();
+               listener.hasCompatibleAddress(*draining_listener.listener_);
       });
 
   if (existing_draining_listener != draining_listeners_.cend()) {

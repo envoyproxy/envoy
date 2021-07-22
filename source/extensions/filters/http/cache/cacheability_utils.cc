@@ -4,6 +4,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 namespace Envoy {
@@ -33,7 +34,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 
 bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
-  const absl::string_view forwarded_proto = headers.getForwardedProtoValue();
+  const absl::string_view scheme = Http::Utility::getScheme(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
   // Check if the request contains any conditional headers.
@@ -52,8 +53,7 @@ bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& h
   return headers.Path() && headers.Host() &&
          !headers.getInline(CacheCustomHeaders::authorization()) &&
          (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
-         (forwarded_proto == header_values.SchemeValues.Http ||
-          forwarded_proto == header_values.SchemeValues.Https);
+         (scheme == header_values.SchemeValues.Http || scheme == header_values.SchemeValues.Https);
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
