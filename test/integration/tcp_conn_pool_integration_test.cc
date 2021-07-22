@@ -293,4 +293,22 @@ TEST_P(TcpConnPoolIntegrationTest, PoolCleanupEnabled) {
   });
 }
 
+TEST_P(TcpConnPoolIntegrationTest, ShutdownWithOpenConnections) {
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+  // Establish downstream and upstream connections.
+  ASSERT_TRUE(tcp_client->write("hello"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  test_server_.reset();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForDisconnect();
+
+  // Success criteria is that no ASSERTs fire and there are no leaks.
+}
+
 } // namespace Envoy
