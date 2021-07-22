@@ -89,8 +89,8 @@ Envoy will parse the config file according to the file extension, please see the
 
    .. tab:: System
 
-      To start Envoy as a system daemon :download:`download the demo configuration <_include/envoy-demo.yaml>`. Confirm that the downloaded file has
-      the `.yaml` extension (and not `.yml`) and start as follows:
+      To start Envoy as a system daemon :download:`download the demo configuration <_include/envoy-demo.yaml>`, and start
+      as follows:
 
       .. code-block:: console
 
