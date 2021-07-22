@@ -107,9 +107,10 @@ protected:
                                    Network::ServerConnectionPtr server_conn_ptr,
                                    std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
   Network::ListenerPtr listener_;
-  // True if the follow up connection deletion is raised by the connection collection deletion is performing.
-  // Otherwise, the collection should be deleted when the last connection in the collection is removed.
-  // This state is maintained in base class because this state is independent from concrete connection type.
+  // True if the follow up connection deletion is raised by the connection collection deletion is
+  // performing. Otherwise, the collection should be deleted when the last connection in the
+  // collection is removed. This state is maintained in base class because this state is independent
+  // from concrete connection type.
   bool is_deleting_{false};
 
 private:
