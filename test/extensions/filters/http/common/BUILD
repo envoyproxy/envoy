@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     srcs = [
         "jwks_fetcher_test.cc",
     ],
-    extension_name = "envoy.filters.http.jwt_authn",
+    extension_names = ["envoy.filters.http.jwt_authn"],
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/extensions/filters/http/common:mock_lib",

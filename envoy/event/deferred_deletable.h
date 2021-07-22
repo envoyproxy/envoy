@@ -13,12 +13,6 @@ namespace Event {
 class DeferredDeletable {
 public:
   virtual ~DeferredDeletable() = default;
-
-  /**
-   * Called when an object is passed to `deferredDelete`. This signals that the object will soon
-   * be deleted.
-   */
-  virtual void deleteIsPending() {}
 };
 
 using DeferredDeletablePtr = std::unique_ptr<DeferredDeletable>;

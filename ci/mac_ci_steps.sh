@@ -42,16 +42,23 @@ fi
 # is somewhat more deterministic (rather than interleaving the build
 # and test steps).
 
+DEFAULT_TEST_TARGETS=(
+  "//test/integration:integration_test"
+  "//test/integration:protocol_integration_test"
+  "//test/integration:tcp_proxy_integration_test"
+  "//test/integration:extension_discovery_integration_test"
+  "//test/integration:listener_lds_integration_test")
+
 if [[ $# -gt 0 ]]; then
-  TEST_TARGETS=$*
+  TEST_TARGETS=("$@")
 else
-  TEST_TARGETS='//test/integration/...'
+  TEST_TARGETS=("${DEFAULT_TEST_TARGETS[@]}")
 fi
 
-if [[ "$TEST_TARGETS" == "//test/..." || "$TEST_TARGETS" == "//test/integration/..." ]]; then
+if [[ "${TEST_TARGETS[*]}" == "${DEFAULT_TEST_TARGETS[*]}" ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" //source/exe:envoy-static
 fi
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS}"
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
 # Additionally run macOS specific test suites
 bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/common/network:apple_dns_impl_test

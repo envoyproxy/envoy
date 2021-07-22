@@ -270,6 +270,10 @@ void ActiveStreamFilterBase::clearRouteCache() {
   parent_.filter_manager_callbacks_.clearRouteCache();
 }
 
+void ActiveStreamFilterBase::resetIdleTimer() {
+  parent_.filter_manager_callbacks_.resetIdleTimer();
+}
+
 void FilterMatchState::evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
   if (match_tree_evaluated_ || !matching_data_) {
     return;
