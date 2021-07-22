@@ -775,6 +775,23 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_headers,
+                                      const absl::optional<uint32_t> max_path_length) {
+  if (!request_headers.Path()) {
+    return "";
+  }
+  absl::string_view path(request_headers.EnvoyOriginalPath()
+                             ? request_headers.getEnvoyOriginalPathValue()
+                             : request_headers.getPathValue());
+
+  if (max_path_length.has_value() && path.length() > max_path_length) {
+    path = path.substr(0, max_path_length.value());
+  }
+
+  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
+                      request_headers.getHostValue(), path);
+}
+
 void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
                                      absl::string_view& path) {
   /**

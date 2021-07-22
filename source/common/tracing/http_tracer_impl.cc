@@ -35,23 +35,6 @@ static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
   return header ? header->value().getStringView() : default_value;
 }
 
-static std::string buildUrl(const Http::RequestHeaderMap& request_headers,
-                            const uint32_t max_path_length) {
-  if (!request_headers.Path()) {
-    return "";
-  }
-  absl::string_view path(request_headers.EnvoyOriginalPath()
-                             ? request_headers.getEnvoyOriginalPathValue()
-                             : request_headers.getPathValue());
-
-  if (path.length() > max_path_length) {
-    path = path.substr(0, max_path_length);
-  }
-
-  return absl::StrCat(request_headers.getForwardedProtoValue(), "://",
-                      request_headers.getHostValue(), path);
-}
-
 const std::string HttpTracerUtility::IngressOperation = "ingress";
 const std::string HttpTracerUtility::EgressOperation = "egress";
 
@@ -163,8 +146,9 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId, request_headers->getRequestIdValue());
     }
-    span.setTag(Tracing::Tags::get().HttpUrl,
-                buildUrl(*request_headers, tracing_config.maxPathTagLength()));
+    span.setTag(
+        Tracing::Tags::get().HttpUrl,
+        Http::Utility::buildOriginalUri(*request_headers, tracing_config.maxPathTagLength()));
     span.setTag(Tracing::Tags::get().HttpMethod, request_headers->getMethodValue());
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
