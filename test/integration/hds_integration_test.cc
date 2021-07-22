@@ -1310,7 +1310,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
   checkCounters(1, 2, 1, 0);
 
   // Simulate disconnection of HDS server
-  hds_fake_connection_->encodeProtocolError();
+  ASSERT_TRUE(hds_fake_connection_->close());
   ASSERT_TRUE(hds_fake_connection_->waitForDisconnect());
 
   // Server <--> Envoy, connect once again
@@ -1327,6 +1327,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
 }
 
 } // namespace
