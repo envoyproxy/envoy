@@ -32,7 +32,7 @@ protected:
   SimpleHttpCacheTest() : vary_allow_list_(getConfig().allowed_vary_headers()) {
     request_headers_.setMethod("GET");
     request_headers_.setHost("example.com");
-    request_headers_.setForwardedProto("https");
+    request_headers_.setScheme("https");
     request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
   }
 

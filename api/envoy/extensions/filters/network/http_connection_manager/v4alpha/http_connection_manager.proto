@@ -993,6 +993,7 @@ message RequestIDExtension {
 
 // [#protodoc-title: Envoy Mobile HTTP connection manager]
 // HTTP connection manager for use in Envoy mobile.
+// [#extension: envoy.filters.network.envoy_mobile_http_connection_manager]
 message EnvoyMobileHttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.network.http_connection_manager.v3."

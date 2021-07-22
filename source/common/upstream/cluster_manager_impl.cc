@@ -1550,7 +1550,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions);
+        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions,
+        quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1571,7 +1572,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
     return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state, source);
+                                         options, transport_socket_options, state, source,
+                                         quic_stat_names_, stats_);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
