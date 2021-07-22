@@ -101,10 +101,12 @@ public:
   ConnectivityGridTestBase(bool use_alternate_protocols)
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
         alternate_protocols_(maybeCreateAlternateProtocolsCacheImpl(use_alternate_protocols)),
+        quic_stat_names_(store_.symbolTable()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
               Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_,
-              state_, simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_),
+              state_, simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_,
+              quic_stat_names_, store_),
         host_(grid_.host()) {
     grid_.info_ = &info_;
     grid_.encoder_ = &encoder_;
@@ -134,6 +136,8 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Random::MockRandomGenerator> random_;
   AlternateProtocolsCacheSharedPtr alternate_protocols_;
+  Stats::IsolatedStoreImpl store_;
+  Quic::QuicStatNames quic_stat_names_;
   ConnectivityGridForTest grid_;
   Upstream::HostDescriptionConstSharedPtr host_;
 
@@ -620,10 +624,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-      simTime(), alternate_protocols_, std::chrono::milliseconds(300), options_);
+  ConnectivityGrid grid(dispatcher_, random_,
+                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+                        Upstream::ResourcePriority::Default, socket_options_,
+                        transport_socket_options_, state_, simTime(), alternate_protocols_,
+                        std::chrono::milliseconds(300), options_, quic_stat_names_, store_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

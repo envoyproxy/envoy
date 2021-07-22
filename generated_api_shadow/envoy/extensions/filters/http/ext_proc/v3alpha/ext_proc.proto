@@ -26,18 +26,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The filter will send the "request_headers" and "response_headers" messages by default.
 // In addition, if the "processing mode" is set , the "request_body" and "response_body"
 // messages will be sent if the corresponding fields of the "processing_mode" are
-// set to BUFFERED, and trailers will be sent if the corresponding fields are set
-// to SEND. The other body processing modes are not
+// set to BUFFERED or STREAMED, and trailers will be sent if the corresponding fields are set
+// to SEND. The BUFFERED_PARTIAL body processing mode is not
 // implemented yet. The filter will also respond to "immediate_response" messages
 // at any point in the stream.
 
 // As designed, the filter supports up to six different processing steps, which are in the
 // process of being implemented:
+//
 // * Request headers: IMPLEMENTED
-// * Request body: Only BUFFERED mode is implemented
+// * Request body: BUFFERED_PARTIAL processing mode is not yet implemented
 // * Request trailers: IMPLEMENTED
 // * Response headers: IMPLEMENTED
-// * Response body: Only BUFFERED mode is implemented
+// * Response body: BUFFERED_PARTIAL processing mode is not yet implemented
 // * Response trailers: IMPLEMENTED
 
 // The filter communicates with an external gRPC service that can use it to do a variety of things
