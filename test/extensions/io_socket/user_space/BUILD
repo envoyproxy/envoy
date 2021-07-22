@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "file_event_impl_test",
     srcs = ["file_event_impl_test.cc"],
-    extension_name = "envoy.io_socket.user_space",
+    extension_names = ["envoy.io_socket.user_space"],
     deps = [
         "//envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "io_handle_impl_test",
     srcs = ["io_handle_impl_test.cc"],
-    extension_name = "envoy.io_socket.user_space",
+    extension_names = ["envoy.io_socket.user_space"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",

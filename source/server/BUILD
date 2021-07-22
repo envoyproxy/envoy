@@ -86,6 +86,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
+        "//envoy/runtime:runtime_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/stats:timespan_interface",
         "//source/common/common:linked_object",

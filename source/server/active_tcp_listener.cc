@@ -14,12 +14,12 @@ namespace Envoy {
 namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config)
-    : ActiveStreamListenerBase(
-          parent, parent.dispatcher(),
-          parent.dispatcher().createListener(config.listenSocketFactory().getListenSocket(), *this,
-                                             config.bindToPort(), config.tcpBacklogSize()),
-          config),
+                                     Network::ListenerConfig& config, uint32_t worker_index)
+    : ActiveStreamListenerBase(parent, parent.dispatcher(),
+                               parent.dispatcher().createListener(
+                                   config.listenSocketFactory().getListenSocket(worker_index),
+                                   *this, config.bindToPort()),
+                               config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -232,7 +232,6 @@ ActiveTcpConnection::ActiveTcpConnection(ActiveConnections& active_connections,
   listener.stats_.downstream_cx_active_.inc();
   listener.per_worker_stats_.downstream_cx_total_.inc();
   listener.per_worker_stats_.downstream_cx_active_.inc();
-  stream_info_->setConnectionID(connection_->id());
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept

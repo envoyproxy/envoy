@@ -146,6 +146,25 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
 
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContext) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
+                                                 /*subject_alt_name_matchers=*/{}),
+            Envoy::Ssl::ClientValidationStatus::NotValidated);
+  X509 cert = {};
+  EXPECT_EQ(default_validator->doVerifyCertChain(/*store_ctx=*/nullptr,
+                                                 /*ssl_extended_info=*/nullptr, /*leaf_cert=*/cert,
+                                                 /*transport_socket_options=*/nullptr),
+            0);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

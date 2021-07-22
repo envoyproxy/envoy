@@ -19,12 +19,13 @@ envoy_py_binary(
         ":plugin",
         "//:.coveragerc",
         "//:pytest.ini",
-        "//tools/base:runner",
-        "//tools/base:utils",
     ],
     deps = [
         requirement("pytest"),
+        requirement("pytest-asyncio"),
         requirement("pytest-cov"),
+        "//tools/base:runner",
+        "//tools/base:utils",
     ],
 )
 

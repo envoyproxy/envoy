@@ -25,9 +25,95 @@ class DummyForkingRunner(runner.ForkingRunner):
         self.args = PropertyMock()
 
 
+class Error1(Exception):
+
+    def __str__(self):
+        return ""
+
+    pass
+
+
+class Error2(Exception):
+    pass
+
+
+def _failing_runner(errors):
+
+    class DummyFailingRunner(object):
+
+        log = PropertyMock()
+        _runner = MagicMock()
+
+        def __init__(self, raises=None):
+            self.raises = raises
+
+        @runner.catches(errors)
+        def run(self, *args, **kwargs):
+            result = self._runner(*args, **kwargs)
+            if self.raises:
+                raise self.raises("AN ERROR OCCURRED")
+            return result
+
+    return DummyFailingRunner
+
+
+@pytest.mark.parametrize(
+    "errors",
+    [Error1, (Error1, Error2)])
+@pytest.mark.parametrize(
+    "raises",
+    [None, Error1, Error2])
+@pytest.mark.parametrize(
+    "args",
+    [(), ("ARG1", "ARG2")])
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, dict(key1="VAL1", key2="VAL2")])
+def test_catches(errors, raises, args, kwargs):
+    run = _failing_runner(errors)(raises)
+    should_fail = (
+        raises
+        and not (
+            raises == errors
+            or (isinstance(errors, tuple)
+                and raises in errors)))
+
+    if should_fail:
+        result = 1
+        with pytest.raises(raises):
+            run.run(*args, **kwargs)
+    else:
+        result = run.run(*args, **kwargs)
+
+    assert (
+        list(run._runner.call_args)
+        == [args, kwargs])
+
+    if not should_fail and raises:
+        assert result == 1
+        error = run.log.error.call_args[0][0]
+        _error = raises("AN ERROR OCCURRED")
+        assert (
+            error
+            == (str(_error) or repr(_error)))
+        assert (
+            list(run.log.error.call_args)
+            == [(error,), {}])
+    else:
+        assert not run.log.error.called
+
+    if raises:
+        assert result == 1
+    else:
+        assert result == run._runner.return_value
+
+
 def test_runner_constructor():
     run = runner.Runner("path1", "path2", "path3")
     assert run._args == ("path1", "path2", "path3")
+    assert run.log_field_styles == runner.LOG_FIELD_STYLES
+    assert run.log_level_styles == runner.LOG_LEVEL_STYLES
+    assert run.log_fmt == runner.LOG_FMT
 
 
 def test_runner_args():
@@ -70,35 +156,39 @@ def test_runner_log(patches):
     run = runner.Runner("path1", "path2", "path3")
     patched = patches(
         "logging.getLogger",
-        "logging.StreamHandler",
         "LogFilter",
+        "coloredlogs",
+        "verboselogs",
         ("Runner.log_level", dict(new_callable=PropertyMock)),
+        ("Runner.log_level_styles", dict(new_callable=PropertyMock)),
+        ("Runner.log_field_styles", dict(new_callable=PropertyMock)),
+        ("Runner.log_fmt", dict(new_callable=PropertyMock)),
         ("Runner.name", dict(new_callable=PropertyMock)),
         prefix="tools.base.runner")
 
-    with patched as (m_logger, m_stream, m_filter, m_level, m_name):
-        loggers = (MagicMock(), MagicMock())
-        m_stream.side_effect = loggers
+    with patched as patchy:
+        (m_logger, m_filter, m_color, m_verb,
+         m_level, m_lstyle, m_fstyle, m_fmt, m_name) = patchy
         assert run.log == m_logger.return_value
+
+    assert (
+        list(m_verb.install.call_args)
+        == [(), {}])
     assert (
         list(m_logger.return_value.setLevel.call_args)
         == [(m_level.return_value,), {}])
     assert (
-        list(list(c) for c in m_stream.call_args_list)
-        == [[(sys.stdout,), {}],
-            [(sys.stderr,), {}]])
+        list(m_logger.return_value.setLevel.call_args)
+        == [(m_level.return_value,), {}])
     assert (
-        list(loggers[0].setLevel.call_args)
-        == [(logging.DEBUG,), {}])
-    assert (
-        list(loggers[0].addFilter.call_args)
-        == [(m_filter.return_value,), {}])
-    assert (
-        list(loggers[1].setLevel.call_args)
-        == [(logging.WARN,), {}])
-    assert (
-        list(list(c) for c in m_logger.return_value.addHandler.call_args_list)
-        == [[(loggers[0],), {}], [(loggers[1],), {}]])
+        list(m_color.install.call_args)
+        == [(),
+            {'fmt': m_fmt.return_value,
+             'isatty': True,
+             'field_styles': m_fstyle.return_value,
+             'level': 'DEBUG',
+             'level_styles': m_lstyle.return_value,
+             'logger': m_logger.return_value}])
     assert "log" in run.__dict__
 
 
@@ -156,9 +246,49 @@ def test_checker_path():
         == [(), {}])
 
 
-def test_runner_add_arguments(patches):
+def test_checker_stdout(patches):
     run = runner.Runner("path1", "path2", "path3")
-    assert run.add_arguments("PARSER") is None
+
+    patched = patches(
+        "logging",
+        ("Runner.log_level", dict(new_callable=PropertyMock)),
+        prefix="tools.base.runner")
+
+    with patched as (m_log, m_level):
+        assert run.stdout == m_log.getLogger.return_value
+
+    assert (
+        list(m_log.getLogger.call_args)
+        == [('stdout',), {}])
+    assert (
+        list(m_log.getLogger.return_value.setLevel.call_args)
+        == [(m_level.return_value,), {}])
+    assert (
+        list(m_log.StreamHandler.call_args)
+        == [(sys.stdout,), {}])
+    assert (
+        list(m_log.Formatter.call_args)
+        == [('%(message)s',), {}])
+    assert (
+        list(m_log.StreamHandler.return_value.setFormatter.call_args)
+        == [(m_log.Formatter.return_value,), {}])
+    assert (
+        list(m_log.getLogger.return_value.addHandler.call_args)
+        == [(m_log.StreamHandler.return_value,), {}])
+
+
+def test_runner_add_arguments():
+    run = runner.Runner("path1", "path2", "path3")
+    parser = MagicMock()
+
+    assert run.add_arguments(parser) is None
+
+    assert (
+        list(list(c) for c in parser.add_argument.call_args_list)
+        == [[('--log-level', '-l'),
+             {'choices': ['debug', 'info', 'warn', 'error'],
+              'default': 'info', 'help': 'Log level to display'}],
+            ])
 
 
 # LogFilter tests
