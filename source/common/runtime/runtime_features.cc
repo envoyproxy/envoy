@@ -122,6 +122,9 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.test_feature_false",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
+    // When matching active listeners and wildcard matching is used, pick the listener
+    // with the same IP family type as the socket address
+    "envoy.reloadable_features.listener_wildcard_match_ip_family",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

@@ -23,6 +23,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* listener: added an option when balancing across active listeners and wildcard matching is used to return the listener that matches the IP family type associated with the listener's socket address. It is off by default, but is turned on by default in v1.19. To set change the runtime guard `envoy.reloadable_features.listener_wildcard_match_ip_family` to true.
 
 Deprecated
 ----------
