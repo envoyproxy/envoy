@@ -76,7 +76,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return true;
-      } else if (body_mode_ == ProcessingMode::STREAMED) {
+      } else if (body_mode_ == ProcessingMode::STREAMED && !no_body_) {
         if (complete_body_available_) {
           // All data came in before headers callback, so act just as if we were buffering
           // since effectively this is the same thing.
