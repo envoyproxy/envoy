@@ -119,6 +119,10 @@ void EnvoyQuicServerStream::encodeMetadata(const Http::MetadataMapVector& /*meta
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
   if (local_end_stream_ && !reading_stopped()) {
     // This is after 200 early response. Reset with QUIC_STREAM_NO_ERROR instead
     // of propagating original reset reason. In QUICHE if a stream stops reading
@@ -127,9 +131,6 @@ void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
     runResetCallbacks(Http::StreamResetReason::LocalReset);
   } else {
     Reset(envoyResetReasonToQuicRstError(reason));
-  }
-  if (buffer_memory_account_) {
-    buffer_memory_account_->clearDownstream();
   }
 }
 

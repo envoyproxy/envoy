@@ -547,11 +547,12 @@ void ConnectionImpl::StreamImpl::encodeDataHelper(Buffer::Instance& data, bool e
 }
 
 void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
-  StreamImpl::resetStream(reason);
   // Clear the downstream on the account since we're resetting the downstream.
   if (buffer_memory_account_) {
     buffer_memory_account_->clearDownstream();
   }
+
+  StreamImpl::resetStream(reason);
 }
 
 void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
