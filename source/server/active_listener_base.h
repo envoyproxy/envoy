@@ -11,6 +11,7 @@ namespace Server {
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_overflow)                                                                  \
   COUNTER(downstream_cx_total)                                                                     \
+  COUNTER(downstream_cx_transport_socket_connect_timeout)                                          \
   COUNTER(downstream_cx_overload_reject)                                                           \
   COUNTER(downstream_global_cx_overflow)                                                           \
   COUNTER(downstream_pre_cx_timeout)                                                               \
