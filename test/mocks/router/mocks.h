@@ -412,7 +412,6 @@ public:
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
-  envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
   absl::optional<ConnectConfig> connect_config_;
 };
@@ -458,6 +457,7 @@ public:
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
   testing::NiceMock<MockRouteTracing> route_tracing_;
+  envoy::config::core::v3::Metadata metadata_;
 };
 
 class MockConfig : public Config {

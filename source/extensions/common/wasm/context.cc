@@ -551,7 +551,7 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::ROUTE_METADATA:
-    if (info) {
+    if (info && info->route()) {
       return CelProtoWrapper::CreateMessage(&info->route()->metadata(), arena);
     }
     break;

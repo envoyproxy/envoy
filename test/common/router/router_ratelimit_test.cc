@@ -295,12 +295,14 @@ public:
     descriptors_.clear();
     local_descriptors_.clear();
     stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
-    ON_CALL(Const(stream_info_), routeEntry()).WillByDefault(testing::Return(&route_));
+    ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
+    ON_CALL(Const(stream_info_), routeEntry())
+        .WillByDefault(testing::Return(&route_->route_entry_));
   }
 
   std::unique_ptr<RateLimitPolicyEntryImpl> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl header_;
-  NiceMock<MockRouteEntry> route_;
+  std::shared_ptr<MockRoute> route_{new NiceMock<MockRoute>()};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_;
   std::vector<Envoy::RateLimit::LocalDescriptor> local_descriptors_;
   Network::Address::InstanceConstSharedPtr default_remote_address_{
@@ -658,7 +660,7 @@ filter_metadata:
       prop: foo
   )EOF";
 
-  TestUtility::loadFromYaml(metadata_yaml, route_.metadata_);
+  TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
 
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);

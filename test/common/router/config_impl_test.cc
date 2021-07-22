@@ -4898,7 +4898,7 @@ virtual_hosts:
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
     EXPECT_EQ("test_value",
-              Envoy::Config::Metadata::metadataValue(&route_entry->metadata(), "com.bar.foo", "baz")
+              Envoy::Config::Metadata::metadataValue(&route->metadata(), "com.bar.foo", "baz")
                   .string_value());
     EXPECT_EQ(nullptr, route_entry->typedMetadata().get<Foo>(baz_factory.name()));
     EXPECT_EQ("meh", route_entry->typedMetadata().get<Baz>(baz_factory.name())->name);
@@ -6319,7 +6319,7 @@ virtual_hosts:
   checkPathMatchCriterion(route.get(), "/", PathMatchType::Prefix);
 
   const auto route_entry = route->routeEntry();
-  const auto& metadata = route_entry->metadata();
+  const auto& metadata = route->metadata();
   const auto& typed_metadata = route_entry->typedMetadata();
 
   EXPECT_EQ("test_value",

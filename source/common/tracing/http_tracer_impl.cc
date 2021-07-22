@@ -354,7 +354,8 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    return &info.route()->metadata();
+    Router::RouteConstSharedPtr route = info.route();
+    return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();
