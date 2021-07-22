@@ -83,10 +83,11 @@ class RouterUpstreamLogTest : public testing::Test {
 public:
   void init(absl::optional<envoy::config::accesslog::v3::AccessLog> upstream_log) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
+    static const std::string cluster_name = "cluster_0";
 
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-    ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef("cluster_0"));
-    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef("cluster_0"));
+    ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
+    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
 
     if (upstream_log) {
