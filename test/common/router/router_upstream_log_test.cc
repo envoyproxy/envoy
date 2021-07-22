@@ -165,6 +165,7 @@ public:
 
     EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(response_code));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
     Http::ResponseTrailerMapPtr response_trailers(
