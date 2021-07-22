@@ -73,7 +73,7 @@ public:
   const Network::SocketAddressSetter& addressProvider() const override {
     return network_connection_->connectionSocket()->addressProvider();
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
+  Network::SocketAddressSetterSharedPtr addressProviderSharedPtr() const override {
     return network_connection_->connectionSocket()->addressProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

@@ -655,11 +655,12 @@ public:
   StreamInfoSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
 
   absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
+    if (stream_info.downstreamAddressProvider().downstreamSslConnection() == nullptr) {
       return absl::nullopt;
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    const auto value =
+        field_extractor_(*stream_info.downstreamAddressProvider().downstreamSslConnection());
     if (value && value->empty()) {
       return absl::nullopt;
     }
@@ -668,11 +669,12 @@ public:
   }
 
   ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
+    if (stream_info.downstreamAddressProvider().downstreamSslConnection() == nullptr) {
       return unspecifiedValue();
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    const auto value =
+        field_extractor_(*stream_info.downstreamAddressProvider().downstreamSslConnection());
     if (value && value->empty()) {
       return unspecifiedValue();
     }
@@ -1335,7 +1337,8 @@ DownstreamPeerCertVStartFormatter::DownstreamPeerCertVStartFormatter(const std::
           parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_START(") - 1),
           std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                const auto connection_info = stream_info.downstreamSslConnection();
+                const auto connection_info =
+                    stream_info.downstreamAddressProvider().downstreamSslConnection();
                 return connection_info != nullptr ? connection_info->validFromPeerCertificate()
                                                   : absl::optional<SystemTime>();
               })) {}
@@ -1347,7 +1350,8 @@ DownstreamPeerCertVEndFormatter::DownstreamPeerCertVEndFormatter(const std::stri
           parseFormat(token, sizeof("DOWNSTREAM_PEER_CERT_V_END(") - 1),
           std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
               [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
-                const auto connection_info = stream_info.downstreamSslConnection();
+                const auto connection_info =
+                    stream_info.downstreamAddressProvider().downstreamSslConnection();
                 return connection_info != nullptr ? connection_info->expirationPeerCertificate()
                                                   : absl::optional<SystemTime>();
               })) {}

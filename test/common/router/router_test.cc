@@ -4844,7 +4844,7 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  upstream_stream_info_.setDownstreamSslConnection(connection_info);
+  upstream_stream_info_.downstream_address_provider_->setDownstreamSslConnection(connection_info);
 
   expectResponseTimerCreate();
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -4865,11 +4865,14 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
-  ASSERT_NE(nullptr, callbacks_.streamInfo().upstreamSslConnection());
-  EXPECT_EQ(session_id, callbacks_.streamInfo().upstreamSslConnection()->sessionId());
+  ASSERT_NE(nullptr, callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection());
+  EXPECT_EQ(
+      session_id,
+      callbacks_.streamInfo().downstreamAddressProvider().upstreamSslConnection()->sessionId());
 }
 
 // Verify that upstream timing information is set into the StreamInfo after the upstream

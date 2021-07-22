@@ -181,8 +181,9 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == MTLS) {
-    return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
-                                info_.downstreamSslConnection()->peerCertificatePresented());
+    return CelValue::CreateBool(
+        info_.downstreamAddressProvider().downstreamSslConnection() != nullptr &&
+        info_.downstreamAddressProvider().downstreamSslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
     return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {
@@ -198,7 +199,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return {};
   }
 
-  auto ssl_info = info_.downstreamSslConnection();
+  auto ssl_info = info_.downstreamAddressProvider().downstreamSslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }
@@ -231,7 +232,7 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
     return CelValue::CreateStringView(info_.upstreamTransportFailureReason());
   }
 
-  auto ssl_info = info_.upstreamSslConnection();
+  auto ssl_info = info_.downstreamAddressProvider().upstreamSslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }

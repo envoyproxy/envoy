@@ -78,22 +78,11 @@ public:
   const Network::SocketAddressSetter& downstreamAddressProvider() const override {
     return *downstream_address_provider_;
   }
-  void
-  setDownstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    downstream_connection_info_ = connection_info;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr downstreamSslConnection() const override {
-    return downstream_connection_info_;
-  }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    upstream_connection_info_ = connection_info;
+    downstream_address_provider_->setUpstreamSslConnection(connection_info);
   }
 
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return upstream_connection_info_;
-  }
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }

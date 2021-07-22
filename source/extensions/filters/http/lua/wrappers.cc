@@ -114,7 +114,7 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
 }
 
 int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
-  const auto& ssl = stream_info_.downstreamSslConnection();
+  const auto& ssl = stream_info_.downstreamAddressProvider().downstreamSslConnection();
   if (ssl != nullptr) {
     if (downstream_ssl_connection_.get() != nullptr) {
       downstream_ssl_connection_.pushStack();
