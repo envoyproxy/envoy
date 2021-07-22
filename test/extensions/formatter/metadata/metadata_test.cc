@@ -17,16 +17,18 @@ namespace Formatter {
 class MetadataFormatterTest : public ::testing::Test {
 public:
   MetadataFormatterTest() {
+    // Create metadata object with test values.
     ProtobufWkt::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map["test_key"] = ValueUtil::stringValue("test_value");
-    (*metadata_.mutable_filter_metadata())["dynamic.test"] = struct_obj;
+    (*metadata_.mutable_filter_metadata())["metadata.test"] = struct_obj;
   }
 
+  // Method creates a yaml config for specific access log METADATA type.
   ::Envoy::Formatter::FormatterPtr getTestMetadataFormatter(std::string type) {
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
-    inline_string: "%METADATA({}:dynamic.test:test_key)%"
+    inline_string: "%METADATA({}:metadata.test:test_key)%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
@@ -37,10 +39,7 @@ public:
     return Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   }
 
-  Http::TestRequestHeaderMapImpl request_headers_{
-      {":method", "GET"},
-      {":path", "/request/path?secret=parameter"},
-      {"x-envoy-original-path", "/original/path?secret=parameter"}};
+  Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
   StreamInfo::MockStreamInfo stream_info_;
@@ -51,14 +50,15 @@ public:
   envoy::config::core::v3::Metadata metadata_;
 };
 
+// Exception should be thrown for unknown type of metadata.
 TEST_F(MetadataFormatterTest, NonExistingMetadataProvider) {
   EXPECT_THROW(getTestMetadataFormatter("BLAH"), EnvoyException);
 }
 
-// Full and extensive testing of Dynamic Metadata formatter is in
+// Extensive testing of Dynamic Metadata formatter is in
 // test/common/formatter/substitution_formatter_test.cc file.
 // Here just make sure that METADATA(DYNAMIC .... returns
-// Dynamic Metadata formatter and run simple test.
+// Dynamic Metadata formatter and dynamicMetadata() is called.
 TEST_F(MetadataFormatterTest, DynamicMetadata) {
   // Make sure that formatter accesses dynamic metadata.
   EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
@@ -69,6 +69,10 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
                                                         response_trailers_, stream_info_, body_));
 }
 
+// Extensive testing of Cluster Metadata formatter is in
+// test/common/formatter/substitution_formatter_test.cc file.
+// Here just make sure that METADATA(CLUSTER .... accesses
+// cluster's metadata object.
 TEST_F(MetadataFormatterTest, ClusterMetadata) {
   // Make sure that formatter accesses cluster metadata.
   absl::optional<std::shared_ptr<NiceMock<Upstream::MockClusterInfo>>> cluster =
@@ -81,8 +85,8 @@ TEST_F(MetadataFormatterTest, ClusterMetadata) {
                                                         response_trailers_, stream_info_, body_));
 }
 
+// Test that METADATA(ROUTE accesses stream_info's RouteEntry.
 TEST_F(MetadataFormatterTest, RouteMetadata) {
-  // Make sure that formatter accesses dynamic metadata.
   NiceMock<Router::MockRouteEntry> route;
   EXPECT_CALL(route, metadata()).WillRepeatedly(testing::ReturnRef(metadata_));
   EXPECT_CALL(stream_info_, routeEntry()).WillRepeatedly(testing::Return(&route));
@@ -92,6 +96,7 @@ TEST_F(MetadataFormatterTest, RouteMetadata) {
                                                       response_trailers_, stream_info_, body_));
 }
 
+// Make sure that code handles nullptr returned for stream_info::routeEntry().
 TEST_F(MetadataFormatterTest, NonExistentRouteMetadata) {
   // Make sure that formatter accesses dynamic metadata.
   NiceMock<Router::MockRouteEntry> route;
