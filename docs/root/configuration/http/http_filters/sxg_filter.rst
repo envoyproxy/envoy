@@ -41,7 +41,7 @@ The following is an example configuring the filter.
     name: private_key
     sds_config:
       path: "/etc/envoy/sxg-private-key.yaml"
-    duration: 432000s
+  duration: 432000s
   mi_record_size: 1024
   client_can_accept_sxg_header: "x-custom-accept-sxg"
   should_encode_sxg_header: "x-custom-should-encode"
