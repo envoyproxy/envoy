@@ -3131,7 +3131,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   }
 }
 
-TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -3148,7 +3148,8 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
   EXPECT_EQ(Http::Protocol::Http2,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
-  EXPECT_EQ(Http::Protocol::Http3,
+  // This will get downgraded because the cluster does not support HTTP/3
+  EXPECT_EQ(Http::Protocol::Http2,
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
@@ -3395,6 +3396,41 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
                           "HTTP3 configured but not enabled in the build.");
 }
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        use_downstream_protocol_config:
+          http3_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  auto cluster = makeCluster(yaml);
+
+  EXPECT_EQ(Http::Protocol::Http10,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
+  EXPECT_EQ(Http::Protocol::Http3,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+}
+
 #endif // ENVOY_ENABLE_QUIC
 
 // Validate empty singleton for HostsPerLocalityImpl.
