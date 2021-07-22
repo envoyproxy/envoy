@@ -308,7 +308,8 @@ void ActiveTcpListener::newConnection(Network::ConnectionSocketPtr&& socket,
       std::move(socket), std::move(transport_socket), *stream_info);
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
-    server_conn_ptr->setTransportSocketConnectTimeout(timeout);
+    server_conn_ptr->setTransportSocketConnectTimeout(
+        timeout, &stats_.downstream_cx_transport_socket_connect_timeout_);
   }
 
   ActiveTcpConnectionPtr active_connection(

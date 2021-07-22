@@ -46,6 +46,7 @@ New Features
 ------------
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
+* listener: new listener metric `downstream_cx_transport_socket_connect_timeout` to track transport socket timeouts.
 
 Deprecated
 ----------
