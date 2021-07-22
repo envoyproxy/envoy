@@ -11,7 +11,7 @@ SXG
 
   The SXG filter is currently under active development.
 
-This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses [libsxg](https://github.com/google/libsxg/) to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document.
+This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses `libsxg <https://github.com/google/libsxg/>`_ to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document.
 
 Transaction flow:
 
@@ -21,7 +21,7 @@ Transaction flow:
 
 If there is an error generating the SXG package we fall back to the original HTML.
 
-For more information on Signed HTTP Exchanges see: https://developers.google.com/web/updates/2018/11/signed-exchanges
+For more information on Signed HTTP Exchanges see `this doc <https://developers.google.com/web/updates/2018/11/signed-exchanges>`_.
 
 Example configuration
 ---------------------
@@ -41,15 +41,10 @@ The following is an example configuring the filter.
     name: private_key
     sds_config:
       path: "/etc/envoy/sxg-private-key.yaml"
-  # (Optional): defaults to 604800s (7 days in seconds) if not provided
-  duration: 432000s
-  # (Optional): defaults to 4096 if not provided
+    duration: 432000s
   mi_record_size: 1024
-  # (Optional): defaults to `x-envoy-client-can-accept-sxg` if not provided
   client_can_accept_sxg_header: "x-custom-accept-sxg"
-  # (Optional): defaults to `x-envoy-should-encode-sxg` if not provided
   should_encode_sxg_header: "x-custom-should-encode"
-  # (Optional)
   header_prefix_filters:
     - "x-foo-"
     - "x-bar-"
@@ -57,7 +52,7 @@ The following is an example configuring the filter.
 Notes
 -----
 
-Instructions for generating a self-signed certificate and private key for testing can be found [here](https://github.com/WICG/webpackage/tree/master/go/signedexchange#creating-our-first-signed-exchange)
+Instructions for generating a self-signed certificate and private key for testing can be found `here <https://github.com/WICG/webpackage/tree/master/go/signedexchange#creating-our-first-signed-exchange>`__
 
 Statistics
 ----------

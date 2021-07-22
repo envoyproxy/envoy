@@ -31,7 +31,9 @@ message SXG {
 
   // The duration for which the generated SXG package will be valid. Default is 604800s (7 days in seconds).
   // Note that in order to account for clock skew, the timestamp will be backdated by a day. So, if duration
-  // is set to 7 days, that will be 7 days from 24 hours ago (6 days from now).
+  // is set to 7 days, that will be 7 days from 24 hours ago (6 days from now). Also note that while 6/7 days
+  // is appropriate for most content, if the downstream service is serving Javascript, or HTML with inline
+  // Javascript, 1 day (so, with backdated expiry, 2 days, or 172800 seconds) is more appropriate.
   google.protobuf.Duration duration = 3;
 
   // The SXG response payload is Merkle Integrity Content Encoding (MICE) encoded (specification is [here](https://datatracker.ietf.org/doc/html/draft-thomson-http-mice-03))
