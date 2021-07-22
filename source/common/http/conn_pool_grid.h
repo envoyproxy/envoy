@@ -3,6 +3,7 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/conn_pool_base.h"
 #include "source/common/http/http3_status_tracker.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -134,7 +135,8 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    AlternateProtocolsCacheSharedPtr alternate_protocols,
                    std::chrono::milliseconds next_attempt_duration,
-                   ConnectivityOptions connectivity_options);
+                   ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
+                   Stats::Scope& scope);
   ~ConnectivityGrid() override;
 
   // Http::ConnPool::Instance
@@ -210,6 +212,9 @@ private:
 
   // Wrapped callbacks are stashed in the wrapped_callbacks_ for ownership.
   std::list<WrapperCallbacksPtr> wrapped_callbacks_;
+
+  Quic::QuicStatNames& quic_stat_names_;
+  Stats::Scope& scope_;
 };
 
 } // namespace Http
