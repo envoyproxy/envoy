@@ -78,10 +78,10 @@ bool HappyEyeballsConnectionImpl::initializeReadFilters() {
   }
   // Filters should only be notified of events on the final connection, so defer
   // initialization of the filters until the final connection has been determined.
-  if (!post_connect_state_.read_filters_.empty()) {
+  if (post_connect_state_.read_filters_.empty()) {
     return false;
   }
-  post_connect_state_.initialize_read_filters_.value() = true;
+  post_connect_state_.initialize_read_filters_ = true;
   return true;
 }
 
@@ -230,7 +230,8 @@ uint32_t HappyEyeballsConnectionImpl::bufferLimit() const { return connections_[
 
 bool HappyEyeballsConnectionImpl::aboveHighWatermark() const {
   if (!connect_finished_) {
-    return above_write_high_water_mark_;
+    return post_connect_state_.write_buffer_.has_value() &&
+           post_connect_state_.write_buffer_.value()->highWatermarkTriggered();
   }
 
   return connections_[0]->aboveHighWatermark();
@@ -536,8 +537,7 @@ void HappyEyeballsConnectionImpl::onBelowWriteBufferLowWatermark(
 }
 
 void HappyEyeballsConnectionImpl::onWriteBufferHighWatermark() {
-  ASSERT(!above_write_high_water_mark_);
-  above_write_high_water_mark_ = true;
+  ASSERT(!connect_finished_);
 }
 
 } // namespace Network

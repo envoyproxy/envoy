@@ -200,8 +200,6 @@ private:
   // True when connect() has finished, either success or failure.
   bool connect_finished_ = false;
   Event::TimerPtr next_attempt_timer_;
-
-  bool above_write_high_water_mark_ = false;
 };
 
 } // namespace Network
