@@ -55,7 +55,8 @@ public:
 
   explicit ProcessorState(Filter& filter)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
-        complete_body_available_(false), trailers_available_(false), body_replaced_(false) {}
+        complete_body_available_(false), trailers_available_(false), body_replaced_(false),
+        bytes_enqueued_(0) {}
   ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
   ProcessorState& operator=(const ProcessorState&) = delete;
