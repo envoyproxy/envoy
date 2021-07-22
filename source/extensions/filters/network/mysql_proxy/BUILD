@@ -78,6 +78,9 @@ envoy_cc_library(
     name = "util_lib",
     srcs = ["mysql_utils.cc"],
     hdrs = ["mysql_utils.h"],
+    external_deps = [
+        "ssl",
+    ],
     deps = [
         ":codec_interface",
         "//source/common/buffer:buffer_lib",
