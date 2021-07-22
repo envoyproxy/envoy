@@ -18,14 +18,14 @@ load("@rules_cc//cc:defs.bzl", "objc_library")
 #     ],
 # )
 #
-def envoy_mobile_swift_test(name, srcs, data = [], deps = []):
+def envoy_mobile_swift_test(name, srcs, data = [], deps = [], repository = ""):
     test_lib_name = name + "_lib"
     swift_library(
         name = test_lib_name,
         srcs = srcs,
         data = data,
         deps = [
-            "//library/swift:ios_framework_archive",
+            repository + "//library/swift:ios_framework_archive",
         ] + deps,
         linkopts = ["-lresolv.9"],
         visibility = ["//visibility:private"],
