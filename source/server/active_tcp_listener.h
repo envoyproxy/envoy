@@ -9,8 +9,6 @@
 #include "source/server/active_stream_listener_base.h"
 #include "source/server/active_tcp_socket.h"
 
-#include "absl/container/node_hash_map.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -98,7 +96,7 @@ public:
    */
   void removeConnection(ActiveTcpConnection& connection);
 
-  absl::node_hash_map<const Network::FilterChain*, std::unique_ptr<ActiveConnections>>
+  absl::flat_hash_map<const Network::FilterChain*, std::unique_ptr<ActiveConnections>>
       connections_by_context_;
 
   Network::TcpConnectionHandler& tcp_conn_handler_;
