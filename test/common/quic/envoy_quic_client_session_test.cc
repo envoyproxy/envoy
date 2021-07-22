@@ -64,32 +64,6 @@ public:
   using EnvoyQuicClientConnection::connectionStats;
 };
 
-class TestQuicCryptoClientStream : public quic::QuicCryptoClientStream {
-public:
-  TestQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
-                             std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                             quic::QuicCryptoClientConfig* crypto_config,
-                             ProofHandler* proof_handler, bool has_application_state)
-      : quic::QuicCryptoClientStream(server_id, session, std::move(verify_context), crypto_config,
-                                     proof_handler, has_application_state) {}
-
-  bool encryption_established() const override { return true; }
-};
-
-class TestQuicCryptoClientStreamFactory : public EnvoyQuicCryptoClientStreamFactoryInterface {
-public:
-  std::unique_ptr<quic::QuicCryptoClientStreamBase>
-  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
-                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                                    quic::QuicCryptoClientConfig* crypto_config,
-                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                                    bool has_application_state) override {
-    return std::make_unique<TestQuicCryptoClientStream>(server_id, session,
-                                                        std::move(verify_context), crypto_config,
-                                                        proof_handler, has_application_state);
-  }
-};
-
 class EnvoyQuicClientSessionTest : public testing::TestWithParam<bool> {
 public:
   EnvoyQuicClientSessionTest()
@@ -97,7 +71,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
           SetQuicReloadableFlag(quic_disable_version_draft_29, !GetParam());
-          SetQuicReloadableFlag(quic_enable_version_rfcv1, GetParam());
+          SetQuicReloadableFlag(quic_disable_version_rfcv1, !GetParam());
           return quic::ParsedVersionOfIndex(quic::CurrentSupportedVersions(), 0);
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),

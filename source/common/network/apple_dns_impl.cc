@@ -78,6 +78,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
     DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
     if (error != kDNSServiceErr_NoError) {
       ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
+      chargeGetAddrInfoErrorStats(error);
       return nullptr;
     }
 
@@ -103,6 +104,23 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
   callback(DnsResolver::ResolutionStatus::Success,
            {DnsResponse(address, std::chrono::seconds(60))});
   return nullptr;
+}
+
+void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error_code) {
+  switch (error_code) {
+  case kDNSServiceErr_DefunctConnection:
+    stats_.connection_failure_.inc();
+    break;
+  case kDNSServiceErr_NoRouter:
+    stats_.network_failure_.inc();
+    break;
+  case kDNSServiceErr_Timeout:
+    stats_.timeout_.inc();
+    break;
+  default:
+    stats_.get_addr_failure_.inc();
+    break;
+  }
 }
 
 AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl& parent,
@@ -222,9 +240,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
 
   // Generic error handling.
   if (error_code != kDNSServiceErr_NoError) {
-    // TODO(junr03): consider creating stats for known error types (timeout, refused connection,
-    // etc.). Currently a bit challenging because there is no scope access wired through. Current
-    // query gets a failure status
+    parent_.chargeGetAddrInfoErrorStats(error_code);
 
     pending_cb_.status_ = ResolutionStatus::Failure;
     pending_cb_.responses_.clear();

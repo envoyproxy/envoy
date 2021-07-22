@@ -14,18 +14,14 @@ namespace {
 
 class CanServeRequestFromCacheTest : public testing::Test {
 protected:
-  Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
-                                                     {":method", "GET"},
-                                                     {"x-forwarded-proto", "http"},
-                                                     {":authority", "test.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_ = {
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "test.com"}};
 };
 
 class RequestConditionalHeadersTest : public testing::TestWithParam<std::string> {
 protected:
-  Http::TestRequestHeaderMapImpl request_headers_ = {{":path", "/"},
-                                                     {":method", "GET"},
-                                                     {"x-forwarded-proto", "http"},
-                                                     {":authority", "test.com"}};
+  Http::TestRequestHeaderMapImpl request_headers_ = {
+      {":path", "/"}, {":method", "GET"}, {":scheme", "http"}, {":authority", "test.com"}};
   std::string conditionalHeader() const { return GetParam(); }
 };
 
@@ -78,11 +74,11 @@ TEST_F(CanServeRequestFromCacheTest, MethodHeader) {
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
-TEST_F(CanServeRequestFromCacheTest, ForwardedProtoHeader) {
+TEST_F(CanServeRequestFromCacheTest, SchemeHeader) {
   EXPECT_TRUE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
-  request_headers_.setForwardedProto("ftp");
+  request_headers_.setScheme("ftp");
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
-  request_headers_.removeForwardedProto();
+  request_headers_.removeScheme();
   EXPECT_FALSE(CacheabilityUtils::canServeRequestFromCache(request_headers_));
 }
 
