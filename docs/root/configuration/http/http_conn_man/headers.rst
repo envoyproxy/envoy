@@ -48,7 +48,7 @@ server
 The *server* header will be set during encoding to the value in the :ref:`server_name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.server_name>` option.
 
-.. _config_http_conn_man_header_referer:
+.. _config_http_conn_man_headers_referer:
 
 referer
 -------
