@@ -59,7 +59,7 @@ void ActiveTcpSocket::startTimer() {
 }
 
 void ActiveTcpSocket::unlink() {
-  auto removed = removeFromList(listener_.sockets_);
+  auto removed = listener_.removeSocket(std::move(*this));
   if (removed->timer_ != nullptr) {
     removed->timer_->disableTimer();
   }

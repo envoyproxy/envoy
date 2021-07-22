@@ -55,6 +55,23 @@ public:
    */
   void newConnection(Network::ConnectionSocketPtr&& socket,
                      std::unique_ptr<StreamInfo::StreamInfo> stream_info);
+
+  /**
+   * Remove the socket from this listener. Should be called when the socket passes the listener
+   * filter.
+   * @return std::unique_ptr<ActiveTcpSocket> the exact same socket in the parameter but in the
+   * state that not owned by the listener.
+   */
+  std::unique_ptr<ActiveTcpSocket> removeSocket(ActiveTcpSocket&& socket) {
+    return socket.removeFromList(sockets_);
+  }
+
+  /**
+   * @return const std::list<std::unique_ptr<ActiveTcpSocket>>& the sockets going through the
+   * listener filters.
+   */
+  const std::list<std::unique_ptr<ActiveTcpSocket>>& sockets() const { return sockets_; }
+
   /**
    * Schedule removal and destruction of all active connections owned by a filter chain.
    */
@@ -92,7 +109,6 @@ public:
   Network::ConnectionHandler& parent_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
 
 protected:
   /**
@@ -106,6 +122,8 @@ protected:
   virtual void newActiveConnection(const Network::FilterChain& filter_chain,
                                    Network::ServerConnectionPtr server_conn_ptr,
                                    std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+
+  std::list<std::unique_ptr<ActiveTcpSocket>> sockets_;
   Network::ListenerPtr listener_;
   // True if the follow up connection deletion is raised by the connection collection deletion is
   // performing. Otherwise, the collection should be deleted when the last connection in the
