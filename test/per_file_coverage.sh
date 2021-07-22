@@ -21,6 +21,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/quic:90.6"
 "source/common/tracing:96.1"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
+"source/common/config/xds_mux/grpc_mux_impl.h:69.8"
 "source/exe:94.3"
 "source/extensions/common/crypto:91.5"
 "source/extensions/common/tap:95.9"
