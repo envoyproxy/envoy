@@ -1320,7 +1320,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
             envoy::service::health::v3::Capability::HTTP);
 
   // Server asks for health checking
-  server_health_check_specifier_ = makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
