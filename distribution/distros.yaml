@@ -1,0 +1,28 @@
+
+debian_bullseye:
+  image: debian
+  tag: bullseye-slim
+
+ubuntu_impish:
+  image: ubuntu
+  tag: 21.10
+
+ubuntu_hirstute:
+  image: ubuntu
+  tag: 21.04
+
+redhat_8.1:
+  image: registry.access.redhat.com/ubi8/ubi
+  tag: 8.1
+
+redhat_8.2:
+  image: registry.access.redhat.com/ubi8/ubi
+  tag: 8.2
+
+redhat_8.3:
+  image: registry.access.redhat.com/ubi8/ubi
+  tag: 8.3
+
+redhat_8.4:
+  image: registry.access.redhat.com/ubi8/ubi
+  tag: 8.4

@@ -177,6 +177,8 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
 
+    external_http_archive("com_github_google_rpmpack")
+
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
