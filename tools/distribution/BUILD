@@ -6,6 +6,14 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_py_binary(
+    name = "tools.distribution.push",
+    deps = [
+        "//tools/base:runner",
+        "//tools/git:utils",
+    ],
+)
+
+envoy_py_binary(
     name = "tools.distribution.sign",
     deps = [
         "//tools/base:runner",
