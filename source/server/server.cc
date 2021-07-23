@@ -338,6 +338,10 @@ void InstanceImpl::initialize(const Options& options,
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
             options.restartEpoch(), restarter_.baseId(), restarter_.version());
 
+  // DefaultsProfileSingleton::initialize(new DefaultsProfile);
+  defaults_profile_ =
+      std::make_unique<ScopedDefaultsProfileSingleton>(std::make_unique<DefaultsProfile>());
+
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     ENVOY_LOG(info, "  {}: {}", ext.first, absl::StrJoin(ext.second->registeredNames(), ", "));

@@ -39,6 +39,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_defaults_lib",
+    srcs = ["envoy_defaults.cc"],
+    hdrs = ["envoy_defaults.h"],
+    deps = [
+        "//source/common/singleton:threadsafe_singleton",
+    ],
+)
+
+envoy_cc_library(
     name = "backoff_lib",
     srcs = ["backoff_strategy.cc"],
     hdrs = ["backoff_strategy.h"],

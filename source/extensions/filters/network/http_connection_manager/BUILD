@@ -34,6 +34,7 @@ envoy_cc_extension(
         "//envoy/server:options_interface",
         "//envoy/stats:stats_interface",
         "//source/common/access_log:access_log_lib",
+        "//source/common/common:envoy_defaults_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/filter/http:filter_config_discovery_lib",
