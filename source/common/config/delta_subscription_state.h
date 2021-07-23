@@ -26,8 +26,7 @@ namespace Config {
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                         const bool wildcard);
+                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
@@ -61,15 +60,17 @@ private:
 
   class ResourceState {
   public:
-    ResourceState(const envoy::service::discovery::v3::Resource& resource)
-        : version_(resource.version()) {}
-
     // Builds a ResourceState in the waitingForServer state.
     ResourceState() = default;
+    // Self-documenting alias of default constructor.
+    static ResourceState waitingForServer() { return ResourceState(); }
 
     // If true, we currently have no version of this resource - we are waiting for the server to
     // provide us with one.
-    bool waitingForServer() const { return version_ == absl::nullopt; }
+    bool isWaitingForServer() const { return version_ == absl::nullopt; }
+
+    void setAsWaitingForServer() { version_ = absl::nullopt; }
+    void setVersion(absl::string_view version) { version_ = std::string(version); }
 
     // Must not be called if waitingForServer() == true.
     std::string version() const {
@@ -81,31 +82,26 @@ private:
     absl::optional<std::string> version_;
   };
 
-  // Use these helpers to ensure resource_state_ and resource_names_ get updated together.
-  void addResourceState(const envoy::service::discovery::v3::Resource& resource);
-  void setResourceWaitingForServer(const std::string& resource_name);
-  void removeResourceState(const std::string& resource_name);
-
-  void populateDiscoveryRequest(envoy::service::discovery::v3::DeltaDiscoveryResponse& request);
+  void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
+  OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
   // any version for that resource: we need to inform the server if we lose interest in them, but we
   // also need to *not* include them in the initial_resource_versions map upon a reconnect.
-  absl::node_hash_map<std::string, ResourceState> resource_state_;
+  absl::node_hash_map<std::string, ResourceState> requested_resource_state_;
+  // A map from resource name to per-resource version. The keys of this map are resource names we
+  // have received as a part of the wildcard subscription.
+  absl::node_hash_map<std::string, std::string> wildcard_resource_state_;
 
   // Not all xDS resources supports heartbeats due to there being specific information encoded in
   // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
   // disable heartbeats for these resources (currently only VHDS).
   const bool supports_heartbeats_;
   TtlManager ttl_;
-  // The keys of resource_versions_. Only tracked separately because std::map does not provide an
-  // iterator into just its keys.
-  absl::flat_hash_set<std::string> resource_names_;
 
   const std::string type_url_;
-  // Is the subscription is for a wildcard request.
-  const bool wildcard_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
@@ -113,6 +109,7 @@ private:
 
   bool any_request_sent_yet_in_current_stream_{};
   bool must_send_discovery_request_{};
+  bool is_legacy_wildcard_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.

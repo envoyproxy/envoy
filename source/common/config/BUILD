@@ -439,6 +439,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
