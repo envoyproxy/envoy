@@ -6,6 +6,7 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/transcoder/v2";
 option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 option java_outer_classname = "TranscoderProto";
 option java_multiple_files = true;

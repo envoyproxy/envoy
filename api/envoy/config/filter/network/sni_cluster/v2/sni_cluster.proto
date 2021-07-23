@@ -5,6 +5,7 @@ package envoy.config.filter.network.sni_cluster.v2;
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/sni_cluster/v2";
 option java_package = "io.envoyproxy.envoy.config.filter.network.sni_cluster.v2";
 option java_outer_classname = "SniClusterProto";
 option java_multiple_files = true;

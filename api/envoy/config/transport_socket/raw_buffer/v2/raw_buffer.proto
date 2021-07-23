@@ -5,6 +5,7 @@ package envoy.config.transport_socket.raw_buffer.v2;
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/transport_socket/raw_buffer/v2";
 option java_package = "io.envoyproxy.envoy.config.transport_socket.raw_buffer.v2";
 option java_outer_classname = "RawBufferProto";
 option java_multiple_files = true;

@@ -6,6 +6,7 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/cluster/aggregate/v2alpha";
 option java_package = "io.envoyproxy.envoy.config.cluster.aggregate.v2alpha";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;

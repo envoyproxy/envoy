@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/direct_response/v2";
 option java_package = "io.envoyproxy.envoy.config.filter.network.direct_response.v2";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;

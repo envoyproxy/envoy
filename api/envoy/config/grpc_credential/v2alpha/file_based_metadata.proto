@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/grpc_credential/v2alpha";
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option java_outer_classname = "FileBasedMetadataProto";
 option java_multiple_files = true;

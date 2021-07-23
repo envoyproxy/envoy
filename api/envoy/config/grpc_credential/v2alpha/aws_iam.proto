@@ -5,6 +5,7 @@ package envoy.config.grpc_credential.v2alpha;
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/grpc_credential/v2alpha";
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option java_outer_classname = "AwsIamProto";
 option java_multiple_files = true;
