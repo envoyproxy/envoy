@@ -8,6 +8,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
@@ -134,6 +135,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_benchmark()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
+    _com_github_google_libsxg()
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
@@ -310,6 +312,17 @@ def _com_github_google_libprotobuf_mutator():
     external_http_archive(
         name = "com_github_google_libprotobuf_mutator",
         build_file = "@envoy//bazel/external:libprotobuf_mutator.BUILD",
+    )
+
+def _com_github_google_libsxg():
+    external_http_archive(
+        name = "com_github_google_libsxg",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
+    native.bind(
+        name = "libsxg",
+        actual = "@envoy//bazel/foreign_cc:libsxg",
     )
 
 def _com_github_jbeder_yaml_cpp():

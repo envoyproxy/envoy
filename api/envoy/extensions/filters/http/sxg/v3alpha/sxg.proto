@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.sxg.v3alpha;
+
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.sxg.v3alpha";
+option java_outer_classname = "SxgProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Signed HTTP Exchange Filter]
+// SXG :ref:`configuration overview <config_http_filters_sxg>`.
+// [#extension: envoy.filters.http.sxg]
+
+// [#next-free-field: 10]
+message SXG {
+  // The SDS configuration for the public key data for the SSL certificate that will be used to sign the
+  // SXG response.
+  transport_sockets.tls.v3.SdsSecretConfig certificate = 1;
+
+  // The SDS configuration for the private key data for the SSL certificate that will be used to sign the
+  // SXG response.
+  transport_sockets.tls.v3.SdsSecretConfig private_key = 2;
+
+  // The duration for which the generated SXG package will be valid. Default is 604800s (7 days in seconds).
+  // Note that in order to account for clock skew, the timestamp will be backdated by a day. So, if duration
+  // is set to 7 days, that will be 7 days from 24 hours ago (6 days from now). Also note that while 6/7 days
+  // is appropriate for most content, if the downstream service is serving Javascript, or HTML with inline
+  // Javascript, 1 day (so, with backdated expiry, 2 days, or 172800 seconds) is more appropriate.
+  google.protobuf.Duration duration = 3;
+
+  // The SXG response payload is Merkle Integrity Content Encoding (MICE) encoded (specification is [here](https://datatracker.ietf.org/doc/html/draft-thomson-http-mice-03))
+  // This value indicates the record size in the encoded payload. The default value is 4096.
+  uint64 mi_record_size = 4;
+
+  // The URI of certificate CBOR file published. Since it is required that the certificate CBOR file
+  // be served from the same domain as the SXG document, this should be a relative URI.
+  string cbor_url = 5 [(validate.rules).string = {min_len: 1 prefix: "/"}];
+
+  // URL to retrieve validity data for signature, a CBOR map. See specification [here](https://tools.ietf.org/html/draft-yasskin-httpbis-origin-signed-exchanges-impl-00#section-3.6)
+  string validity_url = 6 [(validate.rules).string = {min_len: 1 prefix: "/"}];
+
+  // Header that will be set if it is determined that the client can accept SXG (typically `accept: application/signed-exchange;v=b3)
+  // If not set, filter will default to: `x-client-can-accept-sxg`
+  string client_can_accept_sxg_header = 7 [
+    (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
+  ];
+
+  // Header set by downstream service to signal that the response should be transformed to SXG If not set,
+  // filter will default to: `x-should-encode-sxg`
+  string should_encode_sxg_header = 8 [
+    (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
+  ];
+
+  // Headers that will be stripped from the SXG document, by listing a prefix (i.e. `x-custom-` will cause
+  // all headers prefixed by `x-custom-` to be omitted from the SXG document)
+  repeated string header_prefix_filters = 9 [
+    (validate.rules).repeated = {items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}
+  ];
+}
