@@ -2,7 +2,7 @@
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
-licenses(["notice"])  # Apache 2
+licenses(["notice"])  # Apache 2 
 
 # This tracks active development versions of protos.
 proto_library(
