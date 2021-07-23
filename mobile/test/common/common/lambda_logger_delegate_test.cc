@@ -17,7 +17,7 @@ TEST(LambdaDelegate, LogCb) {
       LambdaDelegate({[](envoy_data data, const void* context) -> void {
                         auto* actual_msg = static_cast<std::string*>(const_cast<void*>(context));
                         *actual_msg = Data::Utility::copyToString(data);
-                        data.release(data.context);
+                        release_envoy_data(data);
                       },
                       [](const void*) -> void {}, &actual_msg},
                      Registry::getSink());
@@ -29,7 +29,7 @@ TEST(LambdaDelegate, LogCb) {
 TEST(LambdaDelegate, ReleaseCb) {
   bool released = false;
   LambdaDelegatePtr delegate = LambdaDelegatePtr(
-      new LambdaDelegate({[](envoy_data data, const void*) -> void { data.release(data.context); },
+      new LambdaDelegate({[](envoy_data data, const void*) -> void { release_envoy_data(data); },
                           [](const void* context) -> void {
                             bool* released = static_cast<bool*>(const_cast<void*>(context));
                             *released = true;

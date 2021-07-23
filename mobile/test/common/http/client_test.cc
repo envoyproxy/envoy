@@ -85,7 +85,7 @@ public:
       callbacks_called* cc = static_cast<callbacks_called*>(context);
       cc->on_data_calls++;
       cc->body_data_ += Data::Utility::copyToString(c_data);
-      c_data.release(c_data.context);
+      release_envoy_data(c_data);
       return nullptr;
     };
     bridge_callbacks_.on_cancel = [](void* context) -> void* {
@@ -391,7 +391,7 @@ TEST_P(ClientTest, BasicStreamData) {
     EXPECT_EQ(Data::Utility::copyToString(c_data), "response body");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return nullptr;
   };
 
@@ -684,7 +684,7 @@ TEST_P(ClientTest, EnvoyResponseWithErrorCode) {
     EXPECT_EQ(error.attempt_count, 123);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
-    error.message.release(error.message.context);
+    release_envoy_error(error);
     return nullptr;
   };
 
@@ -760,7 +760,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
     EXPECT_EQ(error.message.length, 0);
     EXPECT_EQ(error.attempt_count, -1);
     // This will use envoy_noop_release.
-    error.message.release(error.message.context);
+    release_envoy_error(error);
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_error_calls++;
     return nullptr;

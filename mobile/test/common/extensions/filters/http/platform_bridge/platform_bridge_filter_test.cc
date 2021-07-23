@@ -603,7 +603,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls++]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
 
@@ -666,7 +666,7 @@ TEST_F(PlatformBridgeFilterTest, BasicError) {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->on_response_data_calls++;
     ADD_FAILURE() << "on_data should not get called for an error response.";
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
   platform_filter.on_error = [](envoy_error c_error, const void* context) -> void {
@@ -675,7 +675,7 @@ TEST_F(PlatformBridgeFilterTest, BasicError) {
     EXPECT_EQ(c_error.error_code, ENVOY_UNDEFINED_ERROR);
     EXPECT_EQ(Data::Utility::copyToString(c_error.message), "busted");
     EXPECT_EQ(c_error.attempt_count, 1);
-    c_error.message.release(c_error.message.context);
+    release_envoy_error(c_error);
   };
 
   setUpFilter(R"EOF(
@@ -734,7 +734,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
     }
 
     invocations->on_request_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return return_status;
   };
 
@@ -819,7 +819,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
     }
 
     invocations->on_request_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return return_status;
   };
 
@@ -884,7 +884,7 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnRequestData) {
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls++]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
@@ -970,7 +970,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     invocations->on_request_data_calls++;
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
@@ -1072,7 +1072,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     invocations->on_request_data_calls++;
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
@@ -1107,7 +1107,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
     *modified_data = Data::Utility::toBridgeData(final_buffer);
-    pending_data->release(pending_data->context);
+    release_envoy_data(*pending_data);
     envoy_headers* modified_trailers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
     *modified_trailers =
@@ -1212,7 +1212,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_request_data_calls]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     invocations->on_request_data_calls++;
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
@@ -1240,7 +1240,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
     EXPECT_TRUE(end_stream);
 
     release_envoy_headers(*pending_headers);
-    pending_data->release(pending_data->context);
+    release_envoy_data(*pending_data);
     release_envoy_headers(*pending_trailers);
 
     invocations->on_resume_request_calls++;
@@ -1636,7 +1636,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls++]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
 
@@ -1710,7 +1710,7 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
     }
 
     invocations->on_response_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return return_status;
   };
 
@@ -1794,7 +1794,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
     }
 
     invocations->on_response_data_calls++;
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return return_status;
   };
 
@@ -1859,7 +1859,7 @@ TEST_F(PlatformBridgeFilterTest, StopNoBufferOnResponseData) {
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls++]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
 
@@ -1945,7 +1945,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     invocations->on_response_data_calls++;
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
@@ -2047,7 +2047,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
     EXPECT_EQ(Data::Utility::copyToString(c_data),
               expected_data[invocations->on_response_data_calls]);
     EXPECT_FALSE(end_stream);
-    c_data.release(c_data.context);
+    release_envoy_data(c_data);
     invocations->on_response_data_calls++;
     return {kEnvoyFilterDataStatusStopIterationAndBuffer, envoy_nodata, nullptr};
   };
@@ -2082,7 +2082,7 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
     Buffer::OwnedImpl final_buffer = Buffer::OwnedImpl("C");
     envoy_data* modified_data = static_cast<envoy_data*>(safe_malloc(sizeof(envoy_data)));
     *modified_data = Data::Utility::toBridgeData(final_buffer);
-    pending_data->release(pending_data->context);
+    release_envoy_data(*pending_data);
     envoy_headers* modified_trailers =
         static_cast<envoy_headers*>(safe_malloc(sizeof(envoy_headers)));
     *modified_trailers =
