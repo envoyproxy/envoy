@@ -482,7 +482,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     }
     return;
   }
-  if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
+  if (absl::EndsWith(path, FileExtensions::get().Yaml) ||
+      absl::EndsWith(path, FileExtensions::get().Yml)) {
     loadFromYaml(contents, message, validation_visitor, do_boosting);
   } else {
     loadFromJson(contents, message, validation_visitor, do_boosting);

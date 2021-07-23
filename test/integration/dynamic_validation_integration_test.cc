@@ -96,7 +96,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Protocol options in CDS with unknown fields are rejected if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.with_unknown_field.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.yaml",
@@ -122,7 +122,7 @@ TEST_P(DynamicValidationIntegrationTest, CdsProtocolOptionsRejected) {
 TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
   allow_lds_rejection_ = true;
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.with_unknown_field.yaml",
@@ -153,7 +153,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejected) {
 TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
   allow_lds_rejection_ = true;
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.with_unknown_field.typed_struct.yaml",
@@ -182,7 +182,7 @@ TEST_P(DynamicValidationIntegrationTest, LdsFilterRejectedTypedStruct) {
 // Unknown fields in RDS cause config load failure if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.yaml",
       "test/config/integration/server_xds.lds.yaml",
@@ -210,7 +210,7 @@ TEST_P(DynamicValidationIntegrationTest, RdsFailedBySubscription) {
 // Unknown fields in EDS cause config load failure if and only if strict.
 TEST_P(DynamicValidationIntegrationTest, EdsFailedBySubscription) {
   api_filesystem_config_ = {
-      "test/config/integration/server_xds.bootstrap.yaml",
+      "test/config/integration/server_xds.bootstrap.yml",
       "test/config/integration/server_xds.cds.yaml",
       "test/config/integration/server_xds.eds.with_unknown_field.yaml",
       "test/config/integration/server_xds.lds.yaml",
