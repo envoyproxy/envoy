@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.config.dynamic_parameters.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.dynamic_parameters.v3";
+option java_outer_classname = "DynamicParametersProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Parameters Resource]
+
+message DynamicParameters {
+  // Dynamic parameters to be used for a given resource type.
+  message ResourceTypeDynamicParameters {
+    map<string, string> dynamic_parameters = 1;
+  }
+
+  // Key is resource type name (e.g., "envoy.config.cluster.v3.Cluster").
+  map<string, ResourceTypeDynamicParameters> resource_type_dynamic_parameters = 1;
+}
