@@ -5,18 +5,28 @@ External Processing
 * :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`
 * This filter should be configured with the name *envoy.filters.http.ext_proc*
 
-The external processing filter calls an external gRPC service to enable it to participate in
-HTTP filter chain processing. The filter is called using a gRPC bidirectional stream, and allows
-the filter to make decisions in real time about what parts of the HTTP request / response stream
-are sent to the filter for processing.
+The external processing filter connects an external service, called an "external processor,"
+to the filter chain. The processing service itself implements a gRPC interface that allows
+it to respond to events in the lifecycle of an HTTP request / response by examining
+and modifying the headers, body, and trailers of each message, or by returning a brand-new response.
 
 The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
-server
+external processor
 :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
-messages, and the server must reply with
-:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`.
+messages, and the processor must reply with
+:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`
+messages.
 
-This filter is a work in progress. In its current state, it actually does nothing.
+Configuration options are provided to control which events are sent to the processor.
+This way, the processor may receive headers, body, and trailers for both
+request and response in any combination. The processor may also change this configuration
+on a message-by-message basis. This allows for the construction of sophisticated processors
+that decide how to respond to each message individually to eliminate unnecessary
+stream requests from the proxy.
+
+This filter is a work in progress. Most of the major bits of functionality
+are complete. The updated list of supported features and implementation status may
+be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`.
 
 Statistics
 ----------
