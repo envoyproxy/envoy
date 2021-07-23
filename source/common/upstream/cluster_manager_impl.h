@@ -402,22 +402,26 @@ private:
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
-      Http::ConnectionPool::Instance* connPool(ResourcePriority priority,
-                                               absl::optional<Http::Protocol> downstream_protocol,
-                                               LoadBalancerContext* context, bool peek);
-
-      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
-                                                 LoadBalancerContext* context, bool peek);
+      std::set<HostConstSharedPtr> selectHost(LoadBalancerContext* context, bool peek);
+      std::set<HostConstSharedPtr> allHealthyHosts();
+      Http::ConnectionPool::Instance*
+      httpConnPoolInternal(HostConstSharedPtr host, ResourcePriority priority,
+                           absl::optional<Http::Protocol> downstream_protocol,
+                           LoadBalancerContext* context);
+      Tcp::ConnectionPool::Instance* tcpConnPoolInternal(HostConstSharedPtr host,
+                                                         ResourcePriority priority,
+                                                         LoadBalancerContext* context);
 
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
-                                                absl::optional<Http::Protocol> downstream_protocol,
-                                                LoadBalancerContext* context) override;
-      absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
-                                              LoadBalancerContext* context) override;
+      HttpPoolDataVector httpConnPool(ResourcePriority priority,
+                                      absl::optional<Http::Protocol> downstream_protocol,
+                                      LoadBalancerContext* context,
+                                      bool fetch_pool_all_hosts) override;
+      TcpPoolDataVector tcpConnPool(ResourcePriority priority, LoadBalancerContext* context,
+                                    bool fetch_pool_all_hosts) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
 

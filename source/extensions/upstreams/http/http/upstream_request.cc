@@ -31,8 +31,11 @@ void HttpConnPool::newStream(GenericConnectionPoolCallbacks* callbacks) {
   // It's possible for a reset to happen inline within the newStream() call. In this case, we
   // might get deleted inline as well. Only write the returned handle out if it is not nullptr to
   // deal with this case.
+  // TODO(shikugawa): Not to establish connections to all selected hosts.
+  // This feature must be implemented to introduce ALS conn rotation.
+  ASSERT(pool_data_set_.size() == 1);
   Envoy::Http::ConnectionPool::Cancellable* handle =
-      pool_data_.value().newStream(callbacks->upstreamToDownstream(), *this);
+      pool_data_set_[0].newStream(callbacks->upstreamToDownstream(), *this);
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }

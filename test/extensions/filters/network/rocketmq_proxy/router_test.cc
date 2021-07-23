@@ -245,8 +245,8 @@ TEST_F(RocketmqRouterTest, NoHealthyHosts) {
       .WillOnce(Invoke([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*No host available*."));
       }));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _, _))
+      .WillOnce(Return(Upstream::TcpPoolDataVector{}));
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();

@@ -311,13 +311,14 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
         response_decoder_ = &decoder;
         return nullptr;
       }));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, auto, Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Upstream::ResourcePriority, auto, Upstream::LoadBalancerContext* context, bool) {
             // this is the hash of :path header value "/"
             // the hash stability across releases is expected, so test the hash value directly here.
             EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
-            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+            return Upstream::HttpPoolDataVector{
+                Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_)};
           }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
@@ -356,11 +357,12 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
         return nullptr;
       }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+                           Upstream::LoadBalancerContext* context, bool) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
-        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+        return Upstream::HttpPoolDataVector{
+            Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_)};
       }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
@@ -399,13 +401,14 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
         return nullptr;
       }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+                           Upstream::LoadBalancerContext* context, bool) {
         EXPECT_NE(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
                   "fake_test_key");
-        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+        return Upstream::HttpPoolDataVector{
+            Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_)};
       }));
 
   TestRequestHeaderMapImpl copy(message_->headers());

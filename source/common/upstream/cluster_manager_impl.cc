@@ -908,45 +908,68 @@ void ClusterManagerImpl::maybePreconnect(
   }
 }
 
-absl::optional<HttpPoolData>
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
+HttpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
     ResourcePriority priority, absl::optional<Http::Protocol> protocol,
-    LoadBalancerContext* context) {
+    LoadBalancerContext* context, bool fetch_pool_all_hosts) {
+  HttpPoolDataVector pool_set;
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = connPool(priority, protocol, context, false);
-  if (pool == nullptr) {
-    return absl::nullopt;
+  const auto& selected_hosts =
+      fetch_pool_all_hosts ? allHealthyHosts() : selectHost(context, false);
+
+  for (const auto& host : selected_hosts) {
+    auto pool = httpConnPoolInternal(host, priority, protocol, context);
+    if (pool == nullptr) {
+      continue;
+    }
+
+    pool_set.emplace_back(
+        [this, priority, protocol, context]() -> void {
+          // Now that a new stream is being established, attempt to preconnect.
+          maybePreconnect(*this, parent_.cluster_manager_state_,
+                          [this, &priority, &protocol, &context]() -> ConnectionPool::Instance* {
+                            const auto& selected_hosts = selectHost(context, true);
+                            ASSERT(selected_hosts.size() < 2);
+                            if (selected_hosts.empty()) {
+                              return nullptr;
+                            }
+                            return httpConnPoolInternal(*selected_hosts.begin(), priority, protocol,
+                                                        context);
+                          });
+        },
+        pool);
   }
 
-  HttpPoolData data(
-      [this, priority, protocol, context]() -> void {
-        // Now that a new stream is being established, attempt to preconnect.
-        maybePreconnect(*this, parent_.cluster_manager_state_,
-                        [this, &priority, &protocol, &context]() {
-                          return connPool(priority, protocol, context, true);
-                        });
-      },
-      pool);
-  return data;
+  return pool_set;
 }
 
-absl::optional<TcpPoolData>
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context) {
+TcpPoolDataVector ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
+    ResourcePriority priority, LoadBalancerContext* context, bool fetch_pool_all_hosts) {
+  TcpPoolDataVector pool_set;
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = tcpConnPool(priority, context, false);
-  if (pool == nullptr) {
-    return absl::nullopt;
+  const auto& selected_hosts =
+      fetch_pool_all_hosts ? allHealthyHosts() : selectHost(context, false);
+
+  for (const auto& host : selected_hosts) {
+    auto pool = tcpConnPoolInternal(host, priority, context);
+    if (pool == nullptr) {
+      continue;
+    }
+    pool_set.emplace_back(
+        [this, priority, context]() -> void {
+          maybePreconnect(*this, parent_.cluster_manager_state_,
+                          [this, &priority, &context]() -> ConnectionPool::Instance* {
+                            const auto& selected_hosts = selectHost(context, true);
+                            ASSERT(selected_hosts.size() < 2);
+                            if (selected_hosts.empty()) {
+                              return nullptr;
+                            }
+                            return tcpConnPoolInternal(*selected_hosts.begin(), priority, context);
+                          });
+        },
+        pool);
   }
 
-  TcpPoolData data(
-      [this, priority, context]() -> void {
-        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
-          return tcpConnPool(priority, context, true);
-        });
-      },
-      pool);
-  return data;
+  return pool_set;
 }
 
 void ClusterManagerImpl::postThreadLocalDrainConnections(const Cluster& cluster,
@@ -1400,19 +1423,43 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
   }
 }
 
-Http::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
-    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+std::set<HostConstSharedPtr>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::selectHost(
     LoadBalancerContext* context, bool peek) {
+  std::set<HostConstSharedPtr> hosts;
+
   HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
       cluster_info_->stats().upstream_cx_none_healthy_.inc();
     }
-    return nullptr;
+    return hosts;
   }
 
+  hosts.insert(host);
+  return hosts;
+}
+
+std::set<HostConstSharedPtr>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::allHealthyHosts() {
+  std::set<HostConstSharedPtr> hosts;
+
+  for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    for (const HostSharedPtr& host : host_set->hosts()) {
+      if (host->health() == Upstream::Host::Health::Healthy) {
+        hosts.insert(host);
+      }
+    }
+  }
+
+  return hosts;
+}
+
+Http::ConnectionPool::Instance*
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolInternal(
+    HostConstSharedPtr host, ResourcePriority priority,
+    absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context) {
   // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
   // We could do better here, and always use the ALPN pool and simply make sure
   // we end up on a connection of the correct protocol, but for simplicity we're
@@ -1475,17 +1522,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 }
 
 Tcp::ConnectionPool::Instance*
-ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
-    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
-  if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->stats().upstream_cx_none_healthy_.inc();
-    }
-    return nullptr;
-  }
-
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolInternal(
+    HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
   // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(priority)};
 

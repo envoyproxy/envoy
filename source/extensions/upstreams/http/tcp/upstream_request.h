@@ -26,11 +26,13 @@ public:
               const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
               Upstream::LoadBalancerContext* ctx) {
     ASSERT(is_connect);
-    conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
+    pool_data_set_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
-    upstream_handle_ = conn_pool_data_.value().newConnection(*this);
+    // TODO(shikugawa): Not to establish connections to all selected hosts.
+    // This feature must be implemented to introduce ALS conn rotation.
+    upstream_handle_ = pool_data_set_[0].newConnection(*this);
   }
 
   bool cancelAnyPendingStream() override {
@@ -42,10 +44,17 @@ public:
     return false;
   }
   Upstream::HostDescriptionConstSharedPtr host() const override {
-    return conn_pool_data_.value().host();
+    // TODO(shikugawa): Connection pool that holds multiple hosts. But this feature doesn't needed
+    // for now. We should introduce multiple host data set when ALS conn rotation is implemented.
+    return pool_data_set_[0].host();
   }
 
-  bool valid() { return conn_pool_data_.has_value(); }
+  bool valid() {
+    // TODO(shikugawa): Valid TCP connection pool must be that has more than one pool data.
+    // But it must be co-implemented with ALS rotation. As workaround, we specify valid data pool
+    // is that has valid connection.
+    return pool_data_set_.size() == 1;
+  }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -59,7 +68,7 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
+  Envoy::Upstream::TcpPoolDataVector pool_data_set_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
