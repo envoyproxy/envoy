@@ -16,6 +16,11 @@
 namespace Envoy {
 namespace StreamInfo {
 
+/*
+ * TODO (Jojy): Move all keys to a common file?
+ */
+static constexpr char KEY_DYNAMIC_PROXY_UPSTREAM_ADDR[] = "KEY_DYNAMIC_PROXY_UPSTREAM_ADDR";
+
 class FilterState;
 
 using FilterStateSharedPtr = std::shared_ptr<FilterState>;

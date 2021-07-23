@@ -136,7 +136,7 @@ private:
  */
 class IPMatcher : public Matcher {
 public:
-  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
+  enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote, Upstream };
 
   IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
       : range_(Network::Address::CidrRange::create(range)), type_(type) {}

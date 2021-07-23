@@ -2,7 +2,9 @@
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "source/common/common/assert.h"
+#include "envoy/upstream/upstream.h"
+
+#include "source/common/stream_info/address_set_accessor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,6 +23,9 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(),
                                              IPMatcher::Type::DownstreamLocal);
+  case envoy::config::rbac::v3::Permission::RuleCase::kUpstreamIp:
+    return std::make_shared<const IPMatcher>(permission.upstream_ip(),
+                                             IPMatcher::Type::Upstream);
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
     return std::make_shared<const PortMatcher>(permission.destination_port());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
@@ -142,6 +147,26 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   case DownstreamLocal:
     ip = info.downstreamAddressProvider().localAddress();
     break;
+  case Upstream: {
+    if (!info.filterState().hasDataWithName(StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR)) {
+      ENVOY_LOG_MISC(info, "Did not find dynamic forward proxy cookie. Do you have dynamic "
+                           "forward proxy in the filter chain?");
+      return false;
+    }
+
+    bool ipMatch = false;
+
+    const StreamInfo::AddressSetAccessor& address_set =
+        info.filterState().getDataReadOnly<StreamInfo::AddressSetAccessor>(
+            StreamInfo::KEY_DYNAMIC_PROXY_UPSTREAM_ADDR);
+    address_set.iterate([&, this](Network::Address::InstanceConstSharedPtr address) {
+      ipMatch = range_.isInRange(*address.get());
+    });
+
+    ENVOY_LOG_MISC(debug, "UpstreamIp matcher evaluated to: {}", ipMatch);
+
+    return ipMatch;
+  }
   case DownstreamDirectRemote:
     ip = info.downstreamAddressProvider().directRemoteAddress();
     break;

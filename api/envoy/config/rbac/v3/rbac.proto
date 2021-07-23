@@ -146,7 +146,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 12]
+// [#next-free-field: 14]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -218,6 +218,12 @@ message Permission {
     // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
+
+    // A CIDR block that describes the upstream IP. This field is only applicable if the request is routed
+    // by dynamic forward proxy. If this field is present and the request did not have dynamic
+    // forward proxy in its filter chain before it was processed by the rbac filter, the matcher
+    // will evaluate the permission as `false`.
+    core.v3.CidrRange upstream_ip = 13;
   }
 }
 

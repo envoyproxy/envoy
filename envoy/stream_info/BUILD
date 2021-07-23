@@ -45,3 +45,11 @@ envoy_cc_library(
         ":filter_state_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "address_set_accessor_interface",
+    hdrs = ["address_set_accessor.h"],
+    deps = [
+        ":filter_state_interface",
+    ],
+)

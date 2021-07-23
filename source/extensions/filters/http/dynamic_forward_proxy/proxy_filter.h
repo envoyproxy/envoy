@@ -59,6 +59,8 @@ public:
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
 private:
+  void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
+
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
