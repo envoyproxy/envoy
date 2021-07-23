@@ -49,7 +49,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 
   response_headers_ = &headers;
   if (end_stream) {
-    setupHttp1Status(response_headers_.GrpcStatus(), response_headers_.GrpcMessage());
+    setupHttp1Status(headers.GrpcStatus(), headers.GrpcMessage());
     return Http::FilterHeadersStatus::Continue;
   } else {
     return Http::FilterHeadersStatus::StopIteration;
@@ -62,7 +62,7 @@ Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end
   }
 
   if (end_stream) {
-    setupHttp1Status(response_headers_.GrpcStatus(), response_headers_.GrpcMessage());
+    setupHttp1Status(response_headers_->GrpcStatus(), response_headers_->GrpcMessage());
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.
