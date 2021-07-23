@@ -23,10 +23,7 @@ requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
   tickets (see `RFC 5077 <https://www.ietf.org/rfc/rfc5077.txt>`_). Resumption can be performed
   across hot restarts and between parallel Envoy instances (typically useful in a front proxy
   configuration).
-* **BoringSSL private key methods**: TLS private key operations (signing and decrypting) can be
-  performed asynchronously from :ref:`an extension <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.PrivateKeyProvider>`. This allows extending Envoy to support various key
-  management schemes (such as TPM) and TLS acceleration. This mechanism uses
-  `BoringSSL private key method interface <https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
+* **BoringSSL private key methods**: Custom TLS private key operations (signing and decrypting).
 * **OCSP Stapling**: Online Certificate Stapling Protocol responses may be stapled to certificates.
 
 Underlying implementation
@@ -212,6 +209,22 @@ manage the remainder.
 A useful example handshaker, named ``SslHandshakerImplForTest``, lives in
 `this test <https://github.com/envoyproxy/envoy/blob/64bd6311bcc8f5b18ce44997ae22ff07ecccfe04/test/extensions/transport_sockets/tls/handshaker_test.cc#L174-L184>`_
 and demonstrates special-case ``SSL_ERROR`` handling and callbacks.
+
+.. _arch_overview_private_key_providers:
+
+Private key providers
+---------------------
+
+:ref:`Private key provider
+extensions<envoy_v3_api_msg_extensions.transport_sockets.tls.v3.PrivateKeyProvider>`
+implement BoringSSL private key methods (signing and decrypting). BoringSSL
+supports asynchronous handshakes with private key methods. This allows extending
+Envoy to support various key management schemes (such as TPM) and TLS
+acceleration. This mechanism uses `BoringSSL private key method interface
+<https://github.com/google/boringssl/blob/c0b4c72b6d4c6f4828a373ec454bd646390017d4/include/openssl/ssl.h#L1169>`_.
+:ref:`CryptoMb private key provider
+<envoy_v3_api_msg_extensions.private_key_providers.cryptomb.v3.CryptoMbPrivateKeyMethodConfig>`
+is one such private key provider for ECDSA and RSA operations.
 
 .. _arch_overview_ssl_trouble_shooting:
 

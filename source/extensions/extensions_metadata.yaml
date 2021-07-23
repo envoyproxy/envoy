@@ -519,6 +519,11 @@ envoy.quic.crypto_stream.server.quiche:
   - envoy.quic.server.crypto_stream
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.tls.key_providers.cryptomb:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
 envoy.rate_limit_descriptors.expr:
   categories:
   - envoy.rate_limit_descriptors

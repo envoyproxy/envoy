@@ -20,7 +20,7 @@ types including:
 * :ref:`Tracers <arch_overview_tracing>`
 * :ref:`Request ID <arch_overview_tracing>`
 * :ref:`Transport sockets <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.CertificateProvider.typed_config>`
-* BoringSSL private key methods
+* :ref:`BoringSSL private key providers <arch_overview_private_key_providers>`
 * :ref:`Watchdog action <envoy_v3_api_msg_config.bootstrap.v3.Watchdog.WatchdogAction>`
 * :ref:`Internal redirect policy <envoy_v3_api_field_config.route.v3.InternalRedirectPolicy.predicates>`
 * :ref:`Compression libraries <arch_overview_compression_libraries>`
