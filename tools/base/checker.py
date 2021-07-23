@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 import os
 from functools import cached_property
 from typing import Sequence, Tuple, Type
@@ -178,7 +179,9 @@ class Checker(runner.Runner):
             getattr(self.log, log_type)(f"[{name}] {message}")
         return 1
 
-    def exit(self):
+    def exit(self) -> int:
+        self.log.handlers[0].setLevel(logging.FATAL)
+        self.stdout.handlers[0].setLevel(logging.FATAL)
         return self.error("exiting", ["Keyboard exit"], log_type="fatal")
 
     def get_checks(self) -> Sequence[str]:
