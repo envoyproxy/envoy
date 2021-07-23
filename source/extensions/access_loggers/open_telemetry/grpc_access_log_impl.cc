@@ -21,7 +21,8 @@ namespace AccessLoggers {
 namespace OpenTelemetry {
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
-    const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
+    const Grpc::RawAsyncClientSharedPtr& client,
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
     envoy::config::core::v3::ApiVersion transport_api_version)
@@ -31,8 +32,11 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
           Grpc::VersionedMethods("opentelemetry.proto.collector.logs.v1.LogsService.Export",
                                  "opentelemetry.proto.collector.logs.v1.LogsService.Export")
               .getMethodDescriptorForVersion(transport_api_version),
+          config.has_grpc_stream_retry_policy()
+              ? absl::make_optional(config.grpc_stream_retry_policy())
+              : absl::nullopt,
           transport_api_version) {
-  initMessageRoot(log_name, local_info);
+  initMessageRoot(config.log_name(), local_info);
 }
 
 namespace {
@@ -82,9 +86,9 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, Stats::Scope& scope) {
-  return std::make_shared<GrpcAccessLoggerImpl>(client, config.log_name(),
-                                                buffer_flush_interval_msec, max_buffer_size_bytes,
-                                                dispatcher, local_info_, scope, transport_version);
+  return std::make_shared<GrpcAccessLoggerImpl>(client, config, buffer_flush_interval_msec,
+                                                max_buffer_size_bytes, dispatcher, local_info_,
+                                                scope, transport_version);
 }
 
 } // namespace OpenTelemetry

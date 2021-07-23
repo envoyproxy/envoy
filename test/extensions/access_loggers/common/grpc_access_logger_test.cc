@@ -50,14 +50,18 @@ class MockGrpcAccessLoggerImpl
     : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
                                       ProtobufWkt::Struct> {
 public:
-  MockGrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client,
-                           std::chrono::milliseconds buffer_flush_interval_msec,
-                           uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                           Stats::Scope& scope, std::string access_log_prefix,
-                           const Protobuf::MethodDescriptor& service_method,
-                           envoy::config::core::v3::ApiVersion transport_api_version)
+  MockGrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+      Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
+      const Protobuf::MethodDescriptor& service_method,
+      envoy::config::core::v3::ApiVersion transport_api_version)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
                          dispatcher, scope, access_log_prefix, service_method,
+                         config.has_grpc_stream_retry_policy()
+                             ? absl::make_optional(config.grpc_stream_retry_policy())
+                             : absl::nullopt,
                          transport_api_version) {}
 
   int numInits() const { return num_inits_; }
@@ -120,9 +124,9 @@ public:
     timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*timer_, enableTimer(buffer_flush_interval_msec, _));
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, buffer_flush_interval_msec, buffer_size_bytes,
-        dispatcher_, stats_store_, "mock_access_log_prefix.", mockMethodDescriptor(),
-        TRANSPORT_API_VERSION);
+        Grpc::RawAsyncClientPtr{async_client_}, config_, buffer_flush_interval_msec,
+        buffer_size_bytes, dispatcher_, stats_store_, "mock_access_log_prefix.",
+        mockMethodDescriptor(), TRANSPORT_API_VERSION);
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -153,6 +157,7 @@ public:
   Event::MockDispatcher dispatcher_;
   Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
   std::unique_ptr<MockGrpcAccessLoggerImpl> logger_;
+  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
 };
 
 // Test basic stream logging flow.
@@ -261,6 +266,28 @@ TEST_F(GrpcAccessLogTest, StreamFailure) {
   EXPECT_EQ(1, logger_->numInits());
 }
 
+TEST_F(GrpcAccessLogTest, StreamFailureAndRetry) {
+  config_.mutable_grpc_stream_retry_policy()->mutable_num_retries()->set_value(2);
+  initLogger(FlushInterval, 1);
+
+  MockAccessLogStream stream;
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+      .WillOnce(Invoke(
+          [&stream](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
+            EXPECT_TRUE(options.retry_policy.has_value());
+            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
+            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);
+            callbacks.onRemoteClose(Grpc::Status::Unavailable, "unavailable");
+            return &stream;
+          }));
+
+  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  EXPECT_CALL(stream, sendMessageRaw_(_, _));
+  logger_->log(mockHttpEntry());
+}
+
 // Test that log entries are batched.
 TEST_F(GrpcAccessLogTest, Batching) {
   // The approximate log size for buffering is calculated based on each entry's byte size.
@@ -329,8 +356,8 @@ private:
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
-        std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-        "mock_access_log_prefix.", mockMethodDescriptor(), config.transport_api_version());
+        std::move(client), config, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
+        scope, "mock_access_log_prefix.", mockMethodDescriptor(), config.transport_api_version());
   }
 };
 

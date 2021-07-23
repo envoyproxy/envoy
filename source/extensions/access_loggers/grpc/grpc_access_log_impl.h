@@ -23,11 +23,12 @@ class GrpcAccessLoggerImpl
                                       envoy::service::accesslog::v3::StreamAccessLogsMessage,
                                       envoy::service::accesslog::v3::StreamAccessLogsResponse> {
 public:
-  GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
-                       std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       envoy::config::core::v3::ApiVersion transport_api_version);
+  GrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
+      envoy::config::core::v3::ApiVersion transport_api_version);
 
 private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger

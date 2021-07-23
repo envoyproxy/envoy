@@ -77,13 +77,15 @@ public:
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method)
-      : GrpcAccessLogClient(client, service_method, absl::nullopt) {}
+                      const Protobuf::MethodDescriptor& service_method,
+                      const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy)
+      : GrpcAccessLogClient(client, service_method, retry_policy, absl::nullopt) {}
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
+                      const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy,
                       envoy::config::core::v3::ApiVersion transport_api_version)
       : client_(client), service_method_(service_method),
-        transport_api_version_(transport_api_version) {}
+        transport_api_version_(transport_api_version), grpc_stream_retry_policy_(retry_policy) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -115,8 +117,7 @@ public:
     }
 
     if (stream_->stream_ == nullptr) {
-      stream_->stream_ =
-          client_->start(service_method_, *stream_, Http::AsyncClient::StreamOptions());
+      stream_->stream_ = client_->start(service_method_, *stream_, createStreamOptionsForRetry());
     }
 
     if (stream_->stream_ != nullptr) {
@@ -135,10 +136,28 @@ public:
     return true;
   }
 
+  Http::AsyncClient::StreamOptions createStreamOptionsForRetry() {
+    auto opt = Http::AsyncClient::StreamOptions();
+
+    if (!grpc_stream_retry_policy_) {
+      return opt;
+    }
+
+    envoy::config::route::v3::RetryPolicy retry_policy;
+    retry_policy.mutable_num_retries()->set_value(
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*grpc_stream_retry_policy_, num_retries, 1));
+    retry_policy.set_retry_on("connect-failure");
+
+    opt.setBufferBodyForRetry(true);
+    opt.setRetryPolicy(retry_policy);
+    return opt;
+  }
+
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
   const absl::optional<envoy::config::core::v3::ApiVersion> transport_api_version_;
+  const absl::optional<envoy::config::core::v3::RetryPolicy> grpc_stream_retry_policy_;
 };
 
 } // namespace Detail
@@ -172,16 +191,18 @@ public:
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
-                   const Protobuf::MethodDescriptor& service_method)
+                   const Protobuf::MethodDescriptor& service_method,
+                   const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy)
       : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
-                         scope, access_log_prefix, service_method, absl::nullopt) {}
+                         scope, access_log_prefix, service_method, retry_policy, absl::nullopt) {}
   GrpcAccessLogger(const Grpc::RawAsyncClientSharedPtr& client,
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
                    const Protobuf::MethodDescriptor& service_method,
+                   const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy,
                    envoy::config::core::v3::ApiVersion transport_api_version)
-      : client_(client, service_method, transport_api_version),
+      : client_(client, service_method, retry_policy, transport_api_version),
         buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
