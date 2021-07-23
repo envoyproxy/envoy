@@ -62,7 +62,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
       clearWatermark();
 
     } else {
-      if (body_mode_ == ProcessingMode::BUFFERED) {
+      if (body_mode_ == ProcessingMode::BUFFERED && !no_body_) {
         if (complete_body_available_) {
           // If we get here, then all the body data came in before the header message
           // was complete, and the server wants the body. So, don't continue filter
@@ -76,7 +76,7 @@ bool ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return true;
-      } else if (body_mode_ == ProcessingMode::STREAMED) {
+      } else if (body_mode_ == ProcessingMode::STREAMED && !no_body_) {
         if (complete_body_available_) {
           // All data came in before headers callback, so act just as if we were buffering
           // since effectively this is the same thing.

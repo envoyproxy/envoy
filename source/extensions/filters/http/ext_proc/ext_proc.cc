@@ -73,6 +73,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   }
 
   state.setHeaders(&headers);
+  state.setHasNoBody(end_stream);
   ProcessingRequest req;
   auto* headers_req = state.mutableHeaders(req);
   MutationUtils::headersToProto(headers, *headers_req->mutable_headers());
