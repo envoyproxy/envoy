@@ -135,5 +135,61 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
+template <typename ActiveConnectionType>
+class TypedActiveStreamListenerBase : public ActiveStreamListenerBase {
+
+public:
+  using ActiveConnectionCollectionType = typename ActiveConnectionType::CollectionType;
+  TypedActiveStreamListenerBase(Network::ConnectionHandler& parent, Event::Dispatcher& dispatcher,
+                                Network::ListenerPtr&& listener, Network::ListenerConfig& config)
+      : ActiveStreamListenerBase(parent, dispatcher, std::move(listener), config) {}
+  using ActiveConnectionPtr = std::unique_ptr<ActiveConnectionType>;
+  using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnectionCollectionType>;
+
+  void removeFilterChain(const Network::FilterChain* filter_chain) override {
+    auto iter = connections_by_context_.find(filter_chain);
+    if (iter == connections_by_context_.end()) {
+      // It is possible when listener is stopping.
+    } else {
+      auto& connections = iter->second->connections_;
+      while (!connections.empty()) {
+        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
+      // Since is_deleting_ is on, we need to manually remove the map value and drive the
+      // iterator. Defer delete connection container to avoid race condition in destroying
+      // connection.
+      dispatcher().deferredDelete(std::move(iter->second));
+      connections_by_context_.erase(iter);
+    }
+  }
+
+  /**
+   * Remove and destroy an active connection.
+   * @param connection supplies the connection to remove.
+   */
+  void removeConnection(ActiveConnectionType& connection) {
+    ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
+    ActiveConnectionCollectionType& active_connections = connection.active_connections_;
+    ActiveConnectionPtr removed = connection.removeFromList(active_connections.connections_);
+    dispatcher().deferredDelete(std::move(removed));
+    // Delete map entry only iff connections becomes empty.
+    if (active_connections.connections_.empty()) {
+      auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+      ASSERT(iter != connections_by_context_.end());
+      // To cover the lifetime of every single connection, Connections need to be deferred deleted
+      // because the previously contained connection is deferred deleted.
+      dispatcher().deferredDelete(std::move(iter->second));
+      // The erase will break the iteration over the connections_by_context_ during the deletion.
+      if (!is_deleting_) {
+        connections_by_context_.erase(iter);
+      }
+    }
+  }
+
+protected:
+  absl::flat_hash_map<const Network::FilterChain*, ActiveConnectionCollectionPtr>
+      connections_by_context_;
+};
+
 } // namespace Server
 } // namespace Envoy

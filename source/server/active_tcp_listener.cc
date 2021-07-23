@@ -14,13 +14,13 @@ namespace Envoy {
 namespace Server {
 
 ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
-                                     Network::ListenerConfig& config)
+                                     Network::ListenerConfig& config, uint32_t worker_index)
     : TypedActiveStreamListenerBase<ActiveTcpConnection>(
           parent, parent.dispatcher(),
-                               parent.dispatcher().createListener(
-                                   config.listenSocketFactory().getListenSocket(worker_index),
-                                   *this, config.bindToPort()),
-                               config),
+          parent.dispatcher().createListener(
+              config.listenSocketFactory().getListenSocket(worker_index), *this,
+              config.bindToPort()),
+          config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);
 }
@@ -35,9 +35,8 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
 }
 
 ActiveTcpListener::~ActiveTcpListener() {
-  config_->connectionBalancer().unregisterHandler(*this);
-
   is_deleting_ = true;
+  config_->connectionBalancer().unregisterHandler(*this);
 
   // Purge sockets that have not progressed to connections. This should only happen when
   // a listener filter stops iteration and never resumes.
@@ -113,11 +112,6 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
   onSocketAccepted(std::move(active_socket));
 }
 
-Network::BalancedConnectionHandlerOptRef
-ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
-  return tcp_conn_handler_.getBalancedHandlerByAddress(address);
-}
-
 void ActiveTcpListener::pauseListening() {
   if (listener_ != nullptr) {
     listener_->disable();
@@ -130,13 +124,18 @@ void ActiveTcpListener::resumeListening() {
   }
 }
 
+Network::BalancedConnectionHandlerOptRef
+ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+  return tcp_conn_handler_.getBalancedHandlerByAddress(address);
+}
+
 void ActiveTcpListener::newActiveConnection(const Network::FilterChain& filter_chain,
                                             Network::ServerConnectionPtr server_conn_ptr,
                                             std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  ActiveTcpConnectionPtr active_connection(
-      new ActiveTcpConnection(active_connections, std::move(server_conn_ptr),
-                              dispatcher().timeSource(), std::move(stream_info)));
+  auto active_connection = 
+      std::make_unique<ActiveTcpConnection>(active_connections, std::move(server_conn_ptr),
+                              dispatcher().timeSource(), std::move(stream_info));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection from {}", *active_connection->connection_,

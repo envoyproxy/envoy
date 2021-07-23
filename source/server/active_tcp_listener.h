@@ -13,9 +13,6 @@ namespace Envoy {
 namespace Server {
 
 struct ActiveTcpConnection;
-using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
-class ActiveConnections;
-using ActiveConnectionCollectionPtr = std::unique_ptr<ActiveConnections>;
 class ActiveTcpListener;
 
 namespace {
@@ -38,7 +35,7 @@ public:
   ActiveTcpListener& listener_;
   const Network::FilterChain& filter_chain_;
   // Owned connections
-  std::list<ActiveTcpConnectionPtr> connections_;
+  std::list<std::unique_ptr<ActiveTcpConnection>> connections_;
 };
 
 /**
@@ -126,17 +123,6 @@ public:
    * connections are not impacted.
    */
   void updateListenerConfig(Network::ListenerConfig& config);
-
-  void removeFilterChain(const Network::FilterChain* filter_chain) override;
-
-  /**
-   * Remove and destroy an active connection.
-   * @param connection supplies the connection to remove.
-   */
-  void removeConnection(ActiveTcpConnection& connection);
-
-  absl::flat_hash_map<const Network::FilterChain*, std::unique_ptr<ActiveConnections>>
-      connections_by_context_;
 
   Network::TcpConnectionHandler& tcp_conn_handler_;
   // The number of connections currently active on this listener. This is typically used for

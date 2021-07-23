@@ -38,23 +38,6 @@ ActiveTcpSocket::~ActiveTcpSocket() {
 
 Event::Dispatcher& ActiveTcpSocket::dispatcher() { return listener_.dispatcher(); }
 
-ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
-                                                   Event::Dispatcher& dispatcher,
-                                                   Network::ListenerPtr&& listener,
-                                                   Network::ListenerConfig& config)
-    : ActiveListenerImplBase(parent, &config), parent_(parent),
-      listener_filters_timeout_(config.listenerFiltersTimeout()),
-      continue_on_listener_filters_timeout_(config.continueOnListenerFiltersTimeout()),
-      dispatcher_(dispatcher), listener_(std::move(listener)) {}
-
-void ActiveStreamListenerBase::emitLogs(Network::ListenerConfig& config,
-                                        StreamInfo::StreamInfo& stream_info) {
-  stream_info.onRequestComplete();
-  for (const auto& access_log : config.accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, stream_info);
-  }
-}
-
 void ActiveTcpSocket::onTimeout() {
   listener_.stats_.downstream_pre_cx_timeout_.inc();
   ASSERT(inserted());
