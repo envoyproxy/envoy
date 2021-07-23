@@ -4,6 +4,7 @@
 #include "envoy/common/platform.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "test/mocks/api/mocks.h"
@@ -16,19 +17,23 @@
 
 using testing::ByMove;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Quic {
 
 class QuicIoHandleWrapperTest : public testing::Test {
 public:
-  QuicIoHandleWrapperTest() : wrapper_(std::make_unique<QuicIoHandleWrapper>(socket_.ioHandle())) {
+  QuicIoHandleWrapperTest() {
+    real_io_handle_ = std::make_unique<Network::IoSocketHandleImpl>();
+    ON_CALL(socket_, ioHandle()).WillByDefault(ReturnRef(*real_io_handle_));
+    wrapper_ = std::make_unique<QuicIoHandleWrapper>(socket_.ioHandle());
     EXPECT_TRUE(wrapper_->isOpen());
     EXPECT_FALSE(socket_.ioHandle().isOpen());
   }
-  ~QuicIoHandleWrapperTest() override = default;
 
 protected:
+  Network::IoHandlePtr real_io_handle_;
   testing::NiceMock<Network::MockListenSocket> socket_;
   std::unique_ptr<QuicIoHandleWrapper> wrapper_;
   testing::StrictMock<Envoy::Api::MockOsSysCalls> os_sys_calls_;

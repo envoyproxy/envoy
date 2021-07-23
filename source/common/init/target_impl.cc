@@ -45,8 +45,14 @@ bool TargetImpl::ready() {
   if (watcher_handle_) {
     // If we have a handle for the ManagerImpl's watcher, signal it and then reset so it can't be
     // accidentally signaled again.
+    // NOTE: The still_alive_ guard is used here to avoid the scenario in which as a result of
+    // calling ready() this target is destroyed. This is possible in practice, for example when
+    // a listener is deleted as a result of a failure in the context of the ready() call.
+    std::weak_ptr<bool> weak_still_alive = still_alive_;
     const bool result = watcher_handle_->ready();
-    watcher_handle_.reset();
+    if (!weak_still_alive.expired()) {
+      watcher_handle_.reset();
+    }
     return result;
   }
   return false;
