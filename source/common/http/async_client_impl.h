@@ -348,8 +348,8 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
-    const envoy::config::core::v3::Metadata& metadata() const override  { return metadata_; }
-    const Envoy::Config::TypedMetadata& typedMetadata() const override  { return typed_metadata_; }
+    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
+    const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
 
     RouteEntryImpl route_entry_;
     const envoy::config::core::v3::Metadata metadata_;
