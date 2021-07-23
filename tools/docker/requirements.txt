@@ -4,9 +4,9 @@
 #
 #    pip-compile --generate-hashes tools/docker/requirements.txt
 #
-aiodocker==0.19.1 \
-    --hash=sha256:59dfae91b5acbfa953baf4a3553b7c5ff375346b0f3bbfd8cae11c3b93adce04 \
-    --hash=sha256:bfbb44dbee185dbc8943be68d1f51358af3ec473c463bdee68a25e33d70ae3ad
+aiodocker==0.21.0 \
+    --hash=sha256:6fe00135bb7dc40a407669d3157ecdfd856f3737d939df54f40a479d40cf7bdc \
+    --hash=sha256:1f2e6db6377195962bb676d4822f6e3a0c525e1b5d60b8ebbab68230bff3d227
     # via -r tools/docker/requirements.txt
 aiohttp==3.7.4.post0 \
     --hash=sha256:02f46fc0e3c5ac58b80d4d56eb0a7c7d97fcef69ace9326289fb9f1955e65cfe \
