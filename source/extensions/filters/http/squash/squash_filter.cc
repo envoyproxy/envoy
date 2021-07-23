@@ -91,7 +91,8 @@ void SquashFilterConfig::updateTemplateInValue(ProtobufWkt::Value& curvalue) {
  To interpolate an environment variable named ENV, add '{{ ENV }}' (without the
   quotes, with the spaces) to the template string.
 
-  See api/envoy/config/filter/http/squash/v2/squash.proto for the motivation on why this is needed.
+  See api/envoy/extensions/filters/http/squash/v3/squash.proto for the motivation on why this is
+ needed.
 */
 std::string SquashFilterConfig::replaceEnv(const std::string& attachment_template) {
   std::string s;

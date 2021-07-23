@@ -52,6 +52,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.lua"],
     deps = [
         "//source/extensions/filters/http/lua:config",
+        "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

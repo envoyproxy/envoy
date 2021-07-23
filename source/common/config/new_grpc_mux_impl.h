@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
