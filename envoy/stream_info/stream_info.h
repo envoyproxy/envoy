@@ -25,7 +25,9 @@
 namespace Envoy {
 
 namespace Router {
+class Route;
 class RouteEntry;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
 } // namespace Router
 
 namespace Upstream {
@@ -490,6 +492,11 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /**
+   * @return const Router::RouteConstSharedPtr Get the route selected for this request.
+   */
+  virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
    * @return const Router::RouteEntry* Get the route entry selected for this request. Note: this

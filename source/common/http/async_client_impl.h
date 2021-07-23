@@ -299,7 +299,6 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
     const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
@@ -325,7 +324,6 @@ private:
     static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
-    static const envoy::config::core::v3::Metadata metadata_;
     // Async client doesn't require metadata.
     static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;

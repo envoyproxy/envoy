@@ -11,6 +11,7 @@
 #include "source/common/config/datasource.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "absl/strings/escaping.h"
 
@@ -50,10 +51,10 @@ bool allowDeprecatedMetadataName() {
 }
 
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
-  if (callbacks->route() == nullptr || callbacks->route()->routeEntry() == nullptr) {
+  if (callbacks->route() == nullptr) {
     return ProtobufWkt::Struct::default_instance();
   }
-  const auto& metadata = callbacks->route()->routeEntry()->metadata();
+  const auto& metadata = callbacks->route()->metadata();
 
   {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");

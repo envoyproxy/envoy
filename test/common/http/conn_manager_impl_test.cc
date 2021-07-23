@@ -1077,9 +1077,6 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         // NOTE: no coverage for routeEntry()->typedMetadata()
         // "The mock function has no default action set, and its return type has no default value
         // set"
-
-        EXPECT_EQ(default_route->routeEntry()->metadata().filter_metadata().size(),
-                  delegating_route_foo->routeEntry()->metadata().filter_metadata().size());
         EXPECT_EQ(default_route->routeEntry()->tlsContextMatchCriteria(),
                   delegating_route_foo->routeEntry()->tlsContextMatchCriteria());
 

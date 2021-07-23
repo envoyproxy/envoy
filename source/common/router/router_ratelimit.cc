@@ -137,7 +137,7 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     metadata_source = &info.dynamicMetadata();
     break;
   case envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY:
-    metadata_source = &info.routeEntry()->metadata();
+    metadata_source = &info.route()->metadata();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

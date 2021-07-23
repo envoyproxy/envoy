@@ -898,12 +898,6 @@ public:
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
 
   /**
-   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
-   * this route.
-   */
-  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
-
-  /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
    * tls context match criteria, nullptr is returned.
    */
@@ -1075,6 +1069,15 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
+   * this route.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const { return empty_metadata_; }
+
+private:
+  envoy::config::core::v3::Metadata empty_metadata_;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
