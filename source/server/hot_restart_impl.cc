@@ -39,20 +39,20 @@ SharedMemory* attachSharedMemory(uint32_t base_id, uint32_t restart_epoch) {
 
   const Api::SysCallIntResult result =
       hot_restart_os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
-  if (result.rc_ == -1) {
+  if (result.return_value_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
                       shmem_name, errorDetails(result.errno_)));
   }
 
   if (restart_epoch == 0) {
     const Api::SysCallIntResult truncateRes =
-        os_sys_calls.ftruncate(result.rc_, sizeof(SharedMemory));
-    RELEASE_ASSERT(truncateRes.rc_ != -1, "");
+        os_sys_calls.ftruncate(result.return_value_, sizeof(SharedMemory));
+    RELEASE_ASSERT(truncateRes.return_value_ != -1, "");
   }
 
   const Api::SysCallPtrResult mmapRes = os_sys_calls.mmap(
-      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, result.rc_, 0);
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.rc_);
+      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, result.return_value_, 0);
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.return_value_);
   RELEASE_ASSERT(shmem != MAP_FAILED, "");
   RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 

@@ -93,7 +93,7 @@ const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
   const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
 
   absl::optional<std::string> hostname;
-  if (result.rc_ == 0) {
+  if (result.return_value_ == 0) {
     hostname = name;
   }
 

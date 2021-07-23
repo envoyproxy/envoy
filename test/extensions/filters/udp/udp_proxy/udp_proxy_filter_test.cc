@@ -42,7 +42,7 @@ public:
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
   auto no_error = Api::ioCallUint64ResultNoError();
-  no_error.rc_ = rc;
+  no_error.return_value_ = rc;
   return no_error;
 }
 

@@ -25,14 +25,14 @@ public:
 
   void SetUp() override {
 #ifdef WIN32
-    ASSERT_EQ(0, os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, 0, fds_).rc_);
+    ASSERT_EQ(0, os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, 0, fds_).return_value_);
 #else
-    ASSERT_EQ(0, os_sys_calls_.socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_).rc_);
+    ASSERT_EQ(0, os_sys_calls_.socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_).return_value_);
 #endif
     int data = 1;
 
     const Api::SysCallSizeResult result = os_sys_calls_.write(fds_[1], &data, sizeof(data));
-    ASSERT_EQ(sizeof(data), static_cast<size_t>(result.rc_));
+    ASSERT_EQ(sizeof(data), static_cast<size_t>(result.return_value_));
   }
 
   void clearReadable() {
@@ -42,8 +42,8 @@ public:
       buffer, sizeof(buffer)
     };
     const Api::SysCallSizeResult result = os_sys_calls_.readv(fds_[0], &vec, 1);
-    EXPECT_LT(0, static_cast<size_t>(result.rc_));
-    EXPECT_GT(sizeof(buffer), static_cast<size_t>(result.rc_));
+    EXPECT_LT(0, static_cast<size_t>(result.return_value_));
+    EXPECT_GT(sizeof(buffer), static_cast<size_t>(result.return_value_));
   }
 
   void TearDown() override {
@@ -79,7 +79,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, FileEventImplActivateTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 TEST_P(FileEventImplActivateTest, Activate) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -117,7 +117,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
 }
 
 TEST_P(FileEventImplActivateTest, ActivateChaining) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();
@@ -181,7 +181,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
 }
 
 TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
-  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).rc_;
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_DGRAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
   Api::ApiPtr api = Api::createApiForTest();

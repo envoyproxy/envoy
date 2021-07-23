@@ -42,7 +42,7 @@ void DaemonBrokerImpl::send(const std::string& data) const {
   const auto rc = Network::Utility::writeToSocket(*io_handle_, &buf, 1 /*num_slices*/,
                                                   nullptr /*local_ip*/, *address_);
 
-  if (rc.rc_ != payload.length()) {
+  if (rc.return_value_ != payload.length()) {
     // TODO(marcomagdy): report this in stats
     ENVOY_LOG_TO_LOGGER(logger, debug, "Failed to send trace payload to the X-Ray daemon.");
   }

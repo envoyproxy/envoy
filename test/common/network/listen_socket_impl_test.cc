@@ -96,7 +96,7 @@ protected:
       // instead of if block.
       auto os_sys_calls = Api::OsSysCallsSingleton::get();
       if (NetworkSocketTrait<Type>::type == Socket::Type::Stream) {
-        EXPECT_EQ(0, socket1->listen(0).rc_);
+        EXPECT_EQ(0, socket1->listen(0).return_value_);
       }
 
       EXPECT_EQ(addr->ip()->port(), socket1->addressProvider().localAddress()->ip()->port());
@@ -118,8 +118,9 @@ protected:
       // Test createListenSocketPtr from IoHandlePtr's os_fd_t constructor
       int domain = version_ == Address::IpVersion::v4 ? AF_INET : AF_INET6;
       auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-      EXPECT_TRUE(SOCKET_VALID(socket_result.rc_));
-      Network::IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(socket_result.rc_);
+      EXPECT_TRUE(SOCKET_VALID(socket_result.return_value_));
+      Network::IoHandlePtr io_handle =
+          std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
       EXPECT_EQ(socket3->addressProvider().localAddress()->asString(), addr->asString());
 

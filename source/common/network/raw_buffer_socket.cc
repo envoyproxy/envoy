@@ -21,13 +21,13 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
     Api::IoCallUint64Result result = callbacks_->ioHandle().read(buffer, absl::nullopt);
 
     if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
-      if (result.rc_ == 0) {
+      ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.return_value_);
+      if (result.return_value_ == 0) {
         // Remote close.
         end_stream = true;
         break;
       }
-      bytes_read += result.rc_;
+      bytes_read += result.return_value_;
       if (callbacks_->shouldDrainReadBuffer()) {
         callbacks_->setTransportSocketIsReadable();
         break;
@@ -64,8 +64,8 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
     Api::IoCallUint64Result result = callbacks_->ioHandle().write(buffer);
 
     if (result.ok()) {
-      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
-      bytes_written += result.rc_;
+      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.return_value_);
+      bytes_written += result.return_value_;
     } else {
       ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
                      result.err_->getErrorDetails());

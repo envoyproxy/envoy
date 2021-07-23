@@ -166,7 +166,7 @@ ParseState Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
+  ENVOY_LOG(trace, "tls inspector: recv: {}", result.return_value_);
 
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
@@ -178,10 +178,10 @@ ParseState Filter::onRead() {
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(result.rc_) > read_) {
+  if (static_cast<uint64_t>(result.return_value_) > read_) {
     const uint8_t* data = buf_ + read_;
-    const size_t len = result.rc_ - read_;
-    read_ = result.rc_;
+    const size_t len = result.return_value_ - read_;
+    read_ = result.return_value_;
     return parseClientHello(data, len);
   }
   return ParseState::Continue;

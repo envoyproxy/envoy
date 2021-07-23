@@ -44,7 +44,7 @@ bool Win32RedirectRecordsOptionImpl::setOption(
         socket.ioctl(ENVOY_SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS,
                      const_cast<void*>(reinterpret_cast<const void*>(redirect_records_.buf_)),
                      redirect_records_.buf_size_, nullptr, 0, &size);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       ENVOY_LOG(warn, "Setting WFP records on socket failed: {}", errorDetails(result.errno_));
       return false;
     }

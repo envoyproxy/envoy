@@ -26,22 +26,22 @@ Api::IoCallUint64Result TestIoSocketHandle::writev(const Buffer::RawSlice* slice
 
 IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen) {
   auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
-  if (SOCKET_INVALID(result.rc_)) {
+  if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
 
-  return std::make_unique<TestIoSocketHandle>(writev_override_, result.rc_, socket_v6only_,
-                                              domain_);
+  return std::make_unique<TestIoSocketHandle>(writev_override_, result.return_value_,
+                                              socket_v6only_, domain_);
 }
 
 IoHandlePtr TestIoSocketHandle::duplicate() {
   auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  if (result.rc_ == -1) {
+  if (result.return_value_ == -1) {
     throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return std::make_unique<TestIoSocketHandle>(writev_override_, result.rc_, socket_v6only_,
-                                              domain_);
+  return std::make_unique<TestIoSocketHandle>(writev_override_, result.return_value_,
+                                              socket_v6only_, domain_);
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,

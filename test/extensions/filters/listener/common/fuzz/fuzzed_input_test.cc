@@ -27,19 +27,19 @@ TEST(FuzzedInputStream, OneRead) {
   std::array<uint8_t, 5> read_data;
 
   // Test peeking
-  EXPECT_EQ(data.read(read_data.data(), 5, true).rc_, 5);
+  EXPECT_EQ(data.read(read_data.data(), 5, true).return_value_, 5);
   EXPECT_EQ(data.size(), 5);
 
   // Test length > data.size()
-  EXPECT_EQ(data.read(read_data.data(), 10, true).rc_, 5);
+  EXPECT_EQ(data.read(read_data.data(), 10, true).return_value_, 5);
   EXPECT_EQ(data.size(), 5);
 
   // Test non-peeking
-  EXPECT_EQ(data.read(read_data.data(), 3, false).rc_, 3);
+  EXPECT_EQ(data.read(read_data.data(), 3, false).return_value_, 3);
   EXPECT_EQ(data.size(), 2);
 
   // Test reaching end-of-stream
-  EXPECT_EQ(data.read(read_data.data(), 5, false).rc_, 2);
+  EXPECT_EQ(data.read(read_data.data(), 5, false).return_value_, 2);
   EXPECT_EQ(data.size(), 0);
 }
 
@@ -54,7 +54,7 @@ TEST(FuzzedInputStream, MultipleReads) {
   std::array<uint8_t, 5> read_data;
 
   // Test peeking (first read)
-  EXPECT_EQ(data.read(read_data.data(), 5, true).rc_, 2);
+  EXPECT_EQ(data.read(read_data.data(), 5, true).return_value_, 2);
   EXPECT_EQ(data.size(), 2);
 
   data.next();
@@ -62,7 +62,7 @@ TEST(FuzzedInputStream, MultipleReads) {
   EXPECT_EQ(data.size(), 4);
 
   // Test non-peeking (second read)
-  EXPECT_EQ(data.read(read_data.data(), 3, false).rc_, 3);
+  EXPECT_EQ(data.read(read_data.data(), 3, false).return_value_, 3);
   EXPECT_EQ(data.size(), 1);
 
   data.next();
@@ -70,7 +70,7 @@ TEST(FuzzedInputStream, MultipleReads) {
   EXPECT_EQ(data.size(), 2);
 
   // Test non-peeking (third read) and reaching end-of-stream
-  EXPECT_EQ(data.read(read_data.data(), 5, false).rc_, 2);
+  EXPECT_EQ(data.read(read_data.data(), 5, false).return_value_, 2);
   EXPECT_EQ(data.size(), 0);
 }
 

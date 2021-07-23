@@ -74,7 +74,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   }
 
   ASSERT(SOCKET_VALID(fd_));
-  const int rc = Api::OsSysCallsSingleton::get().close(fd_).rc_;
+  const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
   SET_SOCKET_INVALID(fd_);
   return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
@@ -117,7 +117,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
   Buffer::Reservation reservation = buffer.reserveForRead();
   Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
                                          reservation.slices(), reservation.numSlices());
-  uint64_t bytes_to_commit = result.ok() ? result.rc_ : 0;
+  uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
   ASSERT(bytes_to_commit <= max_length);
   reservation.commit(bytes_to_commit);
 
@@ -164,8 +164,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   constexpr uint64_t MaxSlices = 16;
   Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
   Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
-  if (result.ok() && result.rc_ > 0) {
-    buffer.drain(static_cast<uint64_t>(result.rc_));
+  if (result.ok() && result.return_value_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.return_value_));
   }
 
   // Emulated edge events need to registered if the socket operation did not complete
@@ -342,7 +342,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   hdr.msg_controllen = cmsg_space_;
   Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
-  if (result.rc_ < 0) {
+  if (result.return_value_ < 0) {
     auto io_result = sysCallResultToIoCallResult(result);
     // Emulated edge events need to registered if the socket operation did not complete
     // because the socket would block.
@@ -354,8 +354,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     return io_result;
   }
   if ((hdr.msg_flags & MSG_TRUNC) != 0) {
-    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.rc_);
-    result.rc_ = 0;
+    ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.return_value_);
+    result.return_value_ = 0;
     (*output.dropped_packets_)++;
     output.msg_[0].truncated_and_dropped_ = true;
     return sysCallResultToIoCallResult(result);
@@ -441,7 +441,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       Api::OsSysCallsSingleton::get().recvmmsg(fd_, mmsg_hdr.data(), num_packets_per_mmsg_call,
                                                messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
-  if (result.rc_ <= 0) {
+  if (result.return_value_ <= 0) {
     auto io_result = sysCallResultToIoCallResult(result);
     // Emulated edge events need to registered if the socket operation did not complete
     // because the socket would block.
@@ -453,7 +453,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     return io_result;
   }
 
-  int num_packets_read = result.rc_;
+  int num_packets_read = result.return_value_;
 
   for (int i = 0; i < num_packets_read; ++i) {
     msghdr& hdr = mmsg_hdr[i].msg_hdr;
@@ -533,11 +533,11 @@ Api::SysCallIntResult IoSocketHandleImpl::listen(int backlog) {
 
 IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
   auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
-  if (SOCKET_INVALID(result.rc_)) {
+  if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
 
-  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -568,9 +568,10 @@ Api::SysCallIntResult IoSocketHandleImpl::setBlocking(bool blocking) {
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {
   auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  RELEASE_ASSERT(result.rc_ != -1, fmt::format("duplicate failed for '{}': ({}) {}", fd_,
-                                               result.errno_, errorDetails(result.errno_)));
-  return std::make_unique<IoSocketHandleImpl>(result.rc_, socket_v6only_, domain_);
+  RELEASE_ASSERT(result.return_value_ != -1,
+                 fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
+                             errorDetails(result.errno_)));
+  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
 }
 
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }
@@ -581,7 +582,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::localAddress() {
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     throw EnvoyException(fmt::format("getsockname failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
@@ -594,7 +595,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     throw EnvoyException(
         fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
   }
@@ -605,7 +606,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
     // mechanisms to hide things, of which there are many).
     ss_len = sizeof ss;
     result = os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       throw EnvoyException(
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
@@ -643,7 +644,7 @@ Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
 absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime() {
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);
-  if (!result.rc_) {
+  if (!result.return_value_) {
     return {};
   }
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);

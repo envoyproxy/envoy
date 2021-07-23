@@ -11,7 +11,7 @@ namespace {
 
 quic::WriteResult convertToQuicWriteResult(Api::IoCallUint64Result& result) {
   if (result.ok()) {
-    return {quic::WRITE_STATUS_OK, static_cast<int>(result.rc_)};
+    return {quic::WRITE_STATUS_OK, static_cast<int>(result.return_value_)};
   }
   quic::WriteStatus status = result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again
                                  ? quic::WRITE_STATUS_BLOCKED

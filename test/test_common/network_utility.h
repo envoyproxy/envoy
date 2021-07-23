@@ -220,7 +220,7 @@ public:
   TcpListenSocketImmediateListen(const Address::InstanceConstSharedPtr& address,
                                  const Network::Socket::OptionsSharedPtr& options = nullptr)
       : TcpListenSocket(address, options, true) {
-    EXPECT_EQ(0, io_handle_->listen(ENVOY_TCP_BACKLOG_SIZE).rc_);
+    EXPECT_EQ(0, io_handle_->listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
   }
 };
 

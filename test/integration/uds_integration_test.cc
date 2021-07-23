@@ -105,7 +105,7 @@ TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat listener_stat;
-  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).rc_, 0);
+  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).return_value_, 0);
   if (mode_ == 0) {
     EXPECT_NE(listener_stat.st_mode & 0777, 0);
   } else {

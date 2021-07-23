@@ -47,13 +47,13 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   }
 
   const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
-  RELEASE_ASSERT(SOCKET_VALID(result.rc_),
+  RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
                  fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = makeSocket(result.rc_, socket_v6only, domain);
+  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  const int rc = io_handle->setBlocking(false).rc_;
+  const int rc = io_handle->setBlocking(false).return_value_;
   RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
 #endif
 
@@ -74,7 +74,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(
         IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
-    RELEASE_ASSERT(!SOCKET_FAILURE(result.rc_), "");
+    RELEASE_ASSERT(!SOCKET_FAILURE(result.return_value_), "");
   }
   return io_handle;
 }
@@ -82,11 +82,12 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
 bool SocketInterfaceImpl::ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSocketResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-  if (SOCKET_VALID(result.rc_)) {
-    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0,
-                   fmt::format("Fail to close fd: response code {}", errorDetails(result.rc_)));
+  if (SOCKET_VALID(result.return_value_)) {
+    RELEASE_ASSERT(
+        os_sys_calls.close(result.return_value_).return_value_ == 0,
+        fmt::format("Fail to close fd: response code {}", errorDetails(result.return_value_)));
   }
-  return SOCKET_VALID(result.rc_);
+  return SOCKET_VALID(result.return_value_);
 }
 
 Server::BootstrapExtensionPtr

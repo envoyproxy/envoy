@@ -313,10 +313,10 @@ ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* 
       return ReadOrParseState::Error;
     }
 
-    proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
+    proxy_protocol_header_.value().extensions_length_ -= recv_result.return_value_;
 
     if (nullptr != buf_off) {
-      *buf_off += recv_result.rc_;
+      *buf_off += recv_result.return_value_;
     }
   }
 
@@ -427,7 +427,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
     }
-    ssize_t nread = result.rc_;
+    ssize_t nread = result.return_value_;
 
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
@@ -454,12 +454,12 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
         ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
         const auto read_result = io_handle.recv(buf_ + buf_off_, exp, 0);
-        if (!result.ok() || read_result.rc_ != uint64_t(exp)) {
+        if (!result.ok() || read_result.return_value_ != uint64_t(exp)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.rc_;
-        nread -= read_result.rc_;
+        buf_off_ += read_result.return_value_;
+        nread -= read_result.return_value_;
       }
       absl::optional<ssize_t> addr_len_opt = lenV2Address(buf_);
       if (!addr_len_opt.has_value()) {
@@ -476,11 +476,11 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
         ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
         const auto read_result = io_handle.recv(buf_ + buf_off_, missing, 0);
-        if (!result.ok() || read_result.rc_ != uint64_t(missing)) {
+        if (!result.ok() || read_result.return_value_ != uint64_t(missing)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.rc_;
+        buf_off_ += read_result.return_value_;
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
         if (parseV2Header(buf_)) {
@@ -490,7 +490,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
         }
       } else {
         const auto result = io_handle.recv(buf_ + buf_off_, nread, 0);
-        nread = result.rc_;
+        nread = result.return_value_;
         if (!result.ok()) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
@@ -524,7 +524,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       }
 
       const auto result = io_handle.recv(buf_ + buf_off_, ntoread, 0);
-      nread = result.rc_;
+      nread = result.return_value_;
       ASSERT(result.ok() && size_t(nread) == ntoread);
 
       buf_off_ += nread;

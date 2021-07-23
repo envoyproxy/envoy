@@ -25,8 +25,9 @@ namespace Filesystem {
 
 FileImplPosix::~FileImplPosix() {
   if (isOpen()) {
+    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
     const Api::IoCallBoolResult result = close();
-    ASSERT(result.rc_);
+    ASSERT(result.return_value_);
   }
 }
 
@@ -152,7 +153,7 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   }
 
   const Api::SysCallStringResult canonical_path = canonicalPath(path);
-  if (canonical_path.rc_.empty()) {
+  if (canonical_path.return_value_.empty()) {
     ENVOY_LOG_MISC(debug, "Unable to determine canonical path for {}: {}", path,
                    errorDetails(canonical_path.errno_));
     return true;
@@ -163,9 +164,9 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
   // platform in the future, growing these or relaxing some constraints (e.g.
   // there are valid reasons to go via /proc for file paths).
   // TODO(htuch): Optimize this as a hash lookup if we grow any further.
-  if (absl::StartsWith(canonical_path.rc_, "/dev") ||
-      absl::StartsWith(canonical_path.rc_, "/sys") ||
-      absl::StartsWith(canonical_path.rc_, "/proc")) {
+  if (absl::StartsWith(canonical_path.return_value_, "/dev") ||
+      absl::StartsWith(canonical_path.return_value_, "/sys") ||
+      absl::StartsWith(canonical_path.return_value_, "/proc")) {
     return true;
   }
   return false;

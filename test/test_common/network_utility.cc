@@ -34,12 +34,12 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
   Api::SysCallIntResult result = sock.bind(addr_port);
   const char* failing_fn = nullptr;
-  if (result.rc_ != 0) {
+  if (result.return_value_ != 0) {
     failing_fn = "bind";
   } else if (type == Socket::Type::Stream) {
     // Try listening on the port also, if the type is TCP.
     result = sock.listen(1);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       failing_fn = "listen";
     }
   }
@@ -171,7 +171,7 @@ bindFreeLoopbackPort(Address::IpVersion version, Socket::Type type, bool reuse_p
                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
   Api::SysCallIntResult result = sock->bind(addr);
-  if (0 != result.rc_) {
+  if (0 != result.return_value_) {
     sock->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), errorDetails(result.errno_), result.errno_);
@@ -232,13 +232,13 @@ UdpSyncPeer::UdpSyncPeer(Network::Address::IpVersion version, uint64_t max_rx_da
     : socket_(
           std::make_unique<UdpListenSocket>(getCanonicalLoopbackAddress(version), nullptr, true)),
       max_rx_datagram_size_(max_rx_datagram_size) {
-  RELEASE_ASSERT(socket_->setBlockingForTest(true).rc_ != -1, "");
+  RELEASE_ASSERT(socket_->setBlockingForTest(true).return_value_ != -1, "");
 }
 
 void UdpSyncPeer::write(const std::string& buffer, const Network::Address::Instance& peer) {
   const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
                                                   nullptr, peer);
-  ASSERT_EQ(rc.rc_, buffer.length());
+  ASSERT_EQ(rc.return_value_, buffer.length());
 }
 
 void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {

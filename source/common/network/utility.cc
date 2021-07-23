@@ -110,7 +110,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
   Api::IoCallUint64Result result = handle.recvmsg(&slice, 1, local_address.ip()->port(), output);
 
   if (result.ok()) {
-    reservation.commit(std::min(max_rx_datagram_size, result.rc_));
+    reservation.commit(std::min(max_rx_datagram_size, result.return_value_));
   }
 
   return result;
@@ -405,9 +405,10 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
   int status;
 
   if (*ipVersion == Address::IpVersion::v4) {
-    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status = sock.getSocketOption(SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
   } else {
-    status = sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).rc_;
+    status =
+        sock.getSocketOption(SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len).return_value_;
   }
 
   if (status != 0) {
@@ -557,7 +558,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.return_value_);
   } else {
     ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),
@@ -607,13 +608,14 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     }
 
     const uint64_t gso_size = output.msg_[0].gso_size_;
-    ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.rc_, gso_size);
+    ENVOY_LOG_MISC(trace, "gro recvmsg bytes {} with gso_size as {}", result.return_value_,
+                   gso_size);
 
     // Skip gso segmentation and proceed as a single payload.
     if (gso_size == 0u) {
-      passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
-                             std::move(output.msg_[0].local_address_), udp_packet_processor,
-                             receive_time);
+      passPayloadToProcessor(
+          result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+          std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
       return result;
     }
 
@@ -662,7 +664,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
       return result;
     }
 
-    uint64_t packets_read = result.rc_;
+    uint64_t packets_read = result.return_value_;
     ENVOY_LOG_MISC(trace, "recvmmsg read {} packets", packets_read);
     for (uint64_t i = 0; i < packets_read; ++i) {
       if (output.msg_[i].truncated_and_dropped_) {
@@ -694,11 +696,11 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     return result;
   }
 
-  ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.rc_);
+  ENVOY_LOG_MISC(trace, "recvmsg bytes {}", result.return_value_);
 
-  passPayloadToProcessor(result.rc_, std::move(buffer), std::move(output.msg_[0].peer_address_),
-                         std::move(output.msg_[0].local_address_), udp_packet_processor,
-                         receive_time);
+  passPayloadToProcessor(
+      result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+      std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time);
   return result;
 }
 

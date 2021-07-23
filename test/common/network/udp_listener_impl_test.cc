@@ -85,7 +85,7 @@ public:
     socklen_t int_size = static_cast<socklen_t>(sizeof(get_recvbuf_size));
     const Api::SysCallIntResult result2 =
         server_socket_->getSocketOption(SOL_SOCKET, SO_RCVBUF, &get_recvbuf_size, &int_size);
-    EXPECT_EQ(0, result2.rc_);
+    EXPECT_EQ(0, result2.return_value_);
     // Kernel increases the buffer size to allow bookkeeping overhead.
     if (get_recvbuf_size < 4 * 1024 * 1024) {
       recvbuf_large_enough_ = false;
@@ -318,14 +318,14 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
                                                   1, nullptr, *test_peer_address);
 
         if (send_rc.ok()) {
-          total_sent += send_rc.rc_;
+          total_sent += send_rc.return_value_;
           if (total_sent >= data_size) {
             break;
           }
         } else if (send_rc.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
           break;
         }
-      } while (((send_rc.rc_ == 0) &&
+      } while (((send_rc.return_value_ == 0) &&
                 (send_rc.err_->getErrorCode() == Api::IoError::IoErrorCode::Again)) ||
                (total_sent < data_size));
 
@@ -460,7 +460,7 @@ TEST_P(UdpListenerImplTest, SendData) {
   // Verify External Flush is a No-op
   auto flush_result = udp_packet_writer_->flush();
   EXPECT_TRUE(flush_result.ok());
-  EXPECT_EQ(0, flush_result.rc_);
+  EXPECT_EQ(0, flush_result.return_value_);
 }
 
 /**

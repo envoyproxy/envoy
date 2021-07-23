@@ -405,7 +405,8 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
     transport_callbacks->connection().dispatcher().exit();
     // Read some amount of data; what's more important is whether the socket was remote-closed. That
     // needs to be propagated to the socket.
-    return Network::IoResult{transport_callbacks->ioHandle().read(buffer, 2 * 1024).rc_ == 0
+    return Network::IoResult{transport_callbacks->ioHandle().read(buffer, 2 * 1024).return_value_ ==
+                                     0
                                  ? Network::PostIoAction::Close
                                  : Network::PostIoAction::KeepOpen,
                              0, false};
