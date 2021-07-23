@@ -64,6 +64,17 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   return std::make_unique<Span>(child_span, tracing_context_, parent_tracer_);
 }
 
+void Span::packSpanContextToMetadata(StreamInfo::StreamInfo& info) const {
+  ProtobufWkt::Struct output;
+  auto* fields = output.mutable_fields();
+  (*fields)["sw_service"] = ValueUtil::stringValue(tracing_context_->service());
+  (*fields)["sw_service_instance"] = ValueUtil::stringValue(tracing_context_->serviceInstance());
+  (*fields)["sw_trace_id"] = ValueUtil::stringValue(tracing_context_->traceId());
+  (*fields)["sw_segment_id"] = ValueUtil::stringValue(tracing_context_->traceSegmentId());
+  (*fields)["sw_span_id"] = ValueUtil::numberValue(span_entity_->spanId());
+  info.setDynamicMetadata("envoy.tracers.skywalking", output);
+}
+
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
 
 void Tracer::sendSegment(TracingContextPtr segment_context) {

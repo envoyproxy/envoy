@@ -1462,6 +1462,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1529,6 +1530,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1594,6 +1596,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1676,6 +1679,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1759,6 +1763,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
       .WillOnce(Return(true));
   EXPECT_CALL(*span, setOperation(_)).Times(0);
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
@@ -1842,6 +1847,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
       .WillOnce(Return(true));
   // Verify that span operation overridden by value supplied in response header.
   EXPECT_CALL(*span, setOperation(Eq("testOp")));
+  EXPECT_CALL(*span, packSpanContextToMetadata(_));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
 
