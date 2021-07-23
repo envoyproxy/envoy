@@ -26,6 +26,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "test/test_common/environment.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -168,7 +169,8 @@ public:
                                quic::QuicServerId("example.com", 443, false),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
-                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory) {}
+                               nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
+                               quic_stat_names_, stats_store_) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -203,6 +205,9 @@ protected:
     return initialized_ ? connection() : nullptr;
   }
   quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
+
+  Stats::IsolatedStoreImpl stats_store_;
+  QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
 Buffer::OwnedImpl

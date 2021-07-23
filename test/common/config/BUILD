@@ -206,6 +206,8 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

@@ -193,11 +193,13 @@ ConnectivityGrid::ConnectivityGrid(
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     AlternateProtocolsCacheSharedPtr alternate_protocols,
-    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options)
+    std::chrono::milliseconds next_attempt_duration, ConnectivityOptions connectivity_options,
+    Quic::QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host),
       priority_(priority), options_(options), transport_socket_options_(transport_socket_options),
       state_(state), next_attempt_duration_(next_attempt_duration), time_source_(time_source),
-      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols) {
+      http3_status_tracker_(dispatcher_), alternate_protocols_(alternate_protocols),
+      quic_stat_names_(quic_stat_names), scope_(scope) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
@@ -225,7 +227,7 @@ absl::optional<ConnectivityGrid::PoolIterator> ConnectivityGrid::createNextPool(
   if (pools_.empty()) {
     pools_.push_back(Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_,
                                              options_, transport_socket_options_, state_,
-                                             time_source_));
+                                             time_source_, quic_stat_names_, scope_));
     return pools_.begin();
   }
   pools_.push_back(std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_,
