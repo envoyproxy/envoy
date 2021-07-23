@@ -213,6 +213,64 @@ request_rules:
   testForbiddenConfig(yaml);
 }
 
+// Tests default value of max_header_value_len.
+TEST(HeaderToMetadataFilterConfigTest, DefaultMaxHeaderValueLen) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+  )EOF";
+
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const Config*>(route_config.get());
+  EXPECT_EQ(Envoy::Extensions::HttpFilters::HeaderToMetadataFilter::DEFAULT_MAX_HEADER_VALUE_LEN,
+            config->getMaxHeaderValueLen());
+}
+
+// Tests configured value of max_header_value_len.
+TEST(HeaderToMetadataFilterConfigTest, ConfiguredMaxHeaderValueLen) {
+  const std::string yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'true'
+      type: STRING
+max_header_value_len: 1024
+  )EOF";
+
+  HeaderToMetadataProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  HeaderToMetadataConfig factory;
+
+  const auto route_config = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto* config = dynamic_cast<const Config*>(route_config.get());
+  EXPECT_EQ(1024, config->getMaxHeaderValueLen());
+}
+
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

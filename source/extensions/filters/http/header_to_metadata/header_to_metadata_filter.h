@@ -84,8 +84,8 @@ private:
 
 using HeaderToMetadataRules = std::vector<Rule>;
 
-// TODO(yangminzhu): Make MAX_HEADER_VALUE_LEN configurable.
-const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
+// The default value of max_header_value_len.
+const uint32_t DEFAULT_MAX_HEADER_VALUE_LEN = 8 * 1024;
 
 /**
  *  Encapsulates the filter configuration with STL containers and provides an area for any custom
@@ -101,6 +101,7 @@ public:
   const HeaderToMetadataRules& responseRules() const { return response_rules_; }
   bool doResponse() const { return response_set_; }
   bool doRequest() const { return request_set_; }
+  uint32_t getMaxHeaderValueLen() const { return max_header_value_len_; };
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
@@ -123,6 +124,7 @@ private:
   HeaderToMetadataRules response_rules_;
   bool response_set_;
   bool request_set_;
+  uint32_t max_header_value_len_{DEFAULT_MAX_HEADER_VALUE_LEN};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
