@@ -73,6 +73,7 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::ConnectionTermination:
     return quic::QUIC_STREAM_CONNECTION_ERROR;
   case Http::StreamResetReason::LocalReset:
+  case Http::StreamResetReason::OverloadManager:
     return quic::QUIC_STREAM_CANCELLED;
   default:
     return quic::QUIC_BAD_APPLICATION_PAYLOAD;

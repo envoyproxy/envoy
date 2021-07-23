@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+
 #include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
@@ -72,15 +74,104 @@ private:
 
 using WatermarkBufferPtr = std::unique_ptr<WatermarkBuffer>;
 
+class WatermarkBufferFactory;
+
+/**
+ * A BufferMemoryAccountImpl tracks allocated bytes across associated buffers and
+ * slices that originate from those buffers, or are untagged and pass through an
+ * associated buffer.
+ *
+ * This BufferMemoryAccount is produced by the *WatermarkBufferFactory*.
+ */
+class BufferMemoryAccountImpl : public BufferMemoryAccount {
+public:
+  // Used to create the account, and complete wiring with the factory
+  // and shared_this_.
+  static BufferMemoryAccountSharedPtr createAccount(WatermarkBufferFactory* factory,
+                                                    Http::StreamResetHandler* reset_handler);
+  ~BufferMemoryAccountImpl() override {
+    ASSERT(buffer_memory_allocated_ == 0);
+    ASSERT(reset_handler_ == nullptr);
+  }
+
+  // Make not copyable
+  BufferMemoryAccountImpl(const BufferMemoryAccountImpl&) = delete;
+  BufferMemoryAccountImpl& operator=(const BufferMemoryAccountImpl&) = delete;
+
+  // Make not movable.
+  BufferMemoryAccountImpl(BufferMemoryAccountImpl&&) = delete;
+  BufferMemoryAccountImpl& operator=(BufferMemoryAccountImpl&&) = delete;
+
+  uint64_t balance() const { return buffer_memory_allocated_; }
+  void charge(uint64_t amount) override;
+  void credit(uint64_t amount) override;
+
+  // Clear the associated downstream, preparing the account to be destroyed.
+  // This is idempotent.
+  void clearDownstream() override;
+
+  void resetDownstream() override {
+    if (reset_handler_ != nullptr) {
+      reset_handler_->resetStream(Http::StreamResetReason::OverloadManager);
+    }
+  }
+
+  // The number of memory classes the Account expects to exists.
+  static constexpr uint32_t NUM_MEMORY_CLASSES_ = 8;
+
+private:
+  BufferMemoryAccountImpl(WatermarkBufferFactory* factory, Http::StreamResetHandler* reset_handler)
+      : factory_(factory), reset_handler_(reset_handler) {}
+
+  // Returns the class index based off of the buffer_memory_allocated_
+  // This can differs with current_bucket_idx_ if buffer_memory_allocated_ was
+  // just modified.
+  // Returned class index range is [-1, NUM_MEMORY_CLASSES_).
+  int balanceToClassIndex();
+  void updateAccountClass();
+
+  uint64_t buffer_memory_allocated_ = 0;
+  // Current bucket index where the account is being tracked in.
+  int current_bucket_idx_ = -1;
+
+  WatermarkBufferFactory* factory_ = nullptr;
+
+  Http::StreamResetHandler* reset_handler_ = nullptr;
+  // Keep a copy of the shared_ptr pointing to this account. We opted to go this
+  // route rather than enable_shared_from_this to avoid wasteful atomic
+  // operations e.g. when updating the tracking of the account.
+  // This is set through the createAccount static method which is the only way to
+  // instantiate an instance of this class. This should is cleared when
+  // unregistering from the factory.
+  BufferMemoryAccountSharedPtr shared_this_ = nullptr;
+};
+
 class WatermarkBufferFactory : public WatermarkFactory {
 public:
   // Buffer::WatermarkFactory
+  ~WatermarkBufferFactory() override;
   InstancePtr createBuffer(std::function<void()> below_low_watermark,
                            std::function<void()> above_high_watermark,
                            std::function<void()> above_overflow_watermark) override {
     return std::make_unique<WatermarkBuffer>(below_low_watermark, above_high_watermark,
                                              above_overflow_watermark);
   }
+
+  BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler* reset_handler) override;
+
+  // Called by BufferMemoryAccountImpls created by the factory on account class
+  // updated.
+  void updateAccountClass(const BufferMemoryAccountSharedPtr& account, int current_class,
+                          int new_class);
+
+  // Unregister a buffer memory account.
+  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class);
+
+protected:
+  // Enable subclasses to inspect the mapping.
+  using MemoryClassesToAccountsSet = std::array<absl::flat_hash_set<BufferMemoryAccountSharedPtr>,
+                                                BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_>;
+  MemoryClassesToAccountsSet size_class_account_sets_;
 };
 
 } // namespace Buffer

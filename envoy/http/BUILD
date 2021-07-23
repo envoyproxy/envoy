@@ -43,12 +43,18 @@ envoy_cc_library(
         ":header_map_interface",
         ":metadata_interface",
         ":protocol_interface",
+        ":stream_reset_handler_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/http:status_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "stream_reset_handler_interface",
+    hdrs = ["stream_reset_handler.h"],
 )
 
 envoy_cc_library(

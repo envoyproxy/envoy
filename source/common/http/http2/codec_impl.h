@@ -192,7 +192,7 @@ protected:
     // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
     // deferred delete lifetime issues that need sorting out if the destructor of the stream is
     // going to be able to refer to the parent connection.
-    void destroy();
+    virtual void destroy();
     void disarmStreamIdleTimer() {
       if (stream_idle_timer_ != nullptr) {
         // To ease testing and the destructor assertion.
@@ -388,6 +388,7 @@ protected:
         : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
 
     // StreamImpl
+    void destroy() override;
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     StreamDecoder& decoder() override { return *request_decoder_; }
@@ -407,6 +408,7 @@ protected:
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
     void createPendingFlushTimer() override;
+    void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
     void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
