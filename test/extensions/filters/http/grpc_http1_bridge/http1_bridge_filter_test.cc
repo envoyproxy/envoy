@@ -261,7 +261,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingNoTailerBadGrpcStatus) {
   Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers));
 
-  Http::TestResponseHeaderMapImpl bad_response_headers{{"grpc-status", "1"}, {"grpc-message", "foo"}};
+  Http::TestResponseHeaderMapImpl bad_response_headers{{"grpc-status", "1"},
+                                                       {"grpc-message", "foo"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(bad_response_headers, true));
   EXPECT_EQ("503", bad_response_headers.get_(":status"));
   EXPECT_EQ("0", bad_response_headers.get_("content-length"));
